@@ -19,9 +19,12 @@ def upsert(
     cols = list(rows[0].keys())
     update_cols = [c for c in cols if c not in skip_on_update]
 
+    # The WHERE skips rows whose values are unchanged: re-running a job (worker retries, backfills)
+    # then writes nothing, sparing Neon Free dead tuples, history and write volume.
     query = sql.SQL(
         "INSERT INTO {table} ({cols}) VALUES ({placeholders}) "
-        "ON CONFLICT ({conflict}) DO UPDATE SET {update_set}"
+        "ON CONFLICT ({conflict}) DO UPDATE SET {update_set} "
+        "WHERE ({current}) IS DISTINCT FROM ({incoming})"
     ).format(
         table=sql.Identifier(table),
         cols=sql.SQL(", ").join(sql.Identifier(c) for c in cols),
@@ -30,6 +33,8 @@ def upsert(
         update_set=sql.SQL(", ").join(
             sql.SQL("{c} = EXCLUDED.{c}").format(c=sql.Identifier(c)) for c in update_cols
         ),
+        current=sql.SQL(", ").join(sql.SQL("{t}.{c}").format(t=sql.Identifier(table), c=sql.Identifier(c)) for c in update_cols),
+        incoming=sql.SQL(", ").join(sql.SQL("EXCLUDED.{c}").format(c=sql.Identifier(c)) for c in update_cols),
     )
 
     with conn.cursor() as cur:

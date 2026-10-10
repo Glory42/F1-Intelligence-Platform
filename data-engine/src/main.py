@@ -1,9 +1,13 @@
 import argparse
+import importlib
 import sys
 from datetime import date
 
 import src.config as _config  # triggers FastF1 cache setup
 from src.utils.logging_utils import log_job_failure
+
+# OpenF1 enrichment jobs share one CLI shape: --year/--round (or latest completed race) + --session.
+_OPENF1_JOBS = ("ingest_race_control", "ingest_overtakes", "ingest_team_radio", "ingest_stints", "ingest_pit_stops")
 
 
 def auto_detect_race(year: int | None, conn) -> tuple[int, int]:
@@ -172,38 +176,35 @@ def _dispatch(job: str, args) -> None:
         from src.jobs.ingest_race import run
         run(year, round_num)
 
-    elif job == "ingest_race_control":
+    elif job == "ingest_qualifying_telemetry":
         from src.db.client import get_conn
         conn = get_conn()
         year, round_num = (args.year, args.round_num) if args.year and args.round_num \
             else auto_detect_completed_race(args.year, conn)
         conn.close()
-        from src.jobs.ingest_race_control import run
-        run(year, round_num, session_name=args.session)
+        from src.jobs.ingest_qualifying_telemetry import run
+        run(year, round_num, session_type="SQ" if args.session == "Sprint" else "Q")
 
-    elif job == "ingest_overtakes":
+    elif job in _OPENF1_JOBS:
         from src.db.client import get_conn
         conn = get_conn()
         year, round_num = (args.year, args.round_num) if args.year and args.round_num \
             else auto_detect_completed_race(args.year, conn)
         conn.close()
-        from src.jobs.ingest_overtakes import run
-        run(year, round_num, session_name=args.session)
-
-    elif job == "ingest_team_radio":
-        from src.db.client import get_conn
-        conn = get_conn()
-        year, round_num = (args.year, args.round_num) if args.year and args.round_num \
-            else auto_detect_completed_race(args.year, conn)
-        conn.close()
-        from src.jobs.ingest_team_radio import run
-        run(year, round_num, session_name=args.session)
+        importlib.import_module(f"src.jobs.{job}").run(year, round_num, session_name=args.session)
 
     elif job == "compute_season_stats":
         if not args.year:
             print("--year required for compute_season_stats", file=sys.stderr)
             sys.exit(1)
         from src.jobs.compute_season_stats import run
+        run(args.year)
+
+    elif job == "compute_title_odds":
+        if not args.year:
+            print("--year required for compute_title_odds", file=sys.stderr)
+            sys.exit(1)
+        from src.jobs.compute_title_odds import run
         run(args.year)
 
     elif job == "compute_sprint_features":
@@ -253,10 +254,10 @@ def main() -> None:
         "ingest_sprint_qualifying",
         "ingest_sprint",
         "ingest_race",
-        "ingest_race_control",
-        "ingest_overtakes",
-        "ingest_team_radio",
+        *_OPENF1_JOBS,
+        "ingest_qualifying_telemetry",
         "compute_season_stats",
+        "compute_title_odds",
         "compute_sprint_features",
         "compute_sprint_predictions",
         "compute_features",
@@ -271,7 +272,7 @@ def main() -> None:
     parser.add_argument("--resolve_run", type=int, help="data_quality_repair: audit run id to act on")
     parser.add_argument(
         "--session", choices=["Race", "Sprint"], default="Race",
-        help="ingest_race_control/ingest_overtakes/ingest_team_radio: which session's OpenF1 data to pull",
+        help="OpenF1 enrichment jobs (ingest_race_control, ingest_stints, ...): which session to pull",
     )
     args = parser.parse_args()
 

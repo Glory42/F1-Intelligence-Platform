@@ -1,0 +1,79 @@
+[
+ {
+  "parentConstructorId": "alfa-romeo",
+  "positionDisplayOrder": 1,
+  "constructorId": "sauber",
+  "yearFrom": 1993,
+  "yearTo": 2005
+ },
+ {
+  "parentConstructorId": "alfa-romeo",
+  "positionDisplayOrder": 2,
+  "constructorId": "bmw-sauber",
+  "yearFrom": 2006,
+  "yearTo": 2010
+ },
+ {
+  "parentConstructorId": "alfa-romeo",
+  "positionDisplayOrder": 3,
+  "constructorId": "sauber",
+  "yearFrom": 2011,
+  "yearTo": 2018
+ },
+ {
+  "parentConstructorId": "alfa-romeo",
+  "positionDisplayOrder": 4,
+  "constructorId": "alfa-romeo",
+  "yearFrom": 2019,
+  "yearTo": 2023
+ },
+ {
+  "parentConstructorId": "alfa-romeo",
+  "positionDisplayOrder": 5,
+  "constructorId": "kick-sauber",
+  "yearFrom": 2024,
+  "yearTo": 2025
+ },
+ {
+  "parentConstructorId": "alfa-romeo",
+  "positionDisplayOrder": 6,
+  "constructorId": "audi",
+  "yearFrom": 2026,
+  "yearTo": null
+ },
+ {
+  "parentConstructorId": "racing-bulls",
+  "positionDisplayOrder": 1,
+  "constructorId": "minardi",
+  "yearFrom": 1985,
+  "yearTo": 2005
+ },
+ {
+  "parentConstructorId": "racing-bulls",
+  "positionDisplayOrder": 2,
+  "constructorId": "toro-rosso",
+  "yearFrom": 2006,
+  "yearTo": 2019
+ },
+ {
+  "parentConstructorId": "racing-bulls",
+  "positionDisplayOrder": 3,
+  "constructorId": "alphatauri",
+  "yearFrom": 2020,
+  "yearTo": 2023
+ },
+ {
+  "parentConstructorId": "racing-bulls",
+  "positionDisplayOrder": 4,
+  "constructorId": "rb",
+  "yearFrom": 2024,
+  "yearTo": 2024
+ },
+ {
+  "parentConstructorId": "racing-bulls",
+  "positionDisplayOrder": 5,
+  "constructorId": "racing-bulls",
+  "yearFrom": 2025,
+  "yearTo": null
+ }
+]

@@ -15,12 +15,16 @@ from src.utils.fastf1_helpers import (
     get_session,
     get_weather,
     get_weather_details,
+    session_to_lap_records,
     session_to_lap_times,
     session_to_quali_results,
     session_to_race_results,
+    session_weather_trace,
     validate_session_data,
 )
 from src.utils.openf1_client import get_session_key
+from src.utils.race_story import build_lap_traces, find_battles
+from src.utils.storage_guard import read_storage_tier
 from src.utils.upsert import upsert
 
 
@@ -51,6 +55,44 @@ class IngestJobConfig:
     cross_table_hook: Callable[[Any, RaceContext], None] | None = None
 
 
+_STORY_SESSIONS = {"R": "race", "S": "sprint"}
+
+
+def _write_race_story(conn, race_id: int, session: str, traces, battles, driver_map: dict[str, int]) -> None:
+    trace_rows = [
+        {
+            "race_id": race_id, "session_type": session, "driver_id": driver_map[code],
+            "positions": t.positions, "gaps_ms": t.gaps_ms, "intervals_ms": t.intervals_ms, "laps_down": t.laps_down,
+        }
+        for code, t in traces.items() if code in driver_map
+    ]
+    upsert(conn, "race_lap_traces", trace_rows, ["race_id", "session_type", "driver_id"])
+    battle_rows = [
+        {
+            "race_id": race_id, "session_type": session,
+            "chaser_driver_id": driver_map[b.chaser], "leader_driver_id": driver_map[b.leader],
+            "lap_start": b.lap_start, "lap_end": b.lap_end, "min_gap_ms": b.min_gap_ms,
+        }
+        for b in battles if b.chaser in driver_map and b.leader in driver_map
+    ]
+    upsert(conn, "race_battles", battle_rows, ["race_id", "session_type", "chaser_driver_id", "lap_start"])
+    print(f"  Upserted {len(trace_rows)} lap traces and {len(battle_rows)} battles")
+
+
+def write_session_story(conn, race_id: int, session: str, traces, battles, weather_samples, driver_map) -> None:
+    """Race-story tables for one session; shared by run_ingest_job and scripts/backfill_race_story.py."""
+    if traces:
+        _write_race_story(conn, race_id, session, traces, battles, driver_map)
+    if weather_samples:
+        upsert(conn, "race_weather_traces", [{
+            "race_id": race_id, "session_type": session,
+            "minute_offsets": weather_samples.minute_offsets,
+            "air_temp_tenths": weather_samples.air_temp_tenths,
+            "track_temp_tenths": weather_samples.track_temp_tenths,
+            "rainfall": weather_samples.rainfall,
+        }], ["race_id", "session_type"])
+
+
 def run_ingest_job(year: int, round_num: int, config: IngestJobConfig) -> None:
     print(f"[{config.job_name}] year={year} round={round_num}")
 
@@ -58,20 +100,26 @@ def run_ingest_job(year: int, round_num: int, config: IngestJobConfig) -> None:
     try:
         race_ctx = config.resolve_race(conn, year, round_num)
         driver_map = build_driver_code_map(conn, race_ctx.season_id)
+    finally:
+        conn.close()
 
-        session = get_session(year, round_num, config.session_type)
+    # Loaded with no connection held: a FastF1 download takes minutes and would keep Neon awake.
+    session = get_session(year, round_num, config.session_type)
+    if not validate_session_data(session, config.session_type):
+        raise RuntimeError(
+            f"{config.session_label} results not fully available or complete yet — retry later"
+        )
+    weather = get_weather(session)
+    weather_details = get_weather_details(session)
+    sc_vsc = get_sc_vsc_laps(session)
+    result_rows = session_to_race_results(session)
+    lap_time_rows = session_to_lap_times(session)
+    traces = build_lap_traces(session_to_lap_records(session))
+    battles = find_battles(traces)
+    weather_samples = session_weather_trace(session)
 
-        if not validate_session_data(session, config.session_type):
-            raise RuntimeError(
-                f"{config.session_label} results not fully available or complete yet — retry later"
-            )
-
-        weather = get_weather(session)
-        weather_details = get_weather_details(session)
-        sc_vsc = get_sc_vsc_laps(session)
-        result_rows = session_to_race_results(session)
-        lap_time_rows = session_to_lap_times(session)
-
+    conn = get_conn()
+    try:
         headshot_updates: dict[int, str] = {}
         for rr in result_rows:
             if rr.get("headshot_url"):
@@ -141,6 +189,10 @@ def run_ingest_job(year: int, round_num: int, config: IngestJobConfig) -> None:
             )
             print(f"  Upserted {len(laps_to_upsert)} {config.laps_row_label} rows")
 
+        if read_storage_tier(conn).allows_optional:
+            write_session_story(conn, race_ctx.race_id, _STORY_SESSIONS[config.session_type], traces, battles,
+                                weather_samples, driver_map)
+
         config.mark_status(conn, race_ctx, weather, weather_details, sc_vsc)
         if config.cross_table_hook is not None:
             # Must run after mark_status: it reads races.status='completed', written above
@@ -200,15 +252,20 @@ def run_qualifying_ingest_job(year: int, round_num: int, config: QualifyingJobCo
         print(f"  event_format={ctx.event_format} — ingesting {session_type} session")
 
         driver_map = build_driver_code_map(conn, ctx.season_id)
-        session = get_session(year, round_num, session_type, messages=True)
-        quali_rows = session_to_quali_results(session)
+    finally:
+        conn.close()
 
-        rows = config.rows_from_quali(quali_rows, driver_map, ctx.race_id)
-        if not rows:
-            raise RuntimeError(
-                config.no_results_error.format(year=year, round_num=round_num, race_id=ctx.race_id)
-            )
+    # Loaded with no connection held: a FastF1 download takes minutes and would keep Neon awake.
+    session = get_session(year, round_num, session_type, messages=True)
+    quali_rows = session_to_quali_results(session)
+    rows = config.rows_from_quali(quali_rows, driver_map, ctx.race_id)
+    if not rows:
+        raise RuntimeError(
+            config.no_results_error.format(year=year, round_num=round_num, race_id=ctx.race_id)
+        )
 
+    conn = get_conn()
+    try:
         upsert(conn, config.results_table, rows, ["race_id", "driver_id"], exclude_update=config.exclude_update)
         print(f"  Upserted {len(rows)} {config.results_row_label} rows")
 
@@ -229,6 +286,10 @@ def run_qualifying_ingest_job(year: int, round_num: int, config: QualifyingJobCo
 # duration + margin — conservative in the direction of waiting longer, never running early
 # enough to hit OpenF1's paid live window.
 OPENF1_LIVE_WINDOW_BUFFER = timedelta(hours=3)
+
+
+_SESSION_KEY_COLUMNS = {"Race": "openf1_race_session_key", "Sprint": "openf1_sprint_session_key"}
+_SESSION_TYPES = {"Race": "race", "Sprint": "sprint"}
 
 
 @dataclass(frozen=True)
@@ -256,7 +317,8 @@ def run_openf1_job(year: int, round_num: int, config: OpenF1JobConfig, *, sessio
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT r.id, r.season_id, r.race_date, r.race_date_utc, r.sprint_date, r.status FROM races r "
+                "SELECT r.id, r.season_id, r.race_date, r.race_date_utc, r.sprint_date, r.status, "
+                "r.openf1_race_session_key, r.openf1_sprint_session_key FROM races r "
                 "JOIN seasons s ON r.season_id = s.id "
                 "WHERE s.year = %s AND r.round_number = %s",
                 (year, round_num),
@@ -266,6 +328,7 @@ def run_openf1_job(year: int, round_num: int, config: OpenF1JobConfig, *, sessio
             raise ValueError(f"Race not found for year={year} round={round_num}")
 
         race_id = race_row["id"]
+        cached_session_key = race_row.get(_SESSION_KEY_COLUMNS[session_name])
         if race_row["status"] != "completed":
             print(f"  [SKIP] Race {race_id} is not 'completed' yet (status={race_row['status']})")
             return
@@ -283,12 +346,29 @@ def run_openf1_job(year: int, round_num: int, config: OpenF1JobConfig, *, sessio
         else:
             session_date = race_row["race_date"]
 
-        session_key = get_session_key(year, session_date, session_name=session_name)
+        tier = read_storage_tier(conn)
+        if not tier.allows_optional:
+            print(f"  [SKIP] Neon storage tier is {tier.value} — OpenF1 enrichment is not written")
+            return
         driver_map = build_driver_number_map(conn, race_row["season_id"])
-        raw = config.fetch(session_key)
-        rows, skipped = config.to_rows(raw, race_id, driver_map)
-        skip_note = f" ({skipped} skipped — unknown driver number)" if skipped else ""
+    finally:
+        conn.close()
 
+    # No connection held across OpenF1's paced HTTP calls — it would keep Neon compute awake.
+    session_key = cached_session_key or get_session_key(year, session_date, session_name=session_name)
+    raw = config.fetch(session_key)
+    rows, skipped = config.to_rows(raw, race_id, driver_map)
+    rows = [{**row, "session_type": _SESSION_TYPES[session_name]} for row in rows]
+    skip_note = f" ({skipped} skipped — unknown driver number)" if skipped else ""
+
+    conn = get_conn()
+    try:
+        if cached_session_key is None:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"UPDATE races SET {_SESSION_KEY_COLUMNS[session_name]} = %s WHERE id = %s",
+                    (session_key, race_id),
+                )
         if rows:
             upsert(conn, config.table, rows, config.conflict_cols)
             print(f"  Upserted {len(rows)} {config.row_label}{skip_note}")

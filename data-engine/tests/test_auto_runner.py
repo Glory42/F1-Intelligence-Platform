@@ -278,12 +278,19 @@ class TestDecideNextAction:
         assert names == [
             "ingest_race",
             "compute_season_stats",
+            "compute_title_odds",
             "ingest_race_control",
             "ingest_overtakes",
             "ingest_team_radio",
+            "ingest_stints",
+            "ingest_pit_stops",
             "ingest_race_control_sprint",
             "ingest_overtakes_sprint",
             "ingest_team_radio_sprint",
+            "ingest_stints_sprint",
+            "ingest_pit_stops_sprint",
+            "ingest_qualifying_telemetry",
+            "ingest_sprint_qualifying_telemetry",
         ]
 
 
@@ -337,13 +344,16 @@ class TestRunOpenF1Step:
 
 class TestRetryMissingRaceEvents:
     def _row(self, **overrides):
-        row = {"id": 1, "status": "completed", "sprint_date": None, "has_race_control": False}
+        row = {"id": 1, "status": "completed", "sprint_date": None, "has_race_control": False, "telemetry_complete": True}
         row.update(overrides)
         return row
 
     def _patch_openf1_jobs(self, monkeypatch):
         calls = []
-        for job in (auto_runner.ingest_race_control, auto_runner.ingest_overtakes, auto_runner.ingest_team_radio):
+        for job in (
+            auto_runner.ingest_race_control, auto_runner.ingest_overtakes, auto_runner.ingest_team_radio,
+            auto_runner.ingest_stints, auto_runner.ingest_pit_stops,
+        ):
             name = job.__name__.rsplit(".", 1)[-1]
             monkeypatch.setattr(
                 job, "run",
@@ -385,6 +395,8 @@ class TestRetryMissingRaceEvents:
             ("ingest_race_control", "Race"),
             ("ingest_overtakes", "Race"),
             ("ingest_team_radio", "Race"),
+            ("ingest_stints", "Race"),
+            ("ingest_pit_stops", "Race"),
         ]
 
     def test_also_retries_sprint_session_jobs_when_sprint_date_present(self, monkeypatch):
@@ -397,10 +409,48 @@ class TestRetryMissingRaceEvents:
             ("ingest_race_control", "Race"),
             ("ingest_overtakes", "Race"),
             ("ingest_team_radio", "Race"),
+            ("ingest_stints", "Race"),
+            ("ingest_pit_stops", "Race"),
             ("ingest_race_control", "Sprint"),
             ("ingest_overtakes", "Sprint"),
             ("ingest_team_radio", "Sprint"),
+            ("ingest_stints", "Sprint"),
+            ("ingest_pit_stops", "Sprint"),
         ]
+
+    def test_retries_only_the_sprint_session_when_just_its_race_control_is_missing(self, monkeypatch):
+        calls = self._patch_openf1_jobs(monkeypatch)
+        conn = FakeConnection([self._row(
+            sprint_date=datetime(2026, 3, 7, 15, 0, tzinfo=timezone.utc),
+            has_race_control=True,
+            has_sprint_race_control=False,
+        )])
+
+        settled = auto_runner._retry_missing_race_events(lambda *_: None, conn, round_number=5, year=2026)
+
+        assert calls == [
+            ("ingest_race_control", "Sprint"),
+            ("ingest_overtakes", "Sprint"),
+            ("ingest_team_radio", "Sprint"),
+            ("ingest_stints", "Sprint"),
+            ("ingest_pit_stops", "Sprint"),
+        ]
+        assert settled is False
+
+    def test_resumes_qualifying_telemetry_until_every_qualifier_is_stored(self, monkeypatch):
+        calls = self._patch_openf1_jobs(monkeypatch)
+        telemetry_calls = []
+        monkeypatch.setattr(
+            auto_runner.ingest_qualifying_telemetry, "run",
+            lambda y, r, session_type="Q": telemetry_calls.append(session_type),
+        )
+        conn = FakeConnection([self._row(has_race_control=True, telemetry_complete=False)])
+
+        settled = auto_runner._retry_missing_race_events(lambda *_: None, conn, round_number=5, year=2026)
+
+        assert calls == []
+        assert telemetry_calls == ["Q", "SQ"]
+        assert settled is False
 
     def test_a_failure_in_one_job_does_not_stop_the_others(self, monkeypatch):
         calls = []
@@ -412,16 +462,20 @@ class TestRetryMissingRaceEvents:
             auto_runner.ingest_overtakes, "run",
             lambda y, r, session_name="Race": calls.append(("ingest_overtakes", session_name))
         )
-        monkeypatch.setattr(
-            auto_runner.ingest_team_radio, "run",
-            lambda y, r, session_name="Race": calls.append(("ingest_team_radio", session_name))
-        )
+        for job in (auto_runner.ingest_team_radio, auto_runner.ingest_stints, auto_runner.ingest_pit_stops):
+            name = job.__name__.rsplit(".", 1)[-1]
+            monkeypatch.setattr(
+                job, "run", lambda y, r, session_name="Race", _name=name: calls.append((_name, session_name))
+            )
         conn = FakeConnection([self._row()])
 
         # Must not raise — each job goes through the same non-fatal _run_openf1_step wrapper.
         auto_runner._retry_missing_race_events(lambda *_: None, conn, round_number=5, year=2026)
 
-        assert calls == [("ingest_overtakes", "Race"), ("ingest_team_radio", "Race")]
+        assert calls == [
+            ("ingest_overtakes", "Race"), ("ingest_team_radio", "Race"),
+            ("ingest_stints", "Race"), ("ingest_pit_stops", "Race"),
+        ]
 
 
 class TestRunActionSteps:
@@ -564,3 +618,169 @@ class TestRunCycleSequenceRetry:
             status="sprint_qualifying_done", is_sprint=True, event=event, now=now
         )
         assert next_action.kind == auto_runner.ActionKind.SPRINT_RACE
+
+
+class TestQuietCyclesBetweenSessions:
+    """Each in-window DB visit wakes Neon Free compute for >= 5 min; once a cycle has seen the
+    race's status, later cycles can tell from the schedule alone that nothing is due yet."""
+
+    def test_skips_the_database_until_the_pending_action_is_ready(self):
+        race = _utc(2026, 3, 8, 4, 0)
+        friday = race - timedelta(days=2) + timedelta(hours=1)  # FP1 done, qualifying a day away
+        memo = auto_runner.WorkerMemo()
+        first = FakeConnection([None, _active_race_row(status="scheduled", event_format="conventional")])
+
+        auto_runner.run_cycle(
+            log_func=lambda *_: None,
+            now_utc=friday,
+            schedule_provider=lambda: _schedule_with_race(1, race),
+            conn_factory=lambda: first,
+            memo=memo,
+        )
+        spy = _SpyConnFactory()
+        auto_runner.run_cycle(
+            log_func=lambda *_: None,
+            now_utc=friday + timedelta(minutes=20),
+            schedule_provider=lambda: _schedule_with_race(1, race),
+            conn_factory=spy,
+            memo=memo,
+        )
+
+        assert spy.calls == 0
+
+    def test_keeps_checking_while_fp2_coverage_is_below_the_gate(self, monkeypatch):
+        monkeypatch.setattr(auto_runner.ingest_fp2, "run", lambda year, round_number: None)
+        race = _utc(2026, 3, 8, 4, 0)
+        saturday_night = race - timedelta(hours=6)  # qualifying ingested, race not yet run
+        memo = auto_runner.WorkerMemo()
+        first = FakeConnection([
+            None,
+            _active_race_row(status="qualifying_done", event_format="conventional"),
+            {"n": 5}, {"n": 20},  # FP2 coverage before the retry: 25%
+            {"n": 5}, {"n": 20},  # ...and still 25% after it
+        ])
+
+        auto_runner.run_cycle(
+            log_func=lambda *_: None,
+            now_utc=saturday_night,
+            schedule_provider=lambda: _schedule_with_race(1, race),
+            conn_factory=lambda: first,
+            memo=memo,
+        )
+        spy = _SpyConnFactory(FakeConnection([None, None]))
+        auto_runner.run_cycle(
+            log_func=lambda *_: None,
+            now_utc=saturday_night + timedelta(minutes=20),
+            schedule_provider=lambda: _schedule_with_race(1, race),
+            conn_factory=spy,
+            memo=memo,
+        )
+
+        assert spy.calls == 1
+
+    def test_checks_the_database_when_the_schedule_has_no_time_for_the_pending_session(self):
+        race = _utc(2026, 3, 8, 4, 0)
+        friday = race - timedelta(days=2) + timedelta(hours=1)
+        memo = auto_runner.WorkerMemo()
+        first = FakeConnection([None, _active_race_row(status="scheduled", event_format="conventional")])
+        auto_runner.run_cycle(
+            log_func=lambda *_: None, now_utc=friday,
+            schedule_provider=lambda: _schedule_with_race(1, race), conn_factory=lambda: first, memo=memo,
+        )
+        timeless = _schedule_with_race(1, race)
+        timeless["Session4DateUtc"] = pd.NaT
+
+        spy = _SpyConnFactory(FakeConnection([None, None]))
+        auto_runner.run_cycle(
+            log_func=lambda *_: None, now_utc=friday + timedelta(minutes=20),
+            schedule_provider=lambda: timeless, conn_factory=spy, memo=memo,
+        )
+
+        assert spy.calls == 1
+
+    def test_keeps_checking_while_the_windows_race_is_missing_race_events(self, monkeypatch):
+        monkeypatch.setattr(auto_runner, "_run_openf1_step", lambda job_run, step_name, ctx: None)
+        race = _utc(2026, 3, 8, 4, 0)
+        next_race = race + timedelta(days=14)
+        schedule = pd.concat([_schedule_with_race(1, race), _schedule_with_race(2, next_race)], ignore_index=True)
+        sunday_evening = race + timedelta(hours=8)
+        memo = auto_runner.WorkerMemo()
+        first = FakeConnection([
+            {"id": 1, "status": "completed", "sprint_date": None, "has_race_control": False},
+            _active_race_row(race_id=2, round_number=2, status="scheduled", event_format="conventional"),
+        ])
+
+        auto_runner.run_cycle(
+            log_func=lambda *_: None, now_utc=sunday_evening,
+            schedule_provider=lambda: schedule, conn_factory=lambda: first, memo=memo,
+        )
+        spy = _SpyConnFactory(FakeConnection([None, None]))
+        auto_runner.run_cycle(
+            log_func=lambda *_: None, now_utc=sunday_evening + timedelta(minutes=20),
+            schedule_provider=lambda: schedule, conn_factory=spy, memo=memo,
+        )
+
+        assert spy.calls == 1
+
+
+class TestCycleOpenF1Budget:
+    def test_each_cycle_starts_with_a_fresh_openf1_request_budget(self):
+        from src.utils import openf1_client
+
+        openf1_client.reset_request_budget(limit=0)
+        race = _utc(2026, 3, 8, 4, 0)
+
+        auto_runner.run_cycle(
+            log_func=lambda *_: None,
+            now_utc=race - timedelta(days=4),
+            schedule_provider=lambda: _schedule_with_race(1, race),
+            conn_factory=_SpyConnFactory(),
+        )
+
+        assert openf1_client.remaining_requests() == openf1_client.DEFAULT_REQUEST_BUDGET
+
+
+class TestStepMemoryLog:
+    def test_each_step_logs_the_process_peak_rss_for_render_free_headroom(self, monkeypatch, capsys):
+        import json
+
+        monkeypatch.setattr(auto_runner.ingest_sprint, "run", lambda y, r: None)
+        monkeypatch.setattr(auto_runner.compute_season_stats, "run", lambda year: None)
+        monkeypatch.setattr(auto_runner.compute_title_odds, "run", lambda year: None)
+        action = auto_runner.Action(
+            kind=auto_runner.ActionKind.SPRINT_RACE,
+            ready=True,
+            label="Sprint Race",
+            steps=auto_runner._ACTION_JOBS[auto_runner.ActionKind.SPRINT_RACE],
+        )
+
+        auto_runner._run_action_steps(action, auto_runner.RaceRunContext(race_id=1, year=2026, round_number=5))
+
+        lines = [json.loads(line) for line in capsys.readouterr().out.splitlines() if line.startswith("{")]
+        assert [line["job"] for line in lines] == ["ingest_sprint", "compute_season_stats", "compute_title_odds"]
+        assert all(line["status"] == "ok" and isinstance(line["peak_rss_mb"], int) for line in lines)
+
+
+class TestTitleOddsSteps:
+    @pytest.mark.parametrize("kind", list(auto_runner.ActionKind))
+    def test_every_action_refreshes_title_odds_after_its_core_steps(self, kind):
+        names = [step.name for step in auto_runner._ACTION_JOBS[kind]]
+        core = [n for n in names if not n.startswith("ingest_") or n in ("ingest_race", "ingest_sprint", "ingest_qualifying", "ingest_sprint_qualifying", "ingest_fp2")]
+
+        assert "compute_title_odds" in names
+        assert names.index("compute_title_odds") > max(names.index(n) for n in core if n != "compute_title_odds")
+
+    def test_a_title_odds_failure_does_not_fail_the_action(self, monkeypatch):
+        monkeypatch.setattr(auto_runner.ingest_sprint, "run", lambda y, r: None)
+        monkeypatch.setattr(auto_runner.compute_season_stats, "run", lambda year: None)
+        monkeypatch.setattr(
+            auto_runner.compute_title_odds, "run", lambda year: (_ for _ in ()).throw(RuntimeError("boom"))
+        )
+        action = auto_runner.Action(
+            kind=auto_runner.ActionKind.SPRINT_RACE, ready=True, label="Sprint Race",
+            steps=auto_runner._ACTION_JOBS[auto_runner.ActionKind.SPRINT_RACE],
+        )
+
+        outcome = auto_runner._run_action_steps(action, auto_runner.RaceRunContext(race_id=1, year=2026, round_number=5))
+
+        assert outcome.ok is True

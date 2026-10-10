@@ -134,3 +134,104 @@ class TestFetchTeamRadio:
         )
 
         assert fetch_team_radio(9636) == []
+
+
+class _ScriptedGet:
+    """Returns each scripted response in turn; records how many HTTP calls were made."""
+
+    def __init__(self, responses):
+        self._responses = list(responses)
+        self.calls = 0
+
+    def __call__(self, *args, **kwargs):
+        self.calls += 1
+        return self._responses.pop(0)
+
+
+class TestResilience:
+    @pytest.fixture(autouse=True)
+    def _no_real_waits(self, monkeypatch):
+        self.waits = []
+        monkeypatch.setattr(openf1_client, "_sleep", self.waits.append)
+
+    def test_retries_a_rate_limited_request_until_it_succeeds(self, monkeypatch):
+        get = _ScriptedGet([_FakeResponse({}, 429), _FakeResponse({}, 429), _FakeResponse([{"message": "GREEN"}])])
+        monkeypatch.setattr(openf1_client.requests, "get", get)
+
+        assert fetch_race_control(9590) == [{"message": "GREEN"}]
+        assert get.calls == 3
+
+    def test_gives_up_after_three_attempts_on_a_persistent_server_error(self, monkeypatch):
+        get = _ScriptedGet([_FakeResponse({}, 503)] * 5)
+        monkeypatch.setattr(openf1_client.requests, "get", get)
+
+        with pytest.raises(requests.exceptions.HTTPError):
+            fetch_race_control(9590)
+        assert get.calls == 3
+
+    def test_retries_a_dropped_connection(self, monkeypatch):
+        outcomes = [requests.exceptions.ConnectionError("reset"), _FakeResponse([{"message": "GREEN"}])]
+
+        def _get(*args, **kwargs):
+            outcome = outcomes.pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+
+        monkeypatch.setattr(openf1_client.requests, "get", _get)
+
+        assert fetch_race_control(9590) == [{"message": "GREEN"}]
+
+    def test_refuses_requests_beyond_the_cycle_budget_without_calling_openf1(self, monkeypatch):
+        get = _ScriptedGet([_FakeResponse([])] * 5)
+        monkeypatch.setattr(openf1_client.requests, "get", get)
+        openf1_client.reset_request_budget(limit=2)
+
+        fetch_race_control(1)
+        fetch_overtakes(1)
+        with pytest.raises(openf1_client.OpenF1BudgetExceeded):
+            fetch_team_radio(1)
+        assert get.calls == 2
+
+    def test_spaces_consecutive_requests_to_stay_under_thirty_per_minute(self, monkeypatch):
+        monkeypatch.setattr(openf1_client.requests, "get", _ScriptedGet([_FakeResponse([])] * 2))
+        monkeypatch.setattr(openf1_client, "_monotonic", lambda: 100.0)
+
+        fetch_race_control(1)
+        fetch_overtakes(1)
+
+        assert self.waits == [2.0]
+
+
+class TestFetchStintsAndPits:
+    def test_stints_and_pits_are_queried_by_session_key(self, monkeypatch):
+        seen = []
+        monkeypatch.setattr(
+            openf1_client.requests, "get",
+            lambda url, params, timeout: seen.append((url.rsplit("/", 1)[-1], params)) or _FakeResponse([]),
+        )
+
+        openf1_client.fetch_stints(9590)
+        openf1_client.fetch_pit_stops(9590)
+
+        assert seen == [("stints", {"session_key": 9590}), ("pit", {"session_key": 9590})]
+
+
+class TestFetchLapChannels:
+    def test_car_data_is_filtered_to_the_lap_window_with_openf1_operator_syntax(self, monkeypatch):
+        seen = []
+        monkeypatch.setattr(
+            openf1_client.requests, "get",
+            lambda url, params, timeout: seen.append((url, params)) or _FakeResponse([]),
+        )
+        start = datetime(2024, 8, 31, 15, 2, 50, 589000, tzinfo=timezone.utc)
+        end = datetime(2024, 8, 31, 15, 4, 9, 916000, tzinfo=timezone.utc)
+
+        openf1_client.fetch_car_data(9586, 4, start, end)
+
+        url, params = seen[0]
+        assert url == (
+            "https://api.openf1.org/v1/car_data?date%3E%3D2024-08-31T15:02:50.589000%2B00:00"
+            "&date%3C%3D2024-08-31T15:04:09.916000%2B00:00"
+        )
+        assert params == {"session_key": 9586, "driver_number": 4}

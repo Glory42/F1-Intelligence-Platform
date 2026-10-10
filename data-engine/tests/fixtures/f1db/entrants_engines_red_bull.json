@@ -1,0 +1,23 @@
+[
+ {
+  "year": 2024,
+  "entrantId": "oracle-red-bull-racing",
+  "constructorId": "red-bull",
+  "engineManufacturerId": "honda-rbpt",
+  "engineId": "honda-rbpt-rbpth002-16-v6-t-h"
+ },
+ {
+  "year": 2025,
+  "entrantId": "oracle-red-bull-racing",
+  "constructorId": "red-bull",
+  "engineManufacturerId": "honda-rbpt",
+  "engineId": "honda-rbpt-rbpth002-16-v6-t-h"
+ },
+ {
+  "year": 2026,
+  "entrantId": "oracle-red-bull-racing",
+  "constructorId": "red-bull",
+  "engineManufacturerId": "red-bull-ford",
+  "engineId": "red-bull-ford-dm01-16-v6-t-h"
+ }
+]

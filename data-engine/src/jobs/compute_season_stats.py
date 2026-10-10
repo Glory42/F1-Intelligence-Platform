@@ -49,8 +49,6 @@ def _compute_driver_stats(conn, season_id: int) -> None:
         )
         driver_aggs = cur.fetchall()
 
-        sorted_drivers = sorted(driver_aggs, key=lambda x: float(x["total_points"]), reverse=True)
-        position_map = {row["driver_id"]: i + 1 for i, row in enumerate(sorted_drivers)}
 
         cur.execute(
             """
@@ -87,6 +85,14 @@ def _compute_driver_stats(conn, season_id: int) -> None:
             (season_id,),
         )
         sprint_aggs = {r["driver_id"]: r for r in cur.fetchall()}
+
+    # The championship counts sprint points too; total_points stays GP-only (the model reads it).
+    def _championship_points(row) -> float:
+        sprint = sprint_aggs.get(row["driver_id"])
+        return float(row["total_points"]) + (float(sprint["sprint_total_points"]) if sprint else 0.0)
+
+    sorted_drivers = sorted(driver_aggs, key=_championship_points, reverse=True)
+    position_map = {row["driver_id"]: i + 1 for i, row in enumerate(sorted_drivers)}
 
     # ── Sector times + top speed from main race lap_times ────────────────────
     with conn.cursor() as cur:
@@ -279,7 +285,11 @@ def _compute_team_stats(conn, season_id: int) -> None:
         )
         sprint_team_aggs = {r["team_id"]: r for r in cur.fetchall()}
 
-    sorted_teams = sorted(team_aggs, key=lambda x: float(x["total_points"]), reverse=True)
+    def _team_championship_points(row) -> float:
+        sprint = sprint_team_aggs.get(row["team_id"])
+        return float(row["total_points"]) + (float(sprint["sprint_total_points"]) if sprint else 0.0)
+
+    sorted_teams = sorted(team_aggs, key=_team_championship_points, reverse=True)
     position_map = {row["team_id"]: i + 1 for i, row in enumerate(sorted_teams)}
 
     # Blends median-finish pace (outlier-robust) with grid pace (raw speed); scoring is
