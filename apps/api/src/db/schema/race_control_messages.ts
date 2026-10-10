@@ -12,6 +12,8 @@ export const raceControlMessages = pgTable('race_control_messages', {
   scope: varchar('scope', { length: 20 }),
   sector: integer('sector'),
   message: text('message').notNull(),
+  // 'race' | 'sprint' — both sessions of a sprint weekend share one race_id.
+  sessionType: varchar('session_type', { length: 10 }).notNull().default('race'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   uniqueIndex('race_control_messages_race_date_message_idx').on(t.raceId, t.date, t.message),

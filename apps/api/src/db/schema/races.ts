@@ -35,6 +35,9 @@ export const races = pgTable('races', {
   sprintAirTempAvg: numeric('sprint_air_temp_avg', { precision: 4, scale: 1 }),
   sprintTrackTempAvg: numeric('sprint_track_temp_avg', { precision: 4, scale: 1 }),
   sprintHumidityAvg: numeric('sprint_humidity_avg', { precision: 4, scale: 1 }),
+  // Cached once resolved so later OpenF1 jobs skip the /sessions lookup (Free-tier request budget).
+  openf1RaceSessionKey: integer('openf1_race_session_key'),
+  openf1SprintSessionKey: integer('openf1_sprint_session_key'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   uniqueIndex('races_season_round_idx').on(t.seasonId, t.roundNumber),
