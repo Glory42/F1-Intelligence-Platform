@@ -1,86 +1,72 @@
 ---
-import { X } from 'lucide-react';
-import { isNavActive, type NavLink } from './navLinks';
+import { Menu, Search, X } from 'lucide-react';
+import SiteLogo from './SiteLogo.astro';
+import NavGroups from './NavGroups.astro';
+import { activeDestination, buildNavGroups, buildNavUtilities } from './navLinks';
 
-interface Props {
-  links: NavLink[];
-  currentPath: string;
-}
-
-const { links, currentPath } = Astro.props;
+const groups = buildNavGroups();
+const utilities = buildNavUtilities(import.meta.env.DEV);
+const active = activeDestination(groups, Astro.url.pathname);
 ---
 
-<!-- Mobile Sidebar Drawer -->
+<header class="glass md:hidden fixed top-0 inset-x-0 z-40 flex h-12 items-center justify-between border-b border-white/[0.06] px-5">
+  <div class="flex items-center gap-3">
+    <button
+      id="mobile-menu-toggle"
+      type="button"
+      class="press text-muted-foreground hover:text-foreground focus:outline-none"
+      aria-label="Open menu"
+      aria-expanded="false"
+      aria-controls="mobile-sidebar"
+    >
+      <Menu size={18} />
+    </button>
+    <a href="/" class="flex items-center gap-2">
+      <SiteLogo />
+      <span class="font-mono text-[9px] tracking-[0.18em] uppercase text-muted-foreground">f1 intelligence</span>
+    </a>
+  </div>
+  <button
+    type="button"
+    onclick="window.dispatchEvent(new Event('open-global-search'))"
+    aria-label="Search"
+    class="press text-muted-foreground hover:text-foreground focus:outline-none"
+  >
+    <Search size={16} />
+  </button>
+</header>
+
+<!-- `invisible` once closed: an off-screen transform alone still leaves the drawer focusable and "visible". -->
 <div
   id="mobile-sidebar"
-  class="glass-heavy fixed inset-y-0 left-0 z-50 w-[260px] border-r border-white/[0.08] transform -translate-x-full transition-transform duration-300 ease-spring sm:hidden"
+  class="glass-heavy md:hidden invisible fixed inset-y-0 left-0 z-50 flex w-[260px] flex-col border-r border-white/[0.08] -translate-x-full transition-[transform,visibility] duration-300 ease-spring"
   role="dialog"
   aria-modal="true"
   aria-label="Navigation menu"
   tabindex="-1"
 >
-  <div class="flex flex-col h-full p-6 space-y-6">
-    <div class="flex items-center justify-between pb-4 border-b border-white/[0.06]">
-      <div class="flex items-center gap-2">
-        <span class="relative flex h-[6px] w-[6px]">
-          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#a855f7] opacity-50" />
-          <span class="relative inline-flex rounded-full h-[6px] w-[6px] bg-[#a855f7]" />
-        </span>
-        <span class="font-mono text-[9px] tracking-[0.25em] uppercase text-[#a855f7]">menu</span>
-      </div>
-      <button id="mobile-sidebar-close" class="press text-muted-foreground hover:text-foreground focus:outline-none" aria-label="Close menu">
-        <X size={16} />
-      </button>
-    </div>
+  <div class="flex h-12 shrink-0 items-center justify-between border-b border-white/[0.06] px-5">
+    <span class="font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">./menu</span>
+    <button id="mobile-sidebar-close" type="button" class="press text-muted-foreground hover:text-foreground focus:outline-none" aria-label="Close menu">
+      <X size={16} />
+    </button>
+  </div>
 
-    <nav class="flex flex-col space-y-4">
-      {links.map((link) => {
-        const { href, label, icon: Icon, dropdown } = link;
-        const active = isNavActive(currentPath, href, dropdown);
-        if (dropdown) {
-          return (
-            <div class="space-y-2">
-              <button
-                class="w-full flex items-center justify-between font-mono text-[10px] tracking-[0.18em] uppercase text-muted-foreground hover:text-white py-1.5 text-left mobile-dropdown-toggle focus:outline-none group"
-                data-target={`mobile-dropdown-${label}`}
-              >
-                <span class="flex items-center gap-2.5">
-                  <Icon size={13} className={active ? 'text-[#a855f7]' : ''} />
-                  {label}
-                </span>
-                <span class="text-[7px] text-muted-foreground/60 transition-transform duration-200 group-hover:text-white">▼</span>
-              </button>
-              <div id={`mobile-dropdown-${label}`} class="grid grid-rows-[0fr] transition-[grid-template-rows] duration-200 ease-spring">
-                <div class="overflow-hidden min-h-0">
-                  <div class="pl-4 border-l border-white/[0.06] flex flex-col space-y-3 mt-1 opacity-0 transition-opacity duration-200 mobile-dropdown-content">
-                    {dropdown.map((sub) => (
-                      <a href={sub.href} class="block font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground hover:text-white py-0.5 transition-colors">
-                        {sub.label}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        }
-        return (
-          <a
-            href={href}
-            class={`flex items-center gap-2.5 font-mono text-[10px] tracking-[0.18em] uppercase py-1.5 transition-colors ${
-              active ? 'text-[#a855f7]' : 'text-muted-foreground hover:text-white'
-            }`}
-          >
-            <Icon size={13} />
-            {label}
-          </a>
-        );
-      })}
-    </nav>
+  <nav aria-label="Site" class="flex-1 overflow-y-auto px-2 py-5">
+    <NavGroups groups={groups} activeHref={active?.href} />
+  </nav>
+
+  <div class="flex flex-col gap-0.5 border-t border-white/[0.06] px-2 py-3">
+    {utilities.map(({ href, label, icon: Icon }) => (
+      <a href={href} class="flex h-9 items-center gap-3 rounded-md px-3 text-[13px] capitalize text-muted-foreground hover:text-foreground transition-colors duration-150">
+        <Icon size={14} />
+        {label}
+      </a>
+    ))}
   </div>
 </div>
 
-<div id="mobile-sidebar-backdrop" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-45 hidden sm:hidden transition-opacity duration-300 opacity-0" />
+<div id="mobile-sidebar-backdrop" class="md:hidden fixed inset-0 z-[45] hidden bg-black/60 backdrop-blur-sm opacity-0 transition-opacity duration-300" />
 
 <script>
   function initMobileMenu() {
@@ -111,7 +97,7 @@ const { links, currentPath } = Astro.props;
     }
 
     function openMenu() {
-      sidebar!.classList.remove('-translate-x-full');
+      sidebar!.classList.remove('-translate-x-full', 'invisible');
       backdrop!.classList.remove('hidden');
       toggleBtn!.setAttribute('aria-expanded', 'true');
       setTimeout(() => backdrop!.classList.add('opacity-100'), 10);
@@ -120,7 +106,7 @@ const { links, currentPath } = Astro.props;
     }
 
     function closeMenu() {
-      sidebar!.classList.add('-translate-x-full');
+      sidebar!.classList.add('-translate-x-full', 'invisible');
       backdrop!.classList.remove('opacity-100');
       toggleBtn!.setAttribute('aria-expanded', 'false');
       document.removeEventListener('keydown', trapFocus);
@@ -131,22 +117,6 @@ const { links, currentPath } = Astro.props;
     toggleBtn.addEventListener('click', openMenu);
     closeBtn?.addEventListener('click', closeMenu);
     backdrop.addEventListener('click', closeMenu);
-
-    document.querySelectorAll('.mobile-dropdown-toggle').forEach((toggle) => {
-      toggle.addEventListener('click', (e) => {
-        const btn = e.currentTarget as HTMLButtonElement;
-        const panel = document.getElementById(btn.getAttribute('data-target') || '');
-        if (!panel) return;
-        const content = panel.querySelector('.mobile-dropdown-content');
-        const arrow = btn.querySelector('span:last-child');
-        const collapsed = panel.classList.contains('grid-rows-[0fr]');
-        panel.classList.toggle('grid-rows-[0fr]', !collapsed);
-        panel.classList.toggle('grid-rows-[1fr]', collapsed);
-        content?.classList.toggle('opacity-0', !collapsed);
-        content?.classList.toggle('opacity-100', collapsed);
-        arrow?.classList.toggle('rotate-180', collapsed);
-      });
-    });
   }
 
   document.addEventListener('astro:page-load', initMobileMenu);

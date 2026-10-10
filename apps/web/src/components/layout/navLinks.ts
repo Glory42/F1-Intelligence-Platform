@@ -1,70 +1,65 @@
-import { Home, Flag, Users, Building2, Cpu, ShieldCheck, Trophy, type LucideIcon } from 'lucide-react';
+import { Home, Flag, Users, Building2, Cpu, ShieldCheck, Trophy, MapPin, ArrowLeftRight, BookOpen, type LucideIcon } from 'lucide-react';
 
-export interface NavDropdownItem {
-  href: string;
-  label: string;
-}
-
-export interface NavLink {
+export interface NavDestination {
   href: string;
   label: string;
   icon: LucideIcon;
-  dropdown?: NavDropdownItem[];
+  owns: string[];
 }
 
-export function buildNavLinks(isDev: boolean): NavLink[] {
-  const links: NavLink[] = [
-    { href: '/', label: 'home', icon: Home },
+export interface NavGroup {
+  label: 'season' | 'explore';
+  destinations: NavDestination[];
+}
+
+export function buildNavGroups(): NavGroup[] {
+  return [
     {
-      href: '/races',
-      label: 'races',
-      icon: Flag,
-      dropdown: [
-        { href: '/races', label: 'seasons' },
-        { href: '/circuits', label: 'circuits' },
+      label: 'season',
+      destinations: [
+        { href: '/', label: 'home', icon: Home, owns: ['/'] },
+        { href: '/races', label: 'calendar', icon: Flag, owns: ['/races'] },
+        { href: '/drivers', label: 'drivers', icon: Users, owns: ['/drivers'] },
+        { href: '/teams', label: 'teams', icon: Building2, owns: ['/teams'] },
+        { href: '/prediction', label: 'predictions', icon: Cpu, owns: ['/prediction'] },
       ],
     },
     {
-      href: '/drivers',
-      label: 'drivers',
-      icon: Users,
-      dropdown: [
-        { href: '/drivers', label: 'standings' },
-        { href: '/drivers/compare', label: 'comparison' },
+      label: 'explore',
+      destinations: [
+        { href: '/circuits', label: 'circuits', icon: MapPin, owns: ['/circuits'] },
+        { href: '/drivers/compare', label: 'compare', icon: ArrowLeftRight, owns: ['/drivers/compare', '/teams/compare'] },
+        { href: '/records', label: 'history', icon: Trophy, owns: ['/records'] },
       ],
     },
-    {
-      href: '/teams',
-      label: 'teams',
-      icon: Building2,
-      dropdown: [
-        { href: '/teams', label: 'standings' },
-        { href: '/teams/compare', label: 'comparison' },
-      ],
-    },
-    {
-      href: '/prediction',
-      label: 'prediction',
-      icon: Cpu,
-      dropdown: [
-        { href: '/prediction', label: 'hub' },
-        { href: '/prediction/recap', label: 'recap' },
-      ],
-    },
-    { href: '/records', label: 'history', icon: Trophy },
   ];
-
-  // The data-quality dashboard reads dev-only reporting tables — never ship its nav link.
-  if (isDev) {
-    links.push({ href: '/health-quality', label: 'data quality', icon: ShieldCheck });
-  }
-
-  return links;
 }
 
-export function isNavActive(currentPath: string, href: string, dropdown?: NavDropdownItem[]): boolean {
-  if (href === '/') return currentPath === '/';
-  if (currentPath.startsWith(href)) return true;
-  if (dropdown && dropdown.some((sub) => currentPath.startsWith(sub.href))) return true;
-  return false;
+export interface NavUtility {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+}
+
+export function buildNavUtilities(isDev: boolean): NavUtility[] {
+  const utilities: NavUtility[] = [{ href: '/docs', label: 'docs', icon: BookOpen }];
+  // The data-quality dashboard reads dev-only reporting tables — never ship its link.
+  if (isDev) utilities.push({ href: '/health-quality', label: 'data quality', icon: ShieldCheck });
+  return utilities;
+}
+
+const ownsPath = (prefix: string, path: string): boolean =>
+  prefix === '/' ? path === '/' : path === prefix || path.startsWith(`${prefix}/`);
+
+// Longest owned prefix wins, so /drivers/compare lights Compare rather than Drivers.
+export function activeDestination(groups: NavGroup[], path: string): NavDestination | null {
+  let best: { destination: NavDestination; length: number } | null = null;
+  for (const destination of groups.flatMap((g) => g.destinations)) {
+    for (const prefix of destination.owns) {
+      if (ownsPath(prefix, path) && prefix.length > (best?.length ?? -1)) {
+        best = { destination, length: prefix.length };
+      }
+    }
+  }
+  return best?.destination ?? null;
 }

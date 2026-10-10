@@ -1,72 +1,14 @@
----
-import { SITE_NAME } from '@/lib/site';
-interface Props {
-  variant?: 'full' | 'minimal';
-}
-const { variant = 'minimal' } = Astro.props;
----
-
-{variant === 'full' ? (
-  <footer class="py-12 px-6 lg:px-12 bg-background border-t border-white/5">
-    <div class="container mx-auto max-w-[1200px]">
-      <div class="h-px w-full bg-gradient-to-r from-transparent via-accent-primary to-transparent opacity-30 mb-16"/>
-      <div class="flex flex-col md:flex-row justify-between items-start gap-12">
-        <div class="space-y-6">
-          <div class="flex items-center gap-2">
-            <svg width="24" height="12" viewBox="0 0 24 12" fill="none">
-              <path d="M2 4H20M4 8H22" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="text-accent-bright"/>
-            </svg>
-            <span class="font-heading font-bold text-lg tracking-tight uppercase">{SITE_NAME}</span>
-          </div>
-          <p class="text-text-secondary text-sm max-w-xs">Race intelligence. Data driven. The next generation of Formula 1 analytics.</p>
-        </div>
-        <div class="space-y-4">
-          <div class="text-[10px] font-bold text-text-secondary uppercase tracking-[0.2em]">Tech Stack</div>
-          <div class="flex flex-wrap gap-4 text-xs font-medium text-text-secondary">
-            {['FastF1', 'Hono', 'Astro', 'Neon', 'PostgreSQL', 'Cloudflare'].map((t, i, arr) => (
-              <>
-                <span>{t}</span>
-                {i < arr.length - 1 && <span class="w-1 h-1 rounded-full bg-white/20 my-auto"/>}
-              </>
-            ))}
-          </div>
-        </div>
-      </div>
-      <div class="mt-16 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-bold text-text-secondary uppercase tracking-[0.2em]">
-        <div class="flex flex-col gap-2">
-          <div>© {new Date().getFullYear()} {SITE_NAME}. Not affiliated with Formula 1 or FIA. Historical data: <a href="https://github.com/f1db/f1db" class="underline" rel="noopener">F1DB</a> (CC BY 4.0).</div>
-          <a
-            href="https://digitalbeacon.co/report/f1-gorkemkaryol-dev"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="flex items-center gap-1.5 normal-case tracking-normal font-medium hover:text-accent-bright transition-colors"
-          >
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-            <span>0.024g CO₂ per visit</span>
-          </a>
-        </div>
-        <div class="flex gap-6">
-          <a href="/races" class="hover:text-accent-bright transition-colors">Races</a>
-          <a href="/prediction" class="hover:text-accent-bright transition-colors">Predictions</a>
-          <a href="/docs" class="hover:text-accent-bright transition-colors">Docs</a>
-        </div>
-      </div>
-    </div>
-  </footer>
-) : (
-  <footer class="border-t border-white/[0.05] py-5 font-mono text-[9px] tracking-[0.2em] text-muted-foreground uppercase px-[max(24px,4vw)]">
-    <div class="max-w-[1400px] mx-auto relative flex items-center justify-center">
-      <a
-        href="https://digitalbeacon.co/report/f1-gorkemkaryol-dev"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="absolute left-0 flex items-center gap-1.5 hover:text-foreground transition-colors normal-case tracking-normal"
-      >
-        <span class="w-1 h-1 rounded-full bg-emerald-500 shrink-0"></span>
-        <span>This visit generated 0.024g of CO₂</span>
-      </a>
-      <div>./f1-intelligence &mdash; powered by <a href="https://docs.fastf1.dev/" target="_blank" rel="noopener noreferrer" class="hover:text-foreground transition-colors">fastf1</a></div>
-      <a href="/docs" class="absolute right-0 hover:text-foreground transition-colors">docs</a>
-    </div>
-  </footer>
-)}
+<footer class="border-t border-white/[0.05] py-5 font-mono text-[9px] tracking-[0.2em] text-muted-foreground uppercase px-[max(24px,4vw)]">
+  <div class="max-w-[1400px] mx-auto relative flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
+    <a
+      href="https://digitalbeacon.co/report/f1-gorkemkaryol-dev"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="sm:absolute sm:left-0 flex items-center gap-1.5 hover:text-foreground transition-colors normal-case tracking-normal"
+    >
+      <span class="w-1 h-1 rounded-full bg-emerald-500 shrink-0"></span>
+      <span>This visit generated 0.024g of CO₂</span>
+    </a>
+    <div>./f1-intelligence &mdash; powered by <a href="https://docs.fastf1.dev/" target="_blank" rel="noopener noreferrer" class="hover:text-foreground transition-colors">fastf1</a></div>
+  </div>
+</footer>

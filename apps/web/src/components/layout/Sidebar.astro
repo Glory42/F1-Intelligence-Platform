@@ -1,0 +1,89 @@
+---
+import { Search, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { SITE_NAME } from '@/lib/site';
+import SiteLogo from './SiteLogo.astro';
+import NavGroups from './NavGroups.astro';
+import { activeDestination, buildNavGroups, buildNavUtilities } from './navLinks';
+
+interface Props {
+  collapsed: boolean;
+}
+
+const { collapsed } = Astro.props;
+const groups = buildNavGroups();
+const utilities = buildNavUtilities(import.meta.env.DEV);
+const active = activeDestination(groups, Astro.url.pathname);
+---
+
+<aside
+  id="site-sidebar"
+  class="hidden md:flex fixed inset-y-0 left-0 z-40 w-[var(--sidebar-w)] flex-col border-r border-white/[0.06] bg-black transition-[width] duration-200 ease-spring"
+>
+  <a href="/" aria-label={SITE_NAME} class="flex h-14 shrink-0 items-center gap-2.5 px-[15px]">
+    <SiteLogo width={28} height={28} />
+    <span class="sidebar-label font-mono text-[9px] tracking-[0.18em] uppercase text-muted-foreground whitespace-nowrap">f1 intelligence</span>
+  </a>
+
+  <div class="px-2">
+    <button
+      type="button"
+      onclick="window.dispatchEvent(new Event('open-global-search'))"
+      aria-label="Search"
+      title="Search (⌘K)"
+      class="press flex h-9 w-full items-center gap-3 rounded-md border border-white/[0.06] px-3 text-[13px] text-muted-foreground hover:text-foreground hover:border-white/[0.12] transition-colors duration-150"
+    >
+      <Search size={15} className="shrink-0" />
+      <span class="sidebar-label">Search</span>
+      <kbd class="sidebar-label ml-auto font-mono text-[10px] text-muted-foreground/70">⌘K</kbd>
+    </button>
+  </div>
+
+  <nav aria-label="Site" class="flex-1 overflow-y-auto overflow-x-hidden px-2 py-5">
+    <NavGroups groups={groups} activeHref={active?.href} />
+  </nav>
+
+  <div class="flex flex-col gap-0.5 border-t border-white/[0.06] px-2 py-3">
+    {utilities.map(({ href, label, icon: Icon }) => (
+      <a
+        href={href}
+        aria-label={label}
+        title={label}
+        class="flex h-8 items-center gap-3 rounded-md px-3 text-[12px] capitalize text-muted-foreground hover:bg-white/[0.03] hover:text-foreground transition-colors duration-150"
+      >
+        <Icon size={14} className="shrink-0" />
+        <span class="sidebar-label">{label}</span>
+      </a>
+    ))}
+    <button
+      id="sidebar-toggle"
+      type="button"
+      aria-controls="site-sidebar"
+      aria-expanded={collapsed ? 'false' : 'true'}
+      aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      class="press flex h-8 items-center gap-3 rounded-md px-3 text-[12px] text-muted-foreground hover:bg-white/[0.03] hover:text-foreground transition-colors duration-150"
+    >
+      <ChevronsLeft size={14} className="sidebar-label shrink-0" />
+      <ChevronsRight size={14} className="sidebar-collapsed-only shrink-0" />
+      <span class="sidebar-label">Collapse</span>
+    </button>
+  </div>
+</aside>
+
+<script>
+  import { sidebarCookie } from '@/lib/sidebarState';
+
+  function initSidebarToggle() {
+    const toggle = document.getElementById('sidebar-toggle');
+    if (!toggle) return;
+    toggle.addEventListener('click', () => {
+      const root = document.documentElement;
+      const collapsed = root.dataset.sidebar !== 'collapsed';
+      root.dataset.sidebar = collapsed ? 'collapsed' : 'expanded';
+      document.cookie = sidebarCookie(collapsed);
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+      toggle.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+    });
+  }
+
+  document.addEventListener('astro:page-load', initSidebarToggle);
+</script>

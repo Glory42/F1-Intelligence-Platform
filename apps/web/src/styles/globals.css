@@ -74,6 +74,9 @@
 }
 
 @layer base {
+  html { --sidebar-w: 13rem; }
+  html[data-sidebar='collapsed'] { --sidebar-w: 3.5rem; }
+
   * { @apply border-border; }
   body { @apply bg-background text-foreground; }
   ::selection { background: rgba(168, 85, 247, 0.35); color: #fff; }
@@ -88,6 +91,10 @@
 }
 
 @layer utilities {
+  /* Sidebar chrome that only makes sense at one width — toggled by <html data-sidebar>. */
+  html[data-sidebar='collapsed'] .sidebar-label { display: none; }
+  html:not([data-sidebar='collapsed']) .sidebar-collapsed-only { display: none; }
+
   /* card with subtle gradient + border — matches portfolio .panel */
   .panel {
     border: 1px solid rgba(255, 255, 255, 0.06);

@@ -1,7 +1,10 @@
 ---
 import { SITE_NAME } from '@/lib/site';
-import Navbar from '@/components/layout/Navbar.astro';
+import Sidebar from '@/components/layout/Sidebar.astro';
+import MobileNav from '@/components/layout/MobileNav.astro';
 import Footer from '@/components/layout/Footer.astro';
+import { GlobalSearch } from '@/features/search/components/GlobalSearch';
+import { SIDEBAR_COOKIE, isSidebarCollapsed } from '@/lib/sidebarState';
 import { ClientRouter, fade } from 'astro:transitions';
 
 interface Props {
@@ -17,10 +20,11 @@ const {
 const fullTitle = `${title} — ${SITE_NAME}`;
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 const ogImageURL = new URL(image, Astro.site);
+const sidebarCollapsed = isSidebarCollapsed(Astro.cookies.get(SIDEBAR_COOKIE)?.value);
 ---
 
 <!doctype html>
-<html lang="en" class="dark scroll-smooth">
+<html lang="en" class="dark scroll-smooth" data-sidebar={sidebarCollapsed ? 'collapsed' : 'expanded'}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -46,20 +50,22 @@ const ogImageURL = new URL(image, Astro.site);
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
   </head>
-  <body class="min-h-screen bg-background text-foreground antialiased font-sans flex flex-col">
+  <body class="min-h-screen bg-background text-foreground antialiased font-sans">
+    <Sidebar collapsed={sidebarCollapsed} />
+    <MobileNav />
 
+    <div class="flex min-h-screen flex-col md:pl-[var(--sidebar-w)] transition-[padding] duration-200 ease-spring">
+      <main
+        class="flex-1 mx-auto w-full max-w-[1400px] px-[max(24px,4vw)] pt-[72px] md:pt-10 pb-24 sm:pb-16"
+        transition:animate={fade({ duration: '0.2s' })}
+      >
+        <slot />
+      </main>
 
-    <Navbar transition:persist />
+      <Footer transition:persist />
+    </div>
 
-    <main
-      class="flex-1 mx-auto w-full max-w-[1400px] px-[max(24px,4vw)] pt-[48px] pb-24 sm:pb-16"
-      transition:animate={fade({ duration: '0.2s' })}
-    >
-      <slot />
-    </main>
-
-    <Footer transition:persist />
-
+    <GlobalSearch client:idle transition:persist />
   </body>
 </html>
 
