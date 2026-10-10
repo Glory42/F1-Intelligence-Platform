@@ -13,7 +13,7 @@ top-level test command.
 |---|---|---|---|
 | Data engine | `data-engine/tests/` | pytest | No — scripted fake DB |
 | API unit | `apps/api/tests/unit/` | `bun test` | No |
-| API integration | `apps/api/tests/integration/` | `bun test` | Yes — dedicated Neon branch |
+| API integration | `apps/api/tests/integration/` | `bun test` | Yes — local Postgres via `docker-compose.test.yml` (never Neon) |
 | Web unit | `apps/web/tests/unit/` | Vitest | No — MSW mocks the API |
 | Web e2e | `apps/e2e/tests/smoke/` | Playwright | No — fixture API server |
 
@@ -27,7 +27,8 @@ covers `src/common/mappers.ts`.
 # data-engine
 cd data-engine && pytest -v
 
-# api  (needs TEST_DATABASE_URL in apps/api/.env for the integration suite)
+# api  (integration suite needs the local test DB: docker-compose.test.yml)
+cd apps/api && bun run test:db:up    # start Postgres + Neon HTTP proxy, apply migrations
 cd apps/api && bun test              # unit + integration
 cd apps/api && bun run test:unit     # unit only
 cd apps/api && bun run test:integration
@@ -35,7 +36,7 @@ cd apps/api && bun run test:integration
 # web
 cd apps/web && bun run test          # vitest run
 
-# e2e  (spins up its own servers)
+# e2e  (spins up its own servers; E2E_WEB_PORT=4331 if your own `astro dev` holds :4321)
 cd apps/e2e && bun run test
 ```
 
@@ -82,12 +83,18 @@ extracted into `common/` or a `*.helpers.ts` (this is what the `max-lines` budge
 
 ## API integration (`apps/api/tests/integration/`)
 
-`bun test` driving the real Hono app in-process via `app.request()` against a **dedicated Neon test
-branch**.
+`bun test` driving the real Hono app in-process via `app.request()` against a **local Postgres**
+(`docker-compose.test.yml`: `postgres:16-alpine` on :5433 behind `local-neon-http-proxy` on :4445).
+Neon Free's 100 CU-hours/month are shared by every branch, and TDD runs this suite constantly, so the
+suite never touches Neon.
 
-- **`TEST_DATABASE_URL`** (in `apps/api/.env`, see `.env.example`) — a distinct env var from
-  `DATABASE_URL`. `tests/support/db/test-db.ts` refuses to truncate if the two are equal
-  (override with `TEST_DB_ALLOW_RESET=1`). Missing `TEST_DATABASE_URL` throws with instructions.
+- **`apps/api/.env.test`** (committed, docker-only credentials) — `bun test` loads it over `.env`. It
+  sets `TEST_DATABASE_URL` and `NEON_FETCH_ENDPOINT`, which `src/config/localNeonProxy.ts` uses to route
+  the Neon HTTP driver to the proxy. `bun run test:db:up` / `test:db:down` start/stop it (tmpfs — data
+  is thrown away).
+- **Guards** in `tests/support/db/test-db.ts`: refuses a `*.neon.tech` host (override
+  `TEST_DB_ALLOW_NEON=1`), and refuses to truncate if `TEST_DATABASE_URL` equals `DATABASE_URL`
+  (override `TEST_DB_ALLOW_RESET=1`).
 - **`tests/support/app/request.ts`** — `apiRequest(path, init?)` calls `app.request()` with a
   `Bindings` env pointing at the test DB.
 - **`tests/support/factories/`** — one insert helper per table, each taking `Partial<$inferInsert>`
@@ -141,12 +148,12 @@ Four jobs, on every push to `master` and every PR:
 | Job | Steps |
 |---|---|
 | `data-engine` | `pip install -r requirements-dev.txt` → `pytest -v` |
-| `api` | `bun install` → `db:migrate` (if `DATABASE_URL` secret set) → `bun test` → `bun run typecheck` → `bun run lint` |
+| `api` | `bun install` → `test:db:up` (docker compose + migrations) → `bun run test` → `bun run typecheck` → `bun run lint` |
 | `web` | `bun install` → `bun run build` → `bun run test` → `bun run typecheck` → `bun run lint` |
 | `e2e` | `bun install` (web + e2e) → `playwright install chromium` → `bun run test` |
 
-The `api` job runs the integration suite against `secrets.TEST_DATABASE_URL`; if that secret is
-absent the suite still runs but integration files fail fast on the missing-env guard.
+The `api` job runs the integration suite against the same `docker-compose.test.yml` stack — CI never
+spends Neon CU-hours, and no `TEST_DATABASE_URL` secret is needed any more.
 
 ## Adding a test
 

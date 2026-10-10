@@ -100,13 +100,66 @@ as race-control.
 Returns team radio clips for a race, ordered by timestamp ascending. `driverId` references
 `drivers.id` (resolved from OpenF1's car number) — look it up the same way as overtakes.
 `recordingUrl` points directly at F1's own CDN. F1 doesn't release radio for every session,
-so an empty or partial list is expected, not an error.
+so an empty or partial list is expected, not an error — and since 2026 F1 releases far fewer clips.
+
+All three race-event routes take `?session=race|sprint` (default `race`): both sessions of a
+sprint weekend share one `race_id`, and each row carries its `session_type`. Any other value → 400
+`INVALID_SESSION`.
+
+### `GET /api/races/:id/strategy?session=race|sprint`
+
+Tyre strategy for one session, drivers in finishing order (`race_results` or `sprint_results`):
+
+```json
+{ "source": "openf1", "drivers": [{ "driver": { "...": "Driver" }, "finishPosition": 1,
+  "stints": [{ "stintNumber": 1, "compound": "MEDIUM", "lapStart": 1, "lapEnd": 15, "tyreAgeAtStart": 0 }],
+  "pitStops": [{ "lapNumber": 15, "pitLaneMs": 24500, "stationaryMs": null }] }] }
+```
+
+`source` is `openf1` (real stints, 2023+), `derived` (pre-2023: rebuilt from accurate `lap_times`,
+so stints span first..last *timed* lap and `tyreAgeAtStart` is null), or `none`. `stationaryMs` is
+only available from the 2024 US GP onward. Cached like other race routes (`cacheControlForStatus`).
+
+### `GET /api/races/:id/race-story?session=race|sprint`
+
+Lap-by-lap story from FastF1 full laps (2018+), drivers in finishing order:
+
+```json
+{ "drivers": [{ "driver": { "...": "Driver" }, "finishPosition": 1,
+    "positions": [2, 1, 1], "gapsMs": [800, 0, 0], "intervalsMs": [800, null, null], "lapsDown": [0, 0, 0] }],
+  "battles": [{ "chaser": { "...": "Driver" }, "leader": { "...": "Driver" }, "lapStart": 12, "lapEnd": 19, "minGapMs": 310 }],
+  "weather": { "minuteOffsets": [0, 1], "airTempC": [25, 25.1], "trackTempC": [41.2, 40.8], "rainfall": [false, false] } }
+```
+
+Array index 0 is lap 1. `gapsMs` is null while a car is lapped (`lapsDown > 0`); `intervalsMs` is
+null for the leader. A battle is 3+ consecutive laps within 1.0 s of the same car ahead. `weather`
+is null when FastF1 had no samples. About 40 KB per race before gzip.
+
+### `GET /api/races/:id/telemetry?session=Q|SQ&a=CODE&b=CODE`
+
+Fastest-lap telemetry for a qualifying session (OpenF1, 2023+). `drivers` lists everyone with a
+stored lap (fastest first, no samples); `laps` holds full samples for only the two requested codes —
+defaulting to the two fastest — to keep the payload (and Neon egress) small:
+
+```json
+{ "session": "Q",
+  "drivers": [{ "driver": { "...": "Driver" }, "lapTimeMs": 79327 }],
+  "laps": [{ "driver": { "...": "Driver" }, "lapNumber": 11, "lapTimeMs": 79327,
+    "samples": { "distanceM": [0, 10], "timeMs": [0, 112], "speed": [321, 322], "throttle": [99, 100],
+                 "brake": [0, 0], "gear": [8, 8], "x": [-1359, -1351], "y": [-498, -460] } }] }
+```
+
+All sample arrays share one 10 m distance grid, so two laps compare index by index.
 
 ### `GET /api/races/circuits`
 
 Returns a list of all circuits in the database, ordered alphabetically by name.
 
 ### `GET /api/races/circuit/:circuitKey`
+
+Also returns `outlinePath`: an SVG path (1000×1000 viewBox) drawn from the latest stored pole lap's
+x/y at the circuit, or null before any 2023+ telemetry exists.
+
 
 Returns historical race results at a specific circuit across all years. Each item includes `hasSprint: boolean`.
 
@@ -124,6 +177,19 @@ Returns historical race results at a specific circuit across all years. Each ite
 ### `GET /api/drivers/standings?year=N`
 
 Returns driver championship standings for the year, ordered by points.
+
+### `GET /api/drivers/racecraft?year=N`
+
+GP-session overtakes per driver from `race_overtakes` (2023+), ranked by net: `[{ driver, made,
+suffered, net }]`. Sprint passes are excluded. OpenF1 marks overtakes as possibly incomplete.
+
+### `GET /api/drivers/:id/teammate-battle?year=N`
+
+Head-to-head against the team-mate with the most shared races that season (`:id` is the
+season-scoped driver id): `{ teammate, sharedRaces, qualifying, race, points }`, each a
+`{ driver, teammate }` count. `qualifying` compares classified qualifying position; `race` only
+counts races both drivers finished (`Finished`/`Lapped`/`+N Lap(s)`, ADR 0002); `points` are GP
+points. `year` only drives the cache header.
 
 ### `GET /api/drivers/:id?year=N`
 
@@ -144,6 +210,12 @@ Returns all teams for the season.
 ### `GET /api/teams/standings?year=N`
 
 Returns constructor championship standings for the year, ordered by points.
+
+### `GET /api/teams/pit-stops?year=N`
+
+Pit crews ranked by **median** stationary time (one botched stop can't skew it): `[{ team, stops,
+medianStationaryMs, fastestStationaryMs }]`. Stops without a stationary time (pre-2024 US GP) are
+ignored. Long-cached for past seasons (`cacheControlForYear`).
 
 ### `GET /api/teams/:id?year=N`
 
@@ -210,6 +282,25 @@ Returns the prediction for the next `qualifying_done` race with `race_date >= to
 ### `GET /api/predictions/race/:raceId`
 
 Returns the prediction for a specific grand prix by race ID. Same shape as `/upcoming`.
+
+### `GET /api/predictions/title-odds?year=N`
+
+Latest Monte Carlo championship odds plus their per-round history (written by `compute_title_odds`):
+
+```json
+{ "afterRound": 19,
+  "drivers": [{ "driver": { "...": "Driver" }, "titleProbability": 0.88, "expectedPoints": 452.3, "pointsP10": 420, "pointsP90": 475 }],
+  "teams":   [{ "team": { "...": "Team" }, "titleProbability": 0.81, "expectedPoints": 690, "pointsP10": 650, "pointsP90": 720 }],
+  "history": [{ "afterRound": 18, "driverId": 10, "titleProbability": 0.93 }] }
+```
+
+404 if no odds exist for the season yet.
+
+### `GET /api/predictions/race/:raceId/friday-pace`
+
+Each driver's quickest practice long run (`fp2_long_run_times`, the Long Run Pace feature's raw
+input), fastest first: `[{ driver, compound, sessionType, medianLapMs, stintLength, deltaToFastestMs }]`.
+`sessionType` is `FP2`, or `FP1` on sprint weekends. 404 if the race doesn't exist.
 
 ### `GET /api/predictions/history?year=N`
 
@@ -388,6 +479,35 @@ Returns all unique drivers (their latest profiles), teams, and circuits across a
 ```
 
 ---
+
+## History (F1DB)
+
+All-time data imported from [F1DB](https://github.com/f1db/f1db) (CC-BY-4.0). Cached for a day.
+
+### `GET /api/history/records`
+
+Top-10 leaders `{ f1dbId, name, value }` for drivers (`wins`, `championships`, `poles`, `podiums`,
+`starts`) and constructors (`wins`, `championships`, `poles`), plus the five `youngestWinners`
+(`ageDays` = first win date − date of birth, `raceName`).
+
+### `GET /api/history/on-this-day?date=MM-DD`
+
+Up to 10 completed races (core DB, 1980+) held on that calendar day, newest first, with the winner.
+
+### `GET /api/drivers/:id/history`
+
+The core driver's all-time F1DB record (career totals, first race / podium / pole / win), matched
+by normalised full name. 404 if the driver isn't in the imported release.
+
+### `GET /api/teams/:id/history`
+
+The constructor's all-time totals plus chassis and engine per season, matched via
+`f1dbConstructorId(team_key)`. 404 if unmatched.
+
+### `GET /api/races/:id/recap`
+
+Home-hub summary: `{ winner, predictedWinner, predictionHit, fastestStop: { driver, stationaryMs },
+topBattle }` — the longest race battle. Each part is null when its data doesn't exist.
 
 ## Data Quality
 

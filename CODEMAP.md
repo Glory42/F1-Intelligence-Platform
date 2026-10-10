@@ -528,9 +528,7 @@ data-engine/
 │   ├── backfill_full.py           # Full historical backfill: sync + ingest + sprint + predictions
 │   ├── backfill_sprint.py         # Sprint-only backfill for specific years
 │   ├── backfill_fp2.py            # Backfill FP2 long-run data for 2018+ completed races
-│   ├── backfill_race_control.py   # Backfill OpenF1 race-control messages for a year range (2023+ only — no OpenF1 coverage before)
-│   ├── backfill_overtakes.py      # Backfill OpenF1 overtakes for a year range (2023+ only — no OpenF1 coverage before)
-│   ├── backfill_team_radio.py     # Backfill OpenF1 team radio clips for a year range (2023+ only — no OpenF1 coverage before)
+│   ├── backfill_openf1.py         # Backfill any OpenF1 job (race control, overtakes, radio, stints, pit stops) for a year range — 2023+, local only, stops at the storage guard
 │   ├── backfill_all_predictions.py # Recompute GP + sprint predictions for all races (weighted-v3 / sprint-v2)
 │   ├── backfill_historical.sh     # Shell loop over sync_schedule/ingest/compute for a year range
 │   └── populate_all.sh            # One-time population run for 2021–2025

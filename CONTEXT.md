@@ -1,6 +1,6 @@
-# F1 Prediction Platform
+# F1 Intelligence Platform
 
-Predicts Formula 1 race and sprint winners from historical and current session data, using a weighted feature-scoring model rather than a trained ML model.
+Follows, predicts and explores Formula 1 — current-season race weekends, championship standings and all-time history — with race and sprint winner predictions (a weighted feature-scoring model, not a trained ML model) as one lens among several.
 
 ## Language
 
@@ -45,6 +45,10 @@ A continuous run of laps on a single tyre Compound between pit stops. Long Run P
 A timestamped, race-scoped happening sourced from OpenF1 rather than FastF1 — race-control messages (flags/SC/VSC), Overtakes, and Team Radio clips. Matches the `apps/api/src/modules/race-events/` module name; all three are ingested only once a Race is `completed` and past OpenF1's live-data window (2023+ only — OpenF1 has no earlier coverage).
 _Avoid_: Confusing with Classification or Race Status — a Race Event is an incident/moment within a session, not a pipeline state or finishing result.
 
+**Recap**:
+A short summary of one completed Race — winner, whether the Prediction picked it, standout moments (fastest stop, top battle). Always Race-scoped.
+_Avoid_: "Recap" for a Season-level view of the model's performance — that is the Scorecard.
+
 ### Prediction Model
 
 **RuleBased (model)**:
@@ -67,6 +71,16 @@ A string (`weighted-v3`, `sprint-v2`, ...) identifying exactly which weight/form
 **Prediction**:
 The full, race-scoped ranked list of drivers with win probabilities and feature breakdowns — assembled from `race_predictions` (predicted winner + model version) joined with `driver_prediction_features` (per-driver scores). Not just the predicted winner.
 _Avoid_: Equating "Prediction" with the `race_predictions` row alone — that table only holds the winner-pointer half of it.
+
+**Scorecard**:
+How the Predictions performed across one Season — race-by-race hits and misses, top-3/top-5 hit rates, Brier score and calibration.
+_Avoid_: "Recap", "season record" or "accuracy" as separate names for parts of it — they are all the Scorecard.
+
+### History
+
+**Records**:
+All-time F1 achievements (most wins, poles, titles, ...) drawn from the full history of the sport, not just the seasons this platform ingests.
+_Avoid_: "Record" for the model's prediction performance — that is the Scorecard.
 
 ### Data Operations
 

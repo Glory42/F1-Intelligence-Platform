@@ -56,14 +56,59 @@ than blocking or reverting the core race-completion pipeline it rides on.
 |-----|---------|
 | `ingest_race_control` | Ingests OpenF1 flags/safety-car/VSC/incident messages into `race_control_messages` — 2023+ only |
 | `ingest_overtakes` | Ingests OpenF1 on-track overtakes into `race_overtakes`, resolving each driver number to a `drivers.id` via `build_driver_number_map` — 2023+ only |
-| `ingest_team_radio` | Ingests OpenF1 team radio clips into `team_radio_clips`, same driver-number resolution — 2023+ only; F1 doesn't release radio for every session, so a partial or empty result is normal |
+| `ingest_team_radio` | Ingests OpenF1 team radio clips into `team_radio_clips`, same driver-number resolution — 2023+ only; F1 doesn't release radio for every session (far fewer since 2026), so a partial or empty result is normal |
+| `ingest_stints` | Ingests OpenF1 tyre stints into `race_stints` (compound, lap range, tyre age at start) — 2023+ only |
+| `ingest_pit_stops` | Ingests OpenF1 pit stops into `race_pit_stops` (pit-lane and stationary time in ms; stationary only from the 2024 US GP) — 2023+ only |
 
-Backfill across a year range with `python scripts/backfill_race_control.py <start> <end>`,
-`python scripts/backfill_overtakes.py <start> <end>`, or
-`python scripts/backfill_team_radio.py <start> <end>` (data-engine/, paced to stay under
-OpenF1's free-tier rate limit). These backfill scripts currently only cover the `Race`
-session; pass `--session Sprint` to the underlying `src.main` job directly to backfill a
-specific sprint weekend's race events by hand.
+Every row is tagged with `session_type` (`race`/`sprint`). The shared runner (`run_openf1_job`)
+reads the race row, closes its connection, makes the OpenF1 calls, then reopens one to write —
+it never holds a Neon connection across HTTP. It caches the resolved session key on
+`races.openf1_{race,sprint}_session_key`, and skips writing entirely if `storage_guard` reports the
+core-only tier. `openf1_client` paces requests 2 s apart, retries 429/5xx, and the worker caps each
+cycle at 25 requests (ADR 0004).
+
+Backfill any of them across a year range, locally (never on Render):
+`python scripts/backfill_openf1.py <job> <start> <end> [--session Sprint]`. It stops as soon as
+`storage_guard` leaves the allow-all tier.
+
+---
+
+### Race story
+
+`run_ingest_job` (`ingest_race` / `ingest_sprint`) also builds lap traces, battles and the weather
+trace from the session it already loaded — no extra download — and writes them in the same
+transaction unless `storage_guard` reports the core-only tier. It loads FastF1 with **no DB
+connection open** (as do `run_qualifying_ingest_job` and `ingest_fp2`): a session load takes minutes
+and an open connection would keep Neon compute awake. Backfill past races locally with
+`python scripts/backfill_race_story.py <start> <end>` (FastF1 2018+); it writes only the race-story
+tables and stops at the storage guard's backfill threshold.
+
+### Qualifying telemetry
+
+`ingest_qualifying_telemetry` (`--session Race|Sprint` → `Q`/`SQ` on the CLI) reads OpenF1 `/laps`,
+picks each driver's fastest timed lap, then fetches `/car_data` and `/location` for that lap's time
+window (~41 requests per session). Distance is integrated from speed, padded to the official lap
+start/end and scaled to the circuit length, then everything is resampled every 10 m
+(`utils/telemetry.py`). It runs after the race as non-fatal OpenF1 steps and is **resumable**: drivers
+already stored are skipped, and when the cycle's 25-request budget runs out it writes what it has;
+`_retry_missing_race_events` resumes it each cycle until every qualifier is stored. Backfill locally
+with `python scripts/backfill_openf1.py ingest_qualifying_telemetry 2023 2026` (unbudgeted, paced).
+
+### Historical data (F1DB)
+
+`python scripts/import_f1db.py [--version vYYYY.RR.M]` downloads F1DB's `json-splitted` release,
+checks its SHA-256 against the release's own checksum file, extracts it into a fresh temp dir and runs
+`jobs/import_f1db.py`: driver bios + career totals + first race/podium/pole/win (computed from F1DB race
+results), constructor totals, chassis/engine per season, and constructor lineage — ~700 KB in Neon.
+Already-imported versions are skipped (`f1db_imports`), and the import respects `storage_guard`'s
+backfill tier. Local only: parsing the release needs more RAM than Render Free has. F1DB publishes a
+release after every race; re-run whenever convenient — history isn't time-critical.
+
+### Title odds
+
+`compute_title_odds --year N` runs as a non-fatal step at the end of every worker action (after
+predictions on qualifying weekends, after `compute_season_stats` on sprint/race completion) and
+writes `title_odds_drivers` / `title_odds_teams`. Method: `docs/prediction-model.md`.
 
 ---
 
@@ -147,8 +192,8 @@ A persistent web service runs continuously:
 4. If the time has passed, it attempts to download the data. 
    - **If F1 data is delayed**, FastF1 throws a `DataNotLoadedError`. The script catches this, exits cleanly, and tries again next hour.
 5. Once ingestion succeeds, it automatically chains the downstream jobs (features, predictions, stats). If any job in the sequence fails, it sets the race `status` to whatever the sequence actually last committed — not blindly back to the pre-sequence value — so the next hour's retry resumes from where it left off instead of redoing already-completed steps.
-6. After `MAIN_RACE`'s core steps (`ingest_race`, `compute_season_stats`) commit `completed`, it also runs the OpenF1 Race Events jobs (race control, overtakes, team radio) for both the Race and Sprint sessions. These run through a non-fatal wrapper — a failure here is logged but never reverts `status` or fails the cycle, since Race Events are supplementary and safe to pick up on a later manual run if OpenF1 has a transient issue.
-7. Because that failure is swallowed rather than retried, and the race is already `completed` by the time it runs (so it drops out of step 1's query on the next poll), `run_cycle` also re-checks the *current* race-weekend window's race on every cycle it's still inside that window (`RaceWeekendWindow`'s 24h tail — see `_retry_missing_race_events`). If that race is `completed` but has zero `race_control_messages` rows (race control is virtually never legitimately empty for a session that happened, unlike team radio), it retries all three OpenF1 jobs again. This is the safety net for the case where FastF1's and OpenF1's timing genuinely diverge — e.g. a red-flag-delayed race pushes the real session end past `OPENF1_LIVE_WINDOW_BUFFER`, so OpenF1 wasn't actually ready the first time.
+6. After `MAIN_RACE`'s core steps (`ingest_race`, `compute_season_stats`) commit `completed`, it also runs the OpenF1 Race Events jobs (race control, overtakes, team radio, stints, pit stops) for both the Race and Sprint sessions. These run through a non-fatal wrapper — a failure here is logged but never reverts `status` or fails the cycle, since Race Events are supplementary and safe to pick up on a later manual run if OpenF1 has a transient issue.
+7. Because that failure is swallowed rather than retried, and the race is already `completed` by the time it runs (so it drops out of step 1's query on the next poll), `run_cycle` also re-checks the *current* race-weekend window's race on every cycle it's still inside that window (`RaceWeekendWindow`'s 24h tail — see `_retry_missing_race_events`). If that race is `completed` but has zero `race_control_messages` rows (race control is virtually never legitimately empty for a session that happened, unlike team radio), it retries every OpenF1 job for that session again — checked per session, so a sprint-only gap is retried too. Once nothing is missing and no session is due, later cycles skip the DB entirely (`WorkerMemo`). This is the safety net for the case where FastF1's and OpenF1's timing genuinely diverge — e.g. a red-flag-delayed race pushes the real session end past `OPENF1_LIVE_WINDOW_BUFFER`, so OpenF1 wasn't actually ready the first time.
 
 ---
 
@@ -159,34 +204,34 @@ cd data-engine
 source venv/bin/activate
 
 # Sync
-python src/main.py --job sync_schedule     --year 2026
-python src/main.py --job sync_season       --year 2026 --round 1
+python -m src.main --job sync_schedule     --year 2026
+python -m src.main --job sync_season       --year 2026 --round 1
 
 # Main race pipeline
-python src/main.py --job ingest_qualifying --year 2026 --round 6
-python src/main.py --job ingest_race       --year 2026 --round 6
-python src/main.py --job compute_season_stats --year 2026
-python src/main.py --job compute_features  --race_id 42
-python src/main.py --job compute_predictions --race_id 42
+python -m src.main --job ingest_qualifying --year 2026 --round 6
+python -m src.main --job ingest_race       --year 2026 --round 6
+python -m src.main --job compute_season_stats --year 2026
+python -m src.main --job compute_features  --race_id 42
+python -m src.main --job compute_predictions --race_id 42
 
 # Sprint pipeline
-python src/main.py --job ingest_sprint_qualifying --year 2026 --round 9
-python src/main.py --job compute_sprint_features  --race_id 55
-python src/main.py --job compute_sprint_predictions --race_id 55
-python src/main.py --job ingest_sprint            --year 2026 --round 9
+python -m src.main --job ingest_sprint_qualifying --year 2026 --round 9
+python -m src.main --job compute_sprint_features  --race_id 55
+python -m src.main --job compute_sprint_predictions --race_id 55
+python -m src.main --job ingest_sprint            --year 2026 --round 9
 
 # Race Events (OpenF1) — --session defaults to Race; pass Sprint for the sprint session
-python src/main.py --job ingest_race_control --year 2026 --round 9 --session Sprint
-python src/main.py --job ingest_overtakes    --year 2026 --round 9 --session Sprint
-python src/main.py --job ingest_team_radio   --year 2026 --round 9 --session Sprint
+python -m src.main --job ingest_race_control --year 2026 --round 9 --session Sprint
+python -m src.main --job ingest_overtakes    --year 2026 --round 9 --session Sprint
+python -m src.main --job ingest_team_radio   --year 2026 --round 9 --session Sprint
 
 # Data-quality audit
-python src/main.py --job data_quality_audit --year 2026     # latest season
-python src/main.py --job data_quality_audit --all            # every season in the DB
+python -m src.main --job data_quality_audit --year 2026     # latest season
+python -m src.main --job data_quality_audit --all            # every season in the DB
 
 # Repair fixable gaps found by the audit (act on the latest run for the year)
-python src/main.py --job data_quality_repair --year 2026
-python src/main.py --job data_quality_repair --year 2026 --resolve_run 5
+python -m src.main --job data_quality_repair --year 2026
+python -m src.main --job data_quality_repair --year 2026 --resolve_run 5
 ```
 
 Repair maps each fixable issue to the ingest+recompute jobs that own that table's
@@ -198,8 +243,8 @@ that ran no long-run stint can't be reconstructed.
 For pre-2018:
 
 ```bash
-python src/main.py --job ingest_qualifying_legacy --year 2015 --round 5
-python src/main.py --job ingest_race_legacy       --year 2015 --round 5
+python -m src.main --job ingest_qualifying_legacy --year 2015 --round 5
+python -m src.main --job ingest_race_legacy       --year 2015 --round 5
 ```
 
 ---

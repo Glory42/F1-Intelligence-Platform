@@ -90,8 +90,8 @@ Then seed circuits and seasons:
 ```bash
 cd data-engine
 source venv/bin/activate
-python src/main.py --job sync_schedule --year 2025
-python src/main.py --job sync_season   --year 2025 --round 1
+python -m src.main --job sync_schedule --year 2025
+python -m src.main --job sync_season   --year 2025 --round 1
 ```
 
 ### 2. API (Cloudflare Workers)

@@ -35,6 +35,11 @@ seasons
         └── race_control_messages   (no driver FK — driver_number is a raw OpenF1 car number)
         └── race_overtakes          (two FKs → drivers: overtaking_driver_id, overtaken_driver_id)
         └── team_radio_clips        (FK → drivers)
+        └── race_stints             (FK → drivers)  ← OpenF1 2023+, per session
+        └── race_pit_stops          (FK → drivers)  ← OpenF1 2023+, per session
+        └── race_lap_traces         (FK → drivers)  ← FastF1 2018+, int[] per lap
+        └── race_battles            (2 FKs → drivers)
+        └── race_weather_traces     (no driver FK)  ← per-minute weather arrays
         └── lap_times               (FK → drivers)
         └── driver_prediction_features (FK → drivers)
         └── race_predictions        (FK → drivers)
@@ -43,6 +48,8 @@ seasons
         └── driver_sprint_features  (FK → drivers)  ← sprint weekends only
         └── sprint_predictions      (FK → drivers)  ← sprint weekends only
   └── driver_season_stats  (FK → drivers)
+  └── title_odds_drivers   (FK → drivers) — one row per driver per round
+  └── title_odds_teams     (FK → teams)   — one row per team per round
   └── team_season_stats    (FK → teams)
 
 circuits      (static, seeded once)
@@ -217,6 +224,7 @@ OpenF1's live-data window.
 | `scope` | varchar(20) | e.g. `Track`, `Sector`, `Driver`; nullable |
 | `sector` | integer | Nullable |
 | `message` | text | Raw OpenF1 message text |
+| `session_type` | varchar(10) | `race` (default) or `sprint` — both sessions of a sprint weekend share `race_id` |
 | UNIQUE | `(race_id, date, message)` | |
 
 ---
@@ -235,6 +243,7 @@ since both sides of the exchange are needed for a usable UI.
 | `overtaking_driver_id` | FK → drivers | The driver who gained the position |
 | `overtaken_driver_id` | FK → drivers | The driver who lost the position |
 | `position` | integer | Track position after the overtake |
+| `session_type` | varchar(10) | `race` (default) or `sprint` — both sessions of a sprint weekend share `race_id` |
 | UNIQUE | `(race_id, date, overtaking_driver_id, overtaken_driver_id)` | |
 
 ---
@@ -251,7 +260,90 @@ session, so sparse or missing coverage for a given race is expected, not a data 
 | `driver_id` | FK → drivers | Resolved from OpenF1's car number via `build_driver_number_map` |
 | `date` | timestamptz | Clip timestamp, from OpenF1 |
 | `recording_url` | text | Direct link to F1's own audio CDN |
+| `session_type` | varchar(10) | `race` (default) or `sprint` — both sessions of a sprint weekend share `race_id` |
 | UNIQUE | `(race_id, driver_id, date)` | |
+
+---
+
+### `race_stints`
+One row per tyre stint per driver per session, from OpenF1 `/stints` (2023+). Pre-2023 strategy
+is rebuilt on the fly from `lap_times` by the API instead (see `/api/races/:id/strategy`).
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | serial PK | |
+| `race_id` | FK → races | |
+| `session_type` | varchar(10) | `race` or `sprint` |
+| `driver_id` | FK → drivers | Resolved from OpenF1's car number |
+| `stint_number` | integer | 1-based |
+| `compound` | varchar(20) | `SOFT`/`MEDIUM`/`HARD`/`INTERMEDIATE`/`WET`; nullable |
+| `lap_start` / `lap_end` | integer | Inclusive lap range |
+| `tyre_age_at_start` | integer | Laps already on the set (> 0 = used set) |
+| UNIQUE | `(race_id, session_type, driver_id, stint_number)` | |
+
+---
+
+### `race_pit_stops`
+One row per pit stop per driver per session, from OpenF1 `/pit` (2023+).
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | serial PK | |
+| `race_id` | FK → races | |
+| `session_type` | varchar(10) | `race` or `sprint` |
+| `driver_id` | FK → drivers | Resolved from OpenF1's car number |
+| `lap_number` | integer | Lap the stop happened on |
+| `pit_lane_ms` | integer | Total pit-lane time, ms |
+| `stationary_ms` | integer | Time stopped in the box, ms — only from the 2024 US GP onward |
+| `date` | timestamptz | |
+| UNIQUE | `(race_id, session_type, driver_id, lap_number)` | |
+
+---
+
+### `race_lap_traces`
+One row per driver per session holding per-lap arrays (index 0 = lap 1), built by
+`race_story.build_lap_traces` from FastF1's **full** `session.laps` (unlike `lap_times`, which only
+keeps accurate laps). ~20 rows and ~18 KB per race — row-per-lap would be ~1,200 rows.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `race_id`, `session_type`, `driver_id` | | UNIQUE together |
+| `positions` | integer[] | Position at the end of each lap |
+| `gaps_ms` | integer[] | Gap to that lap's leader; NULL while lapped |
+| `intervals_ms` | integer[] | Gap to the car directly ahead; NULL for the leader |
+| `laps_down` | integer[] | Laps behind the leader |
+
+### `race_battles`
+3+ consecutive laps within 1.0 s of the same car ahead (`race_story.find_battles`).
+Columns: `race_id`, `session_type`, `chaser_driver_id`, `leader_driver_id`, `lap_start`, `lap_end`,
+`min_gap_ms`. UNIQUE `(race_id, session_type, chaser_driver_id, lap_start)`.
+
+### `race_weather_traces`
+One row per session: `minute_offsets` integer[], `air_temp_tenths` / `track_temp_tenths` integer[]
+(tenths of °C), `rainfall` boolean[]. UNIQUE `(race_id, session_type)`.
+
+---
+
+### `qualifying_lap_telemetry`
+Each driver's fastest qualifying (`Q`) / sprint-qualifying (`SQ`) lap from OpenF1 `/laps` + `/car_data`
++ `/location` (2023+). `samples` is JSONB of int arrays on a 10 m distance grid: `distanceM`,
+`timeMs`, `speed`, `throttle`, `brake` (0/100), `gear`, `x`, `y`. ~11 KB per row after TOAST.
+UNIQUE `(race_id, session_type, driver_id)`; also `lap_number`, `lap_time_ms`.
+
+---
+
+### History tables (F1DB, CC-BY-4.0)
+Imported by `import_f1db`; separate from the season-scoped core tables that feed the model.
+
+- `history_drivers` — one row per F1DB driver: `f1db_id` (UNIQUE), `match_key` (normalised name,
+  indexed — the join to core drivers), bio (`date_of_birth`, `nationality`), career totals
+  (`championships`, `race_starts`, `race_wins`, `podiums`, `pole_positions`, `fastest_laps`,
+  `career_points`, `sprint_wins`, `grand_slams`) and `first_{race,podium,pole,win}_{date,name}`.
+- `history_constructors` — `f1db_id` (UNIQUE), name, country, career totals.
+- `history_constructor_seasons` — `(constructor_f1db_id, year)` UNIQUE; `chassis`, `engine` display names.
+- `history_constructor_lineage` — F1DB chronology: `(parent_f1db_id, position)` UNIQUE, member
+  `constructor_f1db_id`, `year_from`/`year_to`.
+- `f1db_imports` — imported release `version` (UNIQUE), so a release is never imported twice.
 
 ---
 
@@ -381,6 +473,26 @@ Aggregated after each race. Drives `car_performance_score` in predictions.
 | `reliability_score` | numeric(5,4) | Normalized from 1 − dnf_rate |
 | `championship_position` | integer | |
 | UNIQUE | `(season_id, team_id)` | |
+
+---
+
+### `title_odds_drivers` / `title_odds_teams`
+Monte Carlo championship odds written by `compute_title_odds` after every qualifying, sprint and
+race. One row per contender per `after_round` (the last completed round when computed, 0 before the
+opener), so the odds can be charted across the season — about 720 rows a season in total.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | serial PK | |
+| `season_id` | FK → seasons | |
+| `after_round` | integer | Last completed round at compute time |
+| `driver_id` / `team_id` | FK → drivers / teams | |
+| `title_probability` | numeric(6,5) | Share of simulated seasons won (ties split) |
+| `expected_points` | numeric(6,1) | Mean final points, GP + sprint |
+| `points_p10` / `points_p90` | numeric(6,1) | 10th / 90th percentile final points |
+| `simulations` | integer | 10,000 |
+| `model_version` | varchar(30) | `title-odds-v1` |
+| UNIQUE | `(season_id, after_round, driver_id)` / `(season_id, after_round, team_id)` | |
 
 ---
 

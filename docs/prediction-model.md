@@ -201,3 +201,48 @@ Drivers are ranked by `win_probability` descending. Rank 1 = predicted winner, s
 | 1990–1999 | None (fell back to race starting grid) | None | N/A |
 
 For races without qualifying data, `compute_features` cannot run — those races have no predictions.
+
+
+## Championship title odds (`title-odds-v1`)
+
+`compute_title_odds` (data-engine) turns race-by-race win probabilities into championship odds:
+
+1. **Remaining sessions** — every GP not yet `completed`, plus the sprint on sprint weekends whose
+   status is `scheduled`/`sprint_qualifying_done` (`build_remaining_races`).
+2. **Win probabilities per session** — the session's own stored prediction when it exists
+   (features exist once qualifying is in); otherwise each driver's mean predicted GP win probability
+   over the last 5 predicted races (`form_win_probs`), floored at 0.001 so no driver is impossible.
+3. **Finishing orders** — Plackett–Luce draws via the Gumbel-max trick: sort `log(p) + Gumbel noise`.
+   The winner follows `p`; lower places follow the same softmax ranking, consistent with T = 0.3.
+4. **Points** — GP 25-18-15-12-10-8-6-4-2-1 (no fastest-lap point, as from 2025); sprint 8-7-…-1.
+   Current points are `total_points + sprint_total_points`.
+5. **Aggregate** — 10,000 seasons, seeded by `(year, after_round)` so reruns are identical. A points
+   tie splits the title (countback isn't simulated). Team odds sum each team's drivers within the
+   same simulated seasons, so driver and constructor odds are consistent.
+
+The web standings additionally show pure mathematical contention (`titleContention` in
+`apps/web/src/lib/championshipMath.ts`): a driver is eliminated once their points plus every point
+still available (26 per GP 2019–2024, 25 otherwise; 8 per sprint, 3 in 2021) fall short of the leader.
+
+
+## weighted-v4 candidate: measured overtake rate — rejected (backtest, 2026-10-10)
+
+Idea: replace the hand-seeded `circuits.overtake_rate` with one measured from `race_overtakes`
+(mean passes per car-lap, ranked 0–1 across circuits, using only races before the one being predicted,
+shrunk toward the seeded value with weight `n / (n + k)`). `scripts/backtest_model_v4.py` re-prices
+every stored `weighted-v3` prediction exactly — only the two circuit-adjusted features depend on the
+rate — and compares multi-class Brier and winner hit rate over 208 completed races:
+
+| k | v3 Brier | v4 Brier | v3 hit | v4 hit |
+|---|---|---|---|---|
+| 2 | 0.8666 | 0.8667 | 47.1% | 46.6% |
+| 1 | 0.8666 | 0.8666 | 47.1% | 46.2% |
+| 0 | 0.8666 | 0.8666 | 47.1% | 47.6% |
+
+No setting beats v3 beyond noise (±1 race of 208), so the model stays `weighted-v3`. The two features
+carry only 10% of the weight, and overtakes are 2023+ only. Re-run the script when more seasons of
+overtake data exist.
+
+Observed while building it: `circuit_adj_start_pos` multiplies the start-position score by up to ~1.95
+at low-overtake tracks and then clamps at 1.0, so at Monaco-like circuits the front of the grid all
+scores 1.0 — pole and P2 become indistinguishable on that feature. Worth revisiting in a future model.

@@ -1,8 +1,9 @@
-# F1 Prediction Platform — Claude Code Guide
+# F1 Intelligence Platform — Claude Code Guide
 
 ## Project Overview
-F1 race winner prediction platform. Uses historical + current F1 data (via FastF1) to
-predict race winners with a weighted feature scoring system.
+F1 analysis platform (brand: `SITE_NAME` in `apps/web/src/lib/site.ts`). Uses historical + current F1
+data (FastF1, OpenF1) for race analysis and to predict race winners with a weighted feature scoring
+system. Roadmap and free-tier budget rules: `docs/plans/intelligence-platform-roadmap.md`.
 
 ## Monorepo Layout
 ```
@@ -32,8 +33,9 @@ it's Python, and its jobs run once and exit rather than being a long-running dev
   `execute_batch` call, rather than extending `FakeCursor` to fake SQL rendering.
 - `apps/api/tests/unit/` — `bun test`, mirrors `src/` by domain (e.g. `tests/unit/common/mappers.test.ts`
   tests `src/common/mappers.ts`). Covers the shared `src/common/` mapper/aggregation layer.
-- `apps/api/tests/integration/` — `bun test`, real Hono `app.request()` calls against a dedicated Neon test
-  branch (`TEST_DATABASE_URL` in `.env`, separate from `DATABASE_URL` — see `.env.example`). Seeds its own
+- `apps/api/tests/integration/` — `bun test`, real Hono `app.request()` calls against a **local** Postgres
+  (`docker-compose.test.yml` behind a Neon HTTP proxy; `bun run test:db:up`, config in the committed
+  `apps/api/.env.test`). Never against Neon — the test setup refuses `*.neon.tech` hosts. Seeds its own
   fixtures per file via `tests/support/factories/` and truncates after (`tests/support/db/test-db.ts`).
   Covers `races`, `drivers`, `teams`, `seasons`, `search`; `predictions`/`sprint`/`quality` are not yet covered.
 - `apps/web/tests/unit/` — Vitest. Pure logic (`compareStats.ts`, `lib/` lookups) runs under the default `node`
@@ -107,6 +109,17 @@ Do not create write endpoints on the API for ETL use.
 Every Python job uses `INSERT ... ON CONFLICT DO UPDATE`.
 Running any job twice must produce identical results, never duplicate rows.
 
+### 6. Stay inside the free tiers (Neon Free, Render Free, OpenF1 free)
+Exceeding Neon's compute (100 CU-h/mo) or egress (5 GB/mo) suspends the DB until next month; a full
+1 GB blocks every write. Render Free has 512 MB RAM and 750 h/mo (already used by the one service).
+- Never hold a DB connection across HTTP calls (FastF1/OpenF1) — connect late, close early.
+- No new polling or wake-ups: new ETL steps ride the existing worker cycle in `auto_runner.py`.
+- Whole-race data goes in one row per (race, session, driver) with arrays/JSONB, not row-per-lap.
+- Heavy API routes set `Cache-Control` via `src/common/cache.ts`; `edgeCache()` serves repeats.
+- Backfills run locally in bounded chunks and check `storage_guard` first — never on Render.
+- Tests never touch Neon (see "Where tests live").
+Full rules and numbers: `docs/plans/intelligence-platform-roadmap.md` §1–§2.
+
 ---
 
 ## Database
@@ -122,6 +135,12 @@ Running any job twice must produce identical results, never duplicate rows.
 - `qualifying_results` / `race_results` / `lap_times` — raw GP ingested data
 - `sprint_results` — sprint finish data + SQ1/SQ2/SQ3 qualifying times
 - `sprint_lap_times` — per-lap sprint data (mirrors `lap_times` structure)
+- `race_control_messages` / `race_overtakes` / `team_radio_clips` — OpenF1 race events (2023+), tagged `session_type` `race`/`sprint`
+- `race_stints` / `race_pit_stops` — OpenF1 tyre stints and pit stops (2023+), per `session_type`
+- `title_odds_drivers` / `title_odds_teams` — Monte Carlo championship odds, one row per contender per round
+- `race_lap_traces` / `race_battles` / `race_weather_traces` — race story from FastF1 full laps (2018+): per-driver int[] arrays, battles, per-minute weather
+- `qualifying_lap_telemetry` — each driver's fastest Q/SQ lap from OpenF1 (2023+), resampled every 10 m into one JSONB row (~11 KB)
+- `history_drivers` / `history_constructors` / `history_constructor_seasons` / `history_constructor_lineage` / `f1db_imports` — all-time history from F1DB (CC-BY-4.0, credit it wherever shown); joined to core drivers by `match_key` (`normalize_person_name`) and to teams via `f1dbConstructorId(team_key)`
 - `driver_season_stats` / `team_season_stats` — aggregated after each race (includes sprint aggregates)
 - `driver_prediction_features` — 12 normalized feature scores per driver per GP
 - `race_predictions` — one predicted GP winner per race
@@ -187,14 +206,25 @@ GET /api/races?year=N&status=S
 GET /api/races/circuits
 GET /api/races/circuit/:circuitKey
 GET /api/races/:id
+GET /api/races/:id/race-control?session=race|sprint
+GET /api/races/:id/overtakes?session=race|sprint
+GET /api/races/:id/team-radio?session=race|sprint
+GET /api/races/:id/strategy?session=race|sprint
+GET /api/races/:id/race-story?session=race|sprint
+GET /api/races/:id/telemetry?session=Q|SQ&a=CODE&b=CODE
 
 GET /api/drivers?year=N&team_id=N
 GET /api/drivers/standings?year=N
+GET /api/drivers/racecraft?year=N
+GET /api/drivers/:id/teammate-battle?year=N
+GET /api/drivers/:id/history
 GET /api/drivers/:id/career
 GET /api/drivers/:id?year=N
 
 GET /api/teams?year=N
 GET /api/teams/standings?year=N
+GET /api/teams/pit-stops?year=N
+GET /api/teams/:id/history
 GET /api/teams/:id/career
 GET /api/teams/:id?year=N
 
@@ -202,13 +232,19 @@ GET /api/predictions/model-info
 GET /api/predictions/upcoming
 GET /api/predictions/history?year=N
 GET /api/predictions/standings?year=N
+GET /api/predictions/title-odds?year=N
 GET /api/predictions/race/:race_id
+GET /api/predictions/race/:race_id/friday-pace
 
 GET /api/sprint/upcoming
 GET /api/sprint/race/:race_id
 GET /api/sprint/race/:race_id/detail
 
 GET /api/seasons
+
+GET /api/history/records
+GET /api/history/on-this-day?date=MM-DD
+GET /api/races/:id/recap
 
 GET /api/search
 ```
@@ -230,9 +266,12 @@ All queries use Drizzle joins. Never fetch a list then loop-query for each item.
 ### Pages
 | Route | Layout | Data source |
 |-------|--------|------------|
-| `/` | LandingLayout | Static (no API) |
+| `/` | BaseLayout | Race-weekend hub: races, upcoming prediction, `HomeHub` (title odds, last-race recap, on this day) |
 | `/prediction` | BaseLayout | `GET /api/predictions/upcoming` |
-| `/races/[id]` | BaseLayout | `GET /api/races/:id` |
+| `/races/[id]` | BaseLayout | `GET /api/races/:id` (+ strategy, race events) |
+| `/races/[id]/race-story` | BaseLayout | `GET /api/races/:id/race-story` (`?session=sprint` for the sprint) |
+| `/races/[id]/telemetry` | BaseLayout | `GET /api/races/:id/telemetry` — drivers picked with a plain GET form, so no client fetch |
+| `/records` | BaseLayout | `GET /api/history/records` |
 | `/drivers/[id]` | BaseLayout | `GET /api/drivers/:id` |
 | `/teams/[id]` | BaseLayout | `GET /api/teams/:id` |
 
@@ -256,14 +295,22 @@ All queries use Drizzle joins. Never fetch a list then loop-query for each item.
 ### Running jobs locally
 ```bash
 cd data-engine
-python src/main.py --job ingest_race --year 2025 --round 14
-python src/main.py --job ingest_qualifying --year 2025 --round 14
-python src/main.py --job compute_features --race_id 42
-python src/main.py --job compute_predictions --race_id 42
-python src/main.py --job compute_season_stats --year 2025
+python -m src.main --job ingest_race --year 2025 --round 14
+python -m src.main --job ingest_qualifying --year 2025 --round 14
+python -m src.main --job compute_features --race_id 42
+python -m src.main --job compute_predictions --race_id 42
+python -m src.main --job compute_season_stats --year 2025
+python -m src.main --job compute_title_odds --year 2025
+python scripts/backfill_openf1.py ingest_stints 2023 2026   # local only
+python scripts/backfill_race_story.py 2018 2025             # local only
+python scripts/import_f1db.py [--version vYYYY.RR.M]         # local only — download, verify sha256, import
 ```
 
-### Cron schedule (Render)
+### Schedule (Render worker)
+There are no Render cron jobs: `src/server.py` runs `auto_runner.run_cycle` in a loop (20 min inside a
+race-weekend window, 6 h outside it, which never touches the DB). Inside the window a `WorkerMemo`
+skips the DB until the next action is due. Typical action timing:
+
 **Conventional weekend:**
 - **Saturday 22:00 UTC**: `ingest_qualifying` → `compute_features` → `compute_predictions`
 - **Sunday 18:00 UTC**: `ingest_race` → `compute_season_stats`
@@ -284,7 +331,8 @@ Cache FastF1 responses locally during development: `fastf1.Cache.enable_cache('.
 
 ### Error handling
 Jobs exit with code 1 on failure (Render marks job failed for manual retrigger).
-Never use `sleep()` inside jobs — Render has a job timeout.
+Never use `sleep()` inside jobs for waiting on data — retry on the next worker cycle instead. The
+only sanctioned waits are `openf1_client`'s request pacing/backoff (see `docs/adr/0004`).
 Use structured logging: `{"job": "ingest_race", "round": 14, "status": "failed", "error": "..."}`.
 
 ---
@@ -343,7 +391,8 @@ Full detail in `docs/prediction-model.md`.
 
 ### Static / Hardcoded inputs
 - `circuits.overtake_rate` — seeded once per circuit, never changes
-- `circuits.sc_probability` — seeded once per circuit, never changes
+- `circuits.sc_probability` — **not static**: recomputed after every race ingest from `races.safety_car_laps`
+  (`ingest_race._recompute_circuit_sc_probability`)
 - Softmax temperature T=0.3 — `SOFTMAX_TEMPERATURE` in `data-engine/src/utils/feature_manifest.py`, imported by `prediction_runner.py`/`math_utils.py` (Python) and `apps/web/src/lib/predictionMath.ts` (TS)
 - Model weights — `GP_FEATURES`/`SPRINT_FEATURES` in `feature_manifest.py`, re-exported as `WEIGHTS` by `compute_features.py`/`compute_sprint_features.py`; checked against `docs/feature-weights.json` and `apps/web`'s `FEATURE_META`/`SPRINT_FEATURE_META`
 
