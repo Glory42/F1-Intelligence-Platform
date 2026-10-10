@@ -1,0 +1,33 @@
+---
+import { GP_ACCENT, SPRINT_ACCENT } from '@/features/predictions/types';
+
+interface Props {
+  raceId: number;
+  current: 'gp' | 'sprint';
+  /** Override the targets, e.g. to switch between the GP and sprint versions of the race story. */
+  gpHref?: string;
+  sprintHref?: string;
+}
+
+const { raceId, current, gpHref = `/races/${raceId}`, sprintHref = `/races/${raceId}/sprint` } = Astro.props;
+const sessions = [
+  { key: 'gp', label: 'Grand Prix', href: gpHref, accent: GP_ACCENT },
+  { key: 'sprint', label: 'Sprint', href: sprintHref, accent: SPRINT_ACCENT },
+] as const;
+---
+
+<nav aria-label="Race weekend sessions" class="flex items-center gap-1.5">
+  {sessions.map((s) => {
+    const active = s.key === current;
+    return (
+      <a
+        href={s.href}
+        aria-current={active ? 'page' : undefined}
+        class="font-mono text-[9px] tracking-[0.12em] uppercase px-3 py-1.5 border transition-colors duration-150 border-white/[0.08] text-muted-foreground hover:text-foreground hover:border-white/[0.15]"
+        style={active ? `border-color:rgba(${s.accent.rgb},0.5);color:${s.accent.hex};background:rgba(${s.accent.rgb},0.08)` : undefined}
+      >
+        {s.label}
+      </a>
+    );
+  })}
+</nav>

@@ -1,0 +1,29 @@
+---
+import { Timer } from 'lucide-react';
+import SectionKicker from '@/components/shared/SectionKicker.astro';
+import StatTiles from '@/components/shared/StatTiles.astro';
+import { formatStopSeconds } from '@/lib/utils';
+import type { PitCrewRanking } from '@/types';
+
+interface Props {
+  rankings: PitCrewRanking[];
+  teamId: number;
+  year: number;
+}
+
+const { rankings, teamId, year } = Astro.props;
+const index = rankings.findIndex((r) => r.team.id === teamId);
+const crew = index >= 0 ? rankings[index] : null;
+---
+
+{crew && (
+  <section aria-label="Pit crew">
+    <SectionKicker icon={Timer} label={`./pit-crew · ${year}`} href={`/teams?year=${year}#pit-crews`} linkLabel="all crews" />
+    <StatTiles items={[
+      { label: 'Median stop', value: formatStopSeconds(crew.medianStationaryMs) },
+      { label: 'Best stop', value: formatStopSeconds(crew.fastestStationaryMs) },
+      { label: 'Stops timed', value: crew.stops },
+      { label: 'Crew rank', value: `#${index + 1} of ${rankings.length}` },
+    ]} />
+  </section>
+)}

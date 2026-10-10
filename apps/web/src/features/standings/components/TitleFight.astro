@@ -1,0 +1,83 @@
+---
+import { Trophy } from 'lucide-react';
+import LineChart, { type LineSeries } from '@/components/charts/LineChart.astro';
+import SectionKicker from '@/components/shared/SectionKicker.astro';
+import DataList from '@/components/shared/DataList.astro';
+import DataRow from '@/components/shared/DataRow.astro';
+import DriverIdentity from '@/components/shared/DriverIdentity.astro';
+import RankCell from '@/components/shared/RankCell.astro';
+import ShareBar from '@/components/shared/ShareBar.astro';
+import { getTeamColor } from '@/lib/teamColors';
+import { championshipPoints, formatTitleOdds, titleContention, remainingSessions } from '@/lib/championshipMath';
+import type { DriverStanding, Race, TitleOddsResponse } from '@/types';
+
+interface Props {
+  odds: TitleOddsResponse;
+  standings: DriverStanding[];
+  races: Race[];
+  year: number;
+}
+
+const { odds, standings, races, year } = Astro.props;
+const CHART_DRIVERS = 4;
+const COLUMNS = 'grid-cols-[40px_1fr_60px_140px] md:grid-cols-[40px_1fr_70px_200px_110px]';
+
+const contention = titleContention(
+  standings.map((s) => ({ id: s.driver.id, points: championshipPoints(s.stats) })),
+  { year, ...remainingSessions(races) },
+);
+const pointsById = new Map(standings.map((s) => [s.driver.id, championshipPoints(s.stats)]));
+
+// One round of odds is a single point per driver — nothing to chart until a second round exists.
+const roundsComputed = new Set(odds.history.map((h) => h.afterRound)).size;
+const showChart = roundsComputed >= 2;
+
+const series: LineSeries[] = odds.drivers.slice(0, CHART_DRIVERS).map((d) => ({
+  id: d.driver.id,
+  label: d.driver.code,
+  color: getTeamColor(d.driver.team.teamKey),
+  points: odds.history.filter((h) => h.driverId === d.driver.id).map((h) => ({ x: h.afterRound, y: h.titleProbability })),
+}));
+---
+
+<section aria-label="Title fight">
+  <SectionKicker icon={Trophy} label={`./title-fight · after r${odds.afterRound}`} />
+  <div class={`grid gap-4 items-start ${showChart ? 'lg:grid-cols-[1fr_420px]' : ''}`}>
+    <DataList
+      label="Title odds"
+      columns={COLUMNS}
+      headers={[
+        { label: 'Pos' }, { label: 'Driver' }, { label: 'Champ pts', class: 'text-right' },
+        { label: 'Title odds', class: 'pl-6' }, { label: 'Likely final', class: 'text-right hidden md:block' },
+      ]}
+    >
+      {odds.drivers.map((d, i) => {
+        const alive = contention.get(d.driver.id)?.alive ?? true;
+        return (
+          <DataRow columns={COLUMNS} first={i === 0} accent={getTeamColor(d.driver.team.teamKey)}>
+            <RankCell rank={i + 1} />
+            <DriverIdentity driver={d.driver} year={year} />
+            <div role="cell" class="font-mono text-sm font-bold text-right tabular-nums">{Math.round(pointsById.get(d.driver.id) ?? 0)}</div>
+            <div class="pl-6">
+              {alive ? (
+                <ShareBar share={d.titleProbability} color={getTeamColor(d.driver.team.teamKey)} label={formatTitleOdds(d.titleProbability)} />
+              ) : (
+                <div role="cell" class="font-mono text-[9px] tracking-widest uppercase text-muted-foreground">Eliminated</div>
+              )}
+            </div>
+            <div role="cell" class="font-mono text-[10px] text-muted-foreground text-right hidden md:block">{Math.round(d.pointsP10)}–{Math.round(d.pointsP90)}</div>
+          </DataRow>
+        );
+      })}
+    </DataList>
+    {showChart && (
+      <div class="panel p-5">
+        <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase mb-3">Title odds by round</div>
+        <LineChart series={series} ariaLabel="Title odds after each round" yDomain={[0, 1]} formatY={(v) => `${Math.round(v * 100)}%`} xLabel="rnd" height={220} width={380} />
+      </div>
+    )}
+  </div>
+  <p class="font-mono text-[7px] text-muted-foreground/50 mt-3 leading-relaxed">
+    Champ pts = championship points so far (grand prix + sprint). Title odds = share of 10,000 simulated finishes of the remaining races, using the model's win probabilities. Eliminated = can no longer reach the leader even by winning every remaining race.
+  </p>
+</section>

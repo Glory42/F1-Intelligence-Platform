@@ -1,0 +1,46 @@
+---
+import { Timer } from 'lucide-react';
+import SectionKicker from '@/components/shared/SectionKicker.astro';
+import DataList from '@/components/shared/DataList.astro';
+import DataRow from '@/components/shared/DataRow.astro';
+import TeamIdentity from '@/components/shared/TeamIdentity.astro';
+import RankCell from '@/components/shared/RankCell.astro';
+import { formatStopSeconds } from '@/lib/utils';
+import { getTeamColor } from '@/lib/teamColors';
+import type { PitCrewRanking } from '@/types';
+
+interface Props {
+  rankings: PitCrewRanking[];
+  year: number;
+}
+
+const { rankings, year } = Astro.props;
+const COLUMNS = 'grid-cols-[40px_1fr_80px] sm:grid-cols-[40px_1fr_90px_90px_70px]';
+---
+
+{rankings.length > 0 && (
+  <section id="pit-crews">
+    <SectionKicker icon={Timer} label={`./pit-crews · ${year}`} />
+    <DataList
+      label="Pit crew ranking"
+      columns={COLUMNS}
+      headers={[
+        { label: 'Pos' }, { label: 'Constructor' }, { label: 'Median', class: 'text-right' },
+        { label: 'Best', class: 'text-right hidden sm:block' }, { label: 'Stops', class: 'text-right hidden sm:block' },
+      ]}
+    >
+      {rankings.map((r, i) => (
+        <DataRow columns={COLUMNS} first={i === 0} accent={getTeamColor(r.team.teamKey)}>
+          <RankCell rank={i + 1} />
+          <TeamIdentity team={r.team} year={year} />
+          <div role="cell" class="font-mono text-sm font-bold text-right">{formatStopSeconds(r.medianStationaryMs)}</div>
+          <div role="cell" class="font-mono text-sm text-right text-muted-foreground hidden sm:block">{formatStopSeconds(r.fastestStationaryMs)}</div>
+          <div role="cell" class="font-mono text-sm text-right text-muted-foreground hidden sm:block">{r.stops}</div>
+        </DataRow>
+      ))}
+    </DataList>
+    <p class="font-mono text-[7px] text-muted-foreground/50 mt-3 leading-relaxed">
+      Median time stationary in the box (OpenF1, from the 2024 US GP) — one botched stop can't skew it.
+    </p>
+  </section>
+)}

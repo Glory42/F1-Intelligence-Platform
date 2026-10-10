@@ -1,0 +1,52 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import PageHeader from '@/components/shared/PageHeader.astro';
+import SectionKicker from '@/components/shared/SectionKicker.astro';
+import RecordTable from '@/features/history/components/RecordTable.astro';
+import F1dbCredit from '@/features/history/components/F1dbCredit.astro';
+import { api } from '@/lib/api';
+import { formatAgeFromDays, unwrapSettled } from '@/lib/utils';
+import { Building2, Trophy, Users } from 'lucide-react';
+
+const records = unwrapSettled((await Promise.allSettled([api.getHistoryRecords()]))[0], null);
+const toEntries = (rows: Array<{ name: string; value: number }>) => rows.map((r) => ({ name: r.name, value: r.value }));
+---
+
+<BaseLayout title="All-time records">
+  <div class="mt-7 space-y-8">
+    <PageHeader icon={Trophy} kicker="./history" title="All-time Records" subtitle="Every world championship season since 1950" />
+
+    {!records ? (
+      <div class="border border-white/[0.06] p-10 text-center">
+        <p class="font-mono text-[9px] text-muted-foreground tracking-[0.25em] uppercase">Historical data has not been imported yet</p>
+      </div>
+    ) : (
+      <>
+        <section>
+          <SectionKicker icon={Users} label="./drivers" />
+          <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <RecordTable title="Most race wins" entries={toEntries(records.drivers.wins)} />
+            <RecordTable title="Most championships" entries={toEntries(records.drivers.championships)} />
+            <RecordTable title="Most pole positions" entries={toEntries(records.drivers.poles)} />
+            <RecordTable title="Most podiums" entries={toEntries(records.drivers.podiums)} />
+            <RecordTable title="Most race starts" entries={toEntries(records.drivers.starts)} />
+            <RecordTable
+              title="Youngest winners"
+              entries={records.youngestWinners.map((w) => ({ name: w.name, value: formatAgeFromDays(w.ageDays), detail: w.raceName }))}
+            />
+          </div>
+        </section>
+
+        <section>
+          <SectionKicker icon={Building2} label="./constructors" />
+          <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <RecordTable title="Most constructor wins" entries={toEntries(records.constructors.wins)} />
+            <RecordTable title="Most constructors' titles" entries={toEntries(records.constructors.championships)} />
+            <RecordTable title="Most constructor poles" entries={toEntries(records.constructors.poles)} />
+          </div>
+        </section>
+      </>
+    )}
+    <F1dbCredit />
+  </div>
+</BaseLayout>

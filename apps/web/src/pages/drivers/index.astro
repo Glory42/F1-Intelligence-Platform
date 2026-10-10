@@ -1,10 +1,13 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { api } from '@/lib/api';
-import type { DriverStanding, SeasonSummary } from '@/types';
+import type { DriverStanding, SeasonSummary, Race, TitleOddsResponse, RacecraftRow } from '@/types';
+import TitleFight from '@/features/standings/components/TitleFight.astro';
+import RacecraftTable from '@/features/standings/components/RacecraftTable.astro';
 import YearSelect from '@/components/shared/YearSelect.astro';
 import { Trophy, Users } from 'lucide-react';
 import { getTeamColor } from '@/lib/teamColors';
+import { championshipPoints } from '@/lib/championshipMath';
 import { getTeamLogo } from '@/lib/teamLogos';
 import { getNationalityFlag, getDriverFlagByCode, getDriverNationalityCode } from '@/lib/countryFlags';
 
@@ -12,9 +15,18 @@ const year = Number(Astro.url.searchParams.get('year') ?? new Date().getFullYear
 
 let standings: DriverStanding[] = [];
 let seasons: SeasonSummary[] = [];
+let titleOdds: TitleOddsResponse | null = null;
+let races: Race[] = [];
+let racecraft: RacecraftRow[] = [];
 let error: string | null = null;
 try {
-  [standings, seasons] = await Promise.all([api.getDriverStandings(year), api.getSeasons()]);
+  [standings, seasons, titleOdds, races, racecraft] = await Promise.all([
+    api.getDriverStandings(year),
+    api.getSeasons(),
+    api.getTitleOdds(year).catch(() => null),
+    api.getRaces(year).catch(() => []),
+    api.getRacecraft(year).catch(() => []),
+  ]);
 } catch (e) {
   error = e instanceof Error ? e.message : 'Failed to load standings';
 }
@@ -43,6 +55,7 @@ function champPos(pos: number | null, i: number) {
       </div>
       <YearSelect years={seasons} currentYear={year} basePath="/drivers" />
     </div>
+
 
     {error ? (
       <div class="border border-destructive/40 bg-destructive/10 p-8 text-center">
@@ -118,7 +131,7 @@ function champPos(pos: number | null, i: number) {
                 <span class="font-mono text-[9px] text-muted-foreground truncate">{s.driver.team.name}</span>
               </div>
               <!-- Points -->
-              <div class="font-mono text-xs sm:text-sm font-bold text-right tabular-nums pt-1 sm:pt-0">{Math.round(Number(s.stats.totalPoints))}</div>
+              <div class="font-mono text-xs sm:text-sm font-bold text-right tabular-nums pt-1 sm:pt-0">{Math.round(championshipPoints(s.stats))}</div>
               <!-- Wins -->
               <div class="font-mono text-sm text-right hidden sm:block">{s.stats.wins}</div>
               <!-- Podiums -->
@@ -131,5 +144,9 @@ function champPos(pos: number | null, i: number) {
         ))}
       </div>
     )}
+
+    {titleOdds && standings.length > 0 && <TitleFight odds={titleOdds} standings={standings} races={races} year={year} />}
+
+    <RacecraftTable rows={racecraft} year={year} />
   </div>
 </BaseLayout>

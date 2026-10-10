@@ -1,0 +1,44 @@
+---
+import { Radio } from 'lucide-react';
+import SectionKicker from '@/components/shared/SectionKicker.astro';
+import LastRaceCard from './LastRaceCard.astro';
+import ChampionshipCard from './ChampionshipCard.astro';
+import OnThisDayCard from './OnThisDayCard.astro';
+import { api } from '@/lib/api';
+import { unwrapSettled } from '@/lib/utils';
+import type { Race } from '@/types';
+
+interface Props {
+  year: number;
+  lastRace: Race | null;
+  today: Date;
+}
+
+const { year, lastRace, today } = Astro.props;
+const monthDay = `${String(today.getUTCMonth() + 1).padStart(2, '0')}-${String(today.getUTCDate()).padStart(2, '0')}`;
+
+// Each card degrades on its own: a failed call just hides that card.
+const [oddsResult, onThisDayResult, recapResult] = await Promise.allSettled([
+  api.getTitleOdds(year),
+  api.getOnThisDay(monthDay),
+  lastRace ? api.getRaceRecap(lastRace.id) : Promise.reject(new Error('no completed race')),
+]);
+const titleOdds = unwrapSettled(oddsResult, null);
+const onThisDay = unwrapSettled(onThisDayResult, []);
+const recap = unwrapSettled(recapResult, null);
+const cardCount = [lastRace && recap, titleOdds, onThisDay.length > 0].filter(Boolean).length;
+// Sized to the cards present, so a missing card never leaves an empty grey cell.
+const GRID_COLS: Record<number, string> = { 1: 'md:grid-cols-1', 2: 'md:grid-cols-2', 3: 'md:grid-cols-3' };
+---
+
+{(recap || titleOdds || onThisDay.length > 0) && (
+  <section class="mt-12 mb-12">
+    <SectionKicker icon={Radio} label="./briefing" class="mb-5" />
+    <h2 class="text-xl font-bold mb-5">Race Briefing</h2>
+    <div class={`grid grid-cols-1 ${GRID_COLS[cardCount]} gap-px bg-white/[0.06]`}>
+      {lastRace && recap && <LastRaceCard race={lastRace} recap={recap} />}
+      {titleOdds && <ChampionshipCard odds={titleOdds} />}
+      {onThisDay.length > 0 && <OnThisDayCard races={onThisDay} />}
+    </div>
+  </section>
+)}

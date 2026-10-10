@@ -1,0 +1,25 @@
+---
+import type { LucideIcon } from 'lucide-react';
+
+interface Props {
+  icon: LucideIcon;
+  kicker: string;
+  title: string;
+  subtitle?: string;
+  accentRgb?: string;
+}
+
+const { icon: Icon, kicker, title, subtitle, accentRgb = '168,85,247' } = Astro.props;
+---
+
+<div class="flex items-end justify-between gap-4 flex-wrap">
+  <div>
+    <div class="flex items-center gap-3 mb-2">
+      <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style={`color: rgba(${accentRgb},0.55)`}><Icon size={11} />{kicker}</span>
+      <div class="h-px w-16 bg-white/[0.05]" />
+    </div>
+    <h1 class="text-2xl font-bold">{title}</h1>
+    {subtitle && <p class="mt-1 font-mono text-[10px] text-muted-foreground tracking-widest uppercase">{subtitle}</p>}
+  </div>
+  <slot name="aside" />
+</div>

@@ -10,7 +10,7 @@ import {
   type Weights,
 } from '@/lib/predictionMath';
 import { GP_ACCENT, SPRINT_ACCENT, type PredictionAccent, type PredictionDriverVM, type FeatureMeta, type PredictionPageKind } from './types';
-import type { Race, Driver } from '@/types';
+import type { Race, Driver, FridayPaceRow } from '@/types';
 
 interface RawResultRow {
   driver: { id: number; fullName: string };
@@ -42,6 +42,8 @@ interface PredictionBehaviour {
   accent: PredictionAccent;
   radarShortLabels: Partial<Record<string, string>>;
   dateField: (race: Race) => string;
+  // Sprint weekends have no FP2 long run feeding the sprint model, so only the GP shows it.
+  fetchFridayPace: ((raceId: number) => Promise<FridayPaceRow[]>) | null;
 }
 
 const PREDICTION_BEHAVIOUR: Record<PredictionPageKind, PredictionBehaviour> = {
@@ -58,6 +60,7 @@ const PREDICTION_BEHAVIOUR: Record<PredictionPageKind, PredictionBehaviour> = {
       weatherImpact: 'Weather',
     },
     dateField: (race) => race.raceDate,
+    fetchFridayPace: api.getFridayPace,
   },
   sprint: {
     fetchPrediction: api.getSprintByRaceId,
@@ -70,6 +73,7 @@ const PREDICTION_BEHAVIOUR: Record<PredictionPageKind, PredictionBehaviour> = {
       weatherImpact: 'Weather',
     },
     dateField: (race) => race.sprintDate ?? race.raceDate,
+    fetchFridayPace: null,
   },
 };
 
@@ -88,6 +92,7 @@ export interface PredictionPageData {
   weights: Weights;
   featureMeta: FeatureMeta;
   accent: PredictionAccent;
+  fridayPace: FridayPaceRow[];
 }
 
 export async function buildPredictionPageData(kind: PredictionPageKind, raceId: number): Promise<PredictionPageData> {
@@ -97,9 +102,10 @@ export async function buildPredictionPageData(kind: PredictionPageKind, raceId: 
   let detail: RawDetail | null = null;
   let predictionFailed = false;
 
-  const [predResult, detailResult] = await Promise.allSettled([
+  const [predResult, detailResult, fridayPaceResult] = await Promise.allSettled([
     behaviour.fetchPrediction(raceId),
     behaviour.fetchDetail(raceId),
+    behaviour.fetchFridayPace ? behaviour.fetchFridayPace(raceId) : Promise.resolve([]),
   ]);
 
   if (predResult.status === 'fulfilled') prediction = predResult.value;
@@ -132,5 +138,6 @@ export async function buildPredictionPageData(kind: PredictionPageKind, raceId: 
     weights: behaviour.weights,
     featureMeta: behaviour.featureMeta,
     accent: behaviour.accent,
+    fridayPace: fridayPaceResult.status === 'fulfilled' ? fridayPaceResult.value : [],
   };
 }

@@ -1,0 +1,17 @@
+---
+// Same track/fill as the teams page head-to-head bars.
+interface Props {
+  share: number;
+  color?: string;
+  label: string;
+}
+
+const { share, color = '#a855f7', label } = Astro.props;
+---
+
+<div role="cell" class="flex items-center gap-3">
+  <div class="flex-1 h-1.5 bg-white/[0.06] overflow-hidden" aria-hidden="true">
+    <div class="h-full bar-fill" style={`width:${Math.max(0, Math.min(100, share * 100))}%; background:${color}`} />
+  </div>
+  <span class="font-mono text-sm font-bold w-12 text-right tabular-nums">{label}</span>
+</div>

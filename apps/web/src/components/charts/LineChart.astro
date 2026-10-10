@@ -1,0 +1,75 @@
+---
+import { linearScale, niceTicks } from '@/lib/chartScale';
+import { spreadLabels } from '@/lib/labelLayout';
+
+export interface LineSeries {
+  id: string | number;
+  label: string;
+  color: string;
+  // y = null breaks the line (e.g. a lapped car has no gap to the leader).
+  points: Array<{ x: number; y: number | null }>;
+}
+
+interface Props {
+  series: LineSeries[];
+  ariaLabel: string;
+  yDomain?: [number, number];
+  formatY?: (value: number) => string;
+  xLabel?: string;
+  height?: number;
+  /** viewBox width — match the width the chart is shown at so 9px labels stay 9px. */
+  width?: number;
+  integerTicks?: boolean;
+}
+
+const { series, ariaLabel, yDomain, formatY = (v: number) => String(v), xLabel, height = 220, width = 640, integerTicks = false } = Astro.props;
+
+const WIDTH = width;
+const HEIGHT = height;
+const PAD = { top: 12, right: 48, bottom: 28, left: 40 };
+
+const xs = series.flatMap((s) => s.points.map((p) => p.x));
+const ys = series.flatMap((s) => s.points.flatMap((p) => (p.y == null ? [] : [p.y])));
+const xMin = Math.min(...xs);
+const xMax = Math.max(...xs);
+const [yMin, yMax] = yDomain ?? [Math.min(...ys), Math.max(...ys)];
+const x = linearScale([xMin, xMax], [PAD.left, WIDTH - PAD.right]);
+const y = linearScale([yMin, yMax], [HEIGHT - PAD.bottom, PAD.top]);
+const yTicks = niceTicks(Math.min(yMin, yMax), Math.max(yMin, yMax), 4).filter((t) => !integerTicks || Number.isInteger(t));
+const xTicks = niceTicks(xMin, xMax, Math.min(8, Math.max(1, xMax - xMin)));
+const LABEL_GAP = 11;
+const lastPoints = series.map((s) => [...s.points].reverse().find((p) => p.y != null) ?? null);
+const labelYs = spreadLabels(
+  lastPoints.map((p) => (p?.y != null ? y(p.y) + 3 : PAD.top)),
+  LABEL_GAP,
+  PAD.top,
+  HEIGHT - PAD.bottom,
+);
+
+const path = (points: LineSeries['points']) =>
+  points
+    .map((p, i) => (p.y == null ? '' : `${i > 0 && points[i - 1].y != null ? 'L' : 'M'}${x(p.x)},${y(p.y)}`))
+    .join('');
+---
+
+<svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" role="img" aria-label={ariaLabel} style="display:block">
+  {yTicks.map((t) => (
+    <g>
+      <line x1={PAD.left} x2={WIDTH - PAD.right} y1={y(t)} y2={y(t)} stroke="hsl(var(--chart-grid))" />
+      <text x={PAD.left - 6} y={y(t) + 3} text-anchor="end" class="fill-muted-foreground font-mono" font-size="9">{formatY(t)}</text>
+    </g>
+  ))}
+  {xTicks.map((t) => (
+    <text x={x(t)} y={HEIGHT - 10} text-anchor="middle" class="fill-muted-foreground font-mono" font-size="9">{t}</text>
+  ))}
+  {xLabel && <text x={WIDTH - PAD.right} y={HEIGHT - 10} text-anchor="start" dx="8" class="fill-muted-foreground font-mono" font-size="9">{xLabel}</text>}
+  {series.map((s, i) => {
+    const last = lastPoints[i];
+    return (
+      <g>
+        <path d={path(s.points)} fill="none" stroke={s.color} stroke-width="2" />
+        {last && last.y != null && <text x={x(last.x) + 6} y={labelYs[i]} fill={s.color} class="font-mono" font-size="9">{s.label}</text>}
+      </g>
+    );
+  })}
+</svg>

@@ -28,31 +28,22 @@ export function initRaceCountdown(elementId: string, dateDataKey: string, digitC
   countdownTimer = setInterval(tick, 1000);
 }
 
-interface TabOpts {
-  btnClass: string;
-  panelClass: string;
-  panelIdPrefix: string;
-  activeBorder: string;
-  activeColor: string;
-  activeBg: string;
-  strippedClasses: string[];
-}
-
-export function initRaceTabs(opts: TabOpts): void {
-  const btns = Array.from(document.querySelectorAll<HTMLButtonElement>(`.${opts.btnClass}`));
-  const panels = document.querySelectorAll<HTMLElement>(`.${opts.panelClass}`);
+export function initRaceTabs(tablist: HTMLElement): void {
+  const namespace = tablist.dataset.namespace ?? '';
+  const activeStyle = tablist.dataset.activeStyle ?? '';
+  const btns = Array.from(tablist.querySelectorAll<HTMLButtonElement>('.race-tab-btn'));
+  const panelIds = new Set(btns.map((b) => `${namespace}panel-${b.dataset.tab}`));
 
   const activate = (target: string) => {
     btns.forEach((b) => {
       const active = b.dataset.tab === target;
       b.setAttribute('aria-selected', String(active));
       b.tabIndex = active ? 0 : -1;
-      b.style.borderColor = active ? opts.activeBorder : '';
-      b.style.color = active ? opts.activeColor : '';
-      b.style.background = active ? opts.activeBg : '';
-      b.classList.remove(...opts.strippedClasses);
+      b.setAttribute('style', active ? activeStyle : '');
     });
-    panels.forEach((p) => p.classList.toggle('hidden', p.id !== `${opts.panelIdPrefix}${target}`));
+    panelIds.forEach((panelId) => {
+      document.getElementById(panelId)?.classList.toggle('hidden', panelId !== `${namespace}panel-${target}`);
+    });
   };
 
   btns.forEach((btn, i) => {

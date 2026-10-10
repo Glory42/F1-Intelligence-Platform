@@ -1,0 +1,30 @@
+---
+import { Users } from 'lucide-react';
+import SectionKicker from '@/components/shared/SectionKicker.astro';
+import HeadToHead from './HeadToHead.astro';
+import { getTeamColor } from '@/lib/teamColors';
+import type { Driver, TeammateBattle } from '@/types';
+
+interface Props {
+  battle: TeammateBattle;
+  driver: Driver;
+  year: number;
+}
+
+const { battle, driver, year } = Astro.props;
+const rows = [
+  { label: 'Qualifying', v1: battle.qualifying.driver, v2: battle.qualifying.teammate },
+  { label: 'Race', v1: battle.race.driver, v2: battle.race.teammate },
+  { label: 'GP points', v1: Math.round(battle.points.driver), v2: Math.round(battle.points.teammate) },
+];
+---
+
+{battle.teammate && battle.sharedRaces > 0 && (
+  <section aria-label="Team-mate battle">
+    <SectionKicker icon={Users} label={`./teammate-battle · ${battle.sharedRaces} races`} />
+    <HeadToHead left={driver} right={battle.teammate} color={getTeamColor(driver.team.teamKey)} rows={rows} year={year} />
+    <p class="font-mono text-[7px] text-muted-foreground/50 mt-3 leading-relaxed">
+      Race head-to-head counts only races both drivers finished.
+    </p>
+  </section>
+)}

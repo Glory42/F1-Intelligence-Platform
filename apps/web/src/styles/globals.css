@@ -32,6 +32,16 @@
     --success:         142 71% 45%;
     --surface:         0 0% 5%;
     --text-secondary:  0 0% 53%;
+    /* Pirelli compound colours — shared by every strategy/stint chart (see lib/tyres.ts) */
+    --tyre-soft:    354 85% 52%;
+    --tyre-medium:  48 96% 53%;
+    --tyre-hard:    0 0% 92%;
+    --tyre-inter:   142 71% 45%;
+    --tyre-wet:     214 89% 56%;
+    --tyre-unknown: 0 0% 40%;
+    /* SVG chart chrome */
+    --chart-grid:   0 0% 100% / 0.06;
+    --chart-axis:   0 0% 100% / 0.35;
   }
 
   .dark {

@@ -1,0 +1,66 @@
+---
+import { ArrowUpRight } from 'lucide-react';
+import type { PredictionAccent } from '@/features/predictions/types';
+
+export interface RaceTab {
+  id: string;
+  label: string;
+}
+
+export interface RaceTabLink {
+  href: string;
+  label: string;
+}
+
+interface Props {
+  tabs: RaceTab[];
+  /** Heavier analysis lives on its own route so the race page never loads it eagerly. */
+  links?: RaceTabLink[];
+  defaultTab: string;
+  accent: PredictionAccent;
+  /** Prefixes tab/panel ids so two tab sets never collide (e.g. "sprint-"). */
+  namespace?: string;
+}
+
+const { tabs, defaultTab, accent, namespace = '', links = [] } = Astro.props;
+const activeStyle = `border-color:rgba(${accent.rgb},0.5);color:${accent.hex};background:rgba(${accent.rgb},0.08)`;
+---
+
+<div
+  class="race-tabs flex flex-wrap items-center gap-1.5 mb-6"
+  role="tablist"
+  data-namespace={namespace}
+  data-active-style={activeStyle}
+>
+  {tabs.map((t) => (
+    <button
+      type="button"
+      data-tab={t.id}
+      id={`${namespace}tab-${t.id}`}
+      role="tab"
+      aria-selected={t.id === defaultTab ? 'true' : 'false'}
+      aria-controls={`${namespace}panel-${t.id}`}
+      tabindex={t.id === defaultTab ? 0 : -1}
+      class="race-tab-btn font-mono text-[9px] tracking-[0.12em] uppercase px-3 py-1.5 border transition-colors duration-150 border-white/[0.08] text-muted-foreground hover:text-foreground hover:border-white/[0.15]"
+      style={t.id === defaultTab ? activeStyle : undefined}
+    >
+      {t.label}
+    </button>
+  ))}
+  {links.map((l) => (
+    <a
+      href={l.href}
+      class="inline-flex items-center gap-1 font-mono text-[9px] tracking-[0.12em] uppercase px-3 py-1.5 border transition-colors duration-150 border-white/[0.08] text-muted-foreground hover:text-foreground hover:border-white/[0.15]"
+    >
+      {l.label}<ArrowUpRight size={10} />
+    </a>
+  ))}
+</div>
+
+<script>
+  import { initRaceTabs } from '@/features/races/raceTabs';
+
+  document.addEventListener('astro:page-load', () => {
+    document.querySelectorAll<HTMLElement>('.race-tabs').forEach(initRaceTabs);
+  });
+</script>

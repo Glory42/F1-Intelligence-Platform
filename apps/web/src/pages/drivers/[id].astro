@@ -3,10 +3,13 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import { DriverStatsGrid } from '@/features/drivers/components/DriverStatsGrid';
 import { RecentResultsTable } from '@/features/drivers/components/RecentResultsTable';
 import { api } from '@/lib/api';
-import type { DriverYearStats } from '@/types';
+import type { DriverYearStats, TeammateBattle, DriverHistory } from '@/types';
+import TeammateBattleCard from '@/features/drivers/components/TeammateBattleCard.astro';
+import CareerCard from '@/features/history/components/CareerCard.astro';
 import { BarChart2, History, ChevronRight, Trophy, Cpu, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import YearSelectLinks from '@/components/shared/YearSelectLinks.astro';
 import { getTeamColor } from '@/lib/teamColors';
+import { championshipPoints } from '@/lib/championshipMath';
 import { driverPredictionRecord } from '@/lib/predictionMath';
 import { getNationalityFlag, getDriverFlagByCode } from '@/lib/countryFlags';
 
@@ -16,6 +19,9 @@ let year = Number(Astro.url.searchParams.get('year') ?? new Date().getFullYear()
 let data = null;
 let career: DriverYearStats[] = [];
 let error = null;
+let predictionRecord: ReturnType<typeof driverPredictionRecord> | null = null;
+let teammateBattle: TeammateBattle | null = null;
+let driverHistory: DriverHistory | null = null;
 
 try {
   career = await api.getDriverCareer(Number(id));
@@ -28,22 +34,23 @@ try {
       : (activeYears.includes(new Date().getFullYear()) ? new Date().getFullYear() : Math.max(...activeYears));
     
     year = targetYear;
-    data = await api.getDriverById(Number(id), targetYear);
+    const careerYear = career.find((y) => y.year === targetYear);
+    const [driverResult, historyResult, battleResult, careerHistoryResult] = await Promise.allSettled([
+      api.getDriverById(Number(id), targetYear),
+      api.getPredictionHistory(targetYear),
+      api.getTeammateBattle(careerYear?.driverId ?? Number(id), targetYear),
+      api.getDriverHistory(careerYear?.driverId ?? Number(id)),
+    ]);
+    if (driverResult.status === 'rejected') throw driverResult.reason;
+    data = driverResult.value;
+    predictionRecord = historyResult.status === 'fulfilled' ? driverPredictionRecord(historyResult.value, Number(id)) : null;
+    teammateBattle = battleResult.status === 'fulfilled' ? battleResult.value : null;
+    driverHistory = careerHistoryResult.status === 'fulfilled' ? careerHistoryResult.value : null;
   } else {
     error = 'Driver has no career records';
   }
 } catch (e) {
   error = e instanceof Error ? e.message : 'Failed to load driver';
-}
-
-let predictionRecord: ReturnType<typeof driverPredictionRecord> | null = null;
-if (data) {
-  try {
-    const predictionHistory = await api.getPredictionHistory(year);
-    predictionRecord = driverPredictionRecord(predictionHistory, Number(id));
-  } catch {
-    predictionRecord = null;
-  }
 }
 
 const driver = data?.driver;
@@ -130,6 +137,10 @@ const nationalityFlag = driver
           <DriverStatsGrid stats={data.seasonStats} />
         </div>
 
+        {teammateBattle && driver && <TeammateBattleCard battle={teammateBattle} driver={driver} year={year} />}
+
+        {driverHistory && <CareerCard history={driverHistory} />}
+
         <!-- Recent results -->
         {data.recentResults.length > 0 && (
           <div>
@@ -214,7 +225,7 @@ const nationalityFlag = driver
                       <Trophy size={11} color="#a855f7" className="shrink-0" />
                     )}
                   </div>
-                  <div class="font-bold text-sm text-right">{y.stats ? Math.round(Number(y.stats.totalPoints)) : '—'}</div>
+                  <div class="font-bold text-sm text-right">{y.stats ? Math.round(championshipPoints(y.stats)) : '—'}</div>
                   <div class="font-mono text-sm text-right text-muted-foreground">
                     {y.stats?.championshipPosition ? `P${y.stats.championshipPosition}` : '—'}
                   </div>

@@ -1,0 +1,37 @@
+---
+// Styled like the circuit page's Dominance Rankings lists.
+interface Entry {
+  name: string;
+  value: string | number;
+  detail?: string;
+}
+
+interface Props {
+  title: string;
+  entries: Entry[];
+}
+
+const { title, entries } = Astro.props;
+---
+
+<div role="table" aria-label={title} class="border border-white/[0.06] bg-black p-5">
+  <div role="row"><h3 role="columnheader" class="font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground/60 mb-3">{title}</h3></div>
+  <div class="space-y-2">
+    {entries.map((e, i) => (
+      <div
+        role="row"
+        class="flex items-center justify-between gap-3 p-2 bg-white/[0.01] border border-white/[0.04] border-l-2 hover:bg-white/[0.03] transition-colors"
+        style={`border-left-color: ${i === 0 ? '#a855f7' : 'rgba(255,255,255,0.08)'}`}
+      >
+        <div role="cell" class="flex items-center gap-3 min-w-0">
+          <span class={`font-mono text-[10px] w-5 shrink-0 ${i === 0 ? 'text-[#a855f7]' : 'text-muted-foreground'}`}>{String(i + 1).padStart(2, '0')}</span>
+          <div class="min-w-0">
+            <div class="text-xs font-medium truncate">{e.name}</div>
+            {e.detail && <div class="font-mono text-[8px] text-muted-foreground truncate">{e.detail}</div>}
+          </div>
+        </div>
+        <span role="cell" class="font-mono text-[10px] font-bold shrink-0">{e.value}</span>
+      </div>
+    ))}
+  </div>
+</div>

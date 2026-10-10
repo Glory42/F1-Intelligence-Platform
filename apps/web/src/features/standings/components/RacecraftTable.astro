@@ -1,0 +1,46 @@
+---
+import { ArrowLeftRight } from 'lucide-react';
+import SectionKicker from '@/components/shared/SectionKicker.astro';
+import DataList from '@/components/shared/DataList.astro';
+import DataRow from '@/components/shared/DataRow.astro';
+import DriverIdentity from '@/components/shared/DriverIdentity.astro';
+import RankCell from '@/components/shared/RankCell.astro';
+import { getTeamColor } from '@/lib/teamColors';
+import type { RacecraftRow } from '@/types';
+
+interface Props {
+  rows: RacecraftRow[];
+  year: number;
+}
+
+const { rows, year } = Astro.props;
+const COLUMNS = 'grid-cols-[40px_1fr_60px_60px] sm:grid-cols-[40px_1fr_70px_70px_70px]';
+const signed = (n: number) => (n > 0 ? `+${n}` : String(n));
+---
+
+{rows.length > 0 && (
+  <section>
+    <SectionKicker icon={ArrowLeftRight} label={`./racecraft · ${year}`} />
+    <DataList
+      label="Racecraft"
+      columns={COLUMNS}
+      headers={[
+        { label: 'Pos' }, { label: 'Driver' }, { label: 'Made', class: 'text-right' },
+        { label: 'Lost', class: 'text-right hidden sm:block' }, { label: 'Net', class: 'text-right' },
+      ]}
+    >
+      {rows.map((r, i) => (
+        <DataRow columns={COLUMNS} first={i === 0} accent={getTeamColor(r.driver.team.teamKey)}>
+          <RankCell rank={i + 1} />
+          <DriverIdentity driver={r.driver} year={year} />
+          <div role="cell" class="font-mono text-sm text-right">{r.made}</div>
+          <div role="cell" class="font-mono text-sm text-right text-muted-foreground hidden sm:block">{r.suffered}</div>
+          <div role="cell" class={`font-mono text-sm font-bold text-right ${r.net > 0 ? 'text-[#a855f7]' : 'text-muted-foreground'}`}>{signed(r.net)}</div>
+        </DataRow>
+      ))}
+    </DataList>
+    <p class="font-mono text-[7px] text-muted-foreground/50 mt-3 leading-relaxed">
+      Grand prix position changes recorded by OpenF1 (2023+) — passes made vs lost. OpenF1 notes this feed can be incomplete.
+    </p>
+  </section>
+)}

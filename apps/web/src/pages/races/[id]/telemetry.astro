@@ -1,0 +1,132 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import LineChart from '@/components/charts/LineChart.astro';
+import PageHeader from '@/components/shared/PageHeader.astro';
+import SectionKicker from '@/components/shared/SectionKicker.astro';
+import StatTiles from '@/components/shared/StatTiles.astro';
+import { Gauge, Map as MapIcon, Timer, Zap } from 'lucide-react';
+import DominanceMap from '@/features/telemetry/components/DominanceMap.astro';
+import { api } from '@/lib/api';
+import { getTeamColor } from '@/lib/teamColors';
+import { formatMs, unwrapSettled } from '@/lib/utils';
+import { lapDelta, miniSectorWinners } from '@/lib/telemetryCompare';
+import type { QualifyingSession } from '@/types';
+
+const { id } = Astro.params;
+const params = Astro.url.searchParams;
+const session: QualifyingSession = params.get('session') === 'SQ' ? 'SQ' : 'Q';
+const MINI_SECTORS = 25;
+
+const [raceResult, telemetryResult] = await Promise.allSettled([
+  api.getRaceById(Number(id)),
+  api.getTelemetry(Number(id), session, params.get('a') ?? undefined, params.get('b') ?? undefined),
+]);
+const race = unwrapSettled(raceResult, null)?.race ?? null;
+const telemetry = unwrapSettled(telemetryResult, null);
+const [lapA, lapB] = telemetry?.laps ?? [];
+
+const colorA = lapA ? getTeamColor(lapA.driver.team.teamKey) : '#a855f7';
+// Team-mates share a team colour, so the second driver falls back to white for contrast.
+const colorB = lapB && getTeamColor(lapB.driver.team.teamKey) !== colorA ? getTeamColor(lapB.driver.team.teamKey) : '#e5e5e5';
+const winners = lapA && lapB ? miniSectorWinners(lapA.samples, lapB.samples, MINI_SECTORS) : [];
+const aWins = winners.filter((w) => w === 'a').length;
+const delta = lapA && lapB ? lapDelta(lapA.samples, lapB.samples) : [];
+const km = (m: number) => Math.round(m / 100) / 10;
+const sessionLabel = session === 'SQ' ? 'Sprint qualifying' : 'Qualifying';
+const gapMs = lapA && lapB ? lapB.lapTimeMs - lapA.lapTimeMs : 0;
+---
+
+<BaseLayout title={race ? `${sessionLabel} telemetry · ${race.name}` : 'Telemetry'}>
+  <div class="mt-7 space-y-8">
+    <a href={`/races/${id}`} class="inline-block font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground hover:text-foreground transition-colors duration-150">
+      ← {race?.name ?? 'race'}
+    </a>
+
+    <PageHeader icon={Gauge} kicker="./telemetry" title={race?.name ?? 'Telemetry'} subtitle={`${sessionLabel} · fastest laps · OpenF1 car data, every 10 m`} />
+
+    {!telemetry || telemetry.drivers.length < 2 || !lapA || !lapB ? (
+      <div class="border border-white/[0.06] p-10 text-center">
+        <p class="font-mono text-[9px] text-muted-foreground tracking-[0.25em] uppercase">No lap telemetry for this session (OpenF1 covers 2023 on)</p>
+      </div>
+    ) : (
+      <>
+        <form method="get" class="flex flex-wrap items-end gap-3">
+          <input type="hidden" name="session" value={session} />
+          {[['a', 'Driver A', lapA.driver.code], ['b', 'Driver B', lapB.driver.code]].map(([name, label, selected]) => (
+            <label class="flex flex-col gap-1.5 font-mono text-[8px] tracking-widest uppercase text-muted-foreground">
+              {label}
+              <select name={name} class="bg-black border border-white/[0.08] hover:border-white/[0.15] px-3 py-1.5 font-mono text-[9px] tracking-[0.12em] uppercase text-foreground focus:outline-none focus:border-[rgba(168,85,247,0.5)] transition-colors duration-150">
+                {telemetry.drivers.map((d) => (
+                  <option value={d.driver.code} selected={d.driver.code === selected}>{d.driver.code} · {formatMs(d.lapTimeMs)}</option>
+                ))}
+              </select>
+            </label>
+          ))}
+          <button type="submit" class="press font-mono text-[9px] tracking-[0.12em] uppercase px-3 py-1.5 border border-[rgba(168,85,247,0.5)] text-[#a855f7] bg-[rgba(168,85,247,0.08)] hover:bg-[rgba(168,85,247,0.14)] transition-colors duration-150">
+            Compare
+          </button>
+        </form>
+
+        <section>
+          <SectionKicker icon={Timer} label={`./laps · ${lapA.driver.code} vs ${lapB.driver.code}`} />
+          <StatTiles items={[
+            { label: `${lapA.driver.code} lap`, value: formatMs(lapA.lapTimeMs) },
+            { label: `${lapB.driver.code} lap`, value: formatMs(lapB.lapTimeMs) },
+            { label: 'Gap', value: `${gapMs >= 0 ? '+' : '−'}${(Math.abs(gapMs) / 1000).toFixed(3)}` },
+            { label: 'Mini-sectors', value: `${aWins} – ${MINI_SECTORS - aWins}` },
+          ]} />
+          <p class="mt-3 font-mono text-[9px] tracking-widest uppercase text-muted-foreground">
+            <span style={`color:${colorA}`}>{lapA.driver.code}</span> faster in {aWins} of {MINI_SECTORS} mini-sectors
+          </p>
+        </section>
+
+        <div class="grid lg:grid-cols-[1fr_420px] gap-6">
+          <div class="space-y-6">
+            <section>
+              <SectionKicker icon={Gauge} label="./speed · km/h" />
+              <div class="panel p-5">
+                <LineChart
+                  ariaLabel="Speed through the lap"
+                  xLabel="km"
+                  height={260}
+                  width={690}
+                  series={[lapA, lapB].map((lap, i) => ({
+                    id: lap.driver.id, label: lap.driver.code, color: i === 0 ? colorA : colorB,
+                    points: lap.samples.distanceM.map((d, j) => ({ x: km(d), y: lap.samples.speed[j] })),
+                  }))}
+                />
+              </div>
+            </section>
+            <section>
+              <SectionKicker icon={Zap} label={`./delta · ${lapA.driver.code} − ${lapB.driver.code} (s)`} />
+              <div class="panel p-5">
+                <LineChart
+                  ariaLabel="Time delta through the lap"
+                  xLabel="km"
+                  height={170}
+                  width={690}
+                  formatY={(v) => v.toFixed(2)}
+                  series={[{
+                    id: 'delta', label: 'Δ', color: colorA,
+                    points: delta.map((ms, j) => ({ x: km(lapA.samples.distanceM[j]), y: ms / 1000 })),
+                  }]}
+                />
+                <p class="mt-3 font-mono text-[7px] text-muted-foreground/50">Below zero = {lapA.driver.code} ahead at that point of the lap.</p>
+              </div>
+            </section>
+          </div>
+          <section>
+            <SectionKicker icon={MapIcon} label="./dominance · mini-sectors" />
+            <div class="panel p-5">
+              <DominanceMap x={lapA.samples.x} y={lapA.samples.y} winners={winners} colors={{ a: colorA, b: colorB }} />
+              <div class="mt-4 flex gap-4 font-mono text-[8px] tracking-widest uppercase text-muted-foreground">
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5" style={`background:${colorA}`} />{lapA.driver.code}</span>
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5" style={`background:${colorB}`} />{lapB.driver.code}</span>
+              </div>
+            </div>
+          </section>
+        </div>
+      </>
+    )}
+  </div>
+</BaseLayout>

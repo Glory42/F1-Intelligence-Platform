@@ -1,10 +1,14 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { api } from '@/lib/api';
-import type { TeamYearStats, DriverStanding } from '@/types';
+import type { TeamYearStats, DriverStanding, PitCrewRanking, TeamHistory } from '@/types';
+import PitCrewCard from '@/features/teams/components/PitCrewCard.astro';
+import LineageTable from '@/features/history/components/LineageTable.astro';
+import HeadToHead, { type HeadToHeadRow } from '@/features/drivers/components/HeadToHead.astro';
 import { Building2, BarChart2, Users, History, Info } from 'lucide-react';
 import YearSelectLinks from '@/components/shared/YearSelectLinks.astro';
 import { getTeamColor } from '@/lib/teamColors';
+import { championshipPoints } from '@/lib/championshipMath';
 import { getTeamLogo } from '@/lib/teamLogos';
 
 const { id } = Astro.params;
@@ -13,6 +17,8 @@ let year = Number(Astro.url.searchParams.get('year') ?? new Date().getFullYear()
 let data = null;
 let career: TeamYearStats[] = [];
 let driverStandings: DriverStanding[] = [];
+let pitCrewRankings: PitCrewRanking[] = [];
+let teamHistory: TeamHistory | null = null;
 let error = null;
 
 try {
@@ -26,9 +32,11 @@ try {
       : (activeYears.includes(new Date().getFullYear()) ? new Date().getFullYear() : Math.max(...activeYears));
     
     year = targetYear;
-    [data, driverStandings] = await Promise.all([
+    [data, driverStandings, pitCrewRankings, teamHistory] = await Promise.all([
       api.getTeamById(Number(id), targetYear),
       api.getDriverStandings(targetYear),
+      api.getPitCrewRankings(targetYear).catch(() => []),
+      api.getTeamHistory(Number(id)).catch(() => null),
     ]);
   } else {
     error = 'Team has no career records';
@@ -44,9 +52,8 @@ const driverIds = new Set(data?.drivers.map((d) => d.id) ?? []);
 const teamStandings = driverStandings.filter((s) => driverIds.has(s.driver.id));
 const [d1, d2] = teamStandings;
 
-type CompareRow = { label: string; v1: number; v2: number; lowerBetter?: boolean; fmt?: (v: number) => string };
-const compareRows: CompareRow[] = d1 && d2 ? [
-  { label: 'Points',      v1: Number(d1.stats.totalPoints),           v2: Number(d2.stats.totalPoints) },
+const compareRows: HeadToHeadRow[] = d1 && d2 ? [
+  { label: 'Points',      v1: championshipPoints(d1.stats),           v2: championshipPoints(d2.stats) },
   { label: 'Wins',        v1: d1.stats.wins,                          v2: d2.stats.wins },
   { label: 'Podiums',     v1: d1.stats.podiums,                       v2: d2.stats.podiums },
   { label: 'Poles',       v1: d1.stats.poles,                         v2: d2.stats.poles },
@@ -108,7 +115,7 @@ const compareRows: CompareRow[] = d1 && d2 ? [
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-px bg-white/[0.06]">
             {[
               ['Championship', data.seasonStats.championshipPosition ? `P${data.seasonStats.championshipPosition}` : '—'],
-              ['Points', Math.round(Number(data.seasonStats.totalPoints))],
+              ['Points', Math.round(championshipPoints(data.seasonStats))],
               ['Wins', data.seasonStats.wins],
               ['Podiums', data.seasonStats.podiums],
               ['Races', data.seasonStats.racesCompleted],
@@ -139,6 +146,8 @@ const compareRows: CompareRow[] = d1 && d2 ? [
           )}
         </div>
 
+        <PitCrewCard rankings={pitCrewRankings} teamId={team.id} year={year} />
+
         <!-- Drivers -->
         {data.drivers.length > 0 && (
           <div>
@@ -148,68 +157,7 @@ const compareRows: CompareRow[] = d1 && d2 ? [
             </div>
 
             {d1 && d2 && compareRows.length > 0 ? (
-              <div class="border border-white/[0.06]">
-                {/* Driver headers */}
-                <div class="grid grid-cols-[1fr_90px_1fr] border-b border-white/[0.06]">
-                  <a href={`/drivers/${d1.driver.id}?year=${year}`} class="flex items-center gap-3 p-4 hover:bg-white/[0.02] transition-colors group" style={`border-left: 2px solid ${getTeamColor(team.teamKey)};`}>
-                    {d1.driver.headshotUrl ? (
-                      <img src={d1.driver.headshotUrl} alt={d1.driver.fullName} class="w-12 h-12 object-cover object-top border border-white/[0.08] shrink-0" loading="lazy" />
-                    ) : (
-                      <div class="w-12 h-12 border border-white/[0.08] flex items-center justify-center shrink-0">
-                        <span class="font-mono text-sm font-bold text-[#a855f7]">{d1.driver.driverNumber}</span>
-                      </div>
-                    )}
-                    <div>
-                      <div class="font-mono text-[8px] text-muted-foreground tracking-wider">{d1.driver.code} #{d1.driver.driverNumber}</div>
-                      <div class="font-semibold group-hover:text-[#a855f7] transition-colors">{d1.driver.fullName}</div>
-                      {d1.driver.nationality && <div class="font-mono text-[9px] text-muted-foreground">{d1.driver.nationality}</div>}
-                    </div>
-                  </a>
-                  <div class="flex items-center justify-center font-mono text-[8px] text-muted-foreground tracking-widest uppercase border-x border-white/[0.06]">vs</div>
-                  <a href={`/drivers/${d2.driver.id}?year=${year}`} class="flex items-center justify-end gap-3 p-4 hover:bg-white/[0.02] transition-colors group" style={`border-right: 2px solid ${getTeamColor(team.teamKey)};`}>
-                    <div class="text-right">
-                      <div class="font-mono text-[8px] text-muted-foreground tracking-wider">{d2.driver.code} #{d2.driver.driverNumber}</div>
-                      <div class="font-semibold group-hover:text-[#a855f7] transition-colors">{d2.driver.fullName}</div>
-                      {d2.driver.nationality && <div class="font-mono text-[9px] text-muted-foreground">{d2.driver.nationality}</div>}
-                    </div>
-                    {d2.driver.headshotUrl ? (
-                      <img src={d2.driver.headshotUrl} alt={d2.driver.fullName} class="w-12 h-12 object-cover object-top border border-white/[0.08] shrink-0" loading="lazy" />
-                    ) : (
-                      <div class="w-12 h-12 border border-white/[0.08] flex items-center justify-center shrink-0">
-                        <span class="font-mono text-sm font-bold text-[#a855f7]">{d2.driver.driverNumber}</span>
-                      </div>
-                    )}
-                  </a>
-                </div>
-                <!-- Stat rows -->
-                {compareRows.map((row, i) => {
-                  const total = row.v1 + row.v2;
-                  const pct1 = total === 0 ? 50 : Math.round((row.v1 / total) * 100);
-                  const pct2 = 100 - pct1;
-                  const d1Wins = row.lowerBetter ? row.v1 < row.v2 : row.v1 > row.v2;
-                  const d2Wins = row.lowerBetter ? row.v2 < row.v1 : row.v2 > row.v1;
-                  const color = getTeamColor(team.teamKey);
-                  const display1 = row.fmt ? row.fmt(row.v1) : row.v1;
-                  const display2 = row.fmt ? row.fmt(row.v2) : row.v2;
-                  return (
-                    <div class={`grid grid-cols-[1fr_90px_1fr] ${i !== 0 ? 'border-t border-white/[0.04]' : ''}`}>
-                      <div class="flex items-center gap-3 px-4 py-3">
-                        <span class={`font-mono text-sm font-bold w-10 shrink-0 ${d1Wins ? 'text-white' : 'text-muted-foreground'}`}>{display1}</span>
-                        <div class="flex-1 h-1.5 bg-white/[0.06] flex justify-end overflow-hidden">
-                          <div class="h-full bar-fill bar-fill-end" style={`width:${pct1}%; background:${d1Wins ? color : 'rgba(255,255,255,0.12)'}`} />
-                        </div>
-                      </div>
-                      <div class="flex items-center justify-center font-mono text-[8px] text-muted-foreground tracking-widest uppercase border-x border-white/[0.06]">{row.label}</div>
-                      <div class="flex items-center gap-3 px-4 py-3">
-                        <div class="flex-1 h-1.5 bg-white/[0.06] overflow-hidden">
-                          <div class="h-full bar-fill" style={`width:${pct2}%; background:${d2Wins ? color : 'rgba(255,255,255,0.12)'}`} />
-                        </div>
-                        <span class={`font-mono text-sm font-bold w-10 shrink-0 text-right ${d2Wins ? 'text-white' : 'text-muted-foreground'}`}>{display2}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <HeadToHead left={d1.driver} right={d2.driver} color={getTeamColor(team.teamKey)} rows={compareRows} year={year} />
             ) : (
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-px bg-white/[0.06]">
                 {data.drivers.map((d) => (
@@ -236,6 +184,8 @@ const compareRows: CompareRow[] = d1 && d2 ? [
           </div>
         )}
 
+        {teamHistory && <LineageTable history={teamHistory} color={getTeamColor(team.teamKey)} />}
+
         <!-- Career history -->
         {careerWithStats.length > 1 && (
           <div>
@@ -261,7 +211,7 @@ const compareRows: CompareRow[] = d1 && d2 ? [
                   class={`grid grid-cols-[60px_1fr_70px_50px_50px_50px_50px_70px_90px] gap-0 items-center px-5 py-3 hover:bg-white/[0.02] transition-colors duration-150 ${i !== 0 ? 'border-t border-white/[0.04]' : ''} ${y.year === year ? 'bg-[rgba(168,85,247,0.03)]' : ''}`}
                 >
                   <div class={`font-mono text-sm font-bold ${y.year === year ? 'text-[#a855f7]' : 'text-muted-foreground'}`}>{y.year}</div>
-                  <div class="font-bold text-sm text-right">{y.stats ? Math.round(Number(y.stats.totalPoints)) : '—'}</div>
+                  <div class="font-bold text-sm text-right">{y.stats ? Math.round(championshipPoints(y.stats)) : '—'}</div>
                   <div class="font-mono text-sm text-right text-muted-foreground">{y.stats?.championshipPosition ? `P${y.stats.championshipPosition}` : '—'}</div>
                   <div class="font-mono text-sm text-right text-muted-foreground">{y.stats?.wins ?? '—'}</div>
                   <div class="font-mono text-sm text-right text-muted-foreground">{y.stats?.podiums ?? '—'}</div>

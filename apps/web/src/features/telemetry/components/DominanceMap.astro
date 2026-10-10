@@ -1,0 +1,23 @@
+---
+import { projectTrack } from '@/lib/trackMap';
+import { sectorBounds, type SectorWinner } from '@/lib/telemetryCompare';
+
+interface Props {
+  x: number[];
+  y: number[];
+  winners: SectorWinner[];
+  colors: { a: string; b: string };
+}
+
+const { x, y, winners, colors } = Astro.props;
+const SIZE = 400;
+const points = projectTrack(x, y, SIZE);
+const segments = sectorBounds(points.length, winners.length).map(([from, to], k) => ({
+  d: points.slice(from, to + 1).map(([px, py], i) => `${i ? 'L' : 'M'}${px},${py}`).join(''),
+  color: colors[winners[k]],
+}));
+---
+
+<svg viewBox={`-20 -20 ${SIZE + 40} ${SIZE + 40}`} width="100%" role="img" aria-label="Mini-sector dominance map" style="display:block;max-width:420px">
+  {segments.map((s) => <path d={s.d} fill="none" stroke={s.color} stroke-width="8" stroke-linecap="round" />)}
+</svg>

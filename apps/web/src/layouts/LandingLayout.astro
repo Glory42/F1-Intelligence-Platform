@@ -1,11 +1,12 @@
 ---
+import { SITE_NAME } from '@/lib/site';
 import Navbar from '@/components/layout/Navbar.astro';
 import Footer from '@/components/layout/Footer.astro';
 
 interface Props {
   title?: string;
 }
-const { title = 'F1 Prediction — Race Prediction Platform' } = Astro.props;
+const { title = SITE_NAME } = Astro.props;
 ---
 
 <!doctype html>

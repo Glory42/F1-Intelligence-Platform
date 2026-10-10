@@ -1,0 +1,22 @@
+---
+import type { LucideIcon } from 'lucide-react';
+
+interface Props {
+  title: string;
+  id: string;
+  icon: LucideIcon;
+  href?: string;
+}
+
+const { title, id, icon: Icon, href } = Astro.props;
+const Tag = href ? 'a' : 'div';
+---
+
+<section aria-labelledby={id} class="bg-black">
+  <Tag href={href} class="block h-full p-5 hover:bg-white/[0.02] transition-colors duration-150 group">
+    <h3 id={id} class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.2em] text-muted-foreground uppercase mb-3">
+      <Icon size={10} />{title}
+    </h3>
+    <slot />
+  </Tag>
+</section>

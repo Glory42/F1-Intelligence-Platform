@@ -1,0 +1,20 @@
+---
+import { Shield } from 'lucide-react';
+import { getTeamLogo } from '@/lib/teamLogos';
+import type { Team } from '@/types';
+
+interface Props {
+  team: Team;
+  year?: number;
+}
+
+const { team, year } = Astro.props;
+const logo = getTeamLogo(team.teamKey);
+---
+
+<div role="cell" class="flex items-center gap-3 min-w-0">
+  <div class="w-8 h-8 flex items-center justify-center shrink-0 bg-white/[0.01]">
+    {logo ? <img src={logo} alt="" class="max-w-full max-h-full object-contain" loading="lazy" /> : <Shield size={14} className="text-white/20" />}
+  </div>
+  <a href={`/teams/${team.id}${year ? `?year=${year}` : ''}`} class="font-semibold text-sm group-hover:text-[#a855f7] transition-colors duration-150 truncate">{team.name}</a>
+</div>

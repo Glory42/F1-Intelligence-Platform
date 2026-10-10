@@ -28,3 +28,12 @@ export function formatDate(dateStr: string): string {
 export function unwrapSettled<T>(result: PromiseSettledResult<T>, fallback: T): T {
   return result.status === 'fulfilled' ? result.value : fallback;
 }
+
+export function formatStopSeconds(ms: number | null | undefined): string {
+  return ms == null ? '—' : `${(ms / 1000).toFixed(2)} s`;
+}
+
+export function formatAgeFromDays(days: number): string {
+  const years = Math.floor(days / 365.25);
+  return `${years} y ${days - Math.floor(years * 365.25)} d`;
+}

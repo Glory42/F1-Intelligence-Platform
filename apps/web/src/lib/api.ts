@@ -4,7 +4,9 @@ import type {
   PredictionHistoryItem, IntelStandingRow, CircuitDetailResponse, RaceControlMessage, RaceOvertake, TeamRadioClip,
   DriverYearStats, TeamYearStats, SeasonSummary,
   SprintPredictionResponse, SprintDetailResponse, ModelInfo, SeasonAccuracy,
-  QualityReport,
+  QualityReport, RaceSession, StrategyResponse, PitCrewRanking, FridayPaceRow,
+  TitleOddsResponse, TeammateBattle, RacecraftRow, RaceStoryResponse, TelemetryResponse, QualifyingSession,
+  HistoryRecords, DriverHistory, TeamHistory, RaceRecap, OnThisDayRace,
 } from '@/types';
 
 const API_URL = import.meta.env.PUBLIC_API_URL ?? 'http://localhost:8787';
@@ -15,6 +17,11 @@ async function get<T>(path: string): Promise<T> {
   const json = (await res.json()) as { data: T; error: null } | { data: null; error: { message: string } };
   if (json.error) throw new Error(json.error.message);
   return json.data;
+}
+
+// Omitted for the GP so existing URLs (and their edge-cache entries) stay unchanged.
+function sessionQuery(session: RaceSession): string {
+  return session === 'race' ? '' : `?session=${session}`;
 }
 
 export const api = {
@@ -32,9 +39,33 @@ export const api = {
     return get<Race[]>(`/api/races${q}`);
   },
   getRaceById: (id: number) => get<RaceDetailResponse>(`/api/races/${id}`),
-  getRaceControlMessages: (raceId: number) => get<RaceControlMessage[]>(`/api/races/${raceId}/race-control`),
-  getOvertakes: (raceId: number) => get<RaceOvertake[]>(`/api/races/${raceId}/overtakes`),
-  getTeamRadio: (raceId: number) => get<TeamRadioClip[]>(`/api/races/${raceId}/team-radio`),
+  getRaceControlMessages: (raceId: number, session: RaceSession = 'race') =>
+    get<RaceControlMessage[]>(`/api/races/${raceId}/race-control${sessionQuery(session)}`),
+  getOvertakes: (raceId: number, session: RaceSession = 'race') =>
+    get<RaceOvertake[]>(`/api/races/${raceId}/overtakes${sessionQuery(session)}`),
+  getTeamRadio: (raceId: number, session: RaceSession = 'race') =>
+    get<TeamRadioClip[]>(`/api/races/${raceId}/team-radio${sessionQuery(session)}`),
+  getRaceStory: (raceId: number, session: RaceSession = 'race') =>
+    get<RaceStoryResponse>(`/api/races/${raceId}/race-story${sessionQuery(session)}`),
+  getTelemetry: (raceId: number, session: QualifyingSession, a?: string, b?: string) => {
+    const params = new URLSearchParams({ session });
+    if (a) params.set('a', a);
+    if (b) params.set('b', b);
+    return get<TelemetryResponse>(`/api/races/${raceId}/telemetry?${params}`);
+  },
+  getStrategy: (raceId: number, session: RaceSession = 'race') =>
+    get<StrategyResponse>(`/api/races/${raceId}/strategy${sessionQuery(session)}`),
+  getPitCrewRankings: (year: number) => get<PitCrewRanking[]>(`/api/teams/pit-stops?year=${year}`),
+  getFridayPace: (raceId: number) => get<FridayPaceRow[]>(`/api/predictions/race/${raceId}/friday-pace`),
+  getTitleOdds: (year: number) => get<TitleOddsResponse>(`/api/predictions/title-odds?year=${year}`),
+  getTeammateBattle: (driverId: number, year: number) =>
+    get<TeammateBattle>(`/api/drivers/${driverId}/teammate-battle?year=${year}`),
+  getRacecraft: (year: number) => get<RacecraftRow[]>(`/api/drivers/racecraft?year=${year}`),
+  getHistoryRecords: () => get<HistoryRecords>('/api/history/records'),
+  getOnThisDay: (monthDay: string) => get<OnThisDayRace[]>(`/api/history/on-this-day?date=${monthDay}`),
+  getRaceRecap: (raceId: number) => get<RaceRecap>(`/api/races/${raceId}/recap`),
+  getDriverHistory: (driverId: number) => get<DriverHistory>(`/api/drivers/${driverId}/history`),
+  getTeamHistory: (teamId: number) => get<TeamHistory>(`/api/teams/${teamId}/history`),
   getCircuitDetails: (circuitKey: string) => get<CircuitDetailResponse>(`/api/races/circuit/${circuitKey}`),
   getCircuits: () => get<Circuit[]>('/api/races/circuits'),
 

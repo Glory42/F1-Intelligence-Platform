@@ -1,0 +1,101 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import PageHeader from '@/components/shared/PageHeader.astro';
+import SectionKicker from '@/components/shared/SectionKicker.astro';
+import LineChart, { type LineSeries } from '@/components/charts/LineChart.astro';
+import BattleList from '@/features/races/components/BattleList.astro';
+import WeatherStrip from '@/features/races/components/WeatherStrip.astro';
+import SessionSwitcher from '@/features/races/components/SessionSwitcher.astro';
+import { GP_ACCENT, SPRINT_ACCENT } from '@/features/predictions/types';
+import { api } from '@/lib/api';
+import { getTeamColor } from '@/lib/teamColors';
+import { unwrapSettled } from '@/lib/utils';
+import { Activity, CloudRain, ListOrdered, Swords, Timer } from 'lucide-react';
+import type { RaceSession } from '@/types';
+
+const { id } = Astro.params;
+const session: RaceSession = Astro.url.searchParams.get('session') === 'sprint' ? 'sprint' : 'race';
+const accent = session === 'sprint' ? SPRINT_ACCENT : GP_ACCENT;
+// A gap chart with all 20 cars is unreadable; the front of the field tells the story.
+const CHART_DRIVERS = 10;
+
+const [raceResult, storyResult] = await Promise.allSettled([
+  api.getRaceById(Number(id)),
+  api.getRaceStory(Number(id), session),
+]);
+const race = unwrapSettled(raceResult, null)?.race ?? null;
+const story = unwrapSettled(storyResult, null);
+const drivers = story?.drivers ?? [];
+const shown = drivers.slice(0, CHART_DRIVERS);
+const year = race ? new Date(race.raceDate).getFullYear() : new Date().getFullYear();
+
+const toSeries = (pick: (d: (typeof drivers)[number]) => Array<number | null>): LineSeries[] =>
+  shown.map((d) => ({
+    id: d.driver.id,
+    label: d.driver.code,
+    color: getTeamColor(d.driver.team.teamKey),
+    points: pick(d).map((value, i) => ({ x: i + 1, y: value })),
+  }));
+
+const gapSeries = toSeries((d) => d.gapsMs.map((g) => (g == null ? null : g / 1000)));
+const positionSeries = toSeries((d) => d.positions);
+const maxGap = Math.max(1, ...gapSeries.flatMap((s) => s.points.flatMap((p) => (p.y == null ? [] : [p.y]))));
+const backHref = session === 'sprint' ? `/races/${id}/sprint` : `/races/${id}`;
+const sessionName = session === 'sprint' ? 'Sprint' : 'Race';
+---
+
+<BaseLayout title={race ? `${sessionName} story · ${race.name}` : 'Race story'}>
+  <div class="mt-7 space-y-8">
+    <a href={backHref} class="inline-block font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground hover:text-foreground transition-colors duration-150">
+      ← {race?.name ?? 'race'}
+    </a>
+
+    <PageHeader
+      icon={Activity}
+      kicker={session === 'sprint' ? './sprint-story' : './race-story'}
+      title={race?.name ?? 'Race story'}
+      subtitle={`${sessionName} · lap-by-lap timing · top ${Math.min(CHART_DRIVERS, drivers.length)} finishers charted`}
+      accentRgb={accent.rgb}
+    >
+      {race?.hasSprint && (
+        <SessionSwitcher slot="aside" raceId={race.id} current={session === 'sprint' ? 'sprint' : 'gp'}
+          gpHref={`/races/${race.id}/race-story`} sprintHref={`/races/${race.id}/race-story?session=sprint`} />
+      )}
+    </PageHeader>
+
+    {drivers.length === 0 ? (
+      <div class="border border-white/[0.06] p-10 text-center">
+        <p class="font-mono text-[9px] text-muted-foreground tracking-[0.25em] uppercase">No lap-by-lap data for this session yet</p>
+      </div>
+    ) : (
+      <>
+        <section>
+          <SectionKicker icon={Timer} label="./gap-to-leader · seconds" accentRgb={accent.rgb} />
+          <div class="panel p-5">
+            <LineChart series={gapSeries} ariaLabel="Gap to the leader per lap" yDomain={[maxGap, 0]} formatY={(v) => `${v}`} xLabel="lap" height={300} width={1080} />
+            <p class="mt-3 font-mono text-[7px] text-muted-foreground/50">Lines break where a car was lapped.</p>
+          </div>
+        </section>
+
+        <section>
+          <SectionKicker icon={ListOrdered} label="./positions" accentRgb={accent.rgb} />
+          <div class="panel p-5">
+            <LineChart series={positionSeries} ariaLabel="Position per lap" yDomain={[Math.max(...shown.flatMap((d) => d.positions)), 1]} xLabel="lap" height={300} width={1080} integerTicks />
+          </div>
+        </section>
+
+        {story?.weather && (
+          <section>
+            <SectionKicker icon={CloudRain} label="./conditions" accentRgb={accent.rgb} />
+            <WeatherStrip weather={story.weather} />
+          </section>
+        )}
+
+        <section>
+          <SectionKicker icon={Swords} label="./battles · within 1.0 s for 3+ laps" accentRgb={accent.rgb} />
+          <BattleList battles={story?.battles ?? []} year={year} />
+        </section>
+      </>
+    )}
+  </div>
+</BaseLayout>

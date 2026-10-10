@@ -1,0 +1,40 @@
+---
+import { Trophy } from 'lucide-react';
+import SectionKicker from '@/components/shared/SectionKicker.astro';
+import DataList from '@/components/shared/DataList.astro';
+import DataRow from '@/components/shared/DataRow.astro';
+import TeamIdentity from '@/components/shared/TeamIdentity.astro';
+import RankCell from '@/components/shared/RankCell.astro';
+import ShareBar from '@/components/shared/ShareBar.astro';
+import { getTeamColor } from '@/lib/teamColors';
+import { formatTitleOdds } from '@/lib/championshipMath';
+import type { TitleOddsResponse } from '@/types';
+
+interface Props {
+  odds: TitleOddsResponse;
+  year: number;
+}
+
+const { odds, year } = Astro.props;
+const COLUMNS = 'grid-cols-[40px_1fr_140px] md:grid-cols-[40px_1fr_220px_120px]';
+---
+
+{odds.teams.length > 0 && (
+  <section>
+    <SectionKicker icon={Trophy} label={`./title-odds · after r${odds.afterRound}`} />
+    <DataList
+      label="Constructors' title odds"
+      columns={COLUMNS}
+      headers={[{ label: 'Pos' }, { label: 'Constructor' }, { label: 'Title odds' }, { label: 'Likely final', class: 'text-right hidden md:block' }]}
+    >
+      {odds.teams.map((t, i) => (
+        <DataRow columns={COLUMNS} first={i === 0} accent={getTeamColor(t.team.teamKey)}>
+          <RankCell rank={i + 1} />
+          <TeamIdentity team={t.team} year={year} />
+          <ShareBar share={t.titleProbability} color={getTeamColor(t.team.teamKey)} label={formatTitleOdds(t.titleProbability)} />
+          <div role="cell" class="font-mono text-[10px] text-muted-foreground text-right hidden md:block">{Math.round(t.pointsP10)}–{Math.round(t.pointsP90)}</div>
+        </DataRow>
+      ))}
+    </DataList>
+  </section>
+)}

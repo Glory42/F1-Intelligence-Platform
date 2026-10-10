@@ -34,6 +34,14 @@ export default {
         success:           'hsl(var(--success) / <alpha-value>)',
         surface:           'hsl(var(--surface) / <alpha-value>)',
         text: { secondary: 'hsl(var(--text-secondary) / <alpha-value>)' },
+        tyre: {
+          soft:    'hsl(var(--tyre-soft) / <alpha-value>)',
+          medium:  'hsl(var(--tyre-medium) / <alpha-value>)',
+          hard:    'hsl(var(--tyre-hard) / <alpha-value>)',
+          inter:   'hsl(var(--tyre-inter) / <alpha-value>)',
+          wet:     'hsl(var(--tyre-wet) / <alpha-value>)',
+          unknown: 'hsl(var(--tyre-unknown) / <alpha-value>)',
+        },
       },
       fontFamily: {
         sans:    ['Sora', 'system-ui', 'sans-serif'],

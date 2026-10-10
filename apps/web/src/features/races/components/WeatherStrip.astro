@@ -1,0 +1,44 @@
+---
+import LineChart from '@/components/charts/LineChart.astro';
+import { rainSpells } from '@/lib/weatherSpells';
+import type { SessionWeather } from '@/types';
+
+interface Props {
+  weather: SessionWeather;
+}
+
+const { weather } = Astro.props;
+const spells = rainSpells(weather.minuteOffsets, weather.rainfall);
+const series = [
+  {
+    id: 'track',
+    label: 'track',
+    color: '#fb923c',
+    points: weather.minuteOffsets.map((m, i) => ({ x: m, y: weather.trackTempC[i] })),
+  },
+  {
+    id: 'air',
+    label: 'air',
+    color: '#94a3b8',
+    points: weather.minuteOffsets.map((m, i) => ({ x: m, y: weather.airTempC[i] })),
+  },
+];
+const temps = [...weather.trackTempC, ...weather.airTempC];
+---
+
+<div class="panel p-5">
+  <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase mb-3">Track &amp; air temperature (°C)</div>
+  <LineChart
+    series={series}
+    ariaLabel="Track temperature over the session"
+    yDomain={[Math.floor(Math.min(...temps)) - 1, Math.ceil(Math.max(...temps)) + 1]}
+    xLabel="min"
+    height={180}
+    width={1080}
+  />
+  <p class="mt-3 font-mono text-[9px] tracking-widest uppercase text-muted-foreground">
+    {spells.length === 0
+      ? 'Dry throughout'
+      : `Rain: ${spells.map((s) => (s.from === s.to ? `minute ${s.from}` : `minutes ${s.from}–${s.to}`)).join(', ')}`}
+  </p>
+</div>

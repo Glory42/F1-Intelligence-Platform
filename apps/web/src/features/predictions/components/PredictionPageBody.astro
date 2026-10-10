@@ -6,6 +6,7 @@ import PredictionDriverTable from './PredictionDriverTable.astro';
 import DriverRadarCompare from './DriverRadarCompare.astro';
 import ModelWeightsGrid from './ModelWeightsGrid.astro';
 import WhatIfLab from './WhatIfLab.astro';
+import FridayPaceTable from './FridayPaceTable.astro';
 import type { PredictionPageData } from '../buildPredictionPageData';
 import type { PredictionCopy } from '../predictionCopy';
 
@@ -17,7 +18,7 @@ interface Props {
 const { data, copy } = Astro.props;
 const {
   race, prediction, results, predictionFailed, raceYear, actualWinner, correct,
-  winner, breakdown, radarFeatures, weights, featureMeta, accent,
+  winner, breakdown, radarFeatures, weights, featureMeta, accent, fridayPace,
 } = data;
 const kicker = race ? copy.kicker(race.roundNumber) : '';
 ---
@@ -62,6 +63,8 @@ const kicker = race ? copy.kicker(race.roundNumber) : '';
       {winner && breakdown.some((b) => b.share > 0) && (
         <ContributionBar driverCode={winner.driver.code} breakdown={breakdown} featureMeta={featureMeta} accent={accent} />
       )}
+
+      {fridayPace.length > 0 && <FridayPaceTable rows={fridayPace} accent={accent} year={raceYear} />}
 
       <div class="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-8">
         <PredictionDriverTable

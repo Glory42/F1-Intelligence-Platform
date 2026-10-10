@@ -1,0 +1,39 @@
+---
+import DataList from '@/components/shared/DataList.astro';
+import DataRow from '@/components/shared/DataRow.astro';
+import DriverIdentity from '@/components/shared/DriverIdentity.astro';
+import { getTeamColor } from '@/lib/teamColors';
+import type { RaceBattle } from '@/types';
+
+interface Props {
+  battles: RaceBattle[];
+  year: number;
+}
+
+const { battles, year } = Astro.props;
+const SHOWN = 10;
+const COLUMNS = 'grid-cols-[70px_1fr_1fr_70px]';
+const longest = [...battles].sort((a, b) => b.lapEnd - b.lapStart - (a.lapEnd - a.lapStart) || a.minGapMs - b.minGapMs);
+---
+
+{battles.length === 0 ? (
+  <div class="border border-white/[0.06] p-8 text-center">
+    <p class="font-mono text-[9px] text-muted-foreground tracking-[0.25em] uppercase">No sustained battles this session</p>
+  </div>
+) : (
+  <>
+    <DataList label="Battles" columns={COLUMNS} headers={[{ label: 'Laps' }, { label: 'Chasing' }, { label: 'Ahead' }, { label: 'Closest', class: 'text-right' }]}>
+      {longest.slice(0, SHOWN).map((b, i) => (
+        <DataRow columns={COLUMNS} first={i === 0} accent={getTeamColor(b.chaser.team.teamKey)}>
+          <div role="cell" class="font-mono text-[10px] text-muted-foreground">{b.lapStart}–{b.lapEnd}</div>
+          <DriverIdentity driver={b.chaser} year={year} />
+          <DriverIdentity driver={b.leader} year={year} />
+          <div role="cell" class="font-mono text-sm font-bold text-right">{(b.minGapMs / 1000).toFixed(2)} s</div>
+        </DataRow>
+      ))}
+    </DataList>
+    {battles.length > SHOWN && (
+      <p class="font-mono text-[7px] text-muted-foreground/50 mt-3">+{battles.length - SHOWN} shorter battles</p>
+    )}
+  </>
+)}

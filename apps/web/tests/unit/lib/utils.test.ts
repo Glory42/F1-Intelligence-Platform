@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { unwrapSettled } from '../../../src/lib/utils';
+import { formatAgeFromDays, formatStopSeconds, unwrapSettled } from '../../../src/lib/utils';
 
 describe('unwrapSettled', () => {
   test('returns the value when the settled result is fulfilled', () => {
@@ -15,5 +15,23 @@ describe('unwrapSettled', () => {
   test('works with array fallbacks', () => {
     const result: PromiseSettledResult<string[]> = { status: 'rejected', reason: new Error('boom') };
     expect(unwrapSettled(result, [])).toEqual([]);
+  });
+});
+
+describe('formatStopSeconds', () => {
+  test('formats a pit stop duration in seconds with two decimals', () => {
+    expect(formatStopSeconds(2300)).toBe('2.30 s');
+    expect(formatStopSeconds(24545)).toBe('24.55 s');
+  });
+
+  test('shows a dash when the duration is unknown', () => {
+    expect(formatStopSeconds(null)).toBe('—');
+  });
+});
+
+describe('formatAgeFromDays', () => {
+  test('formats an age in days as years and days', () => {
+    // Verstappen won the 2016 Spanish GP aged 18 years 228 days.
+    expect(formatAgeFromDays(6802)).toBe('18 y 228 d');
   });
 });

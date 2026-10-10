@@ -1,0 +1,18 @@
+---
+interface Props {
+  columns: string;
+  first: boolean;
+  accent?: string;
+  class?: string;
+}
+
+const { columns, first, accent = 'transparent', class: className = '' } = Astro.props;
+---
+
+<div
+  role="row"
+  class={`grid ${columns} gap-0 items-center px-5 py-3.5 hover:bg-white/[0.02] transition-colors duration-150 group ${first ? '' : 'border-t border-white/[0.04]'} ${className}`}
+  style={`border-left: 3px solid ${accent};`}
+>
+  <slot />
+</div>

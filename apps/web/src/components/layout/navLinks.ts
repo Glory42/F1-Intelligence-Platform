@@ -1,4 +1,4 @@
-import { Home, Flag, Users, Building2, Cpu, ShieldCheck, type LucideIcon } from 'lucide-react';
+import { Home, Flag, Users, Building2, Cpu, ShieldCheck, Trophy, type LucideIcon } from 'lucide-react';
 
 export interface NavDropdownItem {
   href: string;
@@ -51,6 +51,7 @@ export function buildNavLinks(isDev: boolean): NavLink[] {
         { href: '/prediction/recap', label: 'recap' },
       ],
     },
+    { href: '/records', label: 'history', icon: Trophy },
   ];
 
   // The data-quality dashboard reads dev-only reporting tables — never ship its nav link.

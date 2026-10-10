@@ -3,11 +3,19 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import { RaceResultsTable } from '@/features/races/components/RaceResultsTable';
 import { QualifyingGrid } from '@/features/races/components/QualifyingGrid';
 import LapChart from '@/features/races/components/LapChart.astro';
+import RaceControlTimeline from '@/features/races/components/RaceControlTimeline.astro';
+import OvertakesList from '@/features/races/components/OvertakesList.astro';
+import TeamRadioList from '@/features/races/components/TeamRadioList.astro';
 import RaceHeroInfo from '@/features/races/components/RaceHeroInfo.astro';
 import RacePredictionPanel from '@/features/races/components/RacePredictionPanel.astro';
+import SessionSwitcher from '@/features/races/components/SessionSwitcher.astro';
+import RaceTabs from '@/features/races/components/RaceTabs.astro';
+import RaceTabPanel from '@/features/races/components/RaceTabPanel.astro';
+import StintChart from '@/features/races/components/StintChart.astro';
+import { PitStopTable } from '@/features/races/components/PitStopTable';
 import { api } from '@/lib/api';
-import { formatDate, formatMs } from '@/lib/utils';
-import type { SprintDetailResponse, RaceResult, QualifyingResult, CircuitHistoryItem } from '@/types';
+import { formatDate, formatMs, unwrapSettled } from '@/lib/utils';
+import type { SprintDetailResponse, RaceResult, QualifyingResult, CircuitHistoryItem, RaceControlMessage, RaceOvertake, TeamRadioClip, Driver, StrategyResponse } from '@/types';
 import { RotateCcw, Gauge, Zap, Flag, CornerDownRight, Wind } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { SPRINT_ACCENT } from '@/features/predictions/types';
@@ -18,11 +26,28 @@ let sprintData: SprintDetailResponse | null = null;
 let circuitHistory: CircuitHistoryItem[] = [];
 let error: string | null = null;
 
-try {
-  sprintData = await api.getSprintDetail(Number(id));
-} catch (e) {
-  error = e instanceof Error ? e.message : 'Failed to load sprint data';
+let raceControlMessages: RaceControlMessage[] = [];
+let overtakes: RaceOvertake[] = [];
+let teamRadio: TeamRadioClip[] = [];
+let strategy: StrategyResponse | null = null;
+
+const [sprintResult, raceControlResult, overtakesResult, teamRadioResult, strategyResult] = await Promise.allSettled([
+  api.getSprintDetail(Number(id)),
+  api.getRaceControlMessages(Number(id), 'sprint'),
+  api.getOvertakes(Number(id), 'sprint'),
+  api.getTeamRadio(Number(id), 'sprint'),
+  api.getStrategy(Number(id), 'sprint'),
+]);
+if (sprintResult.status === 'fulfilled') {
+  sprintData = sprintResult.value;
+} else {
+  error = sprintResult.reason instanceof Error ? sprintResult.reason.message : 'Failed to load sprint data';
 }
+raceControlMessages = unwrapSettled(raceControlResult, []);
+overtakes = unwrapSettled(overtakesResult, []);
+teamRadio = unwrapSettled(teamRadioResult, []);
+strategy = unwrapSettled(strategyResult, null);
+const hasStrategy = (strategy?.drivers ?? []).some((d) => d.stints.length > 0);
 
 const race = sprintData?.race ?? null;
 const prediction = sprintData?.prediction ?? null;
@@ -44,6 +69,7 @@ const isUpcoming = race != null && !isSprintDone;
 const hasResults = results.length > 0;
 const hasLaps = laps.length > 0;
 const hasPrediction = prediction != null;
+const driverMap = new Map<number, Driver>(results.map((r) => [r.driverId, r.driver]));
 
 const sprintWinner = hasResults ? results.find((r) => r.finishPosition === 1) : null;
 const flResult = hasResults ? results.find((r) => r.fastestLap) : null;
@@ -80,6 +106,10 @@ const tabs: Tab[] = [];
 if (isSprintDone && hasResults) tabs.push({ id: 'results', label: 'Results' });
 if (hasGrid) tabs.push({ id: 'qualifying', label: 'Sprint Quali' });
 if (isSprintDone && hasLaps) tabs.push({ id: 'laps', label: 'Lap Chart' });
+if (isSprintDone && hasStrategy) tabs.push({ id: 'strategy', label: 'Strategy' });
+if (isSprintDone && raceControlMessages.length > 0) tabs.push({ id: 'incidents', label: 'Incidents' });
+if (isSprintDone && overtakes.length > 0) tabs.push({ id: 'overtakes', label: 'Overtakes' });
+if (isSprintDone && teamRadio.length > 0) tabs.push({ id: 'team-radio', label: 'Team Radio' });
 tabs.push({ id: 'circuit', label: 'Circuit' });
 
 const defaultTab = tabs[0]?.id ?? 'circuit';
@@ -114,9 +144,12 @@ const sprintStats: Array<{ Icon: LucideIcon; label: string; val: string | number
 <BaseLayout title={race ? `Sprint · ${race.name}` : 'Sprint Race'}>
   <div class="mt-7 space-y-8">
 
-    <a href="/races" class="inline-block font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground hover:text-foreground transition-colors duration-150">
-      ← all races
-    </a>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <a href="/races" class="inline-block font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground hover:text-foreground transition-colors duration-150">
+        ← all races
+      </a>
+      {race && <SessionSwitcher raceId={race.id} current="sprint" />}
+    </div>
 
     {error ? (
       <div class="border border-destructive/40 bg-destructive/10 p-8 text-center">
@@ -168,52 +201,73 @@ const sprintStats: Array<{ Icon: LucideIcon; label: string; val: string | number
         {/* ── TABS ── */}
         {tabs.length > 0 && (
           <div>
-            <div class="flex items-center gap-1.5 mb-6" role="tablist">
-              {tabs.map((t) => (
-                <button
-                  type="button"
-                  data-tab={t.id}
-                  id={`sprint-tab-${t.id}`}
-                  role="tab"
-                  aria-selected={t.id === defaultTab ? 'true' : 'false'}
-                  aria-controls={`sprint-panel-${t.id}`}
-                  tabindex={t.id === defaultTab ? 0 : -1}
-                  class={`sprint-tab-btn font-mono text-[9px] tracking-[0.12em] uppercase px-3 py-1.5 border transition-colors duration-150 ${
-                    t.id === defaultTab
-                      ? 'border-orange-500/50 text-orange-400 bg-orange-500/[0.08]'
-                      : 'border-white/[0.08] text-muted-foreground hover:text-foreground hover:border-white/[0.15]'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
+            <RaceTabs tabs={tabs} defaultTab={defaultTab} accent={SPRINT_ACCENT} namespace="sprint-" links={isSprintDone && race ? [
+              { href: `/races/${race.id}/race-story?session=sprint`, label: 'Race story' },
+              { href: `/races/${race.id}/telemetry?session=SQ`, label: 'Telemetry' },
+            ] : []} />
 
             {isSprintDone && hasResults && (
-              <div id="sprint-panel-results" role="tabpanel" aria-labelledby="sprint-tab-results" class={`sprint-tab-panel ${defaultTab !== 'results' ? 'hidden' : ''}`}>
+              <RaceTabPanel id="results" defaultTab={defaultTab} namespace="sprint-">
                 <div class="border border-white/[0.06] overflow-hidden">
                   <RaceResultsTable results={results as unknown as RaceResult[]} year={raceYear} laps={laps} flColor="#fb923c" />
                 </div>
-              </div>
+              </RaceTabPanel>
             )}
 
             {hasGrid && (
-              <div id="sprint-panel-qualifying" role="tabpanel" aria-labelledby="sprint-tab-qualifying" class={`sprint-tab-panel ${defaultTab !== 'qualifying' ? 'hidden' : ''}`}>
+              <RaceTabPanel id="qualifying" defaultTab={defaultTab} namespace="sprint-">
                 <div class="border border-white/[0.06] overflow-hidden">
                   <QualifyingGrid qualifying={sqGrid} year={raceYear} labelPrefix="SQ" />
                 </div>
-              </div>
+              </RaceTabPanel>
             )}
 
             {isSprintDone && hasLaps && (
-              <div id="sprint-panel-laps" role="tabpanel" aria-labelledby="sprint-tab-laps" class={`sprint-tab-panel ${defaultTab !== 'laps' ? 'hidden' : ''}`}>
+              <RaceTabPanel id="laps" defaultTab={defaultTab} namespace="sprint-">
                 <div class="border border-white/[0.06] overflow-hidden">
                   <LapChart laps={laps} />
                 </div>
-              </div>
+              </RaceTabPanel>
             )}
 
-            <div id="sprint-panel-circuit" role="tabpanel" aria-labelledby="sprint-tab-circuit" class={`sprint-tab-panel ${defaultTab !== 'circuit' ? 'hidden' : ''}`}>
+            {hasStrategy && strategy && (
+              <RaceTabPanel id="strategy" defaultTab={defaultTab} namespace="sprint-">
+                <div class="space-y-4">
+                  <div class="border border-white/[0.06] p-5">
+                    <StintChart drivers={strategy.drivers} approximate={strategy.source === 'derived'} />
+                  </div>
+                  <div class="border border-white/[0.06] overflow-hidden">
+                    <PitStopTable drivers={strategy.drivers} year={raceYear} />
+                  </div>
+                </div>
+              </RaceTabPanel>
+            )}
+
+            {raceControlMessages.length > 0 && (
+              <RaceTabPanel id="incidents" defaultTab={defaultTab} namespace="sprint-">
+                <div class="border border-white/[0.06] overflow-hidden">
+                  <RaceControlTimeline messages={raceControlMessages} />
+                </div>
+              </RaceTabPanel>
+            )}
+
+            {overtakes.length > 0 && (
+              <RaceTabPanel id="overtakes" defaultTab={defaultTab} namespace="sprint-">
+                <div class="border border-white/[0.06] overflow-hidden">
+                  <OvertakesList overtakes={overtakes} driverMap={driverMap} />
+                </div>
+              </RaceTabPanel>
+            )}
+
+            {teamRadio.length > 0 && (
+              <RaceTabPanel id="team-radio" defaultTab={defaultTab} namespace="sprint-">
+                <div class="border border-white/[0.06] overflow-hidden">
+                  <TeamRadioList clips={teamRadio} driverMap={driverMap} />
+                </div>
+              </RaceTabPanel>
+            )}
+
+            <RaceTabPanel id="circuit" defaultTab={defaultTab} namespace="sprint-">
               <div class="grid grid-cols-2 sm:grid-cols-3 gap-px bg-white/[0.06]">
                 {sprintStats.map(({ Icon, label, val }) => (
                   <div class="bg-black p-5">
@@ -224,7 +278,7 @@ const sprintStats: Array<{ Icon: LucideIcon; label: string; val: string | number
                   </div>
                 ))}
               </div>
-            </div>
+            </RaceTabPanel>
           </div>
         )}
 
@@ -241,18 +295,9 @@ const sprintStats: Array<{ Icon: LucideIcon; label: string; val: string | number
 </BaseLayout>
 
 <script>
-  import { initRaceCountdown, initRaceTabs } from '@/features/races/raceTabs';
+  import { initRaceCountdown } from '@/features/races/raceTabs';
 
   document.addEventListener('astro:page-load', () => {
     initRaceCountdown('sprint-countdown', 'raceDate', 'sprint-cd');
-    initRaceTabs({
-      btnClass: 'sprint-tab-btn',
-      panelClass: 'sprint-tab-panel',
-      panelIdPrefix: 'sprint-panel-',
-      activeBorder: 'rgba(249,115,22,0.5)',
-      activeColor: '#fb923c',
-      activeBg: 'rgba(249,115,22,0.08)',
-      strippedClasses: ['border-orange-500/50', 'text-orange-400', 'bg-orange-500/[0.08]'],
-    });
   });
 </script>

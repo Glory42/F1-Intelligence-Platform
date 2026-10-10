@@ -1,3 +1,4 @@
+import { championshipPoints } from '@/lib/championshipMath';
 import type { DriverSeasonStats } from '@/types';
 
 
@@ -18,7 +19,7 @@ export function DriverStatsGrid({ stats }: Props) {
 
   const cells: [string, string | number][] = [
     ['Championship', stats.championshipPosition ? `P${stats.championshipPosition}` : '—'],
-    ['Points', Math.round(Number(stats.totalPoints))],
+    ['Points', Math.round(championshipPoints(stats))],
     ['Wins', stats.wins],
     ['Podiums', stats.podiums],
     ['Poles', stats.poles],

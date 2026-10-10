@@ -1,4 +1,5 @@
 ---
+import { SITE_NAME } from '@/lib/site';
 interface Props {
   variant?: 'full' | 'minimal';
 }
@@ -15,7 +16,7 @@ const { variant = 'minimal' } = Astro.props;
             <svg width="24" height="12" viewBox="0 0 24 12" fill="none">
               <path d="M2 4H20M4 8H22" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="text-accent-bright"/>
             </svg>
-            <span class="font-heading font-bold text-lg tracking-tight uppercase">F1 Prediction</span>
+            <span class="font-heading font-bold text-lg tracking-tight uppercase">{SITE_NAME}</span>
           </div>
           <p class="text-text-secondary text-sm max-w-xs">Race intelligence. Data driven. The next generation of Formula 1 analytics.</p>
         </div>
@@ -33,7 +34,7 @@ const { variant = 'minimal' } = Astro.props;
       </div>
       <div class="mt-16 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-bold text-text-secondary uppercase tracking-[0.2em]">
         <div class="flex flex-col gap-2">
-          <div>© 2025 F1 Prediction. Not affiliated with Formula 1 or FIA.</div>
+          <div>© {new Date().getFullYear()} {SITE_NAME}. Not affiliated with Formula 1 or FIA. Historical data: <a href="https://github.com/f1db/f1db" class="underline" rel="noopener">F1DB</a> (CC BY 4.0).</div>
           <a
             href="https://digitalbeacon.co/report/f1-gorkemkaryol-dev"
             target="_blank"

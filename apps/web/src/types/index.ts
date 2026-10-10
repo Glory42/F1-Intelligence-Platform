@@ -1,3 +1,5 @@
+export type RaceSession = 'race' | 'sprint';
+
 export type Circuit = {
   id: number; circuitKey: string; name: string; country: string; city: string;
   lapCount: number; trackLengthKm: string; overtakeRate: string | null;
@@ -50,11 +52,13 @@ export type DriverSeasonStats = {
   dnfCount: number; dnfRate: string | null;
   avgSector1Ms: number | null; avgSector2Ms: number | null; avgSector3Ms: number | null;
   topSpeedAvg: string | null; teammateQualiDelta: string | null;
+  sprintTotalPoints: string;
 };
 export type TeamSeasonStats = {
   racesCompleted: number; wins: number; podiums: number; totalPoints: string;
   championshipPosition: number | null; avgFinishPosition: string | null; carPerformanceScore: string | null;
   dnfCount: number; reliabilityScore: string | null;
+  sprintTotalPoints: string;
 };
 export type FeatureScores = {
   carPerformance: string; driverRating: string; startingPosition: string; winRate: string;
@@ -109,6 +113,7 @@ export type CircuitHistoryItem = {
   raceId: number; raceName: string; raceDate: string; year: number; hasSprint: boolean; winner: Driver | null;
 };
 export type CircuitDetailResponse = {
+  outlinePath: string | null;
   circuit: Circuit;
   history: CircuitHistoryItem[];
   fastestLap: {
@@ -198,3 +203,97 @@ export type QualityReport = {
   byTable: Record<string, number>;
   issues: QualityIssue[];
 };
+
+export type TyreStint = {
+  stintNumber: number;
+  compound: string | null;
+  lapStart: number | null;
+  lapEnd: number | null;
+  tyreAgeAtStart: number | null;
+};
+export type PitStop = { lapNumber: number; pitLaneMs: number | null; stationaryMs: number | null };
+export type DriverStrategy = { driver: Driver; finishPosition: number | null; stints: TyreStint[]; pitStops: PitStop[] };
+export type StrategyResponse = { source: 'openf1' | 'derived' | 'none'; drivers: DriverStrategy[] };
+export type PitCrewRanking = { team: Team; stops: number; medianStationaryMs: number; fastestStationaryMs: number };
+export type FridayPaceRow = {
+  driver: Driver;
+  compound: string;
+  sessionType: string;
+  medianLapMs: number;
+  stintLength: number | null;
+  deltaToFastestMs: number;
+};
+
+type OddsFields = { titleProbability: number; expectedPoints: number; pointsP10: number; pointsP90: number };
+export type TitleOddsResponse = {
+  afterRound: number;
+  drivers: Array<{ driver: Driver } & OddsFields>;
+  teams: Array<{ team: Team } & OddsFields>;
+  history: Array<{ afterRound: number; driverId: number; titleProbability: number }>;
+};
+export type HeadToHead = { driver: number; teammate: number };
+export type TeammateBattle = {
+  teammate: Driver | null;
+  sharedRaces: number;
+  qualifying: HeadToHead;
+  race: HeadToHead;
+  points: HeadToHead;
+};
+export type RacecraftRow = { driver: Driver; made: number; suffered: number; net: number };
+
+export type DriverLapTrace = {
+  driver: Driver;
+  finishPosition: number | null;
+  positions: number[];
+  gapsMs: Array<number | null>;
+  intervalsMs: Array<number | null>;
+  lapsDown: number[];
+};
+export type RaceBattle = { chaser: Driver; leader: Driver; lapStart: number; lapEnd: number; minGapMs: number };
+export type SessionWeather = { minuteOffsets: number[]; airTempC: number[]; trackTempC: number[]; rainfall: boolean[] };
+export type RaceStoryResponse = { drivers: DriverLapTrace[]; battles: RaceBattle[]; weather: SessionWeather | null };
+
+export type LapTelemetrySamples = {
+  distanceM: number[];
+  timeMs: number[];
+  speed: number[];
+  throttle: number[];
+  brake: number[];
+  gear: number[];
+  x: number[];
+  y: number[];
+};
+export type QualifyingSession = 'Q' | 'SQ';
+export type TelemetryResponse = {
+  session: QualifyingSession;
+  drivers: Array<{ driver: Driver; lapTimeMs: number }>;
+  laps: Array<{ driver: Driver; lapNumber: number; lapTimeMs: number; samples: LapTelemetrySamples }>;
+};
+
+export type RecordEntry = { f1dbId: string; name: string; value: number };
+export type HistoryRecords = {
+  drivers: Record<'wins' | 'championships' | 'poles' | 'podiums' | 'starts', RecordEntry[]>;
+  constructors: Record<'wins' | 'championships' | 'poles', RecordEntry[]>;
+  youngestWinners: Array<{ f1dbId: string; name: string; ageDays: number; raceName: string }>;
+};
+export type DriverHistory = {
+  f1dbId: string; name: string; dateOfBirth: string | null; nationality: string | null;
+  championships: number; raceStarts: number; raceWins: number; podiums: number; polePositions: number;
+  fastestLaps: number; careerPoints: number; sprintWins: number; grandSlams: number;
+  firstRaceDate: string | null; firstRaceName: string | null; firstWinDate: string | null; firstWinName: string | null;
+  firstPodiumDate: string | null; firstPodiumName: string | null; firstPoleDate: string | null; firstPoleName: string | null;
+};
+export type TeamHistory = {
+  constructor: { f1dbId: string; name: string; championships: number; raceStarts: number; raceWins: number;
+    podiums: number; polePositions: number };
+  seasons: Array<{ year: number; chassis: string | null; engine: string | null }>;
+};
+
+export type RaceRecap = {
+  winner: Driver | null;
+  predictedWinner: Driver | null;
+  predictionHit: boolean | null;
+  fastestStop: { driver: Driver; stationaryMs: number } | null;
+  topBattle: RaceBattle | null;
+};
+export type OnThisDayRace = { raceId: number; year: number; name: string; winner: Driver | null };

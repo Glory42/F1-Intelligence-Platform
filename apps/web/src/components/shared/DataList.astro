@@ -1,0 +1,25 @@
+---
+// The standings-style row list used across the site, with table semantics so screen readers
+// (and tests) can still read it as rows and columns.
+export interface DataListColumn {
+  label: string;
+  class?: string;
+}
+
+interface Props {
+  label: string;
+  columns: string;
+  headers: DataListColumn[];
+}
+
+const { label, columns, headers } = Astro.props;
+---
+
+<div role="table" aria-label={label} class="border border-white/[0.06]">
+  <div role="row" class={`grid ${columns} gap-0 px-5 py-2.5 border-b border-white/[0.06]`} style="border-left: 3px solid transparent;">
+    {headers.map((h) => (
+      <div role="columnheader" class={`font-mono text-[8px] text-muted-foreground tracking-widest uppercase ${h.class ?? ''}`}>{h.label}</div>
+    ))}
+  </div>
+  <slot />
+</div>

@@ -1,0 +1,27 @@
+---
+import type { Driver } from '@/types';
+
+interface Props {
+  driver: Driver;
+  year?: number;
+}
+
+const { driver, year } = Astro.props;
+const href = `/drivers/${driver.id}${year ? `?year=${year}` : ''}`;
+---
+
+<div role="cell" class="flex items-center gap-2.5 min-w-0">
+  {driver.headshotUrl ? (
+    <img src={driver.headshotUrl} alt={driver.fullName} class="w-9 h-9 object-cover object-top border border-white/[0.08] shrink-0 bg-white/[0.02]" loading="lazy" />
+  ) : (
+    <div class="w-9 h-9 border border-white/[0.08] flex items-center justify-center shrink-0">
+      <span class="font-mono text-[9px] font-bold text-muted-foreground">{driver.driverNumber}</span>
+    </div>
+  )}
+  <div class="min-w-0">
+    <a href={href} class="block font-semibold text-sm leading-none group-hover:text-[#a855f7] transition-colors duration-150 truncate">
+      <span class="sr-only">{driver.code} </span>{driver.fullName}
+    </a>
+    <div class="font-mono text-[8px] text-muted-foreground mt-1 truncate">{driver.code} · {driver.team.name}</div>
+  </div>
+</div>

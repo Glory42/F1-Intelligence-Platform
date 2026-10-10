@@ -1,19 +1,29 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { api } from '@/lib/api';
-import type { TeamStanding, SeasonSummary } from '@/types';
+import type { TeamStanding, SeasonSummary, PitCrewRanking, TitleOddsResponse } from '@/types';
+import PitCrewRankingTable from '@/features/teams/components/PitCrewRankingTable.astro';
+import ConstructorTitleOdds from '@/features/standings/components/ConstructorTitleOdds.astro';
 import YearSelect from '@/components/shared/YearSelect.astro';
 import { Trophy, Building2 } from 'lucide-react';
 import { getTeamColor } from '@/lib/teamColors';
+import { championshipPoints } from '@/lib/championshipMath';
 import { getTeamLogo } from '@/lib/teamLogos';
 
 const year = Number(Astro.url.searchParams.get('year') ?? new Date().getFullYear());
 
 let standings: TeamStanding[] = [];
 let seasons: SeasonSummary[] = [];
+let pitCrewRankings: PitCrewRanking[] = [];
+let titleOdds: TitleOddsResponse | null = null;
 let error: string | null = null;
 try {
-  [standings, seasons] = await Promise.all([api.getTeamStandings(year), api.getSeasons()]);
+  [standings, seasons, pitCrewRankings, titleOdds] = await Promise.all([
+    api.getTeamStandings(year),
+    api.getSeasons(),
+    api.getPitCrewRankings(year).catch(() => []),
+    api.getTitleOdds(year).catch(() => null),
+  ]);
 } catch (e) {
   error = e instanceof Error ? e.message : 'Failed to load standings';
 }
@@ -38,6 +48,7 @@ function champPos(pos: number | null, i: number) { return pos ?? i + 1; }
       </div>
       <YearSelect years={seasons} currentYear={year} basePath="/teams" />
     </div>
+
 
     {error ? (
       <div class="border border-destructive/40 bg-destructive/10 p-8 text-center">
@@ -92,7 +103,7 @@ function champPos(pos: number | null, i: number) { return pos ?? i + 1; }
                 </div>
                 </div>
               </div>
-              <div class="font-bold text-sm text-right">{Math.round(Number(s.stats.totalPoints))}</div>
+              <div class="font-bold text-sm text-right">{Math.round(championshipPoints(s.stats))}</div>
               <div class="font-mono text-sm text-right hidden sm:block">{s.stats.wins}</div>
               <div class="font-mono text-sm text-right text-muted-foreground hidden sm:block">{s.stats.podiums}</div>
               <div class="font-mono text-sm text-right text-muted-foreground hidden md:block">{s.stats.racesCompleted}</div>
@@ -110,5 +121,9 @@ function champPos(pos: number | null, i: number) { return pos ?? i + 1; }
         ))}
       </div>
     )}
+
+    {titleOdds && <ConstructorTitleOdds odds={titleOdds} year={year} />}
+
+    <PitCrewRankingTable rankings={pitCrewRankings} year={year} />
   </div>
 </BaseLayout>

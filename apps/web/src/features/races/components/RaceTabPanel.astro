@@ -1,0 +1,18 @@
+---
+interface Props {
+  id: string;
+  defaultTab: string;
+  namespace?: string;
+}
+
+const { id, defaultTab, namespace = '' } = Astro.props;
+---
+
+<div
+  id={`${namespace}panel-${id}`}
+  role="tabpanel"
+  aria-labelledby={`${namespace}tab-${id}`}
+  class:list={['race-tab-panel', { hidden: id !== defaultTab }]}
+>
+  <slot />
+</div>
