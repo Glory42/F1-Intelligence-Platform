@@ -38,7 +38,7 @@ const { left, right, color, rows, year } = Astro.props;
         {left.nationality && <div class="font-mono text-[9px] text-muted-foreground">{left.nationality}</div>}
       </div>
     </a>
-    <div class="flex items-center justify-center font-mono text-[8px] text-muted-foreground tracking-widest uppercase border-x border-white/[0.06]">vs</div>
+    <div class="flex items-center justify-center text-[11px] text-muted-foreground border-x border-white/[0.06]">vs</div>
     <a href={`/drivers/${right.id}?year=${year}`} class="flex items-center justify-end gap-3 p-4 hover:bg-white/[0.02] transition-colors group" style={`border-right: 2px solid ${color};`}>
       <div class="text-right">
         <div class="font-mono text-[8px] text-muted-foreground tracking-wider">{right.code} #{right.driverNumber}</div>
@@ -71,7 +71,7 @@ const { left, right, color, rows, year } = Astro.props;
             <div class="h-full bar-fill bar-fill-end" style={`width:${pct1}%; background:${d1Wins ? color : 'rgba(255,255,255,0.12)'}`} />
           </div>
         </div>
-        <div class="flex items-center justify-center font-mono text-[8px] text-muted-foreground tracking-widest uppercase border-x border-white/[0.06]">{row.label}</div>
+        <div class="flex items-center justify-center text-[11px] text-muted-foreground border-x border-white/[0.06]">{row.label}</div>
         <div class="flex items-center gap-3 px-4 py-3">
           <div class="flex-1 h-1.5 bg-white/[0.06] overflow-hidden">
             <div class="h-full bar-fill" style={`width:${pct2}%; background:${d2Wins ? color : 'rgba(255,255,255,0.12)'}`} />

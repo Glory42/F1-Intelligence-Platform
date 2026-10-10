@@ -9,8 +9,20 @@ test('the records page lists all-time leaders and the youngest winner', async ({
   await expect(page.getByText('F1DB')).toBeVisible();
 });
 
+test('history leads with all-time records and keeps on this day in a tab', async ({ page }) => {
+  await page.goto('/records');
+
+  const views = page.getByRole('navigation', { name: 'History views' });
+  await expect(views.getByRole('link')).toHaveText(['Records', 'On this day']);
+  await expect(views.getByRole('link', { name: 'Records' })).toHaveAttribute('aria-current', 'page');
+
+  await views.getByRole('link', { name: 'On this day' }).click();
+  await expect(page).toHaveURL(/\/records\?tab=on-this-day$/);
+  await expect(page.getByRole('list', { name: /^On this day/ }).getByRole('link', { name: /2019 · Italian Grand Prix/ })).toBeVisible();
+});
+
 test('the driver page shows all-time career totals and milestones', async ({ page }) => {
-  await page.goto('/drivers/10?year=2026');
+  await page.goto('/drivers/10?year=2026&tab=career');
 
   const career = page.getByRole('region', { name: 'All-time career' });
   await expect(career).toContainText('72');
@@ -19,7 +31,7 @@ test('the driver page shows all-time career totals and milestones', async ({ pag
 });
 
 test('the team page shows its chassis and engine lineage', async ({ page }) => {
-  await page.goto('/teams/1?year=2026');
+  await page.goto('/teams/1?year=2026&tab=history');
 
   await expect(page.getByRole('table', { name: 'Chassis and engines' }).getByRole('row', { name: /2026.*RB22.*Red Bull Ford/ })).toBeVisible();
 });

@@ -1,0 +1,61 @@
+---
+import { getTeamColor } from '@/lib/teamColors';
+import type { IntelStandingRow } from '@/types';
+
+interface Props {
+  standings: IntelStandingRow[];
+  year: number;
+}
+
+const { standings, year } = Astro.props;
+---
+
+<div>
+  <div class="flex items-center gap-3 mb-4">
+    <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">./season model ratings</span>
+    <div class="h-px flex-1 bg-white/[0.05]" />
+  </div>
+  <div class="border border-white/[0.06]">
+    <div class="grid grid-cols-[40px_1fr_60px] sm:grid-cols-[40px_1fr_120px_60px] gap-0 px-5 py-2.5 border-b border-white/[0.06]">
+      <div class="text-[11px] text-muted-foreground">Rank</div>
+      <div class="text-[11px] text-muted-foreground">Driver</div>
+      <div class="text-[11px] text-muted-foreground hidden sm:block">Team</div>
+      <div class="text-[11px] text-muted-foreground text-right">Score</div>
+    </div>
+    {standings.map((s, i) => {
+      return (
+        <div class={`grid grid-cols-[40px_1fr_60px] sm:grid-cols-[40px_1fr_120px_60px] gap-0 items-start sm:items-center px-5 py-3 hover:bg-white/[0.02] transition-colors duration-150 ${i !== 0 ? 'border-t border-white/[0.04]' : ''}`} style={`border-left: 3px solid ${getTeamColor(s.driver.team.teamKey)};`}>
+          <div class={`font-mono text-sm font-bold pt-1 sm:pt-0 ${i < 3 ? 'text-[#a855f7]' : 'text-muted-foreground'}`}>
+            {String(i+1).padStart(2,'0')}
+          </div>
+          <div class="flex items-start sm:items-center gap-2 min-w-0">
+            <span class="font-mono text-[8px] tracking-[0.1em] uppercase text-muted-foreground border border-white/[0.06] px-1.5 py-0.5 shrink-0 mt-0.5">{s.driver.code}</span>
+            <div class="min-w-0">
+              <a href={`/drivers/${s.driver.id}?year=${year}`} class="font-semibold text-sm leading-none block hover:text-[#a855f7] transition-colors duration-150 truncate">{s.driver.fullName}</a>
+              <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+                <a href={`/teams/${s.driver.team.id}?year=${year}`} class="font-mono text-[8px] text-muted-foreground sm:hidden hover:text-foreground transition-colors duration-150">{s.driver.team.name}</a>
+                {s.sprintWins > 0 && (
+                  <span class="font-mono text-[7px] tracking-[0.1em] uppercase px-1.5 py-0.5 border border-orange-500/30 text-orange-400/70">
+                    {s.sprintWins}W sprint
+                  </span>
+                )}
+                {s.sprintPodiums > 0 && s.sprintWins === 0 && (
+                  <span class="font-mono text-[7px] tracking-[0.1em] uppercase px-1.5 py-0.5 border border-orange-500/20 text-orange-400/50">
+                    {s.sprintPodiums}P sprint
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <a href={`/teams/${s.driver.team.id}?year=${year}`} class="font-mono text-[9px] text-muted-foreground truncate hidden sm:block pr-6 hover:text-foreground transition-colors duration-150">{s.driver.team.name}</a>
+          <div class="text-right pt-1 sm:pt-0">
+            <div class="font-bold text-sm">{s.overallScore}</div>
+            <div class="w-full h-0.5 bg-white/[0.06] mt-1">
+              <div class="h-full bg-[#a855f7] bar-fill" style={`width:${s.overallScore}%`} />
+            </div>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</div>

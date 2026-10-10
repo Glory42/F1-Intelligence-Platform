@@ -1,0 +1,79 @@
+---
+import { Trophy } from 'lucide-react';
+import { getTeamColor } from '@/lib/teamColors';
+import { championshipPoints } from '@/lib/championshipMath';
+import { getTeamLogo } from '@/lib/teamLogos';
+import type { TeamStanding } from '@/types';
+
+interface Props {
+  standings: TeamStanding[];
+  year: number;
+}
+
+const { standings, year } = Astro.props;
+
+function isTopPos(pos: number | null, i: number) { return (pos ?? i + 1) < 4; }
+function champPos(pos: number | null, i: number) { return pos ?? i + 1; }
+---
+
+<div class="border border-white/[0.06]">
+  <div class="grid grid-cols-[40px_1fr_60px] sm:grid-cols-[40px_1fr_60px_60px_60px] md:grid-cols-[40px_1fr_60px_60px_60px_80px] lg:grid-cols-[40px_1fr_80px_60px_60px_80px_100px] gap-0 px-5 py-2.5 border-b border-white/[0.06]">
+    <div class="text-[11px] text-muted-foreground">Pos</div>
+    <div class="text-[11px] text-muted-foreground">Constructor</div>
+    <div class="text-[11px] text-muted-foreground text-right">Pts</div>
+    <div class="text-[11px] text-muted-foreground text-right hidden sm:block">W</div>
+    <div class="text-[11px] text-muted-foreground text-right hidden sm:block">Pod</div>
+    <div class="text-[11px] text-muted-foreground text-right hidden md:block">Races</div>
+    <div class="text-[11px] text-muted-foreground text-right hidden lg:block">Car Perf.</div>
+  </div>
+
+  {standings.map((s, i) => (
+      <a
+        href={`/teams/${s.team.id}?year=${year}`}
+        class={`grid grid-cols-[40px_1fr_60px] sm:grid-cols-[40px_1fr_60px_60px_60px] md:grid-cols-[40px_1fr_60px_60px_60px_80px] lg:grid-cols-[40px_1fr_80px_60px_60px_80px_100px] gap-0 items-center px-5 py-4 hover:bg-white/[0.02] transition-colors duration-150 group relative ${i !== 0 ? 'border-t border-white/[0.04]' : ''}`}
+        style={`border-left: 3px solid ${getTeamColor(s.team.teamKey)};`}
+      >
+        <div class={`font-mono text-sm font-bold ${isTopPos(s.stats.championshipPosition, i) ? 'text-[#a855f7]' : 'text-muted-foreground'}`}>
+          {champPos(s.stats.championshipPosition, i) === 1 ? <Trophy size={14} /> : String(champPos(s.stats.championshipPosition, i)).padStart(2, '0')}
+        </div>
+        <div class="flex items-center gap-3 min-w-0">
+          {(() => { const logo = getTeamLogo(s.team.teamKey); return logo ? (
+            <img src={logo} alt={s.team.name} class="h-7 w-14 object-contain shrink-0" loading="lazy" />
+          ) : null; })()}
+          <div class="min-w-0">
+          <div class="font-semibold text-sm group-hover:text-[#a855f7] transition-colors duration-150 truncate">{s.team.name}</div>
+          {s.team.nationality && (
+            <div class="font-mono text-[8px] text-muted-foreground tracking-wider mt-0.5">{s.team.nationality}</div>
+          )}
+          <div class="flex items-center gap-2 mt-1 sm:hidden font-mono text-[8px] text-muted-foreground">
+            <span>{s.stats.wins}W</span>
+            <span class="text-white/20">·</span>
+            <span>{s.stats.podiums} Pod</span>
+            <span class="text-white/20">·</span>
+            <span>{s.stats.racesCompleted} Races</span>
+            {s.stats.carPerformanceScore && (
+              <>
+                <span class="text-white/20">·</span>
+                <span>Car {Math.round(Number(s.stats.carPerformanceScore) * 100)}</span>
+              </>
+            )}
+          </div>
+          </div>
+        </div>
+        <div class="font-bold text-sm text-right">{Math.round(championshipPoints(s.stats))}</div>
+        <div class="font-mono text-sm text-right hidden sm:block">{s.stats.wins}</div>
+        <div class="font-mono text-sm text-right text-muted-foreground hidden sm:block">{s.stats.podiums}</div>
+        <div class="font-mono text-sm text-right text-muted-foreground hidden md:block">{s.stats.racesCompleted}</div>
+        <div class="text-right hidden lg:block">
+          {s.stats.carPerformanceScore ? (
+            <div class="flex items-center justify-end gap-2">
+              <div class="w-16 h-1 bg-white/[0.06]">
+                <div class="h-full bg-[#a855f7] bar-fill" style={`width:${Math.round(Number(s.stats.carPerformanceScore)*100)}%`} />
+              </div>
+              <span class="font-mono text-[9px] text-muted-foreground">{Math.round(Number(s.stats.carPerformanceScore)*100)}</span>
+            </div>
+          ) : <span class="font-mono text-[9px] text-muted-foreground">—</span>}
+        </div>
+      </a>
+  ))}
+</div>

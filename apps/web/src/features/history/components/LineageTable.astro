@@ -1,5 +1,4 @@
 ---
-import { Cpu } from 'lucide-react';
 import SectionKicker from '@/components/shared/SectionKicker.astro';
 import DataList from '@/components/shared/DataList.astro';
 import DataRow from '@/components/shared/DataRow.astro';
@@ -17,7 +16,7 @@ const COLUMNS = 'grid-cols-[60px_1fr_1fr]';
 
 {history.seasons.length > 0 && (
   <section>
-    <SectionKicker icon={Cpu} label={`./lineage · ${history.constructor.raceWins} wins · ${history.constructor.championships} titles`} />
+    <SectionKicker label={`./lineage · ${history.constructor.raceWins} wins · ${history.constructor.championships} titles`} />
     <DataList label="Chassis and engines" columns={COLUMNS} headers={[{ label: 'Season' }, { label: 'Chassis' }, { label: 'Power unit' }]}>
       {history.seasons.map((s, i) => (
         <DataRow columns={COLUMNS} first={i === 0} accent={i === 0 ? color : 'transparent'}>

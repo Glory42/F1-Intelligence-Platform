@@ -1,0 +1,12 @@
+---
+interface Props {
+  message: string;
+  tone?: 'empty' | 'error';
+}
+
+const { message, tone = 'empty' } = Astro.props;
+---
+
+<div class={`border p-10 text-center ${tone === 'error' ? 'border-destructive/40 bg-destructive/10' : 'border-white/[0.06]'}`}>
+  <p class={`text-[13px] ${tone === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>{message}</p>
+</div>

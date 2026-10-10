@@ -20,7 +20,7 @@ interface Props {
 }
 
 const teamSubtitle = (
-  <span className="font-mono text-[8px] text-muted-foreground tracking-widest uppercase block mt-1">Constructor</span>
+  <span className="text-[11px] text-muted-foreground block mt-1">Constructor</span>
 );
 
 const seasonStatConfig: StatRowConfig<TeamSeasonStats>[] = [

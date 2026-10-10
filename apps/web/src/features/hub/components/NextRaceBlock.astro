@@ -1,0 +1,77 @@
+---
+import HomeBlock from './HomeBlock.astro';
+import { nextSession } from '@/lib/nextSession';
+import type { PredictionResponse, Race } from '@/types';
+
+interface Props {
+  race: Race | null;
+  prediction: PredictionResponse | null;
+  today: Date;
+}
+
+const { race, prediction, today } = Astro.props;
+const session = race ? nextSession(race, today) : null;
+const favourite = prediction && race && prediction.race.id === race.id
+  ? [...prediction.drivers].sort((a, b) => (a.predictedPosition ?? 99) - (b.predictedPosition ?? 99))[0]
+  : null;
+---
+
+<HomeBlock
+  title="Next race"
+  id="home-next-race"
+  links={race ? [{ href: '/prediction', label: 'Prediction' }, { href: `/races/${race.id}`, label: 'Race' }] : [{ href: '/races', label: 'Calendar' }]}
+>
+  {race ? (
+    <div class="space-y-4">
+      <div>
+        <p class="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Round {race.roundNumber} · {race.circuit.city}, {race.circuit.country}</p>
+        <p class="mt-1 text-xl font-semibold">{race.name}</p>
+      </div>
+      {session && (
+        <p class="text-[13px] text-muted-foreground">
+          {session.label} in <span id="home-countdown" data-target={session.date} class="font-mono text-foreground">—</span>
+        </p>
+      )}
+      {favourite ? (
+        <p class="text-[13px]">
+          Model favourite <span class="font-mono font-bold">{favourite.driver.code}</span>
+          <span class="font-mono text-[#a855f7]"> {Math.round(Number(favourite.winProbability) * 100)}%</span>
+        </p>
+      ) : (
+        <p class="text-[13px] text-muted-foreground">Prediction after qualifying.</p>
+      )}
+    </div>
+  ) : (
+    <p class="text-[13px] text-muted-foreground">The season is over — next year's calendar soon.</p>
+  )}
+</HomeBlock>
+
+<script>
+  let timer: ReturnType<typeof setInterval> | null = null;
+
+  function initCountdown() {
+    if (timer) clearInterval(timer);
+    const el = document.getElementById('home-countdown');
+    if (!el) return;
+    const raw = el.dataset.target ?? '';
+    const target = new Date(raw.includes('T') ? raw : `${raw}T00:00:00`);
+    const pad = (n: number) => String(n).padStart(2, '0');
+
+    function update() {
+      const diff = target.getTime() - Date.now();
+      if (diff <= 0) {
+        el!.textContent = 'under way';
+        return;
+      }
+      const days = Math.floor(diff / 86_400_000);
+      const hours = Math.floor((diff % 86_400_000) / 3_600_000);
+      const minutes = Math.floor((diff % 3_600_000) / 60_000);
+      el!.textContent = `${days}d ${pad(hours)}h ${pad(minutes)}m`;
+    }
+
+    update();
+    timer = setInterval(update, 30_000);
+  }
+
+  document.addEventListener('astro:page-load', initCountdown);
+</script>

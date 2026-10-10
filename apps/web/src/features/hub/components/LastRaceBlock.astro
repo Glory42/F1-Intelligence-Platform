@@ -1,0 +1,44 @@
+---
+import HomeBlock from './HomeBlock.astro';
+import { formatStopSeconds } from '@/lib/utils';
+import type { Race, RaceRecap } from '@/types';
+
+interface Props {
+  race: Race | null;
+  recap: RaceRecap | null;
+}
+
+const { race, recap } = Astro.props;
+const lines = recap
+  ? [
+      recap.winner && `${recap.winner.code} won`,
+      recap.predictedWinner && `Model picked ${recap.predictedWinner.code}${recap.predictionHit ? ' ✓' : ''}`,
+      recap.fastestStop && `Fastest stop ${recap.fastestStop.driver.code} ${formatStopSeconds(recap.fastestStop.stationaryMs)}`,
+      recap.topBattle && `${recap.topBattle.chaser.code} chased ${recap.topBattle.leader.code} laps ${recap.topBattle.lapStart}–${recap.topBattle.lapEnd}`,
+    ].filter(Boolean)
+  : [];
+---
+
+<HomeBlock
+  title="Last race"
+  id="home-last-race"
+  links={race ? [{ href: `/races/${race.id}`, label: 'Results' }, { href: `/races/${race.id}/race-story`, label: 'Race story' }] : []}
+>
+  {race ? (
+    <div class="space-y-4">
+      <div>
+        <p class="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Round {race.roundNumber} · {race.circuit.city}, {race.circuit.country}</p>
+        <p class="mt-1 text-xl font-semibold">{race.name}</p>
+      </div>
+      {lines.length > 0 ? (
+        <ul class="space-y-1.5 text-[13px]">
+          {lines.map((l) => <li>{l}</li>)}
+        </ul>
+      ) : (
+        <p class="text-[13px] text-muted-foreground">The recap appears once the race data is in.</p>
+      )}
+    </div>
+  ) : (
+    <p class="text-[13px] text-muted-foreground">No race completed this season yet.</p>
+  )}
+</HomeBlock>

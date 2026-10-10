@@ -1,5 +1,4 @@
 ---
-import { Users } from 'lucide-react';
 import SectionKicker from '@/components/shared/SectionKicker.astro';
 import HeadToHead from './HeadToHead.astro';
 import { getTeamColor } from '@/lib/teamColors';
@@ -21,7 +20,7 @@ const rows = [
 
 {battle.teammate && battle.sharedRaces > 0 && (
   <section aria-label="Team-mate battle">
-    <SectionKicker icon={Users} label={`./teammate-battle · ${battle.sharedRaces} races`} />
+    <SectionKicker label={`./teammate-battle · ${battle.sharedRaces} races`} />
     <HeadToHead left={driver} right={battle.teammate} color={getTeamColor(driver.team.teamKey)} rows={rows} year={year} />
     <p class="font-mono text-[7px] text-muted-foreground/50 mt-3 leading-relaxed">
       Race head-to-head counts only races both drivers finished.

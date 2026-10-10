@@ -1,5 +1,4 @@
 ---
-import { History } from 'lucide-react';
 import SectionKicker from '@/components/shared/SectionKicker.astro';
 import StatTiles from '@/components/shared/StatTiles.astro';
 import DataList from '@/components/shared/DataList.astro';
@@ -23,7 +22,7 @@ const milestones = [
 ---
 
 <section aria-label="All-time career" class="space-y-4">
-  <SectionKicker icon={History} label="./career · all-time" class="" />
+  <SectionKicker label="./career · all-time" class="" />
   <StatTiles
     cols="grid-cols-3 sm:grid-cols-6"
     items={[

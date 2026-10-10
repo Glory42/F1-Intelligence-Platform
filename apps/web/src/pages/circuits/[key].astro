@@ -9,6 +9,16 @@ import CircuitTelemetryCard from '@/features/circuits/components/CircuitTelemetr
 import CircuitWinnersTable from '@/features/circuits/components/CircuitWinnersTable.astro';
 import DominanceCard from '@/features/circuits/components/DominanceCard.astro';
 import { getWeatherForecast, type ForecastDay } from '@/features/circuits/weather';
+import PageTabs from '@/components/shared/PageTabs.astro';
+import { resolveTab } from '@/lib/pageTabs';
+
+const TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'winners', label: 'Winners' },
+  { id: 'dominance', label: 'Dominance' },
+  { id: 'telemetry', label: 'Telemetry' },
+] as const;
+const tab = resolveTab(Astro.url, TABS);
 
 const { key } = Astro.params;
 if (!key) return Astro.redirect('/races');
@@ -64,7 +74,7 @@ const meta = getCircuitMetadata(circuit.circuitKey, Number(circuit.trackLengthKm
 const { lat, lng } = meta;
 
 let forecast: ForecastDay[] | null = null;
-if (isUpcomingCircuit && lat !== 0 && lng !== 0) {
+if (tab === 'overview' && isUpcomingCircuit && lat !== 0 && lng !== 0) {
   try {
     forecast = await getWeatherForecast(lat, lng);
   } catch {
@@ -83,29 +93,25 @@ function formatLapTime(ms: number) {
 ---
 
 <BaseLayout title={`${circuit.name} - Circuit Details`}>
-  <div class="mt-7 space-y-8">
-    <!-- Header -->
+  <div class="space-y-6">
     <div>
-      <div class="flex items-center gap-3 mb-2">
-        <a href="/races" class="font-mono text-[9px] tracking-[0.25em] uppercase hover:text-white transition-colors" style="color: rgba(168,85,247,0.55)">./races</a>
-        <span class="font-mono text-[9px] tracking-[0.25em] uppercase text-muted-foreground">/</span>
-        <span class="font-mono text-[9px] tracking-[0.25em] uppercase text-white">circuit</span>
-        <div class="h-px w-16 bg-white/[0.05]" />
-      </div>
-      <h1 class="text-3xl font-bold">
-        {circuit.name} <span class="text-2xl ml-1.5 align-middle select-none">{getCountryFlag(circuit.country)}</span>
+      <a href="/circuits" class="font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground hover:text-foreground transition-colors duration-150">← all circuits</a>
+      <h1 class="mt-4 text-2xl font-bold">
+        {circuit.name} <span class="text-xl ml-1.5 align-middle select-none">{getCountryFlag(circuit.country)}</span>
       </h1>
-      <div class="flex items-center gap-2 mt-2 font-mono text-[10px] text-muted-foreground tracking-widest uppercase">
+      <div class="flex items-center gap-2 mt-1 font-mono text-[10px] text-muted-foreground tracking-widest uppercase">
         <MapPin size={10} /> {circuit.city}, {circuit.country}
       </div>
     </div>
+
+    <PageTabs tabs={TABS} active={tab} label="Circuit views" />
 
     {error ? (
       <div class="border border-destructive/40 bg-destructive/10 p-8 text-center">
         <p class="font-mono text-[10px] text-destructive tracking-widest uppercase">Error loading circuit</p>
         <p class="mt-2 font-mono text-[9px] text-muted-foreground">{error}</p>
       </div>
-    ) : (
+    ) : tab === 'overview' ? (
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         <!-- Left Column: Stats & Model Info -->
@@ -204,38 +210,16 @@ function formatLapTime(ms: number) {
 
           </div>
 
-          <CircuitWinnersTable history={history} />
         </div>
 
         <!-- Right Column: Context & Records -->
         <div class="space-y-6">
-          <CircuitTelemetryCard meta={meta} />
 
           <!-- Live Weather Forecast Widget -->
           {isUpcomingCircuit && (
             <WeatherForecast lat={lat} lng={lng} cityName={circuit.city} forecast={forecast} />
           )}
 
-          <!-- Fastest Lap -->
-          <div class="border border-white/[0.06] bg-black p-5">
-            <h2 class="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mb-4">Fastest Lap Record</h2>
-            {fastestLap ? (
-              <div>
-                <span class="text-3xl font-bold font-mono tracking-tight text-white mb-1 block">
-                  {formatLapTime(fastestLap.timeMs)}
-                </span>
-                <div class="flex items-center justify-between mt-3">
-                  <div>
-                    <span class="block text-sm font-medium">{fastestLap.driver.fullName}</span>
-                    <span class="block font-mono text-[9px] text-muted-foreground mt-0.5">{fastestLap.driver.team.name}</span>
-                  </div>
-                  <span class="font-mono text-[10px] text-white/40 border border-white/10 px-2 py-1">{fastestLap.year}</span>
-                </div>
-              </div>
-            ) : (
-              <span class="text-sm text-muted-foreground">No data available</span>
-            )}
-          </div>
 
           <!-- Safety Car Stats -->
           <div class="border border-white/[0.06] bg-black p-5">
@@ -244,11 +228,11 @@ function formatLapTime(ms: number) {
             </h2>
             <div class="grid grid-cols-2 gap-4">
               <div class="bg-white/[0.01] p-3 border border-white/[0.03]">
-                <span class="block font-mono text-[8px] text-muted-foreground tracking-widest uppercase mb-1">Avg SC Laps</span>
+                <span class="block text-[11px] text-muted-foreground mb-1">Avg SC Laps</span>
                 <span class="text-lg font-semibold text-white">{safetyCarStats.avgScLaps.toFixed(1)} <span class="text-[10px] text-muted-foreground font-normal">laps</span></span>
               </div>
               <div class="bg-white/[0.01] p-3 border border-white/[0.03]">
-                <span class="block font-mono text-[8px] text-muted-foreground tracking-widest uppercase mb-1">Safety Car Rate</span>
+                <span class="block text-[11px] text-muted-foreground mb-1">Safety Car Rate</span>
                 <span class="text-lg font-semibold text-white">{Math.round(safetyCarStats.scRaceRate * 100)}% <span class="text-[10px] text-muted-foreground font-normal">races</span></span>
               </div>
             </div>
@@ -278,9 +262,40 @@ function formatLapTime(ms: number) {
             )}
           </div>
 
-          <DominanceCard dominance={dominance} />
 
         </div>
+      </div>
+    ) : tab === 'winners' ? (
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div class="lg:col-span-2">
+          <CircuitWinnersTable history={history} />
+        </div>
+      <!-- Fastest Lap -->
+      <div class="border border-white/[0.06] bg-black p-5">
+        <h2 class="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mb-4">Fastest Lap Record</h2>
+        {fastestLap ? (
+          <div>
+            <span class="text-3xl font-bold font-mono tracking-tight text-white mb-1 block">
+              {formatLapTime(fastestLap.timeMs)}
+            </span>
+            <div class="flex items-center justify-between mt-3">
+              <div>
+                <span class="block text-sm font-medium">{fastestLap.driver.fullName}</span>
+                <span class="block font-mono text-[9px] text-muted-foreground mt-0.5">{fastestLap.driver.team.name}</span>
+              </div>
+              <span class="font-mono text-[10px] text-white/40 border border-white/10 px-2 py-1">{fastestLap.year}</span>
+            </div>
+          </div>
+        ) : (
+          <span class="text-sm text-muted-foreground">No data available</span>
+        )}
+      </div>
+      </div>
+    ) : tab === 'dominance' ? (
+      <DominanceCard dominance={dominance} />
+    ) : (
+      <div class="max-w-xl">
+        <CircuitTelemetryCard meta={meta} />
       </div>
     )}
   </div>

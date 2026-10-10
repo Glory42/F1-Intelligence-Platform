@@ -23,11 +23,11 @@ interface Props {
 }
 
 const { tabs, defaultTab, accent, namespace = '', links = [] } = Astro.props;
-const activeStyle = `border-color:rgba(${accent.rgb},0.5);color:${accent.hex};background:rgba(${accent.rgb},0.08)`;
+const activeStyle = `border-color:${accent.hex};color:hsl(var(--foreground))`;
 ---
 
 <div
-  class="race-tabs flex flex-wrap items-center gap-1.5 mb-6"
+  class="race-tabs mb-6 flex gap-6 overflow-x-auto border-b border-white/[0.06]"
   role="tablist"
   data-namespace={namespace}
   data-active-style={activeStyle}
@@ -41,7 +41,7 @@ const activeStyle = `border-color:rgba(${accent.rgb},0.5);color:${accent.hex};ba
       aria-selected={t.id === defaultTab ? 'true' : 'false'}
       aria-controls={`${namespace}panel-${t.id}`}
       tabindex={t.id === defaultTab ? 0 : -1}
-      class="race-tab-btn font-mono text-[9px] tracking-[0.12em] uppercase px-3 py-1.5 border transition-colors duration-150 border-white/[0.08] text-muted-foreground hover:text-foreground hover:border-white/[0.15]"
+      class="race-tab-btn -mb-px whitespace-nowrap border-b-2 border-transparent py-2.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors duration-150"
       style={t.id === defaultTab ? activeStyle : undefined}
     >
       {t.label}
@@ -50,9 +50,9 @@ const activeStyle = `border-color:rgba(${accent.rgb},0.5);color:${accent.hex};ba
   {links.map((l) => (
     <a
       href={l.href}
-      class="inline-flex items-center gap-1 font-mono text-[9px] tracking-[0.12em] uppercase px-3 py-1.5 border transition-colors duration-150 border-white/[0.08] text-muted-foreground hover:text-foreground hover:border-white/[0.15]"
+      class="-mb-px inline-flex items-center gap-1 whitespace-nowrap border-b-2 border-transparent py-2.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors duration-150"
     >
-      {l.label}<ArrowUpRight size={10} />
+      {l.label}<ArrowUpRight size={12} />
     </a>
   ))}
 </div>

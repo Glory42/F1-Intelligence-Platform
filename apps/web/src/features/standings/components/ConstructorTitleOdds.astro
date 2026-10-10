@@ -1,5 +1,4 @@
 ---
-import { Trophy } from 'lucide-react';
 import SectionKicker from '@/components/shared/SectionKicker.astro';
 import DataList from '@/components/shared/DataList.astro';
 import DataRow from '@/components/shared/DataRow.astro';
@@ -21,7 +20,7 @@ const COLUMNS = 'grid-cols-[40px_1fr_140px] md:grid-cols-[40px_1fr_220px_120px]'
 
 {odds.teams.length > 0 && (
   <section>
-    <SectionKicker icon={Trophy} label={`./title-odds · after r${odds.afterRound}`} />
+    <SectionKicker label={`./title-odds · after r${odds.afterRound}`} />
     <DataList
       label="Constructors' title odds"
       columns={COLUMNS}

@@ -2,128 +2,63 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { api } from '@/lib/api';
 import type { TeamStanding, SeasonSummary, PitCrewRanking, TitleOddsResponse } from '@/types';
-import PitCrewRankingTable from '@/features/teams/components/PitCrewRankingTable.astro';
-import ConstructorTitleOdds from '@/features/standings/components/ConstructorTitleOdds.astro';
+import PageHeader from '@/components/shared/PageHeader.astro';
+import PageTabs from '@/components/shared/PageTabs.astro';
+import EmptyState from '@/components/shared/EmptyState.astro';
 import YearSelect from '@/components/shared/YearSelect.astro';
-import { Trophy, Building2 } from 'lucide-react';
-import { getTeamColor } from '@/lib/teamColors';
-import { championshipPoints } from '@/lib/championshipMath';
-import { getTeamLogo } from '@/lib/teamLogos';
+import TeamStandingsTable from '@/features/standings/components/TeamStandingsTable.astro';
+import ConstructorTitleOdds from '@/features/standings/components/ConstructorTitleOdds.astro';
+import PitCrewRankingTable from '@/features/teams/components/PitCrewRankingTable.astro';
+import { resolveTab, TAB_PARAM } from '@/lib/pageTabs';
+
+const TABS = [
+  { id: 'standings', label: 'Standings' },
+  { id: 'title-odds', label: 'Title odds' },
+  { id: 'pit-crews', label: 'Pit crews' },
+] as const;
 
 const year = Number(Astro.url.searchParams.get('year') ?? new Date().getFullYear());
+const tab = resolveTab(Astro.url, TABS);
 
-let standings: TeamStanding[] = [];
 let seasons: SeasonSummary[] = [];
-let pitCrewRankings: PitCrewRanking[] = [];
+let standings: TeamStanding[] = [];
 let titleOdds: TitleOddsResponse | null = null;
+let pitCrewRankings: PitCrewRanking[] = [];
 let error: string | null = null;
 try {
-  [standings, seasons, pitCrewRankings, titleOdds] = await Promise.all([
-    api.getTeamStandings(year),
+  [seasons, standings, titleOdds, pitCrewRankings] = await Promise.all([
     api.getSeasons(),
-    api.getPitCrewRankings(year).catch(() => []),
-    api.getTitleOdds(year).catch(() => null),
+    tab === 'standings' ? api.getTeamStandings(year) : [],
+    tab === 'title-odds' ? api.getTitleOdds(year).catch(() => null) : null,
+    tab === 'pit-crews' ? api.getPitCrewRankings(year).catch(() => []) : [],
   ]);
 } catch (e) {
   error = e instanceof Error ? e.message : 'Failed to load standings';
 }
-
-function isTopPos(pos: number | null, i: number) { return (pos ?? i + 1) < 4; }
-function champPos(pos: number | null, i: number) { return pos ?? i + 1; }
 ---
 
 <BaseLayout title={`${year} Constructor Standings`}>
-  <div class="mt-7 space-y-8">
+  <div class="space-y-6">
+    <PageHeader kicker="./teams" title={`${year} Teams`} subtitle={`${year} constructors' championship`}>
+      <YearSelect slot="aside" years={seasons} currentYear={year} basePath="/teams" extraParams={tab === TABS[0].id ? '' : `&${TAB_PARAM}=${tab}`} />
+    </PageHeader>
 
-    <div class="flex items-end justify-between gap-4 flex-wrap">
-      <div>
-        <div class="flex items-center gap-3 mb-2">
-          <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)"><Building2 size={11} />./teams</span>
-          <div class="h-px w-16 bg-white/[0.05]" />
-        </div>
-        <h1 class="text-2xl font-bold">{year} Constructor Standings</h1>
-        <p class="mt-1 font-mono text-[10px] text-muted-foreground tracking-widest uppercase">
-          {standings.length} constructors · {year} championship
-        </p>
-      </div>
-      <YearSelect years={seasons} currentYear={year} basePath="/teams" />
-    </div>
-
+    <PageTabs tabs={TABS} active={tab} label="Teams views" />
 
     {error ? (
-      <div class="border border-destructive/40 bg-destructive/10 p-8 text-center">
-        <p class="font-mono text-[10px] text-destructive tracking-widest uppercase">Error loading standings</p>
-      </div>
-    ) : standings.length === 0 ? (
-      <div class="border border-white/[0.06] p-10 text-center">
-        <p class="font-mono text-[9px] text-muted-foreground tracking-[0.25em] uppercase">No standings available for {year}</p>
-      </div>
+      <EmptyState tone="error" message="Couldn't load the teams. Try again in a moment." />
+    ) : tab === 'standings' ? (
+      standings.length > 0
+        ? <TeamStandingsTable standings={standings} year={year} />
+        : <EmptyState message={`No standings for ${year} yet.`} />
+    ) : tab === 'title-odds' ? (
+      titleOdds && titleOdds.teams.length > 0
+        ? <ConstructorTitleOdds odds={titleOdds} year={year} />
+        : <EmptyState message={`No title odds for ${year} yet — they start after the first race.`} />
     ) : (
-      <div class="border border-white/[0.06]">
-        <div class="grid grid-cols-[40px_1fr_60px] sm:grid-cols-[40px_1fr_60px_60px_60px] md:grid-cols-[40px_1fr_60px_60px_60px_80px] lg:grid-cols-[40px_1fr_80px_60px_60px_80px_100px] gap-0 px-5 py-2.5 border-b border-white/[0.06]">
-          <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase">Pos</div>
-          <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase">Constructor</div>
-          <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right">Pts</div>
-          <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right hidden sm:block">W</div>
-          <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right hidden sm:block">Pod</div>
-          <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right hidden md:block">Races</div>
-          <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right hidden lg:block">Car Perf.</div>
-        </div>
-
-        {standings.map((s, i) => (
-            <a
-              href={`/teams/${s.team.id}?year=${year}`}
-              class={`grid grid-cols-[40px_1fr_60px] sm:grid-cols-[40px_1fr_60px_60px_60px] md:grid-cols-[40px_1fr_60px_60px_60px_80px] lg:grid-cols-[40px_1fr_80px_60px_60px_80px_100px] gap-0 items-center px-5 py-4 hover:bg-white/[0.02] transition-colors duration-150 group relative ${i !== 0 ? 'border-t border-white/[0.04]' : ''}`}
-              style={`border-left: 3px solid ${getTeamColor(s.team.teamKey)};`}
-            >
-              <div class={`font-mono text-sm font-bold ${isTopPos(s.stats.championshipPosition, i) ? 'text-[#a855f7]' : 'text-muted-foreground'}`}>
-                {champPos(s.stats.championshipPosition, i) === 1 ? <Trophy size={14} /> : String(champPos(s.stats.championshipPosition, i)).padStart(2, '0')}
-              </div>
-              <div class="flex items-center gap-3 min-w-0">
-                {(() => { const logo = getTeamLogo(s.team.teamKey); return logo ? (
-                  <img src={logo} alt={s.team.name} class="h-7 w-14 object-contain shrink-0" loading="lazy" />
-                ) : null; })()}
-                <div class="min-w-0">
-                <div class="font-semibold text-sm group-hover:text-[#a855f7] transition-colors duration-150 truncate">{s.team.name}</div>
-                {s.team.nationality && (
-                  <div class="font-mono text-[8px] text-muted-foreground tracking-wider mt-0.5">{s.team.nationality}</div>
-                )}
-                <div class="flex items-center gap-2 mt-1 sm:hidden font-mono text-[8px] text-muted-foreground">
-                  <span>{s.stats.wins}W</span>
-                  <span class="text-white/20">·</span>
-                  <span>{s.stats.podiums} Pod</span>
-                  <span class="text-white/20">·</span>
-                  <span>{s.stats.racesCompleted} Races</span>
-                  {s.stats.carPerformanceScore && (
-                    <>
-                      <span class="text-white/20">·</span>
-                      <span>Car {Math.round(Number(s.stats.carPerformanceScore) * 100)}</span>
-                    </>
-                  )}
-                </div>
-                </div>
-              </div>
-              <div class="font-bold text-sm text-right">{Math.round(championshipPoints(s.stats))}</div>
-              <div class="font-mono text-sm text-right hidden sm:block">{s.stats.wins}</div>
-              <div class="font-mono text-sm text-right text-muted-foreground hidden sm:block">{s.stats.podiums}</div>
-              <div class="font-mono text-sm text-right text-muted-foreground hidden md:block">{s.stats.racesCompleted}</div>
-              <div class="text-right hidden lg:block">
-                {s.stats.carPerformanceScore ? (
-                  <div class="flex items-center justify-end gap-2">
-                    <div class="w-16 h-1 bg-white/[0.06]">
-                      <div class="h-full bg-[#a855f7] bar-fill" style={`width:${Math.round(Number(s.stats.carPerformanceScore)*100)}%`} />
-                    </div>
-                    <span class="font-mono text-[9px] text-muted-foreground">{Math.round(Number(s.stats.carPerformanceScore)*100)}</span>
-                  </div>
-                ) : <span class="font-mono text-[9px] text-muted-foreground">—</span>}
-              </div>
-            </a>
-        ))}
-      </div>
+      pitCrewRankings.length > 0
+        ? <PitCrewRankingTable rankings={pitCrewRankings} year={year} />
+        : <EmptyState message={`No pit stop data for ${year} yet.`} />
     )}
-
-    {titleOdds && <ConstructorTitleOdds odds={titleOdds} year={year} />}
-
-    <PitCrewRankingTable rankings={pitCrewRankings} year={year} />
   </div>
 </BaseLayout>

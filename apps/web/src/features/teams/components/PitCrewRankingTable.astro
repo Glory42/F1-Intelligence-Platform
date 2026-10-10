@@ -1,5 +1,4 @@
 ---
-import { Timer } from 'lucide-react';
 import SectionKicker from '@/components/shared/SectionKicker.astro';
 import DataList from '@/components/shared/DataList.astro';
 import DataRow from '@/components/shared/DataRow.astro';
@@ -20,7 +19,7 @@ const COLUMNS = 'grid-cols-[40px_1fr_80px] sm:grid-cols-[40px_1fr_90px_90px_70px
 
 {rankings.length > 0 && (
   <section id="pit-crews">
-    <SectionKicker icon={Timer} label={`./pit-crews · ${year}`} />
+    <SectionKicker label={`./pit-crews · ${year}`} />
     <DataList
       label="Pit crew ranking"
       columns={COLUMNS}

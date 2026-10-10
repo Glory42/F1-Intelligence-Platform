@@ -10,3 +10,15 @@ test('renders both drivers season comparison from URL params against fixture dat
 
   await expect(page.getByText(/failed to load/i)).toHaveCount(0);
 });
+
+test('compare switches between drivers and teams from one place', async ({ page }) => {
+  await page.goto('/drivers/compare');
+
+  const views = page.getByRole('navigation', { name: 'Compare views' });
+  await expect(views.getByRole('link')).toHaveText(['Drivers', 'Teams']);
+  await expect(views.getByRole('link', { name: 'Drivers' })).toHaveAttribute('aria-current', 'page');
+
+  await views.getByRole('link', { name: 'Teams' }).click();
+  await expect(page).toHaveURL(/\/teams\/compare$/);
+  await expect(page.getByRole('navigation', { name: 'Compare views' }).getByRole('link', { name: 'Teams' })).toHaveAttribute('aria-current', 'page');
+});

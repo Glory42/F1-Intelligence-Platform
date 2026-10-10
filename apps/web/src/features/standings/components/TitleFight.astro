@@ -1,5 +1,4 @@
 ---
-import { Trophy } from 'lucide-react';
 import LineChart, { type LineSeries } from '@/components/charts/LineChart.astro';
 import SectionKicker from '@/components/shared/SectionKicker.astro';
 import DataList from '@/components/shared/DataList.astro';
@@ -41,7 +40,7 @@ const series: LineSeries[] = odds.drivers.slice(0, CHART_DRIVERS).map((d) => ({
 ---
 
 <section aria-label="Title fight">
-  <SectionKicker icon={Trophy} label={`./title-fight · after r${odds.afterRound}`} />
+  <SectionKicker label={`./title-fight · after r${odds.afterRound}`} />
   <div class={`grid gap-4 items-start ${showChart ? 'lg:grid-cols-[1fr_420px]' : ''}`}>
     <DataList
       label="Title odds"
@@ -72,7 +71,7 @@ const series: LineSeries[] = odds.drivers.slice(0, CHART_DRIVERS).map((d) => ({
     </DataList>
     {showChart && (
       <div class="panel p-5">
-        <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase mb-3">Title odds by round</div>
+        <div class="text-[11px] text-muted-foreground mb-3">Title odds by round</div>
         <LineChart series={series} ariaLabel="Title odds after each round" yDomain={[0, 1]} formatY={(v) => `${Math.round(v * 100)}%`} xLabel="rnd" height={220} width={380} />
       </div>
     )}

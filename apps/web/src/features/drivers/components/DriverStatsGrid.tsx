@@ -37,7 +37,7 @@ export function DriverStatsGrid({ stats }: Props) {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-px bg-white/[0.06]">
         {cells.map(([label, val]) => (
           <div key={label} className="bg-black p-4">
-            <div className="font-mono text-[8px] text-muted-foreground tracking-widest uppercase mb-1">{label}</div>
+            <div className="text-[11px] text-muted-foreground mb-1">{label}</div>
             <div className="font-bold text-xl">{val}</div>
           </div>
         ))}

@@ -1,0 +1,22 @@
+---
+import type { OnThisDayRace } from '@/types';
+
+interface Props {
+  races: OnThisDayRace[];
+  dateLabel: string;
+}
+
+const { races, dateLabel } = Astro.props;
+---
+
+<ol aria-label={`On this day, ${dateLabel}`} class="border border-white/[0.06]">
+  {races.map((r, i) => (
+    <li class={i !== 0 ? 'border-t border-white/[0.04]' : ''}>
+      <a href={`/races/${r.raceId}`} class="flex items-center gap-4 px-5 py-3 hover:bg-white/[0.02] transition-colors duration-150 group">
+        <span class="w-12 shrink-0 font-mono text-[13px] font-bold text-muted-foreground">{r.year}</span>
+        <span class="flex-1 truncate text-[13px] group-hover:text-[#a855f7] transition-colors duration-150"><span class="sr-only">{r.year} · </span>{r.name}</span>
+        {r.winner && <span class="shrink-0 text-[13px] text-muted-foreground">{r.winner.fullName}</span>}
+      </a>
+    </li>
+  ))}
+</ol>

@@ -2,7 +2,9 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { api } from '@/lib/api';
 import { TeamCompareTool } from '@/features/compare/components/TeamCompareTool';
-import { Shield } from 'lucide-react';
+import PageHeader from '@/components/shared/PageHeader.astro';
+import PageTabs from '@/components/shared/PageTabs.astro';
+import { COMPARE_TABS } from '@/features/compare/compareTabs';
 import type { Team, SeasonSummary } from '@/types';
 
 const year = Number(Astro.url.searchParams.get('year') ?? new Date().getFullYear());
@@ -26,23 +28,11 @@ try {
 ---
 
 <BaseLayout title="Team Head-to-Head Comparison">
-  <div class="mt-7 space-y-8">
+  <div class="space-y-6">
     
-    {/* Page Header */}
-    <div>
-      <div class="flex items-center gap-3 mb-2">
-        <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">
-          <Shield size={11} />./teams
-        </span>
-        <span class="font-mono text-[9px] tracking-[0.25em] uppercase text-muted-foreground">/</span>
-        <span class="font-mono text-[9px] tracking-[0.25em] uppercase text-white">compare</span>
-        <div class="h-px w-16 bg-white/[0.05]" />
-      </div>
-      <h1 class="text-3xl font-bold tracking-tight">Team Comparison</h1>
-      <p class="mt-1 font-mono text-[10px] text-muted-foreground tracking-widest uppercase">
-        Compare F1 constructors head-to-head across seasons and career statistics
-      </p>
-    </div>
+    <PageHeader kicker="./compare" title="Team comparison" subtitle="head-to-head across seasons" />
+
+    <PageTabs tabs={COMPARE_TABS} active="teams" label="Compare views" />
 
     {error ? (
       <div class="border border-destructive/40 bg-destructive/10 p-8 text-center">

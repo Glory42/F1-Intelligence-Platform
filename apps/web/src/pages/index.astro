@@ -1,308 +1,44 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { api } from '@/lib/api';
-import type { Race, PredictionResponse, ModelInfo } from '@/types';
-import HomeHub from '@/features/hub/components/HomeHub.astro';
-import RecentResults from '@/features/hub/components/RecentResults.astro';
-import { nextSession } from '@/lib/nextSession';
-import { formatDate } from '@/lib/utils';
-import { CalendarDays, RotateCcw, Gauge, MapPin, Trophy, History, Zap, ChevronRight, Flag } from 'lucide-react';
+import { unwrapSettled } from '@/lib/utils';
+import type { Race } from '@/types';
+import PageHeader from '@/components/shared/PageHeader.astro';
+import NextRaceBlock from '@/features/hub/components/NextRaceBlock.astro';
+import LastRaceBlock from '@/features/hub/components/LastRaceBlock.astro';
+import ChampionshipBlock from '@/features/hub/components/ChampionshipBlock.astro';
 
 const year = new Date().getFullYear();
-
-let races: Race[] = [];
-let prediction: PredictionResponse | null = null;
-let modelInfo: ModelInfo | null = null;
-
 const today = new Date();
 
-const [racesResult, predictionResult, modelInfoResult] = await Promise.allSettled([
+const [racesResult, predictionResult, driversResult, teamsResult] = await Promise.allSettled([
   api.getRaces(year),
   api.getUpcomingPrediction(),
-  api.getModelInfo(),
+  api.getDriverStandings(year),
+  api.getTeamStandings(year),
 ]);
+const races: Race[] = unwrapSettled(racesResult, []);
+const prediction = unwrapSettled(predictionResult, null);
 
-if (racesResult.status === 'fulfilled') races = racesResult.value;
-if (predictionResult.status === 'fulfilled') prediction = predictionResult.value;
-if (modelInfoResult.status === 'fulfilled') modelInfo = modelInfoResult.value;
-
-const gpVersion = prediction?.modelVersion ?? modelInfo?.gpVersion ?? 'weighted-v3';
-
-const completed = races.filter((r) => r.status === 'completed').sort((a, b) => b.roundNumber - a.roundNumber);
-const upcoming  = races.filter((r) => r.status !== 'completed').sort((a, b) => a.roundNumber - b.roundNumber);
-
-const heroRace = prediction?.race ?? upcoming[0] ?? null;
-const heroSession = heroRace ? nextSession(heroRace, today) : null;
-const lastRace = completed[0] ?? null;
-// Sprint weekends get a sprint entry (Saturday) then a GP entry (Sunday) — chronological,
-// matching the soonest-first order of this section.
-const calendarEntries = upcoming
-  .filter((r) => r.id !== heroRace?.id)
-  .slice(0, 6)
-  .flatMap((race) =>
-    race.hasSprint
-      ? [
-          { race, isSprint: true,  date: race.sprintDate ?? race.raceDate, href: `/races/${race.id}/sprint` },
-          { race, isSprint: false, date: race.raceDate,                    href: `/races/${race.id}` },
-        ]
-      : [{ race, isSprint: false, date: race.raceDate, href: `/races/${race.id}` }]
-  )
-  .slice(0, 6);
-// For sprint weekends, show both a GP entry and a sprint entry — GP (Sunday) first
-// to match the newest-first ordering the rest of the list uses.
-const archiveEntries = completed.slice(0, 6).flatMap((race) =>
-  race.hasSprint
-    ? [
-        { race, isSprint: false, date: race.raceDate,                    href: `/races/${race.id}` },
-        { race, isSprint: true,  date: race.sprintDate ?? race.raceDate, href: `/races/${race.id}/sprint` },
-      ]
-    : [{ race, isSprint: false, date: race.raceDate, href: `/races/${race.id}` }]
-).slice(0, 8);
-
-const podium = (prediction?.drivers ?? [])
-  .sort((a, b) => (a.predictedPosition ?? 99) - (b.predictedPosition ?? 99))
-  .slice(0, 3);
-
-const confidence = prediction ? Math.round(Number(podium[0]?.winProbability ?? 0) * 100) : null;
+const lastRace = races
+  .filter((r) => r.status === 'completed')
+  .sort((a, b) => b.roundNumber - a.roundNumber)[0] ?? null;
+// The upcoming prediction only exists once qualifying is done, so its race is the next one.
+const nextRace = prediction?.race ?? races
+  .filter((r) => r.status !== 'completed')
+  .sort((a, b) => a.roundNumber - b.roundNumber)[0] ?? null;
+const recap = lastRace ? await api.getRaceRecap(lastRace.id).catch(() => null) : null;
 ---
 
 <BaseLayout title="Dashboard">
+  <div class="space-y-6">
+    <PageHeader kicker="./home" title={`${year} season`} />
 
-  <!-- ── HERO ─────────────────────────────────────────────────────────── -->
-  {heroRace ? (
-    <section class="mt-8 mb-12">
-      <div class="panel">
-        <div class="grid lg:grid-cols-[1fr_380px]">
-
-          <!-- Left: race info -->
-          <div class="p-8 space-y-6 border-b lg:border-b-0 lg:border-r border-white/[0.06]">
-
-            <!-- Label -->
-            <div class="flex items-center gap-3">
-              <span class="font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">
-                ./round-{heroRace.roundNumber.toString().padStart(2,'0')}
-              </span>
-              <div class="h-px flex-1 bg-white/[0.05]" />
-              <span class="font-mono text-[9px] tracking-[0.2em] uppercase" style={
-                heroRace.status === 'qualifying_done'         ? 'color:rgba(168,85,247,0.7)' :
-                heroRace.status === 'sprint_done'             ? 'color:rgba(249,115,22,0.7)' :
-                heroRace.status === 'sprint_qualifying_done'  ? 'color:rgba(249,115,22,0.7)' :
-                'color:rgba(255,255,255,0.3)'
-              }>
-                {heroRace.status === 'qualifying_done'         ? 'qualifying done'  :
-                 heroRace.status === 'sprint_done'             ? 'sprint done'      :
-                 heroRace.status === 'sprint_qualifying_done'  ? 'sprint quali done':
-                 'upcoming'}
-              </span>
-            </div>
-
-            <!-- Title -->
-            <div>
-              <h1 class="text-3xl sm:text-5xl font-bold leading-tight tracking-tight">
-                {heroRace.name}
-              </h1>
-              <p class="mt-2 font-mono text-[11px] text-muted-foreground tracking-widest uppercase">
-                {heroRace.circuit.city}, {heroRace.circuit.country}
-              </p>
-            </div>
-
-            <!-- Meta row -->
-            <div class="flex items-center gap-5 font-mono text-[10px] text-muted-foreground tracking-[0.12em] uppercase">
-              <span class="flex items-center gap-1.5"><CalendarDays size={11} />{formatDate(heroRace.raceDate)}</span>
-              <span class="text-white/20">·</span>
-              <span class="flex items-center gap-1.5"><RotateCcw size={11} />{heroRace.circuit.lapCount} laps</span>
-              <span class="text-white/20">·</span>
-              <span class="flex items-center gap-1.5"><Gauge size={11} />{heroRace.circuit.trackLengthKm} km</span>
-            </div>
-
-            <!-- Countdown -->
-            <div class="font-mono text-[9px] tracking-[0.18em] uppercase text-muted-foreground">{heroSession?.label} starts in</div>
-            <div class="flex items-center gap-3" id="countdown" data-race-date={heroSession?.date ?? heroRace.raceDate}>
-              {(['Days','Hrs','Min','Sec'] as const).map((unit, i) => (
-                <div class="text-center">
-                  <div class="w-[60px] h-[60px] border border-white/[0.08] flex items-center justify-center bg-white/[0.02]">
-                    <span class="text-xl font-bold font-mono countdown-digit" data-index={i}>--</span>
-                  </div>
-                  <div class="font-mono text-[8px] text-muted-foreground tracking-[0.15em] uppercase mt-1">{unit}</div>
-                </div>
-              ))}
-            </div>
-
-            <!-- CTAs -->
-            <div class="flex flex-wrap gap-3 pt-1">
-              <a
-                href={`/races/${heroRace.id}`}
-                class="flex items-center gap-2 border border-[rgba(168,85,247,0.4)] bg-[rgba(168,85,247,0.08)] hover:bg-[rgba(168,85,247,0.15)] text-[#a855f7] px-5 py-2 font-mono text-[9px] tracking-[0.18em] uppercase transition-colors duration-150"
-              >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                Race Data
-              </a>
-              <a
-                href="/races"
-                class="flex items-center gap-2 border border-white/[0.08] hover:border-white/[0.15] text-muted-foreground hover:text-foreground px-5 py-2 font-mono text-[9px] tracking-[0.18em] uppercase transition-colors duration-150"
-              >
-                Full Calendar
-              </a>
-            </div>
-
-          </div>
-
-          <!-- Right: prediction hub -->
-          <div class="p-8 flex flex-col gap-5 bg-white/[0.01]">
-            <div class="flex items-center gap-3">
-              <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)"><Zap size={11} />./prediction</span>
-              <div class="h-px flex-1 bg-white/[0.05]" />
-              <span class="font-mono text-[9px] text-muted-foreground tracking-widest uppercase">{gpVersion}</span>
-            </div>
-
-            {confidence !== null ? (
-              <>
-                <!-- Gauge -->
-                <div class="flex flex-col items-center gap-1 py-2">
-                  <div class="relative w-28 h-28">
-                    <svg class="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="6"/>
-                      <circle
-                        cx="50" cy="50" r="42" fill="none"
-                        stroke="#a855f7" stroke-width="6" stroke-linecap="square"
-                        stroke-dasharray={`${(confidence/100)*263.9} 263.9`}
-                      />
-                    </svg>
-                    <div class="absolute inset-0 flex flex-col items-center justify-center gap-1">
-                      <span class="text-2xl font-bold font-mono">{confidence}</span>
-                      <span class="font-mono text-[7px] text-muted-foreground tracking-[0.15em] uppercase">confidence</span>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Podium -->
-                <div class="space-y-3">
-                  <div class="flex items-center gap-1.5 font-mono text-[8px] text-muted-foreground tracking-[0.2em] uppercase"><Trophy size={11} />predicted podium</div>
-                  {podium.map(({ driver, winProbability }, i) => {
-                    const pct = Math.round(Number(winProbability) * 100);
-                    return (
-                      <div>
-                        <div class="flex items-center justify-between mb-1">
-                          <div class="flex items-center gap-2">
-                            <span class="font-mono text-[9px] text-muted-foreground w-5">P{i+1}</span>
-                            <span class="font-mono text-[11px] font-bold">{driver.code}</span>
-                            <span class="font-mono text-[9px] text-muted-foreground">{driver.team.name.split(' ')[0]}</span>
-                          </div>
-                          <span class="font-mono text-[10px] font-bold" style="color: rgba(168,85,247,0.9)">{pct}%</span>
-                        </div>
-                        <div class="h-px bg-white/[0.05] overflow-hidden">
-                          <div class="h-full bg-[#a855f7] bar-fill" style={`width:${pct}%`} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            ) : (
-              <div class="flex-1 flex flex-col items-center justify-center text-center gap-3 py-8">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-muted-foreground">
-                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-                </svg>
-                <p class="font-mono text-[9px] text-muted-foreground tracking-widest uppercase">No prediction yet</p>
-                <p class="font-mono text-[8px] text-muted-foreground/60 tracking-wider">Run qualifying ingest + compute jobs</p>
-              </div>
-            )}
-          </div>
-
-        </div>
-      </div>
-    </section>
-  ) : (
-    <section class="mt-8 mb-12">
-      <div class="panel p-10 text-center">
-        <p class="font-mono text-[9px] text-muted-foreground tracking-[0.25em] uppercase">No upcoming races</p>
-        <p class="mt-2 font-mono text-[8px] text-muted-foreground/50">
-          Run <code class="text-[#a855f7]">sync_schedule --year {year}</code>
-        </p>
-      </div>
-    </section>
-  )}
-
-  <HomeHub year={year} lastRace={lastRace} today={today} />
-
-  <!-- ── UPCOMING ROUNDS ────────────────────────────────────────────── -->
-  {calendarEntries.length > 0 && (
-    <section class="mb-12">
-      <div class="flex items-center gap-3 mb-5">
-        <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)"><CalendarDays size={11} />./calendar</span>
-        <div class="h-px flex-1 bg-white/[0.05]" />
-        <a href="/races" class="flex items-center gap-1 font-mono text-[8px] tracking-[0.18em] text-muted-foreground hover:text-foreground uppercase transition-colors duration-150">
-          view all <ChevronRight size={10} />
-        </a>
-      </div>
-      <h2 class="text-xl font-bold mb-5">Upcoming Rounds</h2>
-
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-white/[0.06]">
-        {calendarEntries.map(({ race, isSprint, date, href }) => (
-          <a
-            href={href}
-            class={`bg-black hover:bg-white/[0.02] p-5 transition-colors duration-150 group ${isSprint ? 'bg-[rgba(249,115,22,0.02)]' : ''}`}
-          >
-            <div class="flex items-center gap-2 font-mono text-[9px] tracking-[0.2em] text-muted-foreground uppercase mb-3">
-              <span class="flex items-center gap-1.5"><Flag size={10} />R{race.roundNumber.toString().padStart(2, '0')} · {race.circuit.country}</span>
-              {isSprint && (
-                <span class="font-mono text-[7px] tracking-[0.15em] uppercase px-1.5 py-0.5 border border-orange-500/35 text-orange-400/75">SPRINT</span>
-              )}
-            </div>
-            <div class={`font-semibold text-sm leading-snug mb-2 transition-colors duration-150 ${isSprint ? 'group-hover:text-orange-400' : 'group-hover:text-[#a855f7]'}`}>
-              {race.name}{isSprint && ' — Sprint'}
-            </div>
-            <div class="flex items-center gap-1.5 font-mono text-[9px] text-muted-foreground tracking-widest">
-              <CalendarDays size={10} />{formatDate(date)}
-            </div>
-          </a>
-        ))}
-      </div>
-    </section>
-  )}
-
-  <RecentResults entries={archiveEntries} />
-
-  {races.length === 0 && (
-    <div class="mt-8 border border-white/[0.06] p-10 text-center">
-      <p class="font-mono text-[9px] text-muted-foreground tracking-[0.25em] uppercase">Database empty</p>
-      <p class="mt-2 font-mono text-[8px] text-muted-foreground/50">
-        Run <code class="text-[#a855f7]">sync_schedule --year {year}</code>
-      </p>
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <NextRaceBlock race={nextRace} prediction={prediction} today={today} />
+      <LastRaceBlock race={lastRace} recap={recap} />
     </div>
-  )}
 
+    <ChampionshipBlock drivers={unwrapSettled(driversResult, [])} teams={unwrapSettled(teamsResult, [])} />
+  </div>
 </BaseLayout>
-
-<script>
-  let countdownInterval: ReturnType<typeof setInterval> | null = null;
-
-  function initCountdown() {
-    if (countdownInterval) clearInterval(countdownInterval);
-
-    const el = document.getElementById('countdown');
-    if (!el) return;
-
-    const rawDate = el.dataset.raceDate ?? '';
-    const raceDate = new Date(rawDate.includes('T') ? rawDate : `${rawDate}T00:00:00`);
-    const digits = document.querySelectorAll<HTMLElement>('.countdown-digit');
-
-    function update() {
-      if (isNaN(raceDate.getTime()) || digits.length < 4) return;
-      const diff = raceDate.getTime() - Date.now();
-      if (diff <= 0) { digits.forEach((d) => d.textContent = '00'); return; }
-      const vals = [
-        Math.floor(diff / 86400000),
-        Math.floor((diff % 86400000) / 3600000),
-        Math.floor((diff % 3600000) / 60000),
-        Math.floor((diff % 60000) / 1000),
-      ];
-      digits.forEach((d, i) => d.textContent = String(vals[i]).padStart(2, '0'));
-    }
-
-    update();
-    countdownInterval = setInterval(update, 1000);
-  }
-
-  document.addEventListener('astro:page-load', initCountdown);
-</script>

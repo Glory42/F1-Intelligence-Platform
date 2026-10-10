@@ -8,13 +8,18 @@ import type {
   SprintResult, SprintDetailResponse, RaceControlMessage, RaceOvertake, TeamRadioClip,
   StrategyResponse, FridayPaceRow, PitCrewRanking, TeamStanding, TitleOddsResponse,
   RacecraftRow, TeammateBattle, RaceStoryResponse, TelemetryResponse, LapTelemetrySamples,
-  HistoryRecords, DriverHistory, TeamHistory, RaceRecap,
+  HistoryRecords, DriverHistory, TeamHistory, RaceRecap, OnThisDayRace,
 } from '../../web/src/types';
 
 export const circuit: Circuit = {
   id: 5, circuitKey: 'monza', name: 'Autodromo Nazionale Monza', country: 'Italy', city: 'Monza',
   lapCount: 53, trackLengthKm: '5.793', overtakeRate: '0.850',
   numberOfCorners: 11, drsZones: 2, scProbability: '0.300', imageUrl: null,
+};
+
+// Raced before but not on the current calendar — splits "this season" from "all circuits".
+export const pastCircuit: Circuit = {
+  ...circuit, id: 6, circuitKey: 'hockenheimring', name: 'Hockenheimring', country: 'Germany', city: 'Hockenheim',
 };
 
 export const team: Team = {
@@ -442,3 +447,7 @@ export const lastRaceRecap: RaceRecap = {
   fastestStop: { driver: driverB, stationaryMs: 1_980 },
   topBattle: { chaser: driver, leader: driverB, lapStart: 41, lapEnd: 53, minGapMs: 280 },
 };
+
+export const onThisDayRaces: OnThisDayRace[] = [
+  { raceId: 1, year: 2019, name: 'Italian Grand Prix', winner: driverB },
+];

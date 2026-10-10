@@ -1,5 +1,4 @@
 ---
-import { Users } from 'lucide-react';
 import { getTeamColor } from '@/lib/teamColors';
 import type { PredictionAccent, PredictionDriverVM, PredictionResultRow } from '../types';
 
@@ -33,18 +32,18 @@ const cols = hasResults
 
 <div>
   <div class="flex items-center gap-3 mb-4">
-    <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style={`color: rgba(${accent.rgb},0.55)`}><Users size={11} />./all drivers</span>
+    <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style={`color: rgba(${accent.rgb},0.55)`}>./all drivers</span>
     <div class="h-px flex-1 bg-white/[0.05]" />
   </div>
   <div class="border border-white/[0.06]">
     <div class={`grid grid-cols-[32px_1fr_80px] ${cols} gap-0 px-4 py-2.5 border-b border-white/[0.06]`}>
-      <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase">Pos</div>
-      <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase">Driver</div>
-      <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right">Win %</div>
-      <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase hidden sm:block text-center">Car</div>
-      <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase hidden sm:block text-center">{gridColLabel}</div>
+      <div class="text-[11px] text-muted-foreground">Pos</div>
+      <div class="text-[11px] text-muted-foreground">Driver</div>
+      <div class="text-[11px] text-muted-foreground text-right">Win %</div>
+      <div class="text-[11px] text-muted-foreground hidden sm:block text-center">Car</div>
+      <div class="text-[11px] text-muted-foreground hidden sm:block text-center">{gridColLabel}</div>
       {hasResults && (
-        <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase hidden sm:block text-right">Actual Pos</div>
+        <div class="text-[11px] text-muted-foreground hidden sm:block text-right">Actual Pos</div>
       )}
     </div>
     {drivers.map((d, i) => {

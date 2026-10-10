@@ -13,8 +13,21 @@ test('renders driver stats and recent results against fixture data', async ({ pa
   await expect(page.getByText('Driver not found')).toHaveCount(0);
 });
 
-test('the driver page scores the team-mate head-to-head', async ({ page }) => {
+test('the driver page leads with this season and keeps the rest in tabs', async ({ page }) => {
   await page.goto('/drivers/10?year=2026');
+
+  const views = page.getByRole('navigation', { name: 'Driver views' });
+  await expect(views.getByRole('link')).toHaveText(['This season', 'Teammate battle', 'Career', 'Model']);
+  await expect(views.getByRole('link', { name: 'This season' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('region', { name: 'Team-mate battle' })).toHaveCount(0);
+
+  await views.getByRole('link', { name: 'Teammate battle' }).click();
+  await expect(page).toHaveURL(/\/drivers\/10\?year=2026&tab=teammate$/);
+  await expect(page.getByRole('region', { name: 'Team-mate battle' })).toBeVisible();
+});
+
+test('the driver page scores the team-mate head-to-head', async ({ page }) => {
+  await page.goto('/drivers/10?year=2026&tab=teammate');
 
   const battle = page.getByRole('region', { name: 'Team-mate battle' });
   await expect(battle).toContainText('TSU');

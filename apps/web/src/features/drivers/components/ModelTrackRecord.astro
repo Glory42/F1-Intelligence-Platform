@@ -1,0 +1,50 @@
+---
+import { CheckCircle2, XCircle, Clock } from 'lucide-react';
+import type { driverPredictionRecord } from '@/lib/predictionMath';
+
+interface Props {
+  record: ReturnType<typeof driverPredictionRecord>;
+  driverCode: string;
+  year: number;
+}
+
+const { record, driverCode, year } = Astro.props;
+---
+
+<div>
+  <div class="flex items-center gap-3 mb-4">
+    <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">./model track record · {year}</span>
+    <div class="h-px flex-1 bg-white/[0.05]" />
+    {record.tipped > 0 && (
+      <span class="font-mono text-[9px] text-muted-foreground">
+        tipped <span class="text-[#a855f7] font-bold">{record.tipped}×</span>
+        {record.decided > 0 && <> · <span class="text-[#a855f7] font-bold">{record.correct}</span> correct</>}
+      </span>
+    )}
+  </div>
+  {record.tipped === 0 ? (
+    <div class="border border-white/[0.06] px-5 py-6 text-center">
+      <p class="font-mono text-[9px] text-muted-foreground tracking-[0.15em] uppercase">The model hasn't picked {driverCode} to win a race in {year}</p>
+    </div>
+  ) : (
+  <div class="border border-white/[0.06]">
+    {record.races.map((r, i) => (
+      <a
+        href={r.isSprint ? `/prediction/sprint/${r.raceId}` : `/prediction/${r.raceId}`}
+        class={`flex items-center gap-4 px-5 py-3 hover:bg-white/[0.02] transition-colors duration-150 group ${i !== 0 ? 'border-t border-white/[0.04]' : ''}`}
+      >
+        <div class="font-mono text-[9px] text-muted-foreground w-5 shrink-0">{r.roundNumber.toString().padStart(2, '0')}</div>
+        <div class="flex-1 min-w-0 flex items-center gap-2">
+          <span class="font-semibold text-sm truncate group-hover:text-[#a855f7] transition-colors duration-150">{r.raceName}</span>
+          {r.isSprint && <span class="font-mono text-[7px] tracking-[0.1em] uppercase px-1.5 py-0.5 border border-orange-500/30 text-orange-400/70 shrink-0">sprint</span>}
+        </div>
+        <div class="shrink-0 font-mono text-[9px] font-bold w-20 text-right">
+          {r.correct === true && <span class="flex items-center justify-end gap-1 text-green-400"><CheckCircle2 size={12} />won</span>}
+          {r.correct === false && <span class="flex items-center justify-end gap-1 text-red-400"><XCircle size={12} />missed</span>}
+          {r.correct === null && <span class="flex items-center justify-end gap-1 text-muted-foreground"><Clock size={11} />pending</span>}
+        </div>
+      </a>
+    ))}
+  </div>
+  )}
+</div>

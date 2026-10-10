@@ -1,0 +1,49 @@
+---
+import HomeBlock from './HomeBlock.astro';
+import { championshipPoints } from '@/lib/championshipMath';
+import { getTeamColor } from '@/lib/teamColors';
+import type { DriverStanding, TeamStanding } from '@/types';
+
+interface Props {
+  drivers: DriverStanding[];
+  teams: TeamStanding[];
+}
+
+const { drivers, teams } = Astro.props;
+const TOP = 3;
+const topDrivers = drivers.slice(0, TOP).map((s) => ({
+  key: s.driver.id, href: `/drivers/${s.driver.id}`, name: s.driver.code, color: getTeamColor(s.driver.team.teamKey), points: championshipPoints(s.stats),
+}));
+const topTeams = teams.slice(0, TOP).map((s) => ({
+  key: s.team.id, href: `/teams/${s.team.id}`, name: s.team.name, color: getTeamColor(s.team.teamKey), points: championshipPoints(s.stats),
+}));
+const tables = [
+  { label: 'Drivers', rows: topDrivers },
+  { label: 'Teams', rows: topTeams },
+].filter((t) => t.rows.length > 0);
+---
+
+<HomeBlock title="Championship" id="home-championship" links={[{ href: '/drivers', label: 'Drivers' }, { href: '/teams', label: 'Teams' }]}>
+  {tables.length > 0 ? (
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+      {tables.map((t) => (
+        <div>
+          <p class="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{t.label}</p>
+          <ol class="space-y-1">
+            {t.rows.map((r, i) => (
+              <li>
+                <a href={r.href} class="flex items-center gap-3 border-l-[3px] py-1.5 pl-3 text-[13px] hover:bg-white/[0.02] transition-colors duration-150" style={`border-color: ${r.color}`}>
+                  <span class="w-4 font-mono text-[11px] text-muted-foreground">{i + 1}</span>
+                  <span class="flex-1 truncate">{r.name}</span>
+                  <span class="font-mono font-bold tabular-nums">{Math.round(r.points)}</span>
+                </a>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <p class="text-[13px] text-muted-foreground">Standings appear after the first race.</p>
+  )}
+</HomeBlock>

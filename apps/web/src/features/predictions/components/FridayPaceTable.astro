@@ -1,5 +1,4 @@
 ---
-import { Timer } from 'lucide-react';
 import SectionKicker from '@/components/shared/SectionKicker.astro';
 import DataList from '@/components/shared/DataList.astro';
 import DataRow from '@/components/shared/DataRow.astro';
@@ -23,7 +22,7 @@ const formatDelta = (ms: number) => (ms === 0 ? '—' : `+${(ms / 1000).toFixed(
 ---
 
 <section>
-  <SectionKicker icon={Timer} label="./friday-pace · long runs" accentRgb={accent.rgb} />
+  <SectionKicker label="./friday-pace · long runs" accentRgb={accent.rgb} />
   <DataList
     label="Friday long-run pace"
     columns={COLUMNS}

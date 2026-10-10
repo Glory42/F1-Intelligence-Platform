@@ -1,5 +1,4 @@
 ---
-import { Gauge } from 'lucide-react';
 import type { FeatureContribution } from '@/lib/predictionMath';
 import type { FeatureMeta, PredictionAccent } from '../types';
 
@@ -16,9 +15,9 @@ const labelFor = (key: string) => featureMeta[key]?.label ?? key;
 
 <div class="border border-white/[0.06] p-5">
   <div class="flex items-center gap-3 mb-4">
-    <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style={`color: rgba(${accent.rgb},0.55)`}><Gauge size={11} />./why {driverCode}</span>
+    <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style={`color: rgba(${accent.rgb},0.55)`}>./why {driverCode}</span>
     <div class="h-px flex-1 bg-white/[0.05]" />
-    <span class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase">share of weighted score</span>
+    <span class="text-[11px] text-muted-foreground">share of weighted score</span>
   </div>
   <div class="flex h-7 w-full overflow-hidden border border-white/[0.06]">
     {breakdown.map((b, idx) => (

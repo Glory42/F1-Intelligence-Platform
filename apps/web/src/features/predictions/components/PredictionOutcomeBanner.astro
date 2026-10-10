@@ -12,12 +12,12 @@ const { predictedName, actualName, actualLabel, correct } = Astro.props;
 <div class={`panel p-5 border-l-2 ${correct ? 'border-l-green-500' : 'border-l-red-500'}`}>
   <div class="flex items-center gap-6 flex-wrap">
     <div>
-      <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase mb-1">predicted</div>
+      <div class="text-[11px] text-muted-foreground mb-1">predicted</div>
       <div class="font-bold text-lg">{predictedName}</div>
     </div>
     <div class="font-mono text-2xl text-muted-foreground">→</div>
     <div>
-      <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase mb-1">{actualLabel}</div>
+      <div class="text-[11px] text-muted-foreground mb-1">{actualLabel}</div>
       <div class="font-bold text-lg">{actualName}</div>
     </div>
     <div class={`font-mono text-sm font-bold ml-auto ${correct ? 'text-green-400' : 'text-red-400'}`}>

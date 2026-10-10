@@ -4,26 +4,45 @@ import PageHeader from '@/components/shared/PageHeader.astro';
 import SectionKicker from '@/components/shared/SectionKicker.astro';
 import RecordTable from '@/features/history/components/RecordTable.astro';
 import F1dbCredit from '@/features/history/components/F1dbCredit.astro';
+import OnThisDayList from '@/features/history/components/OnThisDayList.astro';
+import PageTabs from '@/components/shared/PageTabs.astro';
+import EmptyState from '@/components/shared/EmptyState.astro';
 import { api } from '@/lib/api';
-import { formatAgeFromDays, unwrapSettled } from '@/lib/utils';
-import { Building2, Trophy, Users } from 'lucide-react';
+import { formatAgeFromDays } from '@/lib/utils';
+import { resolveTab } from '@/lib/pageTabs';
+import type { HistoryRecords, OnThisDayRace } from '@/types';
 
-const records = unwrapSettled((await Promise.allSettled([api.getHistoryRecords()]))[0], null);
+const TABS = [
+  { id: 'records', label: 'Records' },
+  { id: 'on-this-day', label: 'On this day' },
+] as const;
+
+const tab = resolveTab(Astro.url, TABS);
+const today = new Date();
+const monthDay = `${String(today.getUTCMonth() + 1).padStart(2, '0')}-${String(today.getUTCDate()).padStart(2, '0')}`;
+const dateLabel = today.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+
+const records: HistoryRecords | null = tab === 'records' ? await api.getHistoryRecords().catch(() => null) : null;
+const onThisDay: OnThisDayRace[] = tab === 'on-this-day' ? await api.getOnThisDay(monthDay).catch(() => []) : [];
 const toEntries = (rows: Array<{ name: string; value: number }>) => rows.map((r) => ({ name: r.name, value: r.value }));
 ---
 
-<BaseLayout title="All-time records">
-  <div class="mt-7 space-y-8">
-    <PageHeader icon={Trophy} kicker="./history" title="All-time Records" subtitle="Every world championship season since 1950" />
+<BaseLayout title={tab === 'records' ? 'All-time records' : 'On this day'}>
+  <div class="space-y-6">
+    <PageHeader kicker="./history" title="History" subtitle="Every world championship season since 1950" />
 
-    {!records ? (
-      <div class="border border-white/[0.06] p-10 text-center">
-        <p class="font-mono text-[9px] text-muted-foreground tracking-[0.25em] uppercase">Historical data has not been imported yet</p>
-      </div>
+    <PageTabs tabs={TABS} active={tab} label="History views" />
+
+    {tab === 'on-this-day' ? (
+      onThisDay.length > 0
+        ? <OnThisDayList races={onThisDay} dateLabel={dateLabel} />
+        : <EmptyState message={`No Grand Prix has been held on ${dateLabel}.`} />
+    ) : !records ? (
+      <EmptyState message="Historical data hasn't been imported yet." />
     ) : (
       <>
         <section>
-          <SectionKicker icon={Users} label="./drivers" />
+          <SectionKicker label="./drivers" />
           <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <RecordTable title="Most race wins" entries={toEntries(records.drivers.wins)} />
             <RecordTable title="Most championships" entries={toEntries(records.drivers.championships)} />
@@ -38,7 +57,7 @@ const toEntries = (rows: Array<{ name: string; value: number }>) => rows.map((r)
         </section>
 
         <section>
-          <SectionKicker icon={Building2} label="./constructors" />
+          <SectionKicker label="./constructors" />
           <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <RecordTable title="Most constructor wins" entries={toEntries(records.constructors.wins)} />
             <RecordTable title="Most constructors' titles" entries={toEntries(records.constructors.championships)} />

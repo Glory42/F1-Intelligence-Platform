@@ -1,5 +1,4 @@
 ---
-import { Sliders } from 'lucide-react';
 import type { FeatureMeta, PredictionAccent, PredictionDriverVM } from '../types';
 
 interface Props {
@@ -28,7 +27,7 @@ const payload = JSON.stringify({
 <div class="whatif-lab border border-white/[0.06] p-5" data-whatif>
   <script type="application/json" is:inline data-whatif-payload set:html={payload} />
   <div class="flex items-center gap-3 mb-1">
-    <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style={`color: rgba(${accent.rgb},0.55)`}><Sliders size={11} />./what-if lab</span>
+    <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style={`color: rgba(${accent.rgb},0.55)`}>./what-if lab</span>
     <div class="h-px flex-1 bg-white/[0.05]" />
     <button type="button" data-role="reset" class="reset-btn font-mono text-[8px] tracking-[0.15em] uppercase text-muted-foreground transition-colors duration-150">reset to model</button>
   </div>
@@ -44,7 +43,7 @@ const payload = JSON.stringify({
         </label>
       ))}
       <div class="flex items-center justify-between border-t border-white/[0.06] pt-2 mt-2">
-        <span class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase">total weight</span>
+        <span class="text-[11px] text-muted-foreground">total weight</span>
         <span data-role="total" class="font-mono text-[9px] font-bold">100</span>
       </div>
     </div>

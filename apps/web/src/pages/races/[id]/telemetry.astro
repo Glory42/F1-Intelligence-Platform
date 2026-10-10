@@ -4,7 +4,7 @@ import LineChart from '@/components/charts/LineChart.astro';
 import PageHeader from '@/components/shared/PageHeader.astro';
 import SectionKicker from '@/components/shared/SectionKicker.astro';
 import StatTiles from '@/components/shared/StatTiles.astro';
-import { Gauge, Map as MapIcon, Timer, Zap } from 'lucide-react';
+import { Map as MapIcon} from 'lucide-react';
 import DominanceMap from '@/features/telemetry/components/DominanceMap.astro';
 import { api } from '@/lib/api';
 import { getTeamColor } from '@/lib/teamColors';
@@ -37,12 +37,12 @@ const gapMs = lapA && lapB ? lapB.lapTimeMs - lapA.lapTimeMs : 0;
 ---
 
 <BaseLayout title={race ? `${sessionLabel} telemetry · ${race.name}` : 'Telemetry'}>
-  <div class="mt-7 space-y-8">
+  <div class="space-y-8">
     <a href={`/races/${id}`} class="inline-block font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground hover:text-foreground transition-colors duration-150">
       ← {race?.name ?? 'race'}
     </a>
 
-    <PageHeader icon={Gauge} kicker="./telemetry" title={race?.name ?? 'Telemetry'} subtitle={`${sessionLabel} · fastest laps · OpenF1 car data, every 10 m`} />
+    <PageHeader kicker="./telemetry" title={race?.name ?? 'Telemetry'} subtitle={`${sessionLabel} · fastest laps · OpenF1 car data, every 10 m`} />
 
     {!telemetry || telemetry.drivers.length < 2 || !lapA || !lapB ? (
       <div class="border border-white/[0.06] p-10 text-center">
@@ -68,7 +68,7 @@ const gapMs = lapA && lapB ? lapB.lapTimeMs - lapA.lapTimeMs : 0;
         </form>
 
         <section>
-          <SectionKicker icon={Timer} label={`./laps · ${lapA.driver.code} vs ${lapB.driver.code}`} />
+          <SectionKicker label={`./laps · ${lapA.driver.code} vs ${lapB.driver.code}`} />
           <StatTiles items={[
             { label: `${lapA.driver.code} lap`, value: formatMs(lapA.lapTimeMs) },
             { label: `${lapB.driver.code} lap`, value: formatMs(lapB.lapTimeMs) },
@@ -83,7 +83,7 @@ const gapMs = lapA && lapB ? lapB.lapTimeMs - lapA.lapTimeMs : 0;
         <div class="grid lg:grid-cols-[1fr_420px] gap-6">
           <div class="space-y-6">
             <section>
-              <SectionKicker icon={Gauge} label="./speed · km/h" />
+              <SectionKicker label="./speed · km/h" />
               <div class="panel p-5">
                 <LineChart
                   ariaLabel="Speed through the lap"
@@ -98,7 +98,7 @@ const gapMs = lapA && lapB ? lapB.lapTimeMs - lapA.lapTimeMs : 0;
               </div>
             </section>
             <section>
-              <SectionKicker icon={Zap} label={`./delta · ${lapA.driver.code} − ${lapB.driver.code} (s)`} />
+              <SectionKicker label={`./delta · ${lapA.driver.code} − ${lapB.driver.code} (s)`} />
               <div class="panel p-5">
                 <LineChart
                   ariaLabel="Time delta through the lap"
@@ -116,7 +116,7 @@ const gapMs = lapA && lapB ? lapB.lapTimeMs - lapA.lapTimeMs : 0;
             </section>
           </div>
           <section>
-            <SectionKicker icon={MapIcon} label="./dominance · mini-sectors" />
+            <SectionKicker label="./dominance · mini-sectors" />
             <div class="panel p-5">
               <DominanceMap x={lapA.samples.x} y={lapA.samples.y} winners={winners} colors={{ a: colorA, b: colorB }} />
               <div class="mt-4 flex gap-4 font-mono text-[8px] tracking-widest uppercase text-muted-foreground">

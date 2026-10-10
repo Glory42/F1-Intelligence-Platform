@@ -2,42 +2,52 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { CircuitsGrid } from '@/features/circuits/components/CircuitsGrid';
 import { api } from '@/lib/api';
-import type { Circuit } from '@/types';
+import type { Circuit, Race } from '@/types';
+import PageHeader from '@/components/shared/PageHeader.astro';
+import PageTabs from '@/components/shared/PageTabs.astro';
+import EmptyState from '@/components/shared/EmptyState.astro';
+import { resolveTab } from '@/lib/pageTabs';
+
+const TABS = [
+  { id: 'season', label: 'This season' },
+  { id: 'all', label: 'All circuits' },
+] as const;
+
+const year = new Date().getFullYear();
+const tab = resolveTab(Astro.url, TABS);
 
 let circuits: Circuit[] = [];
+let seasonRaces: Race[] = [];
 let error: string | null = null;
-
 try {
-  circuits = await api.getCircuits();
+  [circuits, seasonRaces] = await Promise.all([
+    api.getCircuits(),
+    tab === 'season' ? api.getRaces(year).catch(() => []) : [],
+  ]);
 } catch (e) {
   error = e instanceof Error ? e.message : 'Failed to load circuits';
 }
+
+const seasonCircuitIds = new Set(seasonRaces.map((r) => r.circuit.id));
+const shown = tab === 'season' ? circuits.filter((c) => seasonCircuitIds.has(c.id)) : circuits;
 ---
 
-<BaseLayout title="Circuits Directory">
-  <div class="mt-7 space-y-8">
-    
-    {/* Page Header */}
-    <div class="flex flex-col sm:flex-row sm:items-baseline justify-between flex-wrap gap-4">
-      <div class="space-y-1">
-        <div class="flex items-center gap-2">
-          <span class="font-mono text-[9px] tracking-[0.25em] uppercase text-[#a855f7]/70">./directory</span>
-          <div class="h-px w-8 bg-white/[0.05]" />
-        </div>
-        <h1 class="text-3xl font-bold tracking-tight">Circuits</h1>
-      </div>
-      <div class="font-mono text-[9px] text-muted-foreground tracking-widest uppercase mt-2 sm:mt-0">
-        Total Tracks: <span class="font-bold text-[#a855f7]">{circuits.length}</span>
-      </div>
-    </div>
+<BaseLayout title="Circuits">
+  <div class="space-y-6">
+    <PageHeader
+      kicker="./circuits"
+      title="Circuits"
+      subtitle={tab === 'season' ? `${shown.length} on the ${year} calendar` : `${circuits.length} circuits raced`}
+    />
+
+    <PageTabs tabs={TABS} active={tab} label="Circuits views" />
+
     {error ? (
-      <div class="border border-destructive/40 bg-destructive/10 p-8 text-center">
-        <p class="font-mono text-[10px] text-destructive tracking-widest uppercase">Error loading circuits</p>
-        <p class="mt-2 font-mono text-[9px] text-muted-foreground">{error}</p>
-      </div>
+      <EmptyState tone="error" message="Couldn't load the circuits. Try again in a moment." />
+    ) : shown.length === 0 ? (
+      <EmptyState message={`No ${year} calendar yet.`} />
     ) : (
-      <CircuitsGrid initialCircuits={circuits} client:load />
+      <CircuitsGrid initialCircuits={shown} client:load />
     )}
-    
   </div>
 </BaseLayout>
