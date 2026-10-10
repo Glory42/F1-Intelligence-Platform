@@ -23,8 +23,8 @@ Cloudflare adapter, deployed to Cloudflare Pages. React is available as an islan
 | Data | `PUBLIC_API_URL` → the Hono API; no other backends |
 
 Entry points: `astro.config.mjs` (adapter, sitemap, Vite aliases), `src/layouts/BaseLayout.astro`
-(document shell, `<head>`, Navbar/Footer, view transitions), `src/layouts/LandingLayout.astro`
-(bare shell for `/`).
+(document shell, `<head>`, Sidebar/MobileNav/Footer, view transitions), `src/middleware.ts`
+(301s for retired URLs via `lib/legacyRedirects.ts`).
 
 ## Data fetching is server-side only
 
@@ -73,10 +73,10 @@ throws on `error` or a non-2xx status, so callers get `T` directly. Response typ
 ```
 src/
 ├── pages/              file-based routes — one .astro per URL, frontmatter fetches + composes
-├── layouts/            BaseLayout (app chrome) + LandingLayout (bare)
+├── layouts/            BaseLayout (app chrome)
 ├── components/         generic, cross-feature only
-│   ├── layout/         Navbar, MobileNav, Footer, nav model
-│   ├── shared/         YearSelect, ConfidenceBadge, …
+│   ├── layout/         Sidebar, MobileNav, NavGroups, Footer, nav model
+│   ├── shared/         PageHeader, PageTabs, EmptyState, YearSelect, ConfidenceBadge, …
 │   ├── docs/           OnThisPage TOC
 │   └── ui/             Shadcn primitives (badge, button, card, table, search-select)
 ├── features/           domain UI, grouped by area
@@ -93,15 +93,28 @@ Rule of thumb: **domain UI lives in `features/<area>/`; `components/` is only fo
 unrelated areas.** A helper used by one feature stays in that feature; promote to `lib/` only when a
 second unrelated feature needs it.
 
+## Navigation and page tabs
+
+- **Sidebar** — `Sidebar.astro` on `md+`, `MobileNav.astro` (top bar + drawer) below; both render `NavGroups`
+  from `navLinks.ts`. Two groups: **Season** (home, calendar, drivers, teams, predictions) and **Explore**
+  (circuits, compare, history). `activeDestination()` picks the longest owned prefix, so `/drivers/compare`
+  lights Compare, not Drivers. Collapse state lives in the `sidebar` cookie (`lib/sidebarState.ts`) so the
+  server renders the right width on first paint.
+- **One question per page** — each page leads with one main view; everything else is a `?tab=` link tab
+  (`PageTabs.astro`, `resolveTab`/`tabHref` in `lib/pageTabs.ts`). The default tab keeps the plain URL, other
+  params (e.g. `year`) are preserved, and the frontmatter fetches only what the open tab needs. A tab can
+  point at its own route instead (`href` — Compare's Drivers/Teams).
+- **Season picker** — `YearSelect` in `PageHeader`'s `aside` slot, `?year=` in the URL, default current season.
+- **Retired URLs** — `/prediction/recap[/year]` 301s to the Predictions Scorecard tab (`src/middleware.ts`).
+
 ## Routes
 
 | Route | Data source |
 |---|---|
-| `/` | static (no API) |
-| `/prediction` | `predictions/upcoming` + `sprint/upcoming` + `predictions/accuracy` (+ history, standings) |
+| `/` | `races?year=` + `predictions/upcoming` + `races/:id/recap` + `drivers/standings` + `teams/standings` |
+| `/prediction` | Upcoming tab: `predictions/upcoming` + `sprint/upcoming` + `predictions/standings` · Scorecard tab: `predictions/history?year=` + `predictions/accuracy` |
 | `/prediction/[id]` | `predictions/race/:id` |
 | `/prediction/sprint/[id]` | `sprint/race/:id` |
-| `/prediction/recap` · `/prediction/recap/[year]` | `predictions/accuracy` · `predictions/history?year=` |
 | `/races` · `/races/[id]` · `/races/[id]/sprint` | `races?year=` · `races/:id` · `sprint/race/:id/detail` |
 | `/circuits` · `/circuits/[key]` | `races/circuits` · `races/circuit/:key` |
 | `/drivers` · `/drivers/[id]` · `/drivers/compare` | `drivers/standings?year=` · `drivers/:id?year=` · `drivers?year=` |

@@ -246,18 +246,22 @@ apps/web/
 │   │       ├── compare.astro      # Team head-to-head comparison tool
 │   │       └── [id].astro         # Team profile — stats, driver roster
 │   ├── layouts/
-│   │   ├── BaseLayout.astro       # Shared layout — Navbar, slot, global styles
-│   │   └── LandingLayout.astro    # Landing-specific layout (no navbar chrome)
+│   │   └── BaseLayout.astro       # Shared layout — Sidebar + MobileNav, slot, Footer, GlobalSearch; reads the sidebar cookie
 │   ├── components/                # Generic, cross-feature only — domain UI lives in features/
 │   │   ├── layout/
-│   │   │   ├── Navbar.astro       # Top bar + desktop nav (hover dropdowns for races/drivers/teams/prediction)
-│   │   │   ├── MobileNav.astro    # Mobile drawer + accordion nav + focus-trap script
-│   │   │   ├── navLinks.ts        # buildNavLinks(isDev) + isNavActive() — shared nav model
-│   │   │   └── Footer.astro       # Shared footer; variant="minimal" (default) | "full" (landing)
+│   │   │   ├── Sidebar.astro      # Desktop collapsible sidebar — search, Season/Explore groups, docs, collapse toggle
+│   │   │   ├── MobileNav.astro    # Mobile top bar + drawer with the same grouped list + focus-trap script
+│   │   │   ├── NavGroups.astro    # The grouped destination list both Sidebar and MobileNav render
+│   │   │   ├── SiteLogo.astro     # Brand mark SVG
+│   │   │   ├── navLinks.ts        # buildNavGroups() + buildNavUtilities(isDev) + activeDestination() — nav model
+│   │   │   └── Footer.astro       # Shared footer
 │   │   ├── docs/
 │   │   │   └── OnThisPage.astro   # Sticky right-rail TOC of a doc's h2 sections; scrollspy via IntersectionObserver
 │   │   ├── shared/
-│   │   │   ├── YearSelect.astro       # Year selector; extraParams prop preserves filter/sort on year change
+│   │   │   ├── PageHeader.astro       # Kicker + h1 + subtitle; "aside" slot holds the season picker
+│   │   │   ├── PageTabs.astro         # Server-rendered link tabs (?tab=, or a route href per tab)
+│   │   │   ├── EmptyState.astro       # Bordered "nothing here yet" / error message
+│   │   │   ├── YearSelect.astro       # Year selector; extraParams prop preserves filter/sort/tab on year change
 │   │   │   ├── YearSelectLinks.astro  # Year selector using anchor links; used by driver/team profile pages
 │   │   │   └── ConfidenceBadge.astro  # LOCK / LIKELY / TOSS-UP badge from the P1−P2 win-probability gap
 │   │   └── ui/                    # Shadcn/ui primitives + generic widgets
@@ -300,7 +304,21 @@ apps/web/
 │   │   │       └── RacePredictionPanel.astro  # Hero right column — predicted winner + podium (accent prop)
 │   │   ├── drivers/components/
 │   │   │   ├── DriverStatsGrid.tsx    # Driver season stats card grid
-│   │   │   └── RecentResultsTable.tsx # Compact recent results table
+│   │   │   ├── RecentResultsTable.tsx # Compact recent results table
+│   │   │   ├── DriverCareerTable.astro # Per-season career rows (Career tab)
+│   │   │   └── ModelTrackRecord.astro # Races the model tipped this driver to win (Model tab)
+│   │   ├── teams/components/
+│   │   │   └── TeamCareerTable.astro  # Per-season constructor rows (team History tab)
+│   │   ├── standings/components/
+│   │   │   ├── DriverStandingsTable.astro / TeamStandingsTable.astro  # Standings tabs on /drivers, /teams
+│   │   │   └── TitleFight.astro / RacecraftTable.astro / ConstructorTitleOdds.astro
+│   │   ├── hub/components/            # Home's three blocks
+│   │   │   ├── HomeBlock.astro        # Shared block frame — ./kicker heading (region name) + footer links
+│   │   │   ├── NextRaceBlock.astro    # Next race + countdown + model favourite
+│   │   │   ├── LastRaceBlock.astro    # Last race Recap
+│   │   │   └── ChampionshipBlock.astro # Top 3 drivers + top 3 teams
+│   │   ├── history/components/
+│   │   │   └── OnThisDayList.astro    # History → On this day tab
 │   │   ├── circuits/
 │   │   │   ├── components/
 │   │   │   │   ├── CircuitsGrid.tsx      # React component for circuits grid (filters/sorting)
@@ -323,12 +341,13 @@ apps/web/
 │   │   │   ├── driverCompareConfig.ts # seasonStatConfig + careerStatConfig — the driver stat rows
 │   │   │   ├── compareReducer.ts      # Pure compareReducer(state, action, config) — hydrate/year/selection/mode
 │   │   │   │                          #   transitions + stale-request guarding; no React import, tested directly
-│   │   │   └── useCompareController.ts # Thin useReducer wiring over compareReducer.ts — URL sync via injectable
-│   │   │                              #   locationAdapter, discriminated season/career `comparison` result
+│   │   │   ├── useCompareController.ts # Thin useReducer wiring over compareReducer.ts — URL sync via injectable
+│   │   │   │                          #   locationAdapter, discriminated season/career `comparison` result
+│   │   │   └── compareTabs.ts         # COMPARE_TABS — Drivers/Teams route tabs shared by both compare pages
 │   │   └── search/
 │   │       ├── components/
 │   │       │   └── GlobalSearch.tsx   # React global search palette (cmdk) — render only
-│   │       └── useGlobalSearch.ts     # Search-open state hook (keyboard shortcut, Navbar event bridge, fetch-on-open, close animation)
+│   │       └── useGlobalSearch.ts     # Search-open state hook (keyboard shortcut, sidebar/top-bar search button bridge, fetch-on-open, close animation)
 │   ├── lib/                       # Only truly cross-feature helpers
 │   │   ├── api.ts                 # Typed API client — all fetch calls, uses PUBLIC_API_URL
 │   │   ├── teamColors.ts          # team_key → official hex color map (fallback #6B7280)
@@ -338,7 +357,11 @@ apps/web/
 │   │   │                          #   confidenceTier, brierScore, calibrationBuckets, driverPredictionRecord,
 │   │   │                          #   bestCall/worstMiss/longestStreak, GP_WEIGHTS/SPRINT_WEIGHTS + *_FEATURE_META
 │   │   │                          #   (the canonical TS-side manifest, checked against docs/feature-weights.json)
+│   │   ├── pageTabs.ts            # resolveTab() + tabHref() — ?tab= link tabs that keep other params
+│   │   ├── sidebarState.ts        # Sidebar collapse cookie — isSidebarCollapsed() + sidebarCookie()
+│   │   ├── legacyRedirects.ts     # legacyRedirect(path) — retired URLs → their new home
 │   │   └── utils.ts               # cn() helper (clsx + tailwind-merge)
+│   ├── middleware.ts              # 301s retired URLs via legacyRedirect()
 │   ├── types/
 │   │   └── index.ts               # All TypeScript types — Circuit, Team, Driver, Race,
 │   │                              #   RaceResult, QualifyingResult, LapSummary,
@@ -364,7 +387,10 @@ apps/web/
 │   │   │   ├── compareReducer.test.ts        # pure, `node` env — hydrate/year/mode transitions, stale-request
 │   │   │   │                                 #   guarding, explicit 6bf3415 hydration-race regression case
 │   │   │   └── useCompareController.test.ts  # jsdom — URL hydration, career mode, location-adapter seam
+│   │   ├── components/layout/
+│   │   │   └── navLinks.test.ts              # pure — sidebar groups, utilities, active-destination matching
 │   │   ├── lib/
+│   │   │   ├── pageTabs.test.ts / sidebarState.test.ts / legacyRedirects.test.ts  # pure, `node` env
 │   │   │   ├── teamColors.test.ts            # pure, `node` env
 │   │   │   ├── teamLogos.test.ts             # pure, `node` env
 │   │   │   ├── predictionMath.test.ts        # pure, `node` env — all predictionMath exports
@@ -392,12 +418,11 @@ apps/web/
 |-------|-------------|-------|
 | `/docs` | Astro Content Collections | Doc index — card grid of all 9 docs |
 | `/docs/[slug]` | Astro Content Collections | Rendered markdown with sidebar nav + on-this-page rail |
-| `/` | Static | Landing — no API call |
-| `/prediction` | `GET /api/predictions/upcoming` + `/api/sprint/upcoming` + `/api/predictions/accuracy` | GP + sprint upcoming; history merged; accuracy table; calibration chart + Brier when ≥5 races done |
+| `/` | `races?year=` + `predictions/upcoming` + `races/:id/recap` + driver/team standings | Three blocks: next race, last race Recap, championship top 3 |
+| `/prediction` | Upcoming: `predictions/upcoming` + `sprint/upcoming` + `predictions/standings` · Scorecard: `predictions/history?year=N` + `predictions/accuracy` | Tabs: Upcoming · Scorecard (hit rates, best call/worst miss/streak, race by race, calibration when ≥5 races, every season) |
 | `/prediction/[id]` | `GET /api/predictions/race/:id` | Historical GP prediction — contribution breakdown, radar compare, in-browser what-if lab |
 | `/prediction/sprint/[id]` | `GET /api/sprint/race/:id` | Sprint prediction detail — same feature set, sprint model |
-| `/prediction/recap` | `GET /api/predictions/accuracy` | All-seasons recap landing — accuracy card per season |
-| `/prediction/recap/[year]` | `GET /api/predictions/history?year=N` | Season recap — best call, worst miss, longest streak, round strip |
+| `/prediction/recap[/year]` | — | 301 → `/prediction?tab=scorecard[&year=N]` (`src/middleware.ts`) |
 | `/races` | `GET /api/races?year=N` | Race calendar — filter (ALL/SPRINT/GP), sort (ASC/DESC), sprint weekends as two cards |
 | `/races/[id]` | `GET /api/races/:id` | GP results, qualifying, lap chart |
 | `/races/[id]/sprint` | `GET /api/sprint/race/:id` | Sprint results, SQ grid, sprint lap chart, conditions |
@@ -417,10 +442,12 @@ apps/web/
 | `lib/api.ts` | Single typed API client. All pages call functions from here — never raw `fetch`. |
 | `lib/teamColors.ts` | Maps `team_key` strings (e.g. `red_bull`, `ferrari`) to official hex colors. Used for colored badges/dots across standings, driver pages, and result tables. |
 | `lib/teamLogos.ts` | Maps `team_key` to a static logo path under `/teams/`. Returns `null` for historical teams with no logo file. Used on teams index, teams detail, and drivers standings pages. |
+| `lib/pageTabs.ts` | `resolveTab(url, tabs)` picks the open `?tab=` (first tab when absent/unknown); `tabHref()` builds a tab link that keeps `year` etc. and drops `tab` for the default. Pages fetch only the open tab's data. |
+| `lib/sidebarState.ts` | Reads/writes the `sidebar` cookie — a cookie (not localStorage) so `BaseLayout` renders the right width server-side and the layout never jumps. |
 | `lib/utils.ts` | `cn()` — combines `clsx` and `tailwind-merge` for conditional class names. `unwrapSettled(result, fallback)` — one-line `PromiseSettledResult` unwrap, used wherever a page fans out `Promise.allSettled()` calls. |
 | `features/compare/compareReducer.ts` | Pure `compareReducer(state, action, config)` — every hydrate/year-change/selection/mode transition and stale-fetch-response guard, as one reducer with no React dependency; unit-tested directly. |
 | `features/compare/useCompareController.ts` | Generic hook powering both compare tools — wraps `compareReducer` in `useReducer` plus the URL-hydrate, URL-sync, and fetch effects. Item list, A/B selection, discriminated `comparison` (season/career) result, URL sync through an injectable `locationAdapter` seam. |
-| `features/search/useGlobalSearch.ts` | Hook powering `GlobalSearch` — open/close state, Cmd/Ctrl+K + Escape keyboard shortcut, `open-global-search` event bridge from `Navbar.astro`, fetch-on-first-open, close-animation timing. |
+| `features/search/useGlobalSearch.ts` | Hook powering `GlobalSearch` — open/close state, Cmd/Ctrl+K + Escape keyboard shortcut, `open-global-search` event bridge from the Sidebar/MobileNav search buttons, fetch-on-first-open, close-animation timing. |
 
 ---
 

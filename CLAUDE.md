@@ -266,7 +266,7 @@ All queries use Drizzle joins. Never fetch a list then loop-query for each item.
 ### Pages
 | Route | Layout | Data source |
 |-------|--------|------------|
-| `/` | BaseLayout | Race-weekend hub: races, upcoming prediction, `HomeHub` (title odds, last-race recap, on this day) |
+| `/` | BaseLayout | Three fixed blocks: next race (+ model favourite), last race Recap, championship top 3 |
 | `/prediction` | BaseLayout | `GET /api/predictions/upcoming` |
 | `/races/[id]` | BaseLayout | `GET /api/races/:id` (+ strategy, race events) |
 | `/races/[id]/race-story` | BaseLayout | `GET /api/races/:id/race-story` (`?session=sprint` for the sprint) |
@@ -274,6 +274,13 @@ All queries use Drizzle joins. Never fetch a list then loop-query for each item.
 | `/records` | BaseLayout | `GET /api/history/records` |
 | `/drivers/[id]` | BaseLayout | `GET /api/drivers/:id` |
 | `/teams/[id]` | BaseLayout | `GET /api/teams/:id` |
+
+### Navigation and page tabs
+- Collapsible sidebar (`components/layout/Sidebar.astro`) with two groups — Season (home, calendar, drivers,
+  teams, predictions) and Explore (circuits, compare, history); the same list is the mobile drawer.
+  Collapse state is a cookie so the server renders the right width.
+- Each page leads with one main view; secondary views are server-rendered `?tab=` link tabs
+  (`PageTabs.astro` + `lib/pageTabs.ts`), and each tab fetches only its own data.
 
 ### Component rules
 - No chart libraries — use plain SVG for `LapChart.astro`
