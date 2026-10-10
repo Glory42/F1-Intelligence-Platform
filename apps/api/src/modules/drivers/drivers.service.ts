@@ -15,6 +15,7 @@ function toDriverStats(s: typeof driverSeasonStats.$inferSelect) {
     avgSector1Ms: s.avgSector1Ms ?? null, avgSector2Ms: s.avgSector2Ms ?? null,
     avgSector3Ms: s.avgSector3Ms ?? null, topSpeedAvg: s.topSpeedAvg ?? null,
     teammateQualiDelta: s.teammateQualiDelta ?? null,
+    sprintTotalPoints: s.sprintTotalPoints,
   };
 }
 
@@ -23,7 +24,7 @@ const emptyDriverStats = {
   totalPoints: '0', championshipPosition: null, avgFinishPosition: null,
   winRate: null, avgPositionGain: null, dnfCount: 0, dnfRate: null,
   avgSector1Ms: null, avgSector2Ms: null, avgSector3Ms: null,
-  topSpeedAvg: null, teammateQualiDelta: null,
+  topSpeedAvg: null, teammateQualiDelta: null, sprintTotalPoints: '0',
 };
 
 const driverStatsAdapter: StatsAdapter<

@@ -10,3 +10,9 @@ export function cacheControlForStatus(status: string): string {
 export function cacheControlForYear(year: number, now: Date = new Date()): string {
   return year < now.getFullYear() ? CACHE_COMPLETED : CACHE_ACTIVE;
 }
+
+// Enrichment (race story, telemetry, history…) can arrive after the race via backfills; caching an
+// empty answer for a day would hide the data once it lands.
+export function cacheIfData(cacheControl: string, hasData: boolean): string {
+  return hasData ? cacheControl : CACHE_ACTIVE;
+}

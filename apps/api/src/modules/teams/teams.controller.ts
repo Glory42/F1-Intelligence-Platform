@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 import type { Bindings } from '../../common/types';
 import { createDb } from '../../config/database';
 import { TeamsService } from './teams.service';
+import { cacheControlForYear, cacheIfData } from '../../common/cache';
 
 const service = new TeamsService();
 
@@ -9,6 +10,13 @@ export const TeamsController = {
   getAll: async (c: Context<{ Bindings: Bindings }>) => {
     const year = Number(c.req.query('year') ?? new Date().getFullYear());
     const data = await service.findAll(createDb(c.env.DATABASE_URL), year);
+    return c.json({ data, error: null });
+  },
+
+  getPitCrewRankings: async (c: Context<{ Bindings: Bindings }>) => {
+    const year = Number(c.req.query('year') ?? new Date().getFullYear());
+    const data = await service.findPitCrewRankings(createDb(c.env.DATABASE_URL), year);
+    c.header('Cache-Control', cacheIfData(cacheControlForYear(year), data.length > 0));
     return c.json({ data, error: null });
   },
 

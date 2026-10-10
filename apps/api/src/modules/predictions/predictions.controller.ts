@@ -2,9 +2,14 @@ import type { Context } from 'hono';
 import type { Bindings } from '../../common/types';
 import { createDb } from '../../config/database';
 import { PredictionsService } from './predictions.service';
-import { CACHE_ACTIVE, cacheControlForStatus, cacheControlForYear } from '../../common/cache';
+import { FridayPaceService } from './friday-pace.service';
+import { TitleOddsService } from './title-odds.service';
+import { findRaceStatus } from '../../common/raceStatus';
+import { CACHE_ACTIVE, cacheControlForStatus, cacheControlForYear, cacheIfData } from '../../common/cache';
 
 const service = new PredictionsService();
+const fridayPace = new FridayPaceService();
+const titleOdds = new TitleOddsService();
 
 export const PredictionsController = {
   getUpcoming: async (c: Context<{ Bindings: Bindings }>) => {
@@ -13,6 +18,31 @@ export const PredictionsController = {
       return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'No upcoming prediction available' } }, 404);
     }
     c.header('Cache-Control', cacheControlForStatus(data.race.status));
+    return c.json({ data, error: null });
+  },
+
+  getTitleOdds: async (c: Context<{ Bindings: Bindings }>) => {
+    const year = Number(c.req.query('year') ?? new Date().getFullYear());
+    const data = await titleOdds.findTitleOdds(createDb(c.env.DATABASE_URL), year);
+    if (!data) {
+      return c.json({ data: null, error: { code: 'NOT_FOUND', message: `No title odds for ${year}` } }, 404);
+    }
+    c.header('Cache-Control', cacheControlForYear(year));
+    return c.json({ data, error: null });
+  },
+
+  getFridayPace: async (c: Context<{ Bindings: Bindings }>) => {
+    const raceId = Number(c.req.param('raceId'));
+    if (isNaN(raceId)) {
+      return c.json({ data: null, error: { code: 'INVALID_ID', message: 'raceId must be a number' } }, 400);
+    }
+    const db = createDb(c.env.DATABASE_URL);
+    const status = await findRaceStatus(db, raceId);
+    if (!status) {
+      return c.json({ data: null, error: { code: 'NOT_FOUND', message: `Race ${raceId} not found` } }, 404);
+    }
+    const data = await fridayPace.findFridayPace(db, raceId);
+    c.header('Cache-Control', cacheIfData(cacheControlForStatus(status), data.length > 0));
     return c.json({ data, error: null });
   },
 

@@ -1,7 +1,7 @@
-import { eq, and, inArray, desc } from 'drizzle-orm';
+import { eq, and, inArray, desc, isNotNull, sql } from 'drizzle-orm';
 import type { Db } from '../../config/database';
-import { teams, seasons, drivers, teamSeasonStats } from '../../db/schema';
-import type { Team, Driver, TeamDetailResponse, TeamStanding, TeamYearStats } from '../../common/types';
+import { teams, seasons, drivers, teamSeasonStats, racePitStops } from '../../db/schema';
+import type { Team, Driver, TeamDetailResponse, TeamStanding, TeamYearStats, PitCrewRanking } from '../../common/types';
 import { toTeam, toDriver } from '../../common/mappers';
 import { resolveSeason, buildStandings, buildCareerStats, type StatsAdapter } from '../../common/standings';
 
@@ -11,13 +11,14 @@ function toTeamStats(s: typeof teamSeasonStats.$inferSelect) {
     totalPoints: s.totalPoints, championshipPosition: s.championshipPosition,
     avgFinishPosition: s.avgFinishPosition, carPerformanceScore: s.carPerformanceScore,
     dnfCount: s.dnfCount, reliabilityScore: s.reliabilityScore ?? null,
+    sprintTotalPoints: s.sprintTotalPoints,
   };
 }
 
 const emptyTeamStats = {
   racesCompleted: 0, wins: 0, podiums: 0, totalPoints: '0',
   championshipPosition: null, avgFinishPosition: null, carPerformanceScore: null,
-  dnfCount: 0, reliabilityScore: null,
+  dnfCount: 0, reliabilityScore: null, sprintTotalPoints: '0',
 };
 
 // Standings pass raw `teams` rows; career passes `{ teams, seasons }` entries — so the
@@ -137,5 +138,31 @@ export class TeamsService {
       seasonStats: stats ? toTeamStats(stats) : emptyTeamStats,
       drivers: teamDrivers,
     };
+  }
+
+  // Median, not mean: one botched 10 s stop would otherwise drown a crew's whole season.
+  async findPitCrewRankings(db: Db, year: number): Promise<PitCrewRanking[]> {
+    const median = sql<number>`percentile_cont(0.5) within group (order by ${racePitStops.stationaryMs})`;
+    const rows = await db
+      .select({
+        team: teams,
+        stops: sql<number>`count(*)`,
+        medianStationaryMs: median,
+        fastestStationaryMs: sql<number>`min(${racePitStops.stationaryMs})`,
+      })
+      .from(racePitStops)
+      .innerJoin(drivers, eq(racePitStops.driverId, drivers.id))
+      .innerJoin(teams, eq(drivers.teamId, teams.id))
+      .innerJoin(seasons, eq(teams.seasonId, seasons.id))
+      .where(and(eq(seasons.year, year), isNotNull(racePitStops.stationaryMs)))
+      .groupBy(teams.id)
+      .orderBy(median);
+
+    return rows.map((r) => ({
+      team: toTeam(r.team),
+      stops: Number(r.stops),
+      medianStationaryMs: Math.round(Number(r.medianStationaryMs)),
+      fastestStationaryMs: Number(r.fastestStationaryMs),
+    }));
   }
 }

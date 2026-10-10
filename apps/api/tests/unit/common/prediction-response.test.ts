@@ -28,7 +28,7 @@ const race: typeof races.$inferSelect = {
   eventFormat: 'conventional', qualifyingDate: null, sprintDate: null, sprintQualifyingDate: null,
   weather: 'dry', safetyCarLaps: 0, vscLaps: 0, airTempAvg: null, trackTempAvg: null, humidityAvg: null,
   sprintWeather: null, sprintSafetyCarLaps: null, sprintVscLaps: null, sprintAirTempAvg: null,
-  sprintTrackTempAvg: null, sprintHumidityAvg: null, createdAt: new Date('2025-01-01T00:00:00Z'),
+  sprintTrackTempAvg: null, sprintHumidityAvg: null, openf1RaceSessionKey: null, openf1SprintSessionKey: null, createdAt: new Date('2025-01-01T00:00:00Z'),
 };
 
 const raceRow: RaceRowResult = {

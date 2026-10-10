@@ -1,7 +1,7 @@
-import { eq, asc } from 'drizzle-orm';
+import { and, eq, asc } from 'drizzle-orm';
 import type { Db } from '../../config/database';
 import { races, raceControlMessages, raceOvertakes, teamRadioClips } from '../../db/schema';
-import type { RaceControlMessage, RaceOvertake, TeamRadioClip } from '../../common/types';
+import type { RaceControlMessage, RaceOvertake, TeamRadioClip, RaceSession } from '../../common/types';
 import { toRaceControlMessage, toRaceOvertake, toTeamRadioClip } from '../../common/openf1-mappers';
 
 export class RaceEventsService {
@@ -10,31 +10,31 @@ export class RaceEventsService {
     return rows.length > 0;
   }
 
-  async getRaceControlMessages(db: Db, raceId: number): Promise<RaceControlMessage[]> {
+  async getRaceControlMessages(db: Db, raceId: number, session: RaceSession): Promise<RaceControlMessage[]> {
     const rows = await db
       .select()
       .from(raceControlMessages)
-      .where(eq(raceControlMessages.raceId, raceId))
+      .where(and(eq(raceControlMessages.raceId, raceId), eq(raceControlMessages.sessionType, session)))
       .orderBy(asc(raceControlMessages.date));
 
     return rows.map(toRaceControlMessage);
   }
 
-  async getOvertakes(db: Db, raceId: number): Promise<RaceOvertake[]> {
+  async getOvertakes(db: Db, raceId: number, session: RaceSession): Promise<RaceOvertake[]> {
     const rows = await db
       .select()
       .from(raceOvertakes)
-      .where(eq(raceOvertakes.raceId, raceId))
+      .where(and(eq(raceOvertakes.raceId, raceId), eq(raceOvertakes.sessionType, session)))
       .orderBy(asc(raceOvertakes.date));
 
     return rows.map(toRaceOvertake);
   }
 
-  async getTeamRadio(db: Db, raceId: number): Promise<TeamRadioClip[]> {
+  async getTeamRadio(db: Db, raceId: number, session: RaceSession): Promise<TeamRadioClip[]> {
     const rows = await db
       .select()
       .from(teamRadioClips)
-      .where(eq(teamRadioClips.raceId, raceId))
+      .where(and(eq(teamRadioClips.raceId, raceId), eq(teamRadioClips.sessionType, session)))
       .orderBy(asc(teamRadioClips.date));
 
     return rows.map(toTeamRadioClip);

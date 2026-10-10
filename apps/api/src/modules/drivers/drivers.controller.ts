@@ -2,10 +2,36 @@ import type { Context } from 'hono';
 import type { Bindings } from '../../common/types';
 import { createDb } from '../../config/database';
 import { DriversService } from './drivers.service';
+import { TeammateBattleService } from './teammate-battle.service';
+import { RacecraftService } from './racecraft.service';
+import { cacheControlForYear, cacheIfData } from '../../common/cache';
 
 const service = new DriversService();
+const teammateBattles = new TeammateBattleService();
+const racecraft = new RacecraftService();
 
 export const DriversController = {
+  getRacecraft: async (c: Context<{ Bindings: Bindings }>) => {
+    const year = Number(c.req.query('year') ?? new Date().getFullYear());
+    const data = await racecraft.findRacecraft(createDb(c.env.DATABASE_URL), year);
+    c.header('Cache-Control', cacheIfData(cacheControlForYear(year), data.length > 0));
+    return c.json({ data, error: null });
+  },
+
+  getTeammateBattle: async (c: Context<{ Bindings: Bindings }>) => {
+    const id = Number(c.req.param('id'));
+    if (isNaN(id)) {
+      return c.json({ data: null, error: { code: 'INVALID_ID', message: 'id must be a number' } }, 400);
+    }
+    const data = await teammateBattles.findBattle(createDb(c.env.DATABASE_URL), id);
+    if (!data) {
+      return c.json({ data: null, error: { code: 'NOT_FOUND', message: `Driver ${id} not found` } }, 404);
+    }
+    // Driver ids are season-scoped; the page passes that season's year so past seasons cache long.
+    c.header('Cache-Control', cacheControlForYear(Number(c.req.query('year') ?? new Date().getFullYear())));
+    return c.json({ data, error: null });
+  },
+
   getAll: async (c: Context<{ Bindings: Bindings }>) => {
     const year = Number(c.req.query('year') ?? new Date().getFullYear());
     const teamId = c.req.query('team_id') ? Number(c.req.query('team_id')) : undefined;

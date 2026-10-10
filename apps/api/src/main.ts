@@ -5,6 +5,10 @@ import { sql } from 'drizzle-orm';
 import { createDb } from './config/database';
 import racesModule from './modules/races/races.module';
 import raceEventsModule from './modules/race-events/race-events.module';
+import strategyModule from './modules/strategy/strategy.module';
+import raceStoryModule from './modules/race-story/race-story.module';
+import telemetryModule from './modules/telemetry/telemetry.module';
+import historyModule from './modules/history/history.module';
 import driversModule from './modules/drivers/drivers.module';
 import teamsModule from './modules/teams/teams.module';
 import predictionsModule from './modules/predictions/predictions.module';
@@ -13,6 +17,7 @@ import sprintModule from './modules/sprint/sprint.module';
 import searchModule from './modules/search/search';
 import qualityModule from './modules/quality/quality';
 import type { Bindings } from './common/types';
+import { edgeCache } from './common/edgeCache';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -40,6 +45,7 @@ app.use('*', cors({
   allowMethods: ['GET', 'OPTIONS'],
   allowHeaders: ['Content-Type'],
 }));
+app.use('/api/*', edgeCache());
 
 app.get('/api/health', async (c) => {
   try {
@@ -52,11 +58,15 @@ app.get('/api/health', async (c) => {
 
 app.route('/api/races', racesModule);
 app.route('/api/races', raceEventsModule);
+app.route('/api/races', strategyModule);
+app.route('/api/races', raceStoryModule);
+app.route('/api/races', telemetryModule);
 app.route('/api/drivers', driversModule);
 app.route('/api/teams', teamsModule);
 app.route('/api/predictions', predictionsModule);
 app.route('/api/sprint', sprintModule);
 app.route('/api/seasons', seasonsModule);
+app.route('/api/history', historyModule);
 app.route('/api/search', searchModule);
 app.route('/api/quality', qualityModule);
 

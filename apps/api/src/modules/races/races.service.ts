@@ -1,9 +1,12 @@
 import { eq, and, asc, desc, gte, lte, isNotNull, sql, inArray } from 'drizzle-orm';
 import type { Db } from '../../config/database';
-import { races, circuits, raceResults, qualifyingResults, lapTimes, drivers, teams, raceStatusEnum } from '../../db/schema';
+import {
+  races, circuits, raceResults, qualifyingResults, lapTimes, drivers, teams, raceStatusEnum, qualifyingLapTelemetry,
+} from '../../db/schema';
 import type { Race, RaceDetailResponse, RaceResult, QualifyingResult, LapSummary, CircuitDetailResponse } from '../../common/types';
 import { toDriver, toRace, toCircuit, toRaceResult, toQualifyingResult } from '../../common/mappers';
 import { aggregateEraWins, buildDominanceByEra } from './circuit-era.helpers';
+import { buildOutlinePath } from '../../common/trackOutline';
 import { backfillDriverHeadshots } from './circuit-headshot-backfill';
 import {
   buildCircuitHistory,
@@ -14,6 +17,8 @@ import {
   type FastestLapRow,
   type WinnerRow,
 } from './circuit-stats.helpers';
+
+const OUTLINE_SIZE = 1000;
 
 export class RacesService {
   async findAll(db: Db, year: number, status?: string): Promise<Race[]> {
@@ -61,6 +66,7 @@ export class RacesService {
       .orderBy(desc(races.raceDate));
 
     const raceIds = raceRows.map((r) => r.id);
+    const outlinePath = await this.findOutlinePath(db, circuit.id);
 
     let winnerRows: WinnerRow[] = [];
     let lapRows: FastestLapRow[] = [];
@@ -106,7 +112,23 @@ export class RacesService {
       weatherStats,
       qualifyingImpact,
       safetyCarStats,
+      outlinePath,
     };
+  }
+
+  // Only the x/y arrays leave Neon, not the whole telemetry row (egress budget).
+  private async findOutlinePath(db: Db, circuitId: number): Promise<string | null> {
+    const [lap] = await db
+      .select({
+        x: sql<number[]>`${qualifyingLapTelemetry.samples}->'x'`,
+        y: sql<number[]>`${qualifyingLapTelemetry.samples}->'y'`,
+      })
+      .from(qualifyingLapTelemetry)
+      .innerJoin(races, eq(qualifyingLapTelemetry.raceId, races.id))
+      .where(eq(races.circuitId, circuitId))
+      .orderBy(desc(races.raceDate), asc(qualifyingLapTelemetry.lapTimeMs))
+      .limit(1);
+    return lap ? buildOutlinePath(lap.x, lap.y, OUTLINE_SIZE) : null;
   }
 
   async findById(db: Db, raceId: number): Promise<RaceDetailResponse | null> {

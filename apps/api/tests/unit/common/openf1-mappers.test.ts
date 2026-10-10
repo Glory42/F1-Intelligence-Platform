@@ -14,6 +14,7 @@ describe('toRaceControlMessage', () => {
     scope: 'Sector',
     sector: 4,
     message: 'YELLOW IN TRACK SECTOR 4',
+    sessionType: 'race',
     createdAt: new Date('2025-09-07T14:00:00Z'),
   };
 
@@ -54,6 +55,7 @@ describe('toRaceOvertake', () => {
     overtakingDriverId: 10,
     overtakenDriverId: 11,
     position: 3,
+    sessionType: 'race',
     createdAt: new Date('2025-09-07T14:00:00Z'),
   };
 
@@ -80,6 +82,7 @@ describe('toTeamRadioClip', () => {
     driverId: 10,
     date: new Date('2025-09-07T13:45:52Z'),
     recordingUrl: 'https://livetiming.formula1.com/static/clip.mp3',
+    sessionType: 'race',
     createdAt: new Date('2025-09-07T14:00:00Z'),
   };
 
