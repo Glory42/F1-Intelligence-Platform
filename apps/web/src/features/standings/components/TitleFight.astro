@@ -37,6 +37,10 @@ const series: LineSeries[] = odds.drivers.slice(0, CHART_DRIVERS).map((d) => ({
   color: getTeamColor(d.driver.team.teamKey),
   points: odds.history.filter((h) => h.driverId === d.driver.id).map((h) => ({ x: h.afterRound, y: h.titleProbability })),
 }));
+const chart = {
+  series, ariaLabel: 'Title odds after each round', yDomain: [0, 1] as [number, number],
+  formatY: (v: number) => `${Math.round(v * 100)}%`, xLabel: 'rnd', height: 220,
+};
 ---
 
 <section aria-label="Title fight">
@@ -49,7 +53,8 @@ const series: LineSeries[] = odds.drivers.slice(0, CHART_DRIVERS).map((d) => ({
       { term: 'Eliminated', meaning: "can't catch the leader any more" },
     ]}
   />
-  <div class={`grid gap-4 items-start ${showChart ? 'lg:grid-cols-[1fr_420px]' : ''}`}>
+  {/* Side by side only from 2xl: narrower, the fixed chart squeezed the driver column to nothing. */}
+  <div class={`grid gap-4 items-start ${showChart ? '2xl:grid-cols-[1fr_420px]' : ''}`}>
     <DataList
       label="Title odds"
       columns={COLUMNS}
@@ -80,7 +85,12 @@ const series: LineSeries[] = odds.drivers.slice(0, CHART_DRIVERS).map((d) => ({
     {showChart && (
       <div class="panel p-5">
         <div class="text-[11px] text-muted-foreground mb-3">Title odds by round</div>
-        <LineChart series={series} ariaLabel="Title odds after each round" yDomain={[0, 1]} formatY={(v) => `${Math.round(v * 100)}%`} xLabel="rnd" height={220} width={380} />
+        <div class="2xl:hidden">
+          <LineChart {...chart} width={900} />
+        </div>
+        <div class="hidden 2xl:block">
+          <LineChart {...chart} width={380} />
+        </div>
       </div>
     )}
   </div>
