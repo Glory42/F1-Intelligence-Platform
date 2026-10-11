@@ -311,6 +311,8 @@ python -m src.main --job compute_title_odds --year 2025
 python scripts/backfill_openf1.py ingest_stints 2023 2026   # local only
 python scripts/backfill_race_story.py 2018 2025             # local only
 python scripts/import_f1db.py [--version vYYYY.RR.M]         # local only — download, verify sha256, import
+python scripts/audit_results_vs_f1db.py [--modern-plan]      # local only — read-only results check vs F1DB
+python scripts/backfill_results_from_f1db.py --from 1980 --to 2017 [--apply]  # local only — ADR 0009
 ```
 
 ### Schedule (Render worker)

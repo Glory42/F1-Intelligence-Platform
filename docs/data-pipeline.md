@@ -251,7 +251,22 @@ python -m src.main --job ingest_race_legacy       --year 2015 --round 5
 
 ## Historical Backfill
 
-Two backfill scripts in `data-engine/scripts/`:
+### Results audit and F1DB rebuild (`scripts/audit_results_vs_f1db.py`, `scripts/backfill_results_from_f1db.py`)
+
+Both download a checksum-verified F1DB release (`scripts/f1db_release.py`). The audit is read-only: it compares
+every completed race's race / qualifying / sprint results with F1DB and lists the drivers we're missing;
+`--modern-plan` prints the 2018+ races to re-ingest from FastF1. The rebuild covers 1980–2017 only (ADR 0009): it
+fixes driver codes, adds missing drivers and teams, merges a person's duplicate rows, upserts every result,
+deletes results filed under the wrong driver and marks rebuilt races `completed`. Dry run unless `--apply`;
+it refuses a season with unmatched drivers or mismatched race dates, and checks `storage_guard` first.
+
+```bash
+python scripts/audit_results_vs_f1db.py [--modern-plan]
+python scripts/backfill_results_from_f1db.py --from 1980 --to 2017 [--apply]
+python -m src.main --job compute_season_stats --year 1992   # after a rebuild
+```
+
+Other backfill scripts in `data-engine/scripts/`:
 
 ### Full backfill (`scripts/backfill_full.py`)
 

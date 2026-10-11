@@ -538,6 +538,8 @@ data-engine/
 │       ├── upsert.py              # upsert(conn, table, rows, conflict_cols, exclude_update=[])
 │       ├── driver_map.py          # build_driver_code_map(), build_driver_number_map(conn, season_id) — shared driver code/number→id lookups for ingest jobs
 │       ├── driver_registry.py     # session_entries(), register_session_drivers() — adds a session's missing drivers/teams before results are mapped
+│       ├── f1db_results.py        # match_f1db_driver(), race_row(), qualifying_row() — F1DB record → our rows
+│       ├── f1db_backfill.py       # plan_season() — pure diff of one season vs F1DB (codes, new drivers, merges, rows)
 │       ├── openf1_client.py       # get_session_key(), fetch_race_control(), fetch_overtakes(), fetch_team_radio() over one shared _get(path, params) — thin OpenF1 REST client (free/historical tier only)
 │       ├── prediction_runner.py   # run_prediction_job(...) — shared softmax/rank/upsert logic for GP + sprint predictions
 │       ├── ingest_runner.py       # Three seams: run_ingest_job(...) — shared headshot/results/lap-time/status logic for
@@ -561,6 +563,10 @@ data-engine/
 │   ├── backfill_openf1.py         # Backfill any OpenF1 job (race control, overtakes, radio, stints, pit stops) for a year range — 2023+, local only, stops at the storage guard
 │   ├── backfill_all_predictions.py # Recompute GP + sprint predictions for all races (weighted-v3 / sprint-v2)
 │   ├── backfill_historical.sh     # Shell loop over sync_schedule/ingest/compute for a year range
+│   ├── f1db_release.py            # Download + SHA-256-verify + extract an F1DB release (shared by the scripts below)
+│   ├── import_f1db.py             # Import F1DB all-time history tables
+│   ├── audit_results_vs_f1db.py   # Read-only: every race's results vs F1DB; --modern-plan lists 2018+ races to re-ingest
+│   ├── backfill_results_from_f1db.py # Rebuild 1980–2017 results/drivers from F1DB (ADR 0009) — dry run unless --apply
 │   └── populate_all.sh            # One-time population run for 2021–2025
 ├── tests/                          # pytest — pure functions directly; DB-touching functions via a fake-db double
 │   ├── conftest.py                 # Placeholder DATABASE_URL so importing job modules doesn't need a real .env
@@ -590,6 +596,8 @@ data-engine/
 │   ├── test_sync_schedule.py       # _to_utc_iso + run() circuit-key resolution (Madrid/Spielberg year overrides), status-preserving upsert, round renumbering
 │   ├── test_sync_season.py         # run() hands the round's drivers to the registry, refreshing known ones
 │   ├── test_driver_registry.py     # session entries (code fallbacks incl. NaN, team keys) + registering missing drivers/teams
+│   ├── test_f1db_results.py        # F1DB driver matching (accents, surname, aliases) + race/qualifying row building
+│   ├── test_f1db_backfill.py       # plan_season — stand-ins sharing a number, NAN codes, merges, wrong-driver deletes
 │   └── test_compute_sprint_features.py # _compute_short_run_pace SQ-time source, main-quali fallback, min-max inversion
 ├── render.yaml                    # Render cron job definitions
 ├── requirements.txt               # Python dependencies
