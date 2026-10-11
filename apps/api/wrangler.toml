@@ -9,11 +9,11 @@ keep_vars = true
 # Never put secrets in this file
 
 [vars]
-# Gates which CORS origins are allowed — see main.ts. Local dev overrides
+# Gates which CORS origins are allowed: see main.ts. Local dev overrides
 # this to "development" via .dev.vars so localhost origins keep working.
 ENVIRONMENT = "production"
 
 # Cloudflare's Build watch path for this Worker was a bare "apps/api" for weeks,
-# which never matched any nested file, so every push silently built zero times —
+# which never matched any nested file, so every push silently built zero times:
 # only manual `wrangler deploy` ever actually shipped this Worker. Fixed on
 # 2026-08-24 by changing the watch path to "apps/api/**" in the dashboard.

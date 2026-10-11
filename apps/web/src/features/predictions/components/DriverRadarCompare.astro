@@ -1,5 +1,4 @@
 ---
-import { GitCompare } from 'lucide-react';
 import type { PredictionAccent, PredictionDriverVM } from '../types';
 
 interface Props {
@@ -22,7 +21,7 @@ const payload = JSON.stringify({ options, features, accent }).replace(/</g, '\\u
 
 <div>
   <div class="flex items-center gap-3 mb-4">
-    <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style={`color: rgba(${accent.rgb},0.55)`}><GitCompare size={11} />./compare drivers</span>
+    <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style={`color: rgba(${accent.rgb},0.55)`}>./compare drivers</span>
     <div class="h-px flex-1 bg-white/[0.05]" />
   </div>
   <div class="radar-compare panel p-5 space-y-4" data-radar>
@@ -30,7 +29,7 @@ const payload = JSON.stringify({ options, features, accent }).replace(/</g, '\\u
     <div class="grid grid-cols-2 gap-3">
       {(['a', 'b'] as const).map((slot, slotIdx) => (
         <div>
-          <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase mb-1">Driver {slot === 'a' ? 'Alpha' : 'Beta'}</div>
+          <div class="text-[11px] text-muted-foreground mb-1">Driver {slot === 'a' ? 'Alpha' : 'Beta'}</div>
           <div class="relative">
             <button type="button" data-role={`btn-${slot}`} class="w-full bg-black border border-white/[0.08] px-2 py-2 font-mono text-[10px] tracking-wider text-left text-foreground focus:outline-none flex items-center justify-between">
               <span data-role={`label-${slot}`}>{drivers[slotIdx]?.driver.code} – {drivers[slotIdx]?.driver.lastName}</span>

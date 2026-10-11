@@ -8,7 +8,7 @@ from psycopg2.extras import execute_batch
 from src.db.client import get_conn
 from src.utils.quality_utils import health_from_issues, is_fixable
 
-# FP2 coverage below this triggers a flag — mirrors compute_features' fallback gate.
+# FP2 coverage below this triggers a flag: mirrors compute_features' fallback gate.
 FP2_COVERAGE_GATE = 0.7
 # Per-lap coverage below which a race is flagged. F1 fields normally retire mid-race,
 # so ~70-85% of (drivers × circuit lap_count) is healthy; only flag clearly-degraded sets.
@@ -156,7 +156,7 @@ def _audit_race(conn, race: dict, *, run_season_stats: bool) -> tuple[list[dict]
                 add("sprint_lap_times", "lap_coverage", "low",
                     "no sprint laps ingested for a completed sprint weekend")
 
-    # Sprint weekends use FP1 not FP2, so only conventional weekends are measured here —
+    # Sprint weekends use FP1 not FP2, so only conventional weekends are measured here:
     # low coverage is informational (the model falls back to historical circuit pace).
     if (status in ("qualifying_done", "completed") and year >= 2018
             and expected_grid > 0 and not is_sprint):
@@ -169,7 +169,7 @@ def _audit_race(conn, race: dict, *, run_season_stats: bool) -> tuple[list[dict]
                 f"FP2 long-run coverage {coverage:.0%} ({fp2_drivers}/~{expected_grid} drivers); "
                 f"model falls back to historical circuit pace")
 
-    # Season-scoped aggregate — emit only on the season's first completed race so it
+    # Season-scoped aggregate: emit only on the season's first completed race so it
     # isn't duplicated across every race.
     if status == "completed" and run_season_stats:
         missing = _scalar(conn, """

@@ -1,18 +1,36 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { api } from '@/lib/api';
-import type { TeamYearStats, DriverStanding } from '@/types';
-import { Building2, BarChart2, Users, History, Info } from 'lucide-react';
-import YearSelectLinks from '@/components/shared/YearSelectLinks.astro';
-import { getTeamColor } from '@/lib/teamColors';
-import { getTeamLogo } from '@/lib/teamLogos';
+import type { TeamYearStats, DriverStanding, PitCrewRanking, TeamHistory, TeamPitStop } from '@/types';
+import TeamPitCrew from '@/features/teams/components/TeamPitCrew.astro';
+import HeadToHead, { type HeadToHeadRow } from '@/components/data/HeadToHead.astro';
+import TeamHistoryTable from '@/features/teams/components/TeamHistoryTable.astro';
+import { Info } from 'lucide-react';
+import YearSelectLinks from '@/components/page/YearSelectLinks.astro';
+import PageTabs from '@/components/page/PageTabs.astro';
+import EmptyState from '@/components/page/EmptyState.astro';
+import { resolveTab, TAB_PARAM } from '@/lib/pageTabs';
+import { getTeamColor } from '@/lib/f1/teamColors';
+import { championshipPoints } from '@/lib/f1/championshipMath';
+import { getTeamLogo } from '@/lib/f1/teamLogos';
+
+const TABS = [
+  { id: 'season', label: 'This season' },
+  { id: 'pit-crew', label: 'Pit crew' },
+  { id: 'history', label: 'History' },
+] as const;
 
 const { id } = Astro.params;
+const tab = resolveTab(Astro.url, TABS);
+const tabSuffix = tab === TABS[0].id ? '' : `&${TAB_PARAM}=${tab}`;
 let year = Number(Astro.url.searchParams.get('year') ?? new Date().getFullYear());
 
 let data = null;
 let career: TeamYearStats[] = [];
 let driverStandings: DriverStanding[] = [];
+let pitCrewRankings: PitCrewRanking[] = [];
+let teamPitStops: TeamPitStop[] = [];
+let teamHistory: TeamHistory | null = null;
 let error = null;
 
 try {
@@ -26,9 +44,13 @@ try {
       : (activeYears.includes(new Date().getFullYear()) ? new Date().getFullYear() : Math.max(...activeYears));
     
     year = targetYear;
-    [data, driverStandings] = await Promise.all([
+    const seasonTeamId = career.find((y) => y.year === targetYear)?.teamId ?? Number(id);
+    [data, driverStandings, pitCrewRankings, teamPitStops, teamHistory] = await Promise.all([
       api.getTeamById(Number(id), targetYear),
-      api.getDriverStandings(targetYear),
+      tab === 'season' ? api.getDriverStandings(targetYear) : [],
+      tab === 'pit-crew' ? api.getPitCrewRankings(targetYear).catch(() => []) : [],
+      tab === 'pit-crew' ? api.getTeamPitStops(seasonTeamId, targetYear).catch(() => []) : [],
+      tab === 'history' ? api.getTeamHistory(Number(id)).catch(() => null) : null,
     ]);
   } else {
     error = 'Team has no career records';
@@ -44,9 +66,8 @@ const driverIds = new Set(data?.drivers.map((d) => d.id) ?? []);
 const teamStandings = driverStandings.filter((s) => driverIds.has(s.driver.id));
 const [d1, d2] = teamStandings;
 
-type CompareRow = { label: string; v1: number; v2: number; lowerBetter?: boolean; fmt?: (v: number) => string };
-const compareRows: CompareRow[] = d1 && d2 ? [
-  { label: 'Points',      v1: Number(d1.stats.totalPoints),           v2: Number(d2.stats.totalPoints) },
+const compareRows: HeadToHeadRow[] = d1 && d2 ? [
+  { label: 'Points',      v1: championshipPoints(d1.stats),           v2: championshipPoints(d2.stats) },
   { label: 'Wins',        v1: d1.stats.wins,                          v2: d2.stats.wins },
   { label: 'Podiums',     v1: d1.stats.podiums,                       v2: d2.stats.podiums },
   { label: 'Poles',       v1: d1.stats.poles,                         v2: d2.stats.poles },
@@ -57,7 +78,7 @@ const compareRows: CompareRow[] = d1 && d2 ? [
 ---
 
 <BaseLayout title={team?.name ?? 'Team'}>
-  <div class="mt-7">
+  <div>
     <div class="mb-6 flex items-center gap-4">
       <a href={`/teams?year=${year}`} class="font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground hover:text-foreground transition-colors duration-150">
         ← all teams
@@ -65,7 +86,7 @@ const compareRows: CompareRow[] = d1 && d2 ? [
       {careerWithStats.length > 1 && (
         <div class="ml-auto">
           <YearSelectLinks
-            items={careerWithStats.map((y) => ({ year: y.year, href: `/teams/${y.teamId}?year=${y.year}` }))}
+            items={careerWithStats.map((y) => ({ year: y.year, href: `/teams/${y.teamId}?year=${y.year}${tabSuffix}` }))}
             currentYear={year}
           />
         </div>
@@ -83,7 +104,7 @@ const compareRows: CompareRow[] = d1 && d2 ? [
         <div>
           <div class="w-fit">
             <div class="flex items-center gap-3 mb-2">
-              <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)"><Building2 size={11} />./constructor</span>
+              <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">./constructor</span>
               <div class="h-px flex-1 bg-white/[0.05]" />
             </div>
             <div class="flex items-center gap-3">
@@ -99,189 +120,92 @@ const compareRows: CompareRow[] = d1 && d2 ? [
           </p>
         </div>
 
-        <!-- Current season stats -->
-        <div>
-          <div class="flex items-center gap-3 mb-4">
-            <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)"><BarChart2 size={11} />./stats · {year}</span>
-            <div class="h-px flex-1 bg-white/[0.05]" />
-          </div>
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-px bg-white/[0.06]">
-            {[
-              ['Championship', data.seasonStats.championshipPosition ? `P${data.seasonStats.championshipPosition}` : '—'],
-              ['Points', Math.round(Number(data.seasonStats.totalPoints))],
-              ['Wins', data.seasonStats.wins],
-              ['Podiums', data.seasonStats.podiums],
-              ['Races', data.seasonStats.racesCompleted],
-              ['Avg Finish', data.seasonStats.avgFinishPosition ? `P${Math.round(Number(data.seasonStats.avgFinishPosition))}` : '—'],
-              ['Car Perf', data.seasonStats.carPerformanceScore ? `${Math.round(Number(data.seasonStats.carPerformanceScore)*100)}/100` : '—'],
-              ['DNFs', data.seasonStats.dnfCount],
-            ].map(([label, val]) => (
-              <div class="bg-black p-4">
-                <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase mb-1">{label}</div>
-                <div class="font-bold text-xl">{val}</div>
-              </div>
-            ))}
-          </div>
-          {data.seasonStats.reliabilityScore && (
-            <div class="mt-px bg-black px-4 py-3 flex items-center gap-4">
-              <div class="flex items-center gap-1.5 shrink-0 group relative">
-                <Info size={11} className="text-muted-foreground/40 group-hover:text-muted-foreground transition-colors cursor-help" />
-                <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase">Reliability</div>
-                <div class="absolute bottom-full left-0 mb-2 w-56 p-2.5 bg-[#111] border border-white/[0.1] font-mono text-[9px] text-muted-foreground leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-normal">
-                  % of race entries finished without a DNF this season. 100 = zero retirements.
-                </div>
-              </div>
-              <div class="flex-1 h-1.5 bg-white/[0.06]">
-                <div class="h-full bg-[#a855f7] bar-fill" style={`width:${Math.round(Number(data.seasonStats.reliabilityScore)*100)}%`} />
-              </div>
-              <div class="font-mono text-sm font-bold shrink-0">{Math.round(Number(data.seasonStats.reliabilityScore)*100)}/100</div>
-            </div>
-          )}
-        </div>
+        <PageTabs tabs={TABS} active={tab} label="Team views" />
 
-        <!-- Drivers -->
-        {data.drivers.length > 0 && (
-          <div>
-            <div class="flex items-center gap-3 mb-4">
-              <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)"><Users size={11} />./drivers · {year}</span>
-              <div class="h-px flex-1 bg-white/[0.05]" />
-            </div>
-
-            {d1 && d2 && compareRows.length > 0 ? (
-              <div class="border border-white/[0.06]">
-                {/* Driver headers */}
-                <div class="grid grid-cols-[1fr_90px_1fr] border-b border-white/[0.06]">
-                  <a href={`/drivers/${d1.driver.id}?year=${year}`} class="flex items-center gap-3 p-4 hover:bg-white/[0.02] transition-colors group" style={`border-left: 2px solid ${getTeamColor(team.teamKey)};`}>
-                    {d1.driver.headshotUrl ? (
-                      <img src={d1.driver.headshotUrl} alt={d1.driver.fullName} class="w-12 h-12 object-cover object-top border border-white/[0.08] shrink-0" loading="lazy" />
-                    ) : (
-                      <div class="w-12 h-12 border border-white/[0.08] flex items-center justify-center shrink-0">
-                        <span class="font-mono text-sm font-bold text-[#a855f7]">{d1.driver.driverNumber}</span>
-                      </div>
-                    )}
-                    <div>
-                      <div class="font-mono text-[8px] text-muted-foreground tracking-wider">{d1.driver.code} #{d1.driver.driverNumber}</div>
-                      <div class="font-semibold group-hover:text-[#a855f7] transition-colors">{d1.driver.fullName}</div>
-                      {d1.driver.nationality && <div class="font-mono text-[9px] text-muted-foreground">{d1.driver.nationality}</div>}
-                    </div>
-                  </a>
-                  <div class="flex items-center justify-center font-mono text-[8px] text-muted-foreground tracking-widest uppercase border-x border-white/[0.06]">vs</div>
-                  <a href={`/drivers/${d2.driver.id}?year=${year}`} class="flex items-center justify-end gap-3 p-4 hover:bg-white/[0.02] transition-colors group" style={`border-right: 2px solid ${getTeamColor(team.teamKey)};`}>
-                    <div class="text-right">
-                      <div class="font-mono text-[8px] text-muted-foreground tracking-wider">{d2.driver.code} #{d2.driver.driverNumber}</div>
-                      <div class="font-semibold group-hover:text-[#a855f7] transition-colors">{d2.driver.fullName}</div>
-                      {d2.driver.nationality && <div class="font-mono text-[9px] text-muted-foreground">{d2.driver.nationality}</div>}
-                    </div>
-                    {d2.driver.headshotUrl ? (
-                      <img src={d2.driver.headshotUrl} alt={d2.driver.fullName} class="w-12 h-12 object-cover object-top border border-white/[0.08] shrink-0" loading="lazy" />
-                    ) : (
-                      <div class="w-12 h-12 border border-white/[0.08] flex items-center justify-center shrink-0">
-                        <span class="font-mono text-sm font-bold text-[#a855f7]">{d2.driver.driverNumber}</span>
-                      </div>
-                    )}
-                  </a>
-                </div>
-                <!-- Stat rows -->
-                {compareRows.map((row, i) => {
-                  const total = row.v1 + row.v2;
-                  const pct1 = total === 0 ? 50 : Math.round((row.v1 / total) * 100);
-                  const pct2 = 100 - pct1;
-                  const d1Wins = row.lowerBetter ? row.v1 < row.v2 : row.v1 > row.v2;
-                  const d2Wins = row.lowerBetter ? row.v2 < row.v1 : row.v2 > row.v1;
-                  const color = getTeamColor(team.teamKey);
-                  const display1 = row.fmt ? row.fmt(row.v1) : row.v1;
-                  const display2 = row.fmt ? row.fmt(row.v2) : row.v2;
-                  return (
-                    <div class={`grid grid-cols-[1fr_90px_1fr] ${i !== 0 ? 'border-t border-white/[0.04]' : ''}`}>
-                      <div class="flex items-center gap-3 px-4 py-3">
-                        <span class={`font-mono text-sm font-bold w-10 shrink-0 ${d1Wins ? 'text-white' : 'text-muted-foreground'}`}>{display1}</span>
-                        <div class="flex-1 h-1.5 bg-white/[0.06] flex justify-end overflow-hidden">
-                          <div class="h-full bar-fill bar-fill-end" style={`width:${pct1}%; background:${d1Wins ? color : 'rgba(255,255,255,0.12)'}`} />
-                        </div>
-                      </div>
-                      <div class="flex items-center justify-center font-mono text-[8px] text-muted-foreground tracking-widest uppercase border-x border-white/[0.06]">{row.label}</div>
-                      <div class="flex items-center gap-3 px-4 py-3">
-                        <div class="flex-1 h-1.5 bg-white/[0.06] overflow-hidden">
-                          <div class="h-full bar-fill" style={`width:${pct2}%; background:${d2Wins ? color : 'rgba(255,255,255,0.12)'}`} />
-                        </div>
-                        <span class={`font-mono text-sm font-bold w-10 shrink-0 text-right ${d2Wins ? 'text-white' : 'text-muted-foreground'}`}>{display2}</span>
-                      </div>
-                    </div>
-                  );
-                })}
+        {tab === 'season' ? (
+          <div class="space-y-8">
+            <!-- Current season stats -->
+            <div>
+              <div class="flex items-center gap-3 mb-4">
+                <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">./stats · {year}</span>
+                <div class="h-px flex-1 bg-white/[0.05]" />
               </div>
-            ) : (
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-px bg-white/[0.06]">
-                {data.drivers.map((d) => (
-                  <a href={`/drivers/${d.id}?year=${year}`} class="bg-black hover:bg-white/[0.02] p-5 transition-colors duration-150 group flex items-center gap-4" style={`border-left: 2px solid ${getTeamColor(team.teamKey)};`}>
-                    {d.headshotUrl ? (
-                      <img src={d.headshotUrl} alt={d.fullName} class="w-16 h-16 object-cover object-top border border-white/[0.08] shrink-0 bg-white/[0.02]" loading="lazy" />
-                    ) : (
-                      <div class="w-16 h-16 border border-white/[0.08] flex items-center justify-center shrink-0">
-                        <span class="font-mono text-lg font-bold text-[#a855f7]">{d.driverNumber}</span>
-                      </div>
-                    )}
-                    <div>
-                      <div class="flex items-center gap-1.5 mb-1">
-                        <div class="font-mono text-[8px] tracking-[0.15em] uppercase text-muted-foreground border border-white/[0.06] px-1.5 py-0.5">{d.code}</div>
-                        <div class="font-mono text-[8px] text-muted-foreground/60">#{d.driverNumber}</div>
-                      </div>
-                      <div class="font-semibold group-hover:text-[#a855f7] transition-colors duration-150">{d.fullName}</div>
-                      {d.nationality && <div class="font-mono text-[9px] text-muted-foreground">{d.nationality}</div>}
-                    </div>
-                  </a>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-px bg-white/[0.06]">
+                {[
+                  ['Championship', data.seasonStats.championshipPosition ? `P${data.seasonStats.championshipPosition}` : '-'],
+                  ['Points', Math.round(championshipPoints(data.seasonStats))],
+                  ['Wins', data.seasonStats.wins],
+                  ['Podiums', data.seasonStats.podiums],
+                  ['Races', data.seasonStats.racesCompleted],
+                  ['Avg Finish', data.seasonStats.avgFinishPosition ? `P${Math.round(Number(data.seasonStats.avgFinishPosition))}` : '-'],
+                  ['Car Perf', data.seasonStats.carPerformanceScore ? `${Math.round(Number(data.seasonStats.carPerformanceScore)*100)}/100` : '-'],
+                  ['DNFs', data.seasonStats.dnfCount],
+                ].map(([label, val]) => (
+                  <div class="bg-black p-4">
+                    <div class="text-[11px] text-muted-foreground mb-1">{label}</div>
+                    <div class="font-bold text-xl">{val}</div>
+                  </div>
                 ))}
+              </div>
+              {data.seasonStats.reliabilityScore && (
+                <div class="mt-px bg-black px-4 py-3 flex items-center gap-4">
+                  <div class="flex items-center gap-1.5 shrink-0 group relative">
+                    <Info size={11} className="text-muted-foreground/40 group-hover:text-muted-foreground transition-colors cursor-help" />
+                    <div class="text-[11px] text-muted-foreground">Reliability</div>
+                    <div class="absolute bottom-full left-0 mb-2 w-56 p-2.5 bg-[#111] border border-white/[0.1] font-mono text-[9px] text-muted-foreground leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-normal">
+                      % of race entries finished without a DNF this season. 100 = zero retirements.
+                    </div>
+                  </div>
+                  <div class="flex-1 h-1.5 bg-white/[0.06]">
+                    <div class="h-full bg-[#a855f7] bar-fill" style={`width:${Math.round(Number(data.seasonStats.reliabilityScore)*100)}%`} />
+                  </div>
+                  <div class="font-mono text-sm font-bold shrink-0">{Math.round(Number(data.seasonStats.reliabilityScore)*100)}/100</div>
+                </div>
+              )}
+            </div>
+
+            <!-- Drivers -->
+            {data.drivers.length > 0 && (
+              <div>
+                <div class="flex items-center gap-3 mb-4">
+                  <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">./drivers · {year}</span>
+                  <div class="h-px flex-1 bg-white/[0.05]" />
+                </div>
+
+                {d1 && d2 && compareRows.length > 0 ? (
+                  <HeadToHead left={d1.driver} right={d2.driver} color={getTeamColor(team.teamKey)} rows={compareRows} year={year} />
+                ) : (
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-px bg-white/[0.06]">
+                    {data.drivers.map((d) => (
+                      <a href={`/drivers/${d.id}?year=${year}`} class="bg-black hover:bg-white/[0.02] p-5 transition-colors duration-150 group flex items-center gap-4" style={`border-left: 2px solid ${getTeamColor(team.teamKey)};`}>
+                        {d.headshotUrl ? (
+                          <img src={d.headshotUrl} alt={d.fullName} class="w-16 h-16 object-cover object-top border border-white/[0.08] shrink-0 bg-white/[0.02]" loading="lazy" />
+                        ) : (
+                          <div class="w-16 h-16 border border-white/[0.08] flex items-center justify-center shrink-0">
+                            <span class="font-mono text-lg font-bold text-[#a855f7]">{d.driverNumber}</span>
+                          </div>
+                        )}
+                        <div>
+                          <div class="flex items-center gap-1.5 mb-1">
+                            <div class="font-mono text-[8px] tracking-[0.15em] uppercase text-muted-foreground border border-white/[0.06] px-1.5 py-0.5">{d.code}</div>
+                            <div class="font-mono text-[8px] text-muted-foreground/60">#{d.driverNumber}</div>
+                          </div>
+                          <div class="font-semibold group-hover:text-[#a855f7] transition-colors duration-150">{d.fullName}</div>
+                          {d.nationality && <div class="font-mono text-[9px] text-muted-foreground">{d.nationality}</div>}
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
-
-        <!-- Career history -->
-        {careerWithStats.length > 1 && (
-          <div>
-            <div class="flex items-center gap-3 mb-4">
-              <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)"><History size={11} />./history</span>
-              <div class="h-px flex-1 bg-white/[0.05]" />
-            </div>
-            <div class="border border-white/[0.06]">
-              <div class="grid grid-cols-[60px_1fr_70px_50px_50px_50px_50px_70px_90px] gap-0 px-5 py-2.5 border-b border-white/[0.06]">
-                <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase">Year</div>
-                <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right">Pts</div>
-                <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right">Pos</div>
-                <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right">W</div>
-                <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right">Pod</div>
-                <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right hidden sm:block">Races</div>
-                <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right hidden sm:block">DNFs</div>
-                <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right hidden md:block">Avg Fin</div>
-                <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right hidden md:block">Car Perf</div>
-              </div>
-              {careerWithStats.map((y, i) => (
-                <a
-                  href={`/teams/${y.teamId}?year=${y.year}`}
-                  class={`grid grid-cols-[60px_1fr_70px_50px_50px_50px_50px_70px_90px] gap-0 items-center px-5 py-3 hover:bg-white/[0.02] transition-colors duration-150 ${i !== 0 ? 'border-t border-white/[0.04]' : ''} ${y.year === year ? 'bg-[rgba(168,85,247,0.03)]' : ''}`}
-                >
-                  <div class={`font-mono text-sm font-bold ${y.year === year ? 'text-[#a855f7]' : 'text-muted-foreground'}`}>{y.year}</div>
-                  <div class="font-bold text-sm text-right">{y.stats ? Math.round(Number(y.stats.totalPoints)) : '—'}</div>
-                  <div class="font-mono text-sm text-right text-muted-foreground">{y.stats?.championshipPosition ? `P${y.stats.championshipPosition}` : '—'}</div>
-                  <div class="font-mono text-sm text-right text-muted-foreground">{y.stats?.wins ?? '—'}</div>
-                  <div class="font-mono text-sm text-right text-muted-foreground">{y.stats?.podiums ?? '—'}</div>
-                  <div class="font-mono text-sm text-right text-muted-foreground hidden sm:block">{y.stats?.racesCompleted ?? '—'}</div>
-                  <div class="font-mono text-sm text-right text-muted-foreground hidden sm:block">{y.stats?.dnfCount ?? '—'}</div>
-                  <div class="font-mono text-sm text-right text-muted-foreground hidden md:block">{y.stats?.avgFinishPosition ? `P${Math.round(Number(y.stats.avgFinishPosition))}` : '—'}</div>
-                  <div class="hidden md:flex items-center justify-end gap-1.5">
-                    {y.stats?.carPerformanceScore ? (
-                      <>
-                        <div class="w-12 h-1 bg-white/[0.06]">
-                          <div class="h-full bg-[#a855f7] bar-fill" style={`width:${Math.round(Number(y.stats.carPerformanceScore)*100)}%`} />
-                        </div>
-                        <span class="font-mono text-[9px] text-muted-foreground">{Math.round(Number(y.stats.carPerformanceScore)*100)}</span>
-                      </>
-                    ) : <span class="font-mono text-[9px] text-muted-foreground">—</span>}
-                  </div>
-                </a>
-              ))}
-            </div>
-          </div>
+        ) : tab === 'pit-crew' ? (
+          pitCrewRankings.some((r) => r.team.id === team.id)
+            ? <TeamPitCrew team={team} rankings={pitCrewRankings} stops={teamPitStops} year={year} />
+            : <EmptyState message={`No pit stop data for ${team.name} in ${year}.`} />
+        ) : (
+          <TeamHistoryTable career={careerWithStats} history={teamHistory} year={year} teamName={team.name} />
         )}
 
       </div>

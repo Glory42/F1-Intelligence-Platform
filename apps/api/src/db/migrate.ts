@@ -4,6 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { createDb } from '../config/database';
+import { configureLocalNeonProxy } from '../config/localNeonProxy';
 
 function isIgnorableMigrationError(err: unknown): boolean {
   if (!err) return false;
@@ -64,6 +65,7 @@ async function migrate() {
     process.exit(1);
   }
 
+  configureLocalNeonProxy();
   const db = createDb(dbUrl);
   const migrationsFolder = path.resolve(import.meta.dir, '../../drizzle/migrations');
   const journalPath = path.join(migrationsFolder, 'meta/_journal.json');
@@ -112,7 +114,7 @@ async function migrate() {
         await db.execute(sql.raw(stmt));
       } catch (err) {
         if (isIgnorableMigrationError(err)) {
-          // Schema object already exists in this database environment — safe to proceed
+          // Schema object already exists in this database environment: safe to proceed
           continue;
         }
         throw err;

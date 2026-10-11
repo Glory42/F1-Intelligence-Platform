@@ -50,7 +50,7 @@ class TestSoftmax:
         assert sum(probs) == pytest.approx(1.0, abs=1e-9)
 
     def test_default_temperature_matches_model_spec(self):
-        # Model docs specify T=0.3 as the hardcoded temperature — this pins that default.
+        # Model docs specify T=0.3 as the hardcoded temperature: this pins that default.
         scores = [0.9, 0.6]
         assert softmax(scores) == pytest.approx(softmax(scores, temperature=0.3))
 
@@ -100,7 +100,7 @@ class TestWeightedSum:
 
     def test_gp_weights_applied_to_all_max_scores_sums_to_one(self):
         # If every feature scores a perfect 1.0, the weighted sum must equal the
-        # weight total (1.0) — this is what a bug in weight application would break.
+        # weight total (1.0): this is what a bug in weight application would break.
         scores = {feature: 1.0 for feature in GP_WEIGHTS}
         assert weighted_sum(scores, GP_WEIGHTS) == pytest.approx(1.0)
 

@@ -17,7 +17,7 @@ describe('search (integration)', () => {
 
     await createCircuit(db, { circuitKey: 'search-test-circuit', name: 'Search Test Circuit' });
 
-    // Same team key across two seasons — search should return only the most recent one.
+    // Same team key across two seasons: search should return only the most recent one.
     const teamOld = await createTeam(db, season2093.id, { teamKey: 'search-test-team', name: 'Search Test Team (old name)' });
     const teamNew = await createTeam(db, season2094.id, { teamKey: 'search-test-team', name: 'Search Test Team' });
     await createDriver(db, season2093.id, teamOld.id, { driverNumber: 1, code: 'OLD', firstName: 'Old', lastName: 'Driver' });

@@ -19,7 +19,7 @@ describe('teams (integration)', () => {
     await createDriver(db, season.id, teamA.id, { driverNumber: 1, code: 'AAA' });
     await createDriver(db, season.id, teamA.id, { driverNumber: 2, code: 'BBB' });
 
-    await createTeamSeasonStats(db, season.id, teamA.id, { wins: 8, totalPoints: '500.0', championshipPosition: 1 });
+    await createTeamSeasonStats(db, season.id, teamA.id, { wins: 8, totalPoints: '500.0', sprintTotalPoints: '40.0', championshipPosition: 1 });
     await createTeamSeasonStats(db, season.id, teamB.id, { wins: 1, totalPoints: '90.0', championshipPosition: 2 });
 
     teamAId = teamA.id;
@@ -41,6 +41,12 @@ describe('teams (integration)', () => {
     expect(res.status).toBe(200);
     const { data } = (await res.json()) as { data: Array<{ team: { name: string } }> };
     expect(data[0].team.name).toBe('Teams Test Alpha');
+  });
+
+  it('reports sprint points alongside grand prix points', async () => {
+    const res = await apiRequest('/api/teams/standings?year=2097');
+    const { data } = (await res.json()) as { data: Array<{ stats: { totalPoints: string; sprintTotalPoints: string } }> };
+    expect([data[0].stats.totalPoints, data[0].stats.sprintTotalPoints]).toEqual(['500.0', '40.0']);
   });
 
   it('returns team detail with season stats and its drivers', async () => {

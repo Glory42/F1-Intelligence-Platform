@@ -67,7 +67,7 @@ def test_lap_coverage_maps_to_race_ingest():
 
 
 def test_is_fixable_matches_having_a_repair_path():
-    # A check is fixable exactly when a repair path exists for it — the single fact
+    # A check is fixable exactly when a repair path exists for it: the single fact
     # data_quality_audit.add() and resolve_issue_actions both derive from.
     assert is_fixable("qualifying_results", "row_count") is True
     assert is_fixable("race_results", "points_present") is True

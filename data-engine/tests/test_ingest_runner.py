@@ -13,6 +13,7 @@ from src.utils.ingest_runner import (
     run_openf1_job,
     run_qualifying_ingest_job,
 )
+from src.utils.storage_guard import StorageTier
 from tests.support.fake_db import FakeConnection
 
 _RESULT_ROWS = [
@@ -71,6 +72,9 @@ def _patch_race_session_helpers(monkeypatch, **overrides):
         "get_sc_vsc_laps": lambda session: {"safety_car_laps": 0, "vsc_laps": 0},
         "session_to_race_results": lambda session: _RESULT_ROWS,
         "session_to_lap_times": lambda session: _LAP_ROWS,
+        "session_to_lap_records": lambda session: [],
+        "session_weather_trace": lambda session: None,
+        "read_storage_tier": lambda conn: StorageTier.ALLOW_ALL,
         "session_entries": lambda session: ["entry"],
         "register_session_drivers": lambda conn, season_id, entries: dict(_DRIVER_MAP),
     }
@@ -137,6 +141,68 @@ class TestRunIngestJob:
         assert mark_status_calls[0][1] == "Dry"
         assert conn.commits == 1
         assert conn.closed is True
+
+    def test_holds_no_database_connection_while_fastf1_loads_the_session(self, monkeypatch):
+        # A FastF1 session load takes minutes; an open connection meanwhile keeps Neon awake.
+        opened = []
+
+        def _get_conn():
+            conn = FakeConnection([])
+            opened.append(conn)
+            return conn
+
+        open_during_load = []
+
+        def _get_session(year, round_num, session_type):
+            open_during_load.append(any(not c.closed for c in opened))
+            return object()
+
+        _patch_race_session_helpers(monkeypatch, get_session=_get_session)
+        monkeypatch.setattr(ingest_runner, "upsert", lambda *a, **k: None)
+        monkeypatch.setattr(ingest_runner, "get_conn", _get_conn)
+
+        run_ingest_job(2026, 5, self._config())
+
+        assert open_during_load == [False]
+        assert all(c.closed for c in opened)
+
+    def test_writes_one_lap_trace_row_per_driver_for_the_session(self, monkeypatch):
+        records = [
+            {"driver": "VER", "lap": 1, "position": 1, "time_ms": 100_000},
+            {"driver": "HAM", "lap": 1, "position": 2, "time_ms": 101_200},
+            {"driver": "VER", "lap": 2, "position": 1, "time_ms": 190_000},
+            {"driver": "HAM", "lap": 2, "position": 2, "time_ms": 190_500},
+        ]
+        _patch_race_session_helpers(monkeypatch, session_to_lap_records=lambda session: records)
+        writes = {}
+        monkeypatch.setattr(ingest_runner, "upsert", lambda conn, table, rows, conflict, **k: writes.update({table: (rows, conflict)}))
+        monkeypatch.setattr(ingest_runner, "get_conn", lambda: FakeConnection([]))
+
+        run_ingest_job(2026, 5, self._config(session_type="S"))
+
+        rows, conflict = writes["race_lap_traces"]
+        assert conflict == ["race_id", "session_type", "driver_id"]
+        assert sorted((r["driver_id"], r["session_type"], r["positions"], r["gaps_ms"]) for r in rows) == [
+            (1, "sprint", [1, 1], [0, 0]),
+            (2, "sprint", [2, 2], [1_200, 500]),
+        ]
+
+    def test_writes_the_session_weather_trace(self, monkeypatch):
+        from src.utils.race_story import WeatherTrace
+
+        trace = WeatherTrace(minute_offsets=[0, 1], air_temp_tenths=[250, 251], track_temp_tenths=[400, 398],
+                             rainfall=[False, True])
+        _patch_race_session_helpers(monkeypatch, session_weather_trace=lambda session: trace)
+        writes = {}
+        monkeypatch.setattr(ingest_runner, "upsert", lambda conn, table, rows, conflict, **k: writes.update({table: (rows, conflict)}))
+        monkeypatch.setattr(ingest_runner, "get_conn", lambda: FakeConnection([]))
+
+        run_ingest_job(2026, 5, self._config())
+
+        rows, conflict = writes["race_weather_traces"]
+        assert conflict == ["race_id", "session_type"]
+        assert rows == [{"race_id": 1, "session_type": "race", "minute_offsets": [0, 1], "air_temp_tenths": [250, 251],
+                         "track_temp_tenths": [400, 398], "rainfall": [False, True]}]
 
     def test_cross_table_hook_runs_after_mark_status_when_configured(self, monkeypatch):
         _patch_race_session_helpers(monkeypatch)
@@ -329,6 +395,29 @@ class TestRunQualifyingIngestJob:
         assert conn.commits == 1
         assert conn.closed is True
 
+    def test_holds_no_database_connection_while_fastf1_loads_the_session(self, monkeypatch):
+        opened = []
+
+        def _get_conn():
+            conn = FakeConnection([])
+            opened.append(conn)
+            return conn
+
+        open_during_load = []
+
+        def _get_session(year, round_num, session_type, messages=False):
+            open_during_load.append(any(not c.closed for c in opened))
+            return object()
+
+        _patch_quali_session_helpers(monkeypatch, get_session=_get_session)
+        monkeypatch.setattr(ingest_runner, "upsert", lambda *a, **k: None)
+        monkeypatch.setattr(ingest_runner, "get_conn", _get_conn)
+
+        run_qualifying_ingest_job(2026, 5, self._config())
+
+        assert open_during_load == [False]
+        assert all(c.closed for c in opened)
+
     def test_date_guard_raises_when_quali_day_in_future(self, monkeypatch):
         get_session_calls = []
         _patch_quali_session_helpers(
@@ -483,6 +572,7 @@ class TestRunOpenF1Job:
         monkeypatch.setattr(
             ingest_runner, "build_driver_number_map", lambda conn, season_id: dict(driver_map or {})
         )
+        monkeypatch.setattr(ingest_runner, "read_storage_tier", lambda conn: StorageTier.ALLOW_ALL)
 
     def test_happy_path_upserts_and_commits(self, monkeypatch):
         self._patch_openf1(monkeypatch)
@@ -612,3 +702,91 @@ class TestRunOpenF1Job:
 
         assert capture["session_name"] == "Race"
         assert capture["session_date"] == "2024-11-03"
+
+    def test_holds_no_database_connection_while_fetching_from_openf1(self, monkeypatch):
+        # A connection held across OpenF1's paced HTTP calls keeps Neon Free compute awake.
+        self._patch_openf1(monkeypatch)
+        monkeypatch.setattr(ingest_runner, "upsert", lambda *a, **k: None)
+        opened = []
+
+        def _get_conn():
+            conn = FakeConnection([self._race_row()])
+            opened.append(conn)
+            return conn
+
+        monkeypatch.setattr(ingest_runner, "get_conn", _get_conn)
+        open_during_fetch = []
+
+        def _fetch(session_key):
+            open_during_fetch.append(any(not c.closed for c in opened))
+            return [{"date": "2024-11-03T14:00:00+00:00"}]
+
+        run_openf1_job(2024, 20, self._config(fetch=_fetch))
+
+        assert open_during_fetch == [False]
+
+    def test_uses_the_cached_session_key_instead_of_looking_it_up(self, monkeypatch):
+        self._patch_openf1(monkeypatch)
+
+        def _no_lookup(*args, **kwargs):
+            raise AssertionError("session key was cached: /sessions must not be queried")
+
+        monkeypatch.setattr(ingest_runner, "get_session_key", _no_lookup)
+        monkeypatch.setattr(ingest_runner, "upsert", lambda *a, **k: None)
+        conn = FakeConnection([self._race_row(openf1_race_session_key=9590)])
+        monkeypatch.setattr(ingest_runner, "get_conn", lambda: conn)
+        fetched = []
+
+        run_openf1_job(2024, 20, self._config(
+            fetch=lambda key: fetched.append(key) or [],
+            to_rows=lambda raw, race_id, driver_map: ([], 0),
+        ))
+
+        assert fetched == [9590]
+
+    def test_stores_a_newly_resolved_sprint_session_key_on_the_race(self, monkeypatch):
+        self._patch_openf1(monkeypatch, session_key=9636)
+        monkeypatch.setattr(ingest_runner, "upsert", lambda *a, **k: None)
+        opened = []
+
+        def _get_conn():
+            conn = FakeConnection([self._race_row(sprint_date=self._LONG_AGO)])
+            opened.append(conn)
+            return conn
+
+        monkeypatch.setattr(ingest_runner, "get_conn", _get_conn)
+
+        run_openf1_job(2024, 20, self._config(), session_name="Sprint")
+
+        writes = [(q, p) for c in opened for cur in c.cursors for q, p in cur.executed if q.lstrip().startswith("UPDATE races")]
+        assert len(writes) == 1
+        query, params = writes[0]
+        assert "openf1_sprint_session_key" in query
+        assert params == (9636, 1)
+
+    def test_tags_every_row_with_the_session_it_came_from(self, monkeypatch):
+        self._patch_openf1(monkeypatch)
+        upsert_calls = []
+        monkeypatch.setattr(ingest_runner, "upsert", lambda *a, **k: upsert_calls.append(a))
+        conn = FakeConnection([self._race_row(sprint_date=self._LONG_AGO)])
+        monkeypatch.setattr(ingest_runner, "get_conn", lambda: conn)
+
+        run_openf1_job(2024, 20, self._config(), session_name="Sprint")
+
+        (_, _, rows, _) = upsert_calls[0]
+        assert [r["session_type"] for r in rows] == ["sprint"]
+
+
+    def test_writes_nothing_once_neon_storage_reaches_the_core_only_tier(self, monkeypatch):
+        self._patch_openf1(monkeypatch)
+        monkeypatch.setattr(ingest_runner, "read_storage_tier", lambda conn: StorageTier.CORE_ONLY)
+        upsert_calls = []
+        monkeypatch.setattr(ingest_runner, "upsert", lambda *a, **k: upsert_calls.append(a))
+        fetched = []
+        conn = FakeConnection([self._race_row()])
+        monkeypatch.setattr(ingest_runner, "get_conn", lambda: conn)
+
+        run_openf1_job(2024, 20, self._config(fetch=lambda key: fetched.append(key) or []))
+
+        assert upsert_calls == []
+        assert fetched == []  # no OpenF1 request spent on data that can't be stored

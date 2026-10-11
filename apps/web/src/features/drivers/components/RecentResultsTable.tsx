@@ -51,7 +51,7 @@ export function RecentResultsTable({ results }: Props) {
                   ) : gained < 0 ? (
                     <span className="font-mono text-sm text-red-400">{gained}</span>
                   ) : (
-                    <span className="font-mono text-sm text-muted-foreground">—</span>
+                    <span className="font-mono text-sm text-muted-foreground">-</span>
                   )}
                 </TableCell>
               </TableRow>

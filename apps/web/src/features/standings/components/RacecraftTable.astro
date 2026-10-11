@@ -1,0 +1,49 @@
+---
+import DataList from '@/components/data/DataList.astro';
+import TabIntro from '@/components/page/TabIntro.astro';
+import DataRow from '@/components/data/DataRow.astro';
+import DriverIdentity from '@/components/identity/DriverIdentity.astro';
+import RankCell from '@/components/data/RankCell.astro';
+import { getTeamColor } from '@/lib/f1/teamColors';
+import type { RacecraftRow } from '@/types';
+
+interface Props {
+  rows: RacecraftRow[];
+  year: number;
+}
+
+const { rows, year } = Astro.props;
+const COLUMNS = 'grid-cols-[40px_1fr_60px_60px] sm:grid-cols-[40px_1fr_70px_70px_70px]';
+const signed = (n: number) => (n > 0 ? `+${n}` : String(n));
+---
+
+{rows.length > 0 && (
+  <section>
+    <TabIntro
+      lead="Grand prix overtakes recorded by OpenF1, 2023 onwards. The feed can miss some passes."
+      terms={[
+        { term: 'Made', meaning: 'passes made' },
+        { term: 'Lost', meaning: 'times passed' },
+        { term: 'Net', meaning: 'made minus lost' },
+      ]}
+    />
+    <DataList
+      label="Racecraft"
+      columns={COLUMNS}
+      headers={[
+        { label: 'Pos' }, { label: 'Driver' }, { label: 'Made', class: 'text-right' },
+        { label: 'Lost', class: 'text-right hidden sm:block' }, { label: 'Net', class: 'text-right' },
+      ]}
+    >
+      {rows.map((r, i) => (
+        <DataRow columns={COLUMNS} first={i === 0} accent={getTeamColor(r.driver.team.teamKey)}>
+          <RankCell rank={i + 1} />
+          <DriverIdentity driver={r.driver} year={year} />
+          <div role="cell" class="font-mono text-sm text-right">{r.made}</div>
+          <div role="cell" class="font-mono text-sm text-right text-muted-foreground hidden sm:block">{r.suffered}</div>
+          <div role="cell" class={`font-mono text-sm font-bold text-right ${r.net > 0 ? 'text-[#a855f7]' : 'text-muted-foreground'}`}>{signed(r.net)}</div>
+        </DataRow>
+      ))}
+    </DataList>
+  </section>
+)}

@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const FIXTURE_API_PORT = 4310;
-const WEB_PORT = 4321;
+// Overridable so a developer's own `astro dev` on :4321 isn't silently reused against real data.
+const FIXTURE_API_PORT = Number(process.env.E2E_API_PORT ?? 4310);
+const WEB_PORT = Number(process.env.E2E_WEB_PORT ?? 4321);
 
 export default defineConfig({
   testDir: './tests',
@@ -25,7 +26,7 @@ export default defineConfig({
     },
     {
       // @astrojs/cloudflare doesn't support `astro preview`, so tests run via `astro dev`
-      // instead — still the real page frontmatter/runtime, just via Vite's dev server.
+      // instead: still the real page frontmatter/runtime, just via Vite's dev server.
       command: `bun run dev --port ${WEB_PORT}`,
       cwd: '../web',
       url: `http://localhost:${WEB_PORT}/`,

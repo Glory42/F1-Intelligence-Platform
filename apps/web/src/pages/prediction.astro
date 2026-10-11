@@ -1,307 +1,124 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { api } from '@/lib/api';
-import { formatDate } from '@/lib/utils';
-import type { PredictionHistoryItem, IntelStandingRow, SeasonSummary, SprintPredictionResponse, ModelInfo, SeasonAccuracy } from '@/types';
-import { Cpu, BarChart2, History, CheckCircle2, XCircle, Clock, TrendingUp } from 'lucide-react';
-import YearSelect from '@/components/shared/YearSelect.astro';
-import { getTeamColor } from '@/lib/teamColors';
-import { brierScore } from '@/lib/predictionMath';
+import type { PredictionHistoryItem, IntelStandingRow, SeasonSummary, SprintPredictionResponse, PredictionResponse, ModelInfo, SeasonAccuracy } from '@/types';
+import PageHeader from '@/components/page/PageHeader.astro';
+import PageTabs from '@/components/page/PageTabs.astro';
+import EmptyState from '@/components/page/EmptyState.astro';
+import YearSelect from '@/components/page/YearSelect.astro';
 import { GP_ACCENT, SPRINT_ACCENT } from '@/features/predictions/types';
-import CalibrationChart from '@/features/predictions/components/CalibrationChart.astro';
 import UpcomingPredictionPanel from '@/features/predictions/components/UpcomingPredictionPanel.astro';
+import ModelRatingsTable from '@/features/predictions/components/ModelRatingsTable.astro';
+import Scorecard from '@/features/predictions/components/Scorecard.astro';
+import { resolveTab, TAB_PARAM } from '@/lib/pageTabs';
+
+const TABS = [
+  { id: 'upcoming', label: 'Upcoming' },
+  { id: 'scorecard', label: 'Scorecard' },
+] as const;
 
 const year = Number(Astro.url.searchParams.get('year') ?? new Date().getFullYear());
+const tab = resolveTab(Astro.url, TABS);
 
-let upcoming = null;
+const settled = <T,>(result: PromiseSettledResult<T>, fallback: T): T =>
+  result.status === 'fulfilled' ? result.value : fallback;
+
+let upcoming: PredictionResponse | null = null;
 let upcomingSprint: SprintPredictionResponse | null = null;
-let history: PredictionHistoryItem[] = [];
 let standings: IntelStandingRow[] = [];
-let seasons: SeasonSummary[] = [];
 let modelInfo: ModelInfo | null = null;
+let history: PredictionHistoryItem[] = [];
+let seasons: SeasonSummary[] = [];
 let seasonAccuracy: SeasonAccuracy[] = [];
 
-const [upcomingResult, historyResult, standingsResult, seasonsResult, modelInfoResult, accuracyResult] = await Promise.allSettled([
-  api.getUpcomingPrediction(),
-  api.getPredictionHistory(year),
-  api.getIntelStandings(year),
-  api.getSeasons(),
-  api.getModelInfo(),
-  api.getPredictionAccuracy(),
-]);
+if (tab === 'upcoming') {
+  const [upcomingResult, standingsResult, modelInfoResult] = await Promise.allSettled([
+    api.getUpcomingPrediction(),
+    api.getIntelStandings(year),
+    api.getModelInfo(),
+  ]);
+  upcoming = settled(upcomingResult, null);
+  standings = settled(standingsResult, []);
+  modelInfo = settled(modelInfoResult, null);
 
-if (upcomingResult.status === 'fulfilled') upcoming = upcomingResult.value;
-if (historyResult.status === 'fulfilled') history = historyResult.value;
-if (standingsResult.status === 'fulfilled') standings = standingsResult.value;
-if (seasonsResult.status === 'fulfilled') seasons = seasonsResult.value;
-if (modelInfoResult.status === 'fulfilled') modelInfo = modelInfoResult.value;
-if (accuracyResult.status === 'fulfilled') seasonAccuracy = accuracyResult.value;
+  if (upcoming?.race.hasSprint) {
+    try { upcomingSprint = await api.getSprintByRaceId(upcoming.race.id); } catch {}
+  }
+  if (!upcomingSprint) {
+    try { upcomingSprint = await api.getSprintUpcoming(); } catch {}
+  }
+} else {
+  const [historyResult, seasonsResult, accuracyResult] = await Promise.allSettled([
+    api.getPredictionHistory(year),
+    api.getSeasons(),
+    api.getPredictionAccuracy(),
+  ]);
+  history = settled(historyResult, []);
+  seasons = settled(seasonsResult, []);
+  seasonAccuracy = settled(accuracyResult, []);
+}
 
 const gpVersion = upcoming?.modelVersion ?? modelInfo?.gpVersion ?? 'weighted-v3';
-
-// For sprint weekends: fetch sprint prediction for the upcoming race, or standalone sprint upcoming
-if (upcoming?.race.hasSprint) {
-  try { upcomingSprint = await api.getSprintByRaceId(upcoming.race.id); } catch {}
-}
-if (!upcomingSprint) {
-  try { upcomingSprint = await api.getSprintUpcoming(); } catch {}
-}
-
-const correctCount = history.filter((h) => h.correct === true).length;
-const completedCount = history.filter((h) => h.correct !== null).length;
-const top3Count = history.filter((h) => h.actualWinnerPredictedPosition !== null && h.actualWinnerPredictedPosition <= 3).length;
-const top5Count = history.filter((h) => h.actualWinnerPredictedPosition !== null && h.actualWinnerPredictedPosition <= 5).length;
-
-const brier = brierScore(history);
-const brierText = brier === null ? null : brier.toFixed(3);
-
-const accuracy = completedCount > 0 ? Math.round((correctCount / completedCount) * 100) : null;
-const top3Accuracy = completedCount > 0 ? Math.round((top3Count / completedCount) * 100) : null;
-const top5Accuracy = completedCount > 0 ? Math.round((top5Count / completedCount) * 100) : null;
 ---
 
-<BaseLayout title={`${year} F1 Predictions`}>
-  <div class="mt-7 space-y-10">
+<BaseLayout title={tab === 'scorecard' ? `${year} Prediction Scorecard` : 'Predictions'}>
+  <div class="space-y-6">
+    <PageHeader
+      kicker="./predictions"
+      title={tab === 'scorecard' ? `${year} Scorecard` : 'Predictions'}
+      subtitle={tab === 'scorecard' ? 'how the model did, race by race' : `model ${gpVersion}`}
+    >
+      {tab === 'scorecard' && (
+        <YearSelect slot="aside" years={seasons} currentYear={year} basePath="/prediction" extraParams={`&${TAB_PARAM}=${tab}`} />
+      )}
+    </PageHeader>
 
-    <!-- Header -->
-    <div class="flex items-end justify-between gap-4 flex-wrap">
-      <div>
-        <div class="flex items-center gap-3 mb-2">
-          <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)"><Cpu size={11} />./prediction</span>
-          <div class="h-px w-16 bg-white/[0.05]" />
-        </div>
-        <h1 class="text-2xl font-bold">{year} Race Predictions</h1>
-        <p class="mt-1 font-mono text-[10px] text-muted-foreground tracking-widest uppercase">
-          {gpVersion} · {history.length} predictions · {accuracy !== null ? `${accuracy}% accuracy` : 'no results yet'}
-        </p>
-      </div>
-      <YearSelect years={seasons} currentYear={year} basePath="/prediction" />
-    </div>
+    <PageTabs tabs={TABS} active={tab} label="Predictions views" />
 
-    <!-- Upcoming prediction hero -->
-    {(upcoming || upcomingSprint) && (
-      <div class={`grid gap-4 ${upcoming && upcomingSprint ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
-        {upcomingSprint && (
-          <UpcomingPredictionPanel
-            winnerName={upcomingSprint.predictedWinner.fullName}
-            teamName={upcomingSprint.predictedWinner.team.name}
-            drivers={upcomingSprint.drivers}
-            modelVersion={upcomingSprint.modelVersion}
-            accent={SPRINT_ACCENT}
-            kicker={`./sprint · ${upcomingSprint.race.name}`}
-            showZap
-            detailHref={`/races/${upcomingSprint.race.id}/sprint`}
-            detailLabel="detail →"
-            winnerLabel="predicted sprint winner"
-            confidenceLabel="sprint confidence"
-            topBorder
-          />
-        )}
-        {upcoming && (
-          <UpcomingPredictionPanel
-            winnerName={upcoming.predictedWinner.fullName}
-            teamName={upcoming.predictedWinner.team.name}
-            drivers={upcoming.drivers}
-            modelVersion={upcoming.modelVersion}
-            accent={GP_ACCENT}
-            kicker={`${upcoming.race.hasSprint ? '⬟ grand prix · ' : './next race · '}${upcoming.race.name}`}
-            detailHref={`/prediction/${upcoming.race.id}`}
-            detailLabel="full prediction →"
-            winnerLabel="predicted winner"
-            confidenceLabel="model confidence"
-          />
-        )}
-      </div>
-    )}
-
-    <!-- Intel standings + Prediction history side by side on lg+ -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-
-    <!-- Intel standings table -->
-    {standings.length > 0 && (
-      <div>
-        <div class="flex items-center gap-3 mb-4">
-          <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)"><BarChart2 size={11} />./season model ratings</span>
-          <div class="h-px flex-1 bg-white/[0.05]" />
-        </div>
-        <div class="border border-white/[0.06]">
-          <div class="grid grid-cols-[40px_1fr_60px] sm:grid-cols-[40px_1fr_120px_60px] gap-0 px-5 py-2.5 border-b border-white/[0.06]">
-            <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase">Rank</div>
-            <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase">Driver</div>
-            <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase hidden sm:block">Team</div>
-            <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right">Score</div>
+    {tab === 'upcoming' ? (
+      <div class="space-y-10">
+        {upcoming || upcomingSprint ? (
+          <div class={`grid gap-4 ${upcoming && upcomingSprint ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
+            {upcomingSprint && (
+              <UpcomingPredictionPanel
+                winnerName={upcomingSprint.predictedWinner.fullName}
+                teamName={upcomingSprint.predictedWinner.team.name}
+                drivers={upcomingSprint.drivers}
+                modelVersion={upcomingSprint.modelVersion}
+                accent={SPRINT_ACCENT}
+                kicker={`./sprint · ${upcomingSprint.race.name}`}
+                showZap
+                detailHref={`/races/${upcomingSprint.race.id}/sprint`}
+                detailLabel="detail →"
+                winnerLabel="predicted sprint winner"
+                confidenceLabel="sprint confidence"
+                topBorder
+              />
+            )}
+            {upcoming && (
+              <UpcomingPredictionPanel
+                winnerName={upcoming.predictedWinner.fullName}
+                teamName={upcoming.predictedWinner.team.name}
+                drivers={upcoming.drivers}
+                modelVersion={upcoming.modelVersion}
+                accent={GP_ACCENT}
+                kicker={`${upcoming.race.hasSprint ? '⬟ grand prix · ' : './next race · '}${upcoming.race.name}`}
+                detailHref={`/prediction/${upcoming.race.id}`}
+                detailLabel="full prediction →"
+                winnerLabel="predicted winner"
+                confidenceLabel="model confidence"
+              />
+            )}
           </div>
-          {standings.map((s, i) => {
-            return (
-              <div class={`grid grid-cols-[40px_1fr_60px] sm:grid-cols-[40px_1fr_120px_60px] gap-0 items-start sm:items-center px-5 py-3 hover:bg-white/[0.02] transition-colors duration-150 ${i !== 0 ? 'border-t border-white/[0.04]' : ''}`} style={`border-left: 3px solid ${getTeamColor(s.driver.team.teamKey)};`}>
-                <div class={`font-mono text-sm font-bold pt-1 sm:pt-0 ${i < 3 ? 'text-[#a855f7]' : 'text-muted-foreground'}`}>
-                  {String(i+1).padStart(2,'0')}
-                </div>
-                <div class="flex items-start sm:items-center gap-2 min-w-0">
-                  <span class="font-mono text-[8px] tracking-[0.1em] uppercase text-muted-foreground border border-white/[0.06] px-1.5 py-0.5 shrink-0 mt-0.5">{s.driver.code}</span>
-                  <div class="min-w-0">
-                    <a href={`/drivers/${s.driver.id}?year=${year}`} class="font-semibold text-sm leading-none block hover:text-[#a855f7] transition-colors duration-150 truncate">{s.driver.fullName}</a>
-                    <div class="flex items-center gap-2 mt-0.5 flex-wrap">
-                      <a href={`/teams/${s.driver.team.id}?year=${year}`} class="font-mono text-[8px] text-muted-foreground sm:hidden hover:text-foreground transition-colors duration-150">{s.driver.team.name}</a>
-                      {s.sprintWins > 0 && (
-                        <span class="font-mono text-[7px] tracking-[0.1em] uppercase px-1.5 py-0.5 border border-orange-500/30 text-orange-400/70">
-                          {s.sprintWins}W sprint
-                        </span>
-                      )}
-                      {s.sprintPodiums > 0 && s.sprintWins === 0 && (
-                        <span class="font-mono text-[7px] tracking-[0.1em] uppercase px-1.5 py-0.5 border border-orange-500/20 text-orange-400/50">
-                          {s.sprintPodiums}P sprint
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <a href={`/teams/${s.driver.team.id}?year=${year}`} class="font-mono text-[9px] text-muted-foreground truncate hidden sm:block pr-6 hover:text-foreground transition-colors duration-150">{s.driver.team.name}</a>
-                <div class="text-right pt-1 sm:pt-0">
-                  <div class="font-bold text-sm">{s.overallScore}</div>
-                  <div class="w-full h-0.5 bg-white/[0.06] mt-1">
-                    <div class="h-full bg-[#a855f7] bar-fill" style={`width:${s.overallScore}%`} />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        ) : (
+          <EmptyState message="The next prediction appears once qualifying is done." />
+        )}
+        {standings.length > 0 && <ModelRatingsTable standings={standings} year={year} />}
       </div>
+    ) : history.length > 0 ? (
+      <Scorecard history={history} seasonAccuracy={seasonAccuracy} year={year} />
+    ) : (
+      <EmptyState message={`No predictions for ${year} yet.`} />
     )}
-
-    <!-- Prediction history -->
-    {history.length > 0 && (
-      <div class="min-w-0">
-        <div class="flex items-center gap-3 mb-4">
-          <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)"><History size={11} />./prediction history</span>
-          <div class="h-px flex-1 bg-white/[0.05]" />
-          {accuracy !== null && (
-            <div class="flex items-center gap-4">
-              <span class="font-mono text-[8px] text-muted-foreground" title="Win correctly predicted">
-                P1 Hit: <span class="text-[#a855f7]">{accuracy}%</span>
-              </span>
-              <span class="font-mono text-[8px] text-muted-foreground" title="Winner landed in predicted Top 3">
-                Top 3 Hit: <span class="text-[#a855f7]">{top3Accuracy}%</span>
-              </span>
-              <span class="font-mono text-[8px] text-muted-foreground" title="Winner landed in predicted Top 5">
-                Top 5 Hit: <span class="text-[#a855f7]">{top5Accuracy}%</span>
-              </span>
-              {brierText !== null && (
-                <span class="font-mono text-[8px] text-muted-foreground" title="Brier score — mean squared error of the win probabilities; 0 is perfect, lower is better">
-                  Brier: <span class="text-[#a855f7]">{brierText}</span>
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-        <div class="border border-white/[0.06]">
-          {history.map((h, i) => (
-            <a
-              href={h.isSprint ? `/prediction/sprint/${h.raceId}` : `/prediction/${h.raceId}`}
-              class={`flex items-center gap-4 px-5 py-4 hover:bg-white/[0.02] transition-colors duration-150 group ${i !== 0 ? 'border-t border-white/[0.04]' : ''}`}
-            >
-              <div class="font-mono text-[9px] text-muted-foreground w-5 shrink-0">{h.roundNumber.toString().padStart(2,'0')}</div>
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2">
-                  <span class={`font-semibold text-sm transition-colors duration-150 truncate ${h.isSprint ? 'group-hover:text-orange-400' : 'group-hover:text-[#a855f7]'}`}>{h.raceName}</span>
-                  {h.isSprint && <span class="font-mono text-[7px] tracking-[0.1em] uppercase px-1.5 py-0.5 border border-orange-500/30 text-orange-400/70 shrink-0">sprint</span>}
-                </div>
-                <div class="font-mono text-[9px] text-muted-foreground mt-0.5">
-                  Predicted: <span class="text-foreground">{h.predictedWinner.code}</span>
-                  {h.actualWinner && (
-                    <> · Actual: <span class={h.correct === false ? 'text-red-400' : 'text-foreground'}>{h.actualWinner.code}</span></>
-                  )}
-                  {h.correct === false && h.actualWinnerPredictedPosition !== null && (
-                    <span class="text-muted-foreground/60"> · model had them P{h.actualWinnerPredictedPosition}</span>
-                  )}
-                </div>
-              </div>
-              <div class="font-mono text-[9px] text-muted-foreground hidden sm:block shrink-0">{formatDate(h.raceDate)}</div>
-              <div class="shrink-0 font-mono text-[9px] font-bold w-24 text-right">
-                {h.correct === true && <span class="flex items-center justify-end gap-1 text-green-400"><CheckCircle2 size={12} />correct</span>}
-                {h.correct === false && <span class="flex items-center justify-end gap-1 text-red-400"><XCircle size={12} />wrong</span>}
-                {h.correct === null && (
-                  <span class="flex items-center justify-end gap-1 text-muted-foreground">
-                    <Clock size={11} />{Math.round(Number(h.winProbability)*100)}%
-                  </span>
-                )}
-              </div>
-            </a>
-          ))}
-        </div>
-      </div>
-    )}
-
-    </div>{/* end side-by-side grid */}
-
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-
-    <!-- Model calibration -->
-    {completedCount >= 5 && (
-      <div>
-        <div class="flex items-center gap-3 mb-4">
-          <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)"><TrendingUp size={11} />./calibration</span>
-          <div class="h-px flex-1 bg-white/[0.05]" />
-        </div>
-        <div class="border border-white/[0.06] p-5">
-          <CalibrationChart items={history} />
-        </div>
-      </div>
-    )}
-
-    <!-- Season-by-season accuracy -->
-    {seasonAccuracy.length > 0 && (
-      <div>
-        <div class="flex items-center gap-3 mb-4">
-          <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)"><TrendingUp size={11} />./accuracy by season</span>
-          <div class="h-px flex-1 bg-white/[0.05]" />
-          {completedCount > 0 && (
-            <a href={`/prediction/recap/${year}`} class="font-mono text-[8px] tracking-[0.15em] uppercase text-muted-foreground hover:text-[#a855f7] transition-colors duration-150 shrink-0">
-              {year} recap →
-            </a>
-          )}
-        </div>
-        <div class="border border-white/[0.06] overflow-x-auto">
-          <div class="min-w-[420px]">
-            <div class="grid grid-cols-[70px_1fr_1fr_1fr] gap-0 px-5 py-2.5 border-b border-white/[0.06]">
-              <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase">Season</div>
-              <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right">GP</div>
-              <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right">Sprint</div>
-              <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right">Overall</div>
-            </div>
-            <div class="max-h-[360px] overflow-y-auto">
-              {seasonAccuracy.map((s, i) => (
-                <a
-                  href={`/prediction?year=${s.year}`}
-                  class={`grid grid-cols-[70px_1fr_1fr_1fr] gap-0 items-center px-5 py-3 hover:bg-white/[0.02] transition-colors duration-150 ${i !== 0 ? 'border-t border-white/[0.04]' : ''} ${s.year === year ? 'bg-white/[0.02]' : ''}`}
-                >
-                  <div class="font-semibold text-sm">{s.year}</div>
-                  <div class="font-mono text-[10px] text-right">
-                    {s.gp.races > 0 ? <>{s.gp.correct}/{s.gp.races} <span class="text-muted-foreground">({s.gp.accuracyPct}%)</span></> : <span class="text-muted-foreground">—</span>}
-                  </div>
-                  <div class="font-mono text-[10px] text-right">
-                    {s.sprint.races > 0 ? <>{s.sprint.correct}/{s.sprint.races} <span class="text-muted-foreground">({s.sprint.accuracyPct}%)</span></> : <span class="text-muted-foreground">—</span>}
-                  </div>
-                  <div class="font-mono text-[10px] font-bold text-right" style="color: rgba(168,85,247,0.9)">
-                    {s.overall.races > 0 ? <>{s.overall.correct}/{s.overall.races} ({s.overall.accuracyPct}%)</> : <span class="text-muted-foreground font-normal">—</span>}
-                  </div>
-                </a>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    )}
-
-    </div>{/* end calibration + accuracy grid */}
-
-    {history.length === 0 && standings.length === 0 && !upcoming && (
-      <div class="border border-white/[0.06] p-10 text-center">
-        <p class="font-mono text-[9px] text-muted-foreground tracking-[0.25em] uppercase">No intelligence data for {year}</p>
-        <p class="mt-2 font-mono text-[8px] text-muted-foreground/50">Run qualifying ingest + compute_predictions after qualifying sessions</p>
-      </div>
-    )}
-
   </div>
 </BaseLayout>

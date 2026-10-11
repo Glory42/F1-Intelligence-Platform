@@ -1,0 +1,22 @@
+---
+interface Props {
+  lead: string;
+  terms?: Array<{ term: string; meaning: string }>;
+}
+
+const { lead, terms = [] } = Astro.props;
+---
+
+<div class="mb-4 space-y-2">
+  <p class="text-[13px] text-muted-foreground">{lead}</p>
+  {terms.length > 0 && (
+    <dl class="flex flex-wrap gap-x-6 gap-y-1.5 text-[12px]">
+      {terms.map((t) => (
+        <div class="flex items-baseline gap-1.5">
+          <dt class="font-medium text-foreground/85">{t.term}</dt>
+          <dd class="text-muted-foreground/70">{t.meaning}</dd>
+        </div>
+      ))}
+    </dl>
+  )}
+</div>

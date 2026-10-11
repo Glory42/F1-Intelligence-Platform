@@ -1,6 +1,6 @@
 ---
 title: "Frontend"
-description: "Astro SSR app — routing, the server-only data-fetch rule, component layout, and styling"
+description: "Astro SSR app, routing, the server-only data-fetch rule, component layout, and styling"
 order: 5.5
 ---
 
@@ -8,14 +8,14 @@ order: 5.5
 
 The `apps/web/` app is [Astro](https://astro.build) in SSR mode (`output: 'server'`) on the
 Cloudflare adapter, deployed to Cloudflare Pages. React is available as an island renderer
-(`@astrojs/react`) but is used sparingly — most of the UI is `.astro`.
+(`@astrojs/react`) but is used sparingly: most of the UI is `.astro`.
 
 ## Stack
 
 | Concern | Choice |
 |---|---|
 | Framework | Astro `output: 'server'`, `@astrojs/cloudflare` adapter |
-| Islands | React 18 via `@astrojs/react` — only where interactivity is required |
+| Islands | React 18 via `@astrojs/react`: only where interactivity is required |
 | Styling | Tailwind, dark theme fixed on `<html class="dark">` |
 | Icons | `lucide-react` |
 | Fonts | Sora + JetBrains Mono (Google Fonts, preconnected in `BaseLayout`) |
@@ -23,8 +23,8 @@ Cloudflare adapter, deployed to Cloudflare Pages. React is available as an islan
 | Data | `PUBLIC_API_URL` → the Hono API; no other backends |
 
 Entry points: `astro.config.mjs` (adapter, sitemap, Vite aliases), `src/layouts/BaseLayout.astro`
-(document shell, `<head>`, Navbar/Footer, view transitions), `src/layouts/LandingLayout.astro`
-(bare shell for `/`).
+(document shell, `<head>`, Sidebar/MobileNav/Footer, view transitions), `src/middleware.ts`
+(301s for retired URLs via `lib/legacyRedirects.ts`).
 
 ## Data fetching is server-side only
 
@@ -56,35 +56,38 @@ time, so it can't be pre-rendered into frontmatter:
 | `features/compare/components/TeamCompareTool.tsx` | `client:load` | arbitrary team pair × year, picked on demand |
 
 These are the only client-side `fetch` calls in the app, and the only reason the e2e fixture server
-sends CORS headers. Any *new* client fetch must fit the same shape — data genuinely unknowable until
+sends CORS headers. Any *new* client fetch must fit the same shape: data genuinely unknowable until
 the user interacts. If it's knowable at request time (a circuit's coordinates, a fixed list), it
 belongs in frontmatter. `CircuitsGrid.tsx` is `client:load` but only for filtering/sorting a list
-already passed in as a prop — it does not fetch.
+already passed in as a prop: it does not fetch.
 
 ## The API client
 
 `src/lib/api.ts` is the single place any `fetch` to the API happens. Every page imports `api` and
-calls a named method — never a raw `fetch`. `get<T>()` unwraps the `{ data, error }` envelope and
+calls a named method: never a raw `fetch`. `get<T>()` unwraps the `{ data, error }` envelope and
 throws on `error` or a non-2xx status, so callers get `T` directly. Response types come from
-`src/types/index.ts`.
+`@/types`.
 
 ## Directory layout
 
 ```
 src/
-├── pages/              file-based routes — one .astro per URL, frontmatter fetches + composes
-├── layouts/            BaseLayout (app chrome) + LandingLayout (bare)
-├── components/         generic, cross-feature only
-│   ├── layout/         Navbar, MobileNav, Footer, nav model
-│   ├── shared/         YearSelect, ConfidenceBadge, …
-│   ├── docs/           OnThisPage TOC
-│   └── ui/             Shadcn primitives (badge, button, card, table, search-select)
-├── features/           domain UI, grouped by area
+├── pages/              file-based routes: one .astro per URL, frontmatter fetches + composes
+├── layouts/            BaseLayout (app chrome)
+├── components/         generic, cross-feature only: grouped by role
+│   ├── layout/         Sidebar, MobileNav, NavGroups, Footer, nav model
+│   ├── page/           page chrome: PageHeader, PageTabs, TabIntro, SectionKicker, EmptyState, YearSelect(Links)
+│   ├── data/           data display: DataList/DataRow, StatTiles, RankCell, HeadToHead, LineChart (+ chartScale, labelLayout)
+│   ├── identity/       DriverIdentity, TeamIdentity
+│   └── ui/             Shadcn primitives (table, search-select)
+├── features/           domain UI, grouped by area (one per sidebar section, plus docs and search)
 │   └── <area>/
 │       ├── components/ the area's .astro / .tsx pieces
-│       └── *.ts        pure logic + hooks (compareStats, useCompareController, raceTabs, …)
-├── lib/                truly cross-feature helpers (api, teamColors, teamLogos, predictionMath, utils)
-├── types/index.ts      all TypeScript types in one file
+│       └── *.ts        pure logic + hooks (compareStats, useCompareController, raceTabs, nextSession, …)
+├── lib/                app plumbing: api client, utils, site, pageTabs, sidebarState, legacyRedirects
+│   └── f1/             F1 reference data and maths shared by features: teamColors, teamLogos, countryFlags,
+│                       championshipMath, predictionMath, tyres
+├── types/            API response types, one file per domain (mirrors apps/api common/types/), index.ts barrel
 ├── content/config.ts   Astro content collection for docs/ (globs ../../docs, minus adr/)
 └── styles/globals.css  Tailwind base + CSS custom properties
 ```
@@ -93,21 +96,44 @@ Rule of thumb: **domain UI lives in `features/<area>/`; `components/` is only fo
 unrelated areas.** A helper used by one feature stays in that feature; promote to `lib/` only when a
 second unrelated feature needs it.
 
+## Navigation and page tabs
+
+- **Sidebar**: `Sidebar.astro` on `md+`, `MobileNav.astro` (top bar + drawer) below; both render `NavGroups`
+  from `navLinks.ts`. Two groups: **Season** (home, calendar, drivers, teams, predictions) and **Explore**
+  (circuits, compare, history). Compare (`/compare/drivers`, `/compare/teams`) and History (`/history`) are their
+  own sections; `activeDestination()` picks the longest owned prefix. Collapse state lives in the `sidebar` cookie (`lib/sidebarState.ts`) so the
+  server renders the right width on first paint.
+- **One question per page**: each page leads with one main view; everything else is a `?tab=` link tab
+  (`PageTabs.astro`, `resolveTab`/`tabHref` in `lib/pageTabs.ts`). The default tab keeps the plain URL, other
+  params (e.g. `year`) are preserved, and the frontmatter fetches only what the open tab needs. A tab can
+  point at its own route instead (`href`: Compare's Drivers/Teams). `TabIntro.astro` opens a tab with a one-line
+  lead-in and optional term definitions (racecraft, title odds, pit crews, teammate battle, …).
+- **Compare layout**: `CompareLayout.tsx`: head-to-head stats on the left, a sticky panel on the right with
+  the two pickers, season/career controls and both entity cards (A/B badges match the stat columns, so
+  team-mates with the same colour stay tellable apart). Stacks panel-first below `lg`.
+- **Season picker**: `YearSelect` in `PageHeader`'s `aside` slot, `?year=` in the URL, default current season.
+- **Retired URLs**: `/prediction/recap[/year]` 301s to the Predictions Scorecard tab (`src/middleware.ts`).
+
 ## Routes
 
-| Route | Data source |
+| Route | Data source (per `?tab=` where the page has tabs) |
 |---|---|
-| `/` | static (no API) |
-| `/prediction` | `predictions/upcoming` + `sprint/upcoming` + `predictions/accuracy` (+ history, standings) |
+| `/` | `races?year=` + `predictions/upcoming` + `races/:id` + `races/:id/recap` + `predictions/history?year=` + `drivers/standings` + `teams/standings` + `predictions/title-odds`: season progress strip, next race, last race, championship top 5 |
+| `/prediction` | Upcoming tab: `predictions/upcoming` + `sprint/upcoming` + `predictions/standings` · Scorecard tab: `predictions/history?year=` + `predictions/accuracy` |
 | `/prediction/[id]` | `predictions/race/:id` |
 | `/prediction/sprint/[id]` | `sprint/race/:id` |
-| `/prediction/recap` · `/prediction/recap/[year]` | `predictions/accuracy` · `predictions/history?year=` |
-| `/races` · `/races/[id]` · `/races/[id]/sprint` | `races?year=` · `races/:id` · `sprint/race/:id/detail` |
-| `/circuits` · `/circuits/[key]` | `races/circuits` · `races/circuit/:key` |
-| `/drivers` · `/drivers/[id]` · `/drivers/compare` | `drivers/standings?year=` · `drivers/:id?year=` · `drivers?year=` |
-| `/teams` · `/teams/[id]` · `/teams/compare` | `teams/standings?year=` · `teams/:id?year=` · `teams?year=` |
+| `/races` · `/races/[id]` · `/races/[id]/sprint` | `races?year=` · `races/:id` + per tab `strategy` / `race-control` / `overtakes` / `team-radio` / `predictions/race/:id` / `races/circuit/:key` · `sprint/race/:id/detail` |
+| `/races/[id]/race-story` | `races/:id/race-story` (`?session=sprint` for the sprint) |
+| `/races/[id]/telemetry` | `races/:id/telemetry?session=&a=&b=`: drivers picked with a plain GET form |
+| `/circuits` · `/circuits/[key]` | `races/circuits` · `races/circuit/:key` (Overview / Winners / Dominance tabs) + `races/circuit/:key/telemetry` (Telemetry tab) |
+| `/drivers` | Standings / Title fight / Racecraft tabs: `drivers/standings` · `predictions/title-odds` · `drivers/racecraft` |
+| `/drivers/[id]` | Season: `drivers/:id?year=` · Teammate: `drivers/:id/teammate-battle` · Career: `drivers/:id/career` + `drivers/:id/history` · Model: `predictions/history` |
+| `/teams` | Standings / Title odds / Pit crews tabs: `teams/standings` · `predictions/title-odds` · `teams/pit-stops` |
+| `/teams/[id]` | Season: `teams/:id?year=` · Pit crew: `teams/pit-stops` + `teams/:id/pit-stops` · History: `teams/:id/career` + `teams/:id/history` |
+| `/compare/drivers` · `/compare/teams` | `seasons` + `drivers?year=` / `teams?year=` + `search` in frontmatter; the compare island then fetches `:id?year=` / `:id/career` client-side |
+| `/history` | Records: `history/records` · Milestones: `history/milestones` · On this day: `history/on-this-day?date=MM-DD` (`?date=` param, nearest-day fallback) · Lineage: `history/lineages` |
 | `/docs` · `/docs/[slug]` | Astro content collection (`prerender = true`) |
-| `/health-quality` | `quality?year=` — dev-only, 404-guarded outside `import.meta.env.DEV` |
+| `/health-quality` | `quality?year=`: dev-only, 404-guarded outside `import.meta.env.DEV` |
 
 Year-scoped pages read `?year=` from `Astro.url.searchParams`, defaulting to the current year;
 `YearSelect` / `RaceYearSelect` navigate by changing that param.
@@ -119,15 +145,15 @@ Year-scoped pages read `?year=` from `Astro.url.searchParams`, defaulting to the
   `GlobalSearch` (`client:idle`), `DriverCompareTool` / `TeamCompareTool` / `CircuitsGrid`
   (`client:load`). Everything else is server-rendered.
 - React hooks correctness is linted (`react-hooks/rules-of-hooks` error, `exhaustive-deps` warn).
-- No chart libraries — charts are hand-rolled SVG (`LapChart.astro`, `CalibrationChart.astro`,
+- No chart libraries: charts are hand-rolled SVG (`LapChart.astro`, `CalibrationChart.astro`,
   `DriverRadarCompare.astro`). No heavy animation libraries.
 - Small co-located `<script>` blocks in `.astro` files are fine for view-local behaviour
-  (tab toggles, countdowns — see `features/races/raceTabs.ts`).
+  (tab toggles, countdowns: see `features/races/raceTabs.ts`).
 
 ## Styling
 
 Tailwind for everything; the dark theme is fixed (`<html class="dark">`), colour tokens are CSS
-custom properties in `styles/globals.css`. `lib/teamColors.ts` and `lib/teamLogos.ts` map a
+custom properties in `styles/globals.css`. `lib/f1/teamColors.ts` and `lib/f1/teamLogos.ts` map a
 `team_key` to an official hex colour / static logo path under `public/teams/`.
 
 ## File-size budget
@@ -143,14 +169,15 @@ via `bun run lint` and in CI:
 | `src/types/**`, `tests/**`, `*.config.*` | off |
 
 When a page or component grows past its budget, extract sections into `features/<area>/components/`
-rather than raising the limit. (`apps/api` has its own parallel budget — see the Testing doc and
+rather than raising the limit. (`apps/api` has its own parallel budget: see the Testing doc and
 `apps/api/eslint.config.js`.)
 
 ## Types
 
-`src/types/index.ts` holds **all** frontend types in one file. It is a hand-maintained mirror of the
-API's response shapes (`apps/api/src/common/types.ts`) — the two are separate files and can drift, so
-when an endpoint's response changes, update both. Same applies to `lib/predictionMath.ts`, whose
+`src/types/` holds the API response types, one file per domain behind an `index.ts` barrel (import
+from `@/types`). It is a hand-maintained mirror of `apps/api/src/common/types/`, file for file: the
+two can drift, so when an endpoint's response changes, update the matching file on both sides.
+Feature-only view models stay in that feature's `types.ts`. Same applies to `lib/f1/predictionMath.ts`, whose
 `GP_WEIGHTS` / `SPRINT_WEIGHTS` are hand-copied from the Python model.
 
 ## Local development

@@ -12,13 +12,13 @@ const allItems: Item[] = [...items, { id: 3, name: 'C' }];
 const yearItems: Item[] = [{ id: 5, name: 'X' }, { id: 6, name: 'Y' }];
 
 function makeAdapter(initialSearch: string) {
-  let currentUrl = `/drivers/compare${initialSearch}`;
+  let currentUrl = `/compare/drivers${initialSearch}`;
   const replaceUrl = vi.fn((url: string) => {
     currentUrl = url;
   });
   const adapter: CompareLocationAdapter = {
     getSearchParams: () => new URLSearchParams(initialSearch),
-    getPathname: () => '/drivers/compare',
+    getPathname: () => '/compare/drivers',
     replaceUrl,
   };
   return { adapter, replaceUrl, getUrl: () => currentUrl };
@@ -96,7 +96,7 @@ describe('useCompareController', () => {
     renderHook(() => useCompareController(config, adapter));
 
     await waitFor(() =>
-      expect(replaceUrl).toHaveBeenCalledWith('/drivers/compare?year=2025&a=1&b=2')
+      expect(replaceUrl).toHaveBeenCalledWith('/compare/drivers?year=2025&a=1&b=2')
     );
   });
 });

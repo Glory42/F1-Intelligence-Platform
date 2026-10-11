@@ -4,7 +4,7 @@ compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
-# This overrides any PUBLIC_API_URL set in the Pages dashboard (see docs/deployment.md) —
+# This overrides any PUBLIC_API_URL set in the Pages dashboard (see docs/deployment.md):
 # it must match apps/api/wrangler.toml's `name` field + your Cloudflare workers.dev subdomain,
 # not be hand-typed from memory. Get the real value from `wrangler deploy`'s own output.
 PUBLIC_API_URL = "https://f1-prediction-platform-api.gorkemkaryol03.workers.dev"

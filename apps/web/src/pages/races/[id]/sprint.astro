@@ -5,118 +5,77 @@ import { QualifyingGrid } from '@/features/races/components/QualifyingGrid';
 import LapChart from '@/features/races/components/LapChart.astro';
 import RaceHeroInfo from '@/features/races/components/RaceHeroInfo.astro';
 import RacePredictionPanel from '@/features/races/components/RacePredictionPanel.astro';
+import SessionSwitcher from '@/features/races/components/SessionSwitcher.astro';
+import RaceTabs from '@/features/races/components/RaceTabs.astro';
+import RaceTabPanel from '@/features/races/components/RaceTabPanel.astro';
+import RaceEventPanels from '@/features/races/components/RaceEventPanels.astro';
+import CircuitStatsGrid from '@/features/races/components/CircuitStatsGrid.astro';
 import { api } from '@/lib/api';
-import { formatDate, formatMs } from '@/lib/utils';
-import type { SprintDetailResponse, RaceResult, QualifyingResult, CircuitHistoryItem } from '@/types';
-import { RotateCcw, Gauge, Zap, Flag, CornerDownRight, Wind } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { formatDate } from '@/lib/utils';
+import { NO_RACE_EVENTS, loadRaceEvents, raceEventTabs } from '@/features/races/loadRaceEvents';
+import {
+  circuitYearItems, conditionsOf, driverMapOf, fastestLapOf, predictedPodium, sprintQualifyingGrid, winnerOf,
+} from '@/features/races/raceView';
+import type { SprintDetailResponse, RaceResult, CircuitHistoryItem } from '@/types';
+import { Zap } from 'lucide-react';
 import { SPRINT_ACCENT } from '@/features/predictions/types';
 
 const { id } = Astro.params;
 
-let sprintData: SprintDetailResponse | null = null;
-let circuitHistory: CircuitHistoryItem[] = [];
-let error: string | null = null;
-
-try {
-  sprintData = await api.getSprintDetail(Number(id));
-} catch (e) {
-  error = e instanceof Error ? e.message : 'Failed to load sprint data';
-}
+const [sprintResult, eventsResult] = await Promise.allSettled([
+  api.getSprintDetail(Number(id)),
+  loadRaceEvents(Number(id), 'sprint'),
+]);
+const sprintData: SprintDetailResponse | null = sprintResult.status === 'fulfilled' ? sprintResult.value : null;
+const error = sprintResult.status === 'rejected'
+  ? (sprintResult.reason instanceof Error ? sprintResult.reason.message : 'Failed to load sprint data')
+  : null;
+const events = eventsResult.status === 'fulfilled' ? eventsResult.value : NO_RACE_EVENTS;
 
 const race = sprintData?.race ?? null;
+let circuitHistory: CircuitHistoryItem[] = [];
+if (race) circuitHistory = await api.getCircuitDetails(race.circuit.circuitKey).then((d) => d.history, () => []);
+
 const prediction = sprintData?.prediction ?? null;
 const rawResults = sprintData?.results ?? [];
 const results = rawResults.filter((r) => r.status !== 'grid_set');
 const laps = sprintData?.laps ?? [];
-
-if (race) {
-  try {
-    circuitHistory = (await api.getCircuitDetails(race.circuit.circuitKey)).history;
-  } catch {
-    circuitHistory = [];
-  }
-}
+const sqGrid = sprintQualifyingGrid(rawResults);
 
 const isSprintDone = race != null && ['sprint_done', 'qualifying_done', 'completed'].includes(race.status);
 const isUpcoming = race != null && !isSprintDone;
-
-const hasResults = results.length > 0;
-const hasLaps = laps.length > 0;
-const hasPrediction = prediction != null;
-
-const sprintWinner = hasResults ? results.find((r) => r.finishPosition === 1) : null;
-const flResult = hasResults ? results.find((r) => r.fastestLap) : null;
-const flLapMs = flResult ? (laps.find((l) => l.driverId === flResult.driver.id)?.fastestLapMs ?? null) : null;
-
-const predCorrect = prediction && sprintWinner
-  ? prediction.predictedWinner.id === sprintWinner.driver.id
-  : null;
-
-const podium = (prediction?.drivers ?? [])
-  .sort((a, b) => (a.predictedPosition ?? 99) - (b.predictedPosition ?? 99))
-  .slice(0, 5);
-
-// SQ grid — map SprintResult → QualifyingResult shape so QualifyingGrid can be reused
-const sqGrid: QualifyingResult[] = [...rawResults]
-  .sort((a, b) => a.gridPosition - b.gridPosition)
-  .map((r) => ({
-    id: r.id,
-    driverId: r.driverId,
-    gridPosition: r.gridPosition,
-    q1TimeMs: r.sq1TimeMs ?? null,
-    q2TimeMs: r.sq2TimeMs ?? null,
-    q3TimeMs: r.sq3TimeMs ?? null,
-    sector1Ms: r.sqSector1Ms ?? null,
-    sector2Ms: r.sqSector2Ms ?? null,
-    sector3Ms: r.sqSector3Ms ?? null,
-    speedSt: r.sqSpeedSt ?? null,
-    driver: r.driver,
-  }));
-const hasGrid = sqGrid.length > 0;
-
-type Tab = { id: string; label: string };
-const tabs: Tab[] = [];
-if (isSprintDone && hasResults) tabs.push({ id: 'results', label: 'Results' });
-if (hasGrid) tabs.push({ id: 'qualifying', label: 'Sprint Quali' });
-if (isSprintDone && hasLaps) tabs.push({ id: 'laps', label: 'Lap Chart' });
-tabs.push({ id: 'circuit', label: 'Circuit' });
-
-const defaultTab = tabs[0]?.id ?? 'circuit';
 const raceYear = race ? new Date(race.raceDate).getFullYear() : new Date().getFullYear();
 
-const circuitYearItems = circuitHistory
-  .filter((h) => h.hasSprint)
-  .sort((a, b) => b.year - a.year)
-  .map((h) => ({ year: h.year, href: `/races/${h.raceId}/sprint` }));
+const eventTabs = isSprintDone ? raceEventTabs(events) : [];
+const tabs = [
+  ...(isSprintDone && results.length > 0 ? [{ id: 'results', label: 'Results' }] : []),
+  ...(sqGrid.length > 0 ? [{ id: 'qualifying', label: 'Sprint Quali' }] : []),
+  ...(isSprintDone && laps.length > 0 ? [{ id: 'laps', label: 'Lap Chart' }] : []),
+  ...eventTabs,
+  { id: 'circuit', label: 'Circuit' },
+];
+const defaultTab = tabs[0].id;
 
-const sprintDistKm = race ? (17 * Number(race.circuit.trackLengthKm)).toFixed(1) : null;
-
-const conditions: { label: string; val: string | number }[] = [];
-if (race) {
-  if (race.sprintSafetyCarLaps != null) conditions.push({ label: 'SC Laps', val: race.sprintSafetyCarLaps });
-  if (race.sprintVscLaps != null) conditions.push({ label: 'VSC', val: race.sprintVscLaps });
-  if (race.sprintAirTempAvg) conditions.push({ label: 'Air', val: `${Math.round(Number(race.sprintAirTempAvg))}°C` });
-  if (race.sprintTrackTempAvg) conditions.push({ label: 'Track', val: `${Math.round(Number(race.sprintTrackTempAvg))}°C` });
-  if (race.sprintHumidityAvg) conditions.push({ label: 'Humidity', val: `${Math.round(Number(race.sprintHumidityAvg))}%` });
-}
-
-const sprintStats: Array<{ Icon: LucideIcon; label: string; val: string | number }> = race ? [
-  { Icon: RotateCcw, label: 'Sprint Laps', val: '~17' },
-  { Icon: Gauge, label: 'Length', val: `${race.circuit.trackLengthKm} km` },
-  { Icon: Flag, label: 'Sprint Dist', val: `${sprintDistKm} km` },
-  { Icon: CornerDownRight, label: 'Corners', val: race.circuit.numberOfCorners ?? '—' },
-  { Icon: Wind, label: 'DRS Zones', val: race.circuit.drsZones ?? '—' },
-  { Icon: Zap, label: 'Overtake Rate', val: race.circuit.overtakeRate ? `${Math.round(Number(race.circuit.overtakeRate) * 100)}%` : '—' },
-] : [];
+const podium = predictedPodium(prediction?.drivers ?? []);
+const sprintWinner = winnerOf(results);
+const predCorrect = prediction && sprintWinner ? prediction.predictedWinner.id === sprintWinner.driver.id : null;
+const conditions = race
+  ? conditionsOf({
+      safetyCarLaps: race.sprintSafetyCarLaps, vscLaps: race.sprintVscLaps, airTempAvg: race.sprintAirTempAvg,
+      trackTempAvg: race.sprintTrackTempAvg, humidityAvg: race.sprintHumidityAvg,
+    })
+  : [];
 ---
 
 <BaseLayout title={race ? `Sprint · ${race.name}` : 'Sprint Race'}>
-  <div class="mt-7 space-y-8">
+  <div class="space-y-8">
 
-    <a href="/races" class="inline-block font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground hover:text-foreground transition-colors duration-150">
-      ← all races
-    </a>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <a href="/races" class="inline-block font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground hover:text-foreground transition-colors duration-150">
+        ← all races
+      </a>
+      {race && <SessionSwitcher raceId={race.id} current="sprint" />}
+    </div>
 
     {error ? (
       <div class="border border-destructive/40 bg-destructive/10 p-8 text-center">
@@ -139,10 +98,10 @@ const sprintStats: Array<{ Icon: LucideIcon; label: string; val: string | number
               lengthKm={race.circuit.trackLengthKm}
               weather={race.weather}
               conditions={conditions}
-              fastestLap={flResult ? { code: flResult.driver.code, timeStr: flLapMs ? formatMs(flLapMs) : null } : null}
+              fastestLap={fastestLapOf(results, laps)}
               accent={SPRINT_ACCENT}
               countdown={isUpcoming ? { id: 'sprint-countdown', date: race.sprintDate ?? race.raceDate, borderClass: 'border-orange-500/20', digitClass: 'sprint-cd' } : null}
-              yearItems={circuitYearItems}
+              yearItems={circuitYearItems(circuitHistory, 'sprint')}
               currentYear={raceYear}
               yearVariant="orange"
             />
@@ -151,7 +110,7 @@ const sprintStats: Array<{ Icon: LucideIcon; label: string; val: string | number
               accent={SPRINT_ACCENT}
               heading="./sprint prediction"
               fullHref={`/prediction/sprint/${id}`}
-              hasPrediction={hasPrediction}
+              hasPrediction={prediction != null}
               predictedWinnerName={prediction?.predictedWinner.fullName}
               winnerLabel="predicted sprint winner"
               confidence={Math.round(Number(podium[0]?.winProbability ?? 0) * 100)}
@@ -166,69 +125,44 @@ const sprintStats: Array<{ Icon: LucideIcon; label: string; val: string | number
         </div>
 
         {/* ── TABS ── */}
-        {tabs.length > 0 && (
-          <div>
-            <div class="flex items-center gap-1.5 mb-6" role="tablist">
-              {tabs.map((t) => (
-                <button
-                  type="button"
-                  data-tab={t.id}
-                  id={`sprint-tab-${t.id}`}
-                  role="tab"
-                  aria-selected={t.id === defaultTab ? 'true' : 'false'}
-                  aria-controls={`sprint-panel-${t.id}`}
-                  tabindex={t.id === defaultTab ? 0 : -1}
-                  class={`sprint-tab-btn font-mono text-[9px] tracking-[0.12em] uppercase px-3 py-1.5 border transition-colors duration-150 ${
-                    t.id === defaultTab
-                      ? 'border-orange-500/50 text-orange-400 bg-orange-500/[0.08]'
-                      : 'border-white/[0.08] text-muted-foreground hover:text-foreground hover:border-white/[0.15]'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
+        <div>
+          <RaceTabs tabs={tabs} defaultTab={defaultTab} accent={SPRINT_ACCENT} namespace="sprint-" links={isSprintDone && race ? [
+            { href: `/races/${race.id}/race-story?session=sprint`, label: 'Race story' },
+            { href: `/races/${race.id}/telemetry?session=SQ`, label: 'Telemetry' },
+          ] : []} />
 
-            {isSprintDone && hasResults && (
-              <div id="sprint-panel-results" role="tabpanel" aria-labelledby="sprint-tab-results" class={`sprint-tab-panel ${defaultTab !== 'results' ? 'hidden' : ''}`}>
-                <div class="border border-white/[0.06] overflow-hidden">
-                  <RaceResultsTable results={results as unknown as RaceResult[]} year={raceYear} laps={laps} flColor="#fb923c" />
-                </div>
+          {isSprintDone && results.length > 0 && (
+            <RaceTabPanel id="results" defaultTab={defaultTab} namespace="sprint-">
+              <div class="border border-white/[0.06] overflow-hidden">
+                <RaceResultsTable results={results as unknown as RaceResult[]} year={raceYear} laps={laps} flColor="#fb923c" />
               </div>
-            )}
+            </RaceTabPanel>
+          )}
 
-            {hasGrid && (
-              <div id="sprint-panel-qualifying" role="tabpanel" aria-labelledby="sprint-tab-qualifying" class={`sprint-tab-panel ${defaultTab !== 'qualifying' ? 'hidden' : ''}`}>
-                <div class="border border-white/[0.06] overflow-hidden">
-                  <QualifyingGrid qualifying={sqGrid} year={raceYear} labelPrefix="SQ" />
-                </div>
+          {sqGrid.length > 0 && (
+            <RaceTabPanel id="qualifying" defaultTab={defaultTab} namespace="sprint-">
+              <div class="border border-white/[0.06] overflow-hidden">
+                <QualifyingGrid qualifying={sqGrid} year={raceYear} labelPrefix="SQ" />
               </div>
-            )}
+            </RaceTabPanel>
+          )}
 
-            {isSprintDone && hasLaps && (
-              <div id="sprint-panel-laps" role="tabpanel" aria-labelledby="sprint-tab-laps" class={`sprint-tab-panel ${defaultTab !== 'laps' ? 'hidden' : ''}`}>
-                <div class="border border-white/[0.06] overflow-hidden">
-                  <LapChart laps={laps} />
-                </div>
+          {isSprintDone && laps.length > 0 && (
+            <RaceTabPanel id="laps" defaultTab={defaultTab} namespace="sprint-">
+              <div class="border border-white/[0.06] overflow-hidden">
+                <LapChart laps={laps} />
               </div>
-            )}
+            </RaceTabPanel>
+          )}
 
-            <div id="sprint-panel-circuit" role="tabpanel" aria-labelledby="sprint-tab-circuit" class={`sprint-tab-panel ${defaultTab !== 'circuit' ? 'hidden' : ''}`}>
-              <div class="grid grid-cols-2 sm:grid-cols-3 gap-px bg-white/[0.06]">
-                {sprintStats.map(({ Icon, label, val }) => (
-                  <div class="bg-black p-5">
-                    <div class="flex items-center gap-1 font-mono text-[8px] text-muted-foreground tracking-widest uppercase mb-2">
-                      <Icon size={10} />{label}
-                    </div>
-                    <div class="font-bold text-xl">{val}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+          <RaceEventPanels events={events} tabs={eventTabs} defaultTab={defaultTab} namespace="sprint-" driverMap={driverMapOf(results)} year={raceYear} />
 
-        {!hasPrediction && !hasResults && (
+          <RaceTabPanel id="circuit" defaultTab={defaultTab} namespace="sprint-">
+            <CircuitStatsGrid circuit={race.circuit} session="sprint" />
+          </RaceTabPanel>
+        </div>
+
+        {prediction == null && results.length === 0 && (
           <div class="border border-white/[0.06] p-10 text-center">
             <Zap size={20} className="text-muted-foreground opacity-20 mx-auto mb-3" />
             <p class="font-mono text-[9px] text-muted-foreground tracking-[0.25em] uppercase">Sprint prediction available after sprint qualifying</p>
@@ -241,18 +175,9 @@ const sprintStats: Array<{ Icon: LucideIcon; label: string; val: string | number
 </BaseLayout>
 
 <script>
-  import { initRaceCountdown, initRaceTabs } from '@/features/races/raceTabs';
+  import { initRaceCountdown } from '@/features/races/raceTabs';
 
   document.addEventListener('astro:page-load', () => {
     initRaceCountdown('sprint-countdown', 'raceDate', 'sprint-cd');
-    initRaceTabs({
-      btnClass: 'sprint-tab-btn',
-      panelClass: 'sprint-tab-panel',
-      panelIdPrefix: 'sprint-panel-',
-      activeBorder: 'rgba(249,115,22,0.5)',
-      activeColor: '#fb923c',
-      activeBg: 'rgba(249,115,22,0.08)',
-      strippedClasses: ['border-orange-500/50', 'text-orange-400', 'bg-orange-500/[0.08]'],
-    });
   });
 </script>

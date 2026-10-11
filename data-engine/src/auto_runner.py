@@ -1,5 +1,5 @@
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 from typing import Any, Callable, Optional
@@ -8,7 +8,8 @@ import pandas as pd
 import fastf1
 from fastf1.core import DataNotLoadedError, InvalidSessionError, NoLapDataError
 from src.db.client import get_conn
-from src.utils.logging_utils import log_job_failure
+from src.utils import openf1_client
+from src.utils.logging_utils import log_job_failure, log_job_ok
 from src.utils.schedule_window import race_weekend_window, RaceWeekendWindow
 
 # Import jobs
@@ -27,6 +28,11 @@ from src.jobs import (
     ingest_race_control,
     ingest_overtakes,
     ingest_team_radio,
+    ingest_stints,
+    ingest_pit_stops,
+    compute_title_odds,
+    ingest_qualifying_telemetry,
+    ingest_race_story,
 )
 
 
@@ -51,14 +57,51 @@ class JobStep:
     commits_status: Optional[str]
 
 
-def _run_openf1_step(job_run: Callable[[int, int], None], step_name: str, ctx: RaceRunContext) -> None:
-    """Race-event enrichment (OpenF1) rides on the MAIN_RACE sequence but must never fail or
-    revert it — these jobs are independently idempotent, so a transient OpenF1 hiccup here is
-    safe to just log and leave for a manual re-run rather than treating as a pipeline failure."""
+def _run_openf1_step(job_run: Callable[[int, int], Any], step_name: str, ctx: RaceRunContext) -> bool:
+    """Enrichment rides on the core sequences but must never fail or revert them: these jobs are
+    independently idempotent, so a failure is logged and left for _retry_missing_race_events.
+    Returns whether the job finished: a job may return False to ask for another pass."""
     try:
-        job_run(ctx.year, ctx.round_number)
+        return job_run(ctx.year, ctx.round_number) is not False
     except Exception as e:
         log_job_failure(step_name, e, race_id=ctx.race_id, year=ctx.year, round=ctx.round_number)
+        return False
+
+
+def _run_title_odds_step(ctx: RaceRunContext) -> bool:
+    """Title odds are derived analysis: a failure is logged and must never fail or revert the
+    race-weekend sequence that produced the standings/predictions it reads."""
+    return _run_openf1_step(lambda y, _r: compute_title_odds.run(y), "compute_title_odds", ctx)
+
+
+_TITLE_ODDS_STEP = JobStep("compute_title_odds", _run_title_odds_step, None)
+
+
+def _telemetry_job(session_type: str) -> Callable[[int, int], bool]:
+    return lambda y, r: ingest_qualifying_telemetry.run(y, r, session_type=session_type)
+
+
+def _telemetry_step(name: str, session_type: str) -> JobStep:
+    return JobStep(name, lambda ctx: _run_openf1_step(_telemetry_job(session_type), name, ctx), None)
+
+
+# Fastest-lap telemetry runs as soon as its session is over (~41 OpenF1 requests, more than one
+# cycle's budget); _retry_missing_race_events resumes it on later cycles.
+_Q_TELEMETRY_STEP = _telemetry_step("ingest_qualifying_telemetry", "Q")
+_SQ_TELEMETRY_STEP = _telemetry_step("ingest_sprint_qualifying_telemetry", "SQ")
+
+_OPENF1_JOB_MODULES = (ingest_race_control, ingest_overtakes, ingest_team_radio, ingest_stints, ingest_pit_stops)
+
+
+def _openf1_session_jobs(session_name: str) -> list[tuple[str, Callable[[int, int], None]]]:
+    """Step name + (year, round) runner for every OpenF1 enrichment job of one session.
+    Looks up module.run at call time so a patched job is always the one that runs."""
+    suffix = "" if session_name == "Race" else "_sprint"
+    return [
+        (f"{module.__name__.rsplit('.', 1)[-1]}{suffix}",
+         lambda y, r, module=module: module.run(y, r, session_name=session_name))
+        for module in _OPENF1_JOB_MODULES
+    ]
 
 
 _ACTION_JOBS: dict[ActionKind, tuple[JobStep, ...]] = {
@@ -70,60 +113,34 @@ _ACTION_JOBS: dict[ActionKind, tuple[JobStep, ...]] = {
         ),
         JobStep("compute_sprint_features", lambda ctx: compute_sprint_features.run(ctx.race_id), None),
         JobStep("compute_sprint_predictions", lambda ctx: compute_sprint_predictions.run(ctx.race_id), None),
+        _TITLE_ODDS_STEP,
+        _SQ_TELEMETRY_STEP,
     ),
     ActionKind.SPRINT_RACE: (
         JobStep("ingest_sprint", lambda ctx: ingest_sprint.run(ctx.year, ctx.round_number), "sprint_done"),
         JobStep("compute_season_stats", lambda ctx: compute_season_stats.run(ctx.year), None),
+        _TITLE_ODDS_STEP,
     ),
     ActionKind.MAIN_QUALIFYING: (
         JobStep("ingest_qualifying", lambda ctx: ingest_qualifying.run(ctx.year, ctx.round_number), "qualifying_done"),
         JobStep("ingest_fp2", lambda ctx: ingest_fp2.run(ctx.year, ctx.round_number), None),
         JobStep("compute_features", lambda ctx: compute_features.run(ctx.race_id), None),
         JobStep("compute_predictions", lambda ctx: compute_predictions.run(ctx.race_id), None),
+        _TITLE_ODDS_STEP,
+        _Q_TELEMETRY_STEP,
     ),
     ActionKind.MAIN_RACE: (
         JobStep("ingest_race", lambda ctx: ingest_race.run(ctx.year, ctx.round_number), "completed"),
         JobStep("compute_season_stats", lambda ctx: compute_season_stats.run(ctx.year), None),
-        # Race Events (OpenF1) — 2023+ only, and run_openf1_job self-skips while still inside
+        _TITLE_ODDS_STEP,
+        # Race Events (OpenF1): 2023+ only, and run_openf1_job self-skips while still inside
         # OpenF1's live-data window; see openf1_client.py. Non-fatal via _run_openf1_step.
         # The Sprint-session steps self-skip too (no-op) on a non-sprint weekend, since
-        # races.sprint_date is null there — see run_openf1_job.
-        JobStep(
-            "ingest_race_control",
-            lambda ctx: _run_openf1_step(ingest_race_control.run, "ingest_race_control", ctx),
-            None,
-        ),
-        JobStep(
-            "ingest_overtakes",
-            lambda ctx: _run_openf1_step(ingest_overtakes.run, "ingest_overtakes", ctx),
-            None,
-        ),
-        JobStep(
-            "ingest_team_radio",
-            lambda ctx: _run_openf1_step(ingest_team_radio.run, "ingest_team_radio", ctx),
-            None,
-        ),
-        JobStep(
-            "ingest_race_control_sprint",
-            lambda ctx: _run_openf1_step(
-                lambda y, r: ingest_race_control.run(y, r, session_name="Sprint"), "ingest_race_control_sprint", ctx
-            ),
-            None,
-        ),
-        JobStep(
-            "ingest_overtakes_sprint",
-            lambda ctx: _run_openf1_step(
-                lambda y, r: ingest_overtakes.run(y, r, session_name="Sprint"), "ingest_overtakes_sprint", ctx
-            ),
-            None,
-        ),
-        JobStep(
-            "ingest_team_radio_sprint",
-            lambda ctx: _run_openf1_step(
-                lambda y, r: ingest_team_radio.run(y, r, session_name="Sprint"), "ingest_team_radio_sprint", ctx
-            ),
-            None,
-        ),
+        # races.sprint_date is null there: see run_openf1_job.
+        *(JobStep(name, lambda ctx, job=job, name=name: _run_openf1_step(job, name, ctx), None)
+          for name, job in _openf1_session_jobs("Race")),
+        *(JobStep(name, lambda ctx, job=job, name=name: _run_openf1_step(job, name, ctx), None)
+          for name, job in _openf1_session_jobs("Sprint")),
     ),
 }
 
@@ -148,7 +165,7 @@ def _is_ready(session_date_utc: Any, delay_hours: float, now: datetime) -> tuple
 
 
 def decide_next_action(status: str, is_sprint: bool, event: pd.Series, now: datetime) -> Optional[Action]:
-    """Pure — no I/O — so it's testable with fake inputs, no FastF1/DB mocking needed."""
+    """Pure (no I/O) so it's testable with fake inputs, no FastF1/DB mocking needed."""
     if is_sprint and status == "scheduled":
         ready, ready_at = _is_ready(event["Session2DateUtc"], delay_hours=1.5, now=now)
         return Action(
@@ -209,6 +226,7 @@ def _run_action_steps(action: Action, ctx: RaceRunContext) -> StepOutcome:
             step.run(ctx)
         except Exception as e:
             return StepOutcome(ok=False, last_committed_status=last_committed_status, failed_step=step.name, error=e)
+        log_job_ok(step.name, race_id=ctx.race_id, year=ctx.year, round=ctx.round_number)
         if step.commits_status:
             last_committed_status = step.commits_status
     return StepOutcome(ok=True, last_committed_status=last_committed_status, failed_step=None, error=None)
@@ -223,7 +241,7 @@ def revert_race_status(
     failed_step: str,
 ) -> None:
     """Reverts to the last status the sequence actually committed, not the pre-sequence value.
-    Opens its own connection — the shared one may have gone stale during a long job run."""
+    Opens its own connection: the shared one may have gone stale during a long job run."""
     log_job_failure(failed_step, error, race_id=ctx.race_id, year=ctx.year, round=ctx.round_number)
     target_status = last_committed_status if last_committed_status is not None else pre_sequence_status
     conn = conn_factory()
@@ -253,13 +271,14 @@ def _fp2_coverage(conn, race_id: int) -> float:
     return covered / expected
 
 
-def _backfill_fp2(log_func, conn, ctx: RaceRunContext) -> None:
+def _backfill_fp2(log_func, conn, ctx: RaceRunContext) -> bool:
     """ingest_fp2 only runs once (at MAIN_QUALIFYING); if data wasn't ready it was never
-    retried, so retry here each wait-cycle while coverage is below the 0.7 fallback gate."""
+    retried, so retry here each wait-cycle while coverage is below the 0.7 fallback gate.
+    Returns whether coverage has reached the gate."""
     before = _fp2_coverage(conn, ctx.race_id)
     if before >= 0.7:
-        return
-    log_func(f"[auto_runner] FP2 coverage {before:.0%} — retrying FP2 + recompute while waiting for race")
+        return True
+    log_func(f"[auto_runner] FP2 coverage {before:.0%}, retrying FP2 + recompute while waiting for race")
     try:
         ingest_fp2.run(ctx.year, ctx.round_number)
         after = _fp2_coverage(conn, ctx.race_id)
@@ -269,53 +288,93 @@ def _backfill_fp2(log_func, conn, ctx: RaceRunContext) -> None:
             log_func(f"[auto_runner] FP2 backfilled ({before:.0%} -> {after:.0%}); features/predictions refreshed")
         else:
             log_func(f"[auto_runner] FP2 still not available ({after:.0%}); will retry next cycle")
+        return after >= 0.7
     except (DataNotLoadedError, InvalidSessionError, NoLapDataError) as e:
         log_func(f"[auto_runner] FP2 not ready yet: {e}")
+        return False
 
 
-def _retry_missing_race_events(log_func: Callable[[str], None], conn: Any, round_number: int, year: int) -> None:
-    """Safety net for MAIN_RACE's non-fatal OpenF1 steps (see _run_openf1_step): if a race
-    completed but OpenF1 genuinely wasn't ready yet (e.g. a red-flag-delayed race pushed the
-    real session end past OPENF1_LIVE_WINDOW_BUFFER), that failure is logged and swallowed
-    there rather than retried — deliberately, so it never blocks or reverts the core pipeline.
-    This re-checks the current window's race every cycle (up to 24h post-race, per
-    RaceWeekendWindow's _TAIL) and retries if it's still missing.
+_SPRINT_QUALIFIED = ("sprint_qualifying_done", "sprint_done", "qualifying_done", "completed")
+_QUALIFIED = ("qualifying_done", "completed")
 
-    Race control is used as the "did ingestion ever actually succeed" signal because a
-    session that happened virtually always has at least one message — unlike team radio,
-    which is routinely and legitimately empty, so its absence alone would be a false signal.
-    """
+# One flag per (table, session) that a weekend should end up with. Team radio is left out on
+# purpose: F1 often publishes none, so an empty table there says nothing.
+_COVERAGE_SQL = """
+SELECT r.id, r.status, r.sprint_date,
+  EXISTS (SELECT 1 FROM race_control_messages t WHERE t.race_id = r.id AND t.session_type = 'race') AS has_race_control,
+  EXISTS (SELECT 1 FROM race_control_messages t WHERE t.race_id = r.id AND t.session_type = 'sprint') AS has_sprint_race_control,
+  EXISTS (SELECT 1 FROM race_overtakes t WHERE t.race_id = r.id AND t.session_type = 'race') AS has_overtakes,
+  EXISTS (SELECT 1 FROM race_overtakes t WHERE t.race_id = r.id AND t.session_type = 'sprint') AS has_sprint_overtakes,
+  EXISTS (SELECT 1 FROM race_stints t WHERE t.race_id = r.id AND t.session_type = 'race') AS has_stints,
+  EXISTS (SELECT 1 FROM race_stints t WHERE t.race_id = r.id AND t.session_type = 'sprint') AS has_sprint_stints,
+  EXISTS (SELECT 1 FROM race_pit_stops t WHERE t.race_id = r.id AND t.session_type = 'race') AS has_pit_stops,
+  EXISTS (SELECT 1 FROM race_pit_stops t WHERE t.race_id = r.id AND t.session_type = 'sprint') AS has_sprint_pit_stops,
+  EXISTS (SELECT 1 FROM race_lap_traces t WHERE t.race_id = r.id AND t.session_type = 'race') AS has_story,
+  EXISTS (SELECT 1 FROM race_lap_traces t WHERE t.race_id = r.id AND t.session_type = 'sprint') AS has_sprint_story,
+  (SELECT count(*) FROM qualifying_lap_telemetry t WHERE t.race_id = r.id AND t.session_type = 'Q')
+    >= (SELECT count(*) FROM qualifying_results q WHERE q.race_id = r.id) AS telemetry_complete,
+  (SELECT count(*) FROM qualifying_lap_telemetry t WHERE t.race_id = r.id AND t.session_type = 'SQ')
+    >= (SELECT count(*) FROM sprint_results q WHERE q.race_id = r.id AND q.sq1_time_ms IS NOT NULL) AS sq_telemetry_complete,
+  COALESCE((SELECT max(t.races_completed) FROM team_season_stats t WHERE t.season_id = r.season_id), 0)
+    >= (SELECT count(*) FROM races c WHERE c.season_id = r.season_id AND c.status = 'completed') AS stats_current,
+  EXISTS (SELECT 1 FROM title_odds_drivers t WHERE t.season_id = r.season_id AND t.after_round = r.round_number) AS odds_current
+FROM races r
+JOIN seasons s ON s.id = r.season_id
+WHERE s.year = %s AND r.round_number = %s
+"""
+
+
+def _weekend_checks(row: dict) -> list[tuple[str, str, Callable[[int, int], Any]]]:
+    """(coverage flag, step name, job) for everything this weekend should have by now."""
+    status, sprint = row["status"], row["sprint_date"] is not None
+    checks: list[tuple[str, str, Callable[[int, int], Any]]] = []
+    if status in _QUALIFIED:
+        checks.append(("telemetry_complete", "ingest_qualifying_telemetry", _telemetry_job("Q")))
+    if sprint and status in _SPRINT_QUALIFIED:
+        checks.append(("sq_telemetry_complete", "ingest_sprint_qualifying_telemetry", _telemetry_job("SQ")))
+    if status != "completed":
+        return checks
+    sessions = (("Race", ""), ("Sprint", "sprint_")) if sprint else (("Race", ""),)
+    for session_name, prefix in sessions:
+        jobs = dict(_openf1_session_jobs(session_name))
+        suffix = "" if session_name == "Race" else "_sprint"
+        for table, job_module in (("race_control", "ingest_race_control"), ("overtakes", "ingest_overtakes"),
+                                  ("stints", "ingest_stints"), ("pit_stops", "ingest_pit_stops")):
+            checks.append((f"has_{prefix}{table}", f"{job_module}{suffix}", jobs[f"{job_module}{suffix}"]))
+        checks.append((
+            f"has_{prefix}story", f"ingest_race_story{suffix}",
+            lambda y, r, session_name=session_name: ingest_race_story.run(y, r, session_name=session_name),
+        ))
+    checks.append(("stats_current", "compute_season_stats", lambda y, _r: compute_season_stats.run(y)))
+    checks.append(("odds_current", "compute_title_odds", lambda y, _r: compute_title_odds.run(y)))
+    return checks
+
+
+def _retry_missing_race_events(
+    log_func: Callable[[str], None], conn: Any, round_number: int, year: int, memo: Optional["WorkerMemo"] = None,
+) -> bool:
+    """Safety net for the non-fatal enrichment steps (see _run_openf1_step), re-checked every
+    cycle inside the window's race-weekend window (up to 24h after the race). Each table is
+    checked on its own and only its job reruns. A job that has finished cleanly once is settled
+    in the memo even if it wrote nothing (a sprint with no stops, a feed with gaps), so a
+    legitimately empty table never keeps the worker opening Neon every cycle.
+
+    Returns False when anything still needs another pass, so the caller keeps re-checking."""
     with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT r.id, r.status, r.sprint_date,
-                   EXISTS (SELECT 1 FROM race_control_messages rc WHERE rc.race_id = r.id) AS has_race_control
-            FROM races r
-            JOIN seasons s ON s.id = r.season_id
-            WHERE s.year = %s AND r.round_number = %s
-            """,
-            (year, round_number),
-        )
+        cur.execute(_COVERAGE_SQL, (year, round_number))
         row = cur.fetchone()
+    if row is None:
+        return True
 
-    if row is None or row["status"] != "completed" or row["has_race_control"]:
-        return
-
-    log_func(f"[auto_runner] Race {row['id']} is completed but has no race control data — retrying OpenF1 ingestion")
     ctx = RaceRunContext(race_id=row["id"], year=year, round_number=round_number)
-    _run_openf1_step(ingest_race_control.run, "ingest_race_control", ctx)
-    _run_openf1_step(ingest_overtakes.run, "ingest_overtakes", ctx)
-    _run_openf1_step(ingest_team_radio.run, "ingest_team_radio", ctx)
-    if row["sprint_date"] is not None:
-        _run_openf1_step(
-            lambda y, r: ingest_race_control.run(y, r, session_name="Sprint"), "ingest_race_control_sprint", ctx
-        )
-        _run_openf1_step(
-            lambda y, r: ingest_overtakes.run(y, r, session_name="Sprint"), "ingest_overtakes_sprint", ctx
-        )
-        _run_openf1_step(
-            lambda y, r: ingest_team_radio.run(y, r, session_name="Sprint"), "ingest_team_radio_sprint", ctx
-        )
+    settled = memo.settled if memo is not None else set()
+    pending = [(name, job) for flag, name, job in _weekend_checks(row)
+               if not row.get(flag, True) and (ctx.race_id, name) not in settled]
+    for name, job in pending:
+        log_func(f"[auto_runner] Race {ctx.race_id} is missing {name} data: retrying")
+        if _run_openf1_step(job, name, ctx):
+            settled.add((ctx.race_id, name))
+    return all((ctx.race_id, name) in settled for name, _ in pending)
 
 
 ACTIVE_POLL_SECONDS = 20 * 60
@@ -329,6 +388,35 @@ def _default_schedule_fetcher(now_utc: datetime) -> "pd.DataFrame":
     # always going to the network keeps the race-weekend gate accurate.
     with fastf1.Cache.disabled():
         return fastf1.get_event_schedule(now_utc.year, include_testing=False)
+
+
+@dataclass(frozen=True)
+class TrackedRace:
+    ctx: RaceRunContext
+    status: str
+    is_sprint: bool
+
+
+@dataclass
+class WorkerMemo:
+    """Survives between cycles in the long-running worker. The worker is the only writer of
+    races.status, so a status it last saw stays true until it runs the next action itself."""
+
+    tracked: Optional[TrackedRace] = None
+    # (race_id, step name) that finished cleanly in _retry_missing_race_events.
+    settled: set[tuple[int, str]] = field(default_factory=set)
+
+
+def _quiet_action(memo: Optional[WorkerMemo], schedule: "pd.DataFrame", now_utc: datetime) -> Optional[Action]:
+    if memo is None or memo.tracked is None:
+        return None
+    events = schedule[schedule["RoundNumber"] == memo.tracked.ctx.round_number]
+    if events.empty:
+        return None
+    action = decide_next_action(memo.tracked.status, memo.tracked.is_sprint, events.iloc[0], now_utc)
+    if action is None or action.ready or action.ready_at is None:
+        return None
+    return action
 
 
 @dataclass(frozen=True)
@@ -358,8 +446,10 @@ def run_cycle(
     now_utc: Optional[datetime] = None,
     schedule_provider: Optional[Callable[[], "pd.DataFrame"]] = None,
     conn_factory: Callable[[], Any] = get_conn,
+    memo: Optional[WorkerMemo] = None,
 ) -> CycleResult:
     log_func("[auto_runner] Waking up to check for pending F1 sessions...")
+    openf1_client.reset_request_budget()
 
     now_utc = now_utc if now_utc is not None else datetime.now(timezone.utc)
     fetch = schedule_provider or (lambda: _default_schedule_fetcher(now_utc))
@@ -385,13 +475,21 @@ def run_cycle(
             log_func(f"[auto_runner] Outside a race-weekend window ({detail}); skipping the database check.")
             return CycleResult(window=window, schedule_available=True)
 
+        quiet = _quiet_action(memo, schedule, now_utc)
+        if quiet is not None:
+            log_func(f"[auto_runner] {quiet.label} not ready until {quiet.ready_at:%Y-%m-%d %H:%MZ}; skipping the database check.")
+            return CycleResult(window=window, schedule_available=True)
+
+    if memo is not None:
+        memo.tracked = None
     conn = conn_factory()
     try:
         # The window's race may already be 'completed' and so invisible to the "active race"
-        # query below (or superseded by the next round already being 'scheduled') — check it
+        # query below (or superseded by the next round already being 'scheduled'): check it
         # directly on every cycle we're still inside its window (up to 24h post-race-start).
+        race_events_settled = True
         if window is not None:
-            _retry_missing_race_events(log_func, conn, window.round_number, now_utc.year)
+            race_events_settled = _retry_missing_race_events(log_func, conn, window.round_number, now_utc.year, memo)
 
         with conn.cursor() as cur:
             # Find the most recent active race
@@ -443,7 +541,7 @@ def run_cycle(
         if stored_name and schedule_name and stored_name != schedule_name:
             log_func(
                 f"[auto_runner] Round {ctx.round_number} is {schedule_name} in FastF1 but {stored_name} "
-                f"in the database — re-syncing the {ctx.year} calendar."
+                f"in the database: re-syncing the {ctx.year} calendar."
             )
             sync_schedule.run(ctx.year, schedule=schedule)
             return CycleResult(window=window, schedule_available=schedule_available)
@@ -455,9 +553,12 @@ def run_cycle(
                 log_func(f"[auto_runner] Unhandled status '{status}'. Exiting.")
                 return CycleResult(window=window, schedule_available=schedule_available)
             if not action.ready:
+                fp2_settled = True
                 # Opportunistically backfill FP2 (see _backfill_fp2) while waiting for the race.
                 if status == "qualifying_done" and action.kind == ActionKind.MAIN_RACE:
-                    _backfill_fp2(log_func, conn, ctx)
+                    fp2_settled = _backfill_fp2(log_func, conn, ctx)
+                if memo is not None and fp2_settled and race_events_settled:
+                    memo.tracked = TrackedRace(ctx=ctx, status=status, is_sprint=is_sprint)
                 ready_at_str = f"{action.ready_at:%Y-%m-%d %H:%MZ}" if action.ready_at else "unknown (session time missing from schedule)"
                 log_func(
                     f"[auto_runner] {action.label} not finished yet or hasn't reached delay threshold "

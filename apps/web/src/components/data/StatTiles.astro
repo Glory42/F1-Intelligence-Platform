@@ -1,0 +1,17 @@
+---
+interface Props {
+  items: Array<{ label: string; value: string | number }>;
+  cols?: string;
+}
+
+const { items, cols = 'grid-cols-2 sm:grid-cols-4' } = Astro.props;
+---
+
+<div class={`grid ${cols} gap-px bg-white/[0.06]`}>
+  {items.map(({ label, value }) => (
+    <div class="bg-black p-4">
+      <div class="mb-1 text-[12px] text-muted-foreground">{label}</div>
+      <div class="font-mono text-xl font-bold tabular-nums">{value}</div>
+    </div>
+  ))}
+</div>

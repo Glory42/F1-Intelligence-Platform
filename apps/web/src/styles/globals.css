@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    /* Apple "Designing Fluid Interfaces" curves — critically damped default, momentum-bounce reserved for gesture-driven motion */
+    /* Apple "Designing Fluid Interfaces" curves: critically damped default, momentum-bounce reserved for gesture-driven motion */
     --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
     --ease-spring-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
     --background: 0 0% 0%;
@@ -32,6 +32,21 @@
     --success:         142 71% 45%;
     --surface:         0 0% 5%;
     --text-secondary:  0 0% 53%;
+    /* Pirelli compound colours: shared by every strategy/stint chart (see lib/tyres.ts) */
+    --tyre-soft:    354 85% 52%;
+    --tyre-medium:  48 96% 53%;
+    --tyre-hard:    0 0% 92%;
+    --tyre-inter:   142 71% 45%;
+    --tyre-wet:     214 89% 56%;
+    --tyre-unknown: 0 0% 40%;
+    /* 2018's named compounds (see lib/f1/tyres.ts) */
+    --tyre-hypersoft: 330 85% 70%;
+    --tyre-ultrasoft: 280 65% 58%;
+    --tyre-icehard:   195 80% 72%;
+    --tyre-superhard: 25 95% 55%;
+    /* SVG chart chrome */
+    --chart-grid:   0 0% 100% / 0.06;
+    --chart-axis:   0 0% 100% / 0.35;
   }
 
   .dark {
@@ -64,6 +79,9 @@
 }
 
 @layer base {
+  html { --sidebar-w: 13rem; }
+  html[data-sidebar='collapsed'] { --sidebar-w: 3.5rem; }
+
   * { @apply border-border; }
   body { @apply bg-background text-foreground; }
   ::selection { background: rgba(168, 85, 247, 0.35); color: #fff; }
@@ -78,7 +96,23 @@
 }
 
 @layer utilities {
-  /* card with subtle gradient + border — matches portfolio .panel */
+  /* Tab rows scroll sideways on narrow screens; the bar itself shows the overflow. */
+  .scrollbar-none { scrollbar-width: none; }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+
+  .tab-panel-enter { animation: tab-panel-in 200ms ease-out; }
+  @keyframes tab-panel-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tab-panel-enter { animation: none; }
+  }
+  /* Sidebar chrome that only makes sense at one width: toggled by <html data-sidebar>. */
+  html[data-sidebar='collapsed'] .sidebar-label { display: none; }
+  html:not([data-sidebar='collapsed']) .sidebar-collapsed-only { display: none; }
+
+  /* card with subtle gradient + border: matches portfolio .panel */
   .panel {
     border: 1px solid rgba(255, 255, 255, 0.06);
     background: linear-gradient(160deg, rgba(13, 13, 13, 0.85), rgba(13, 13, 13, 0.6));
@@ -99,20 +133,20 @@
     animation: telemetry 4s ease-in-out infinite alternate;
   }
 
-  /* Translucent floating chrome — thin material for quick, transient surfaces (top bar, small menus) */
+  /* Translucent floating chrome: thin material for quick, transient surfaces (top bar, small menus) */
   .glass {
     background-color: rgba(0, 0, 0, 0.72);
     backdrop-filter: blur(20px) saturate(160%);
     -webkit-backdrop-filter: blur(20px) saturate(160%);
   }
-  /* Heavier material for structural / text-dense surfaces (drawers, command palette) — legibility over transparency */
+  /* Heavier material for structural / text-dense surfaces (drawers, command palette): legibility over transparency */
   .glass-heavy {
     background-color: rgba(0, 0, 0, 0.92);
     backdrop-filter: blur(24px) saturate(160%);
     -webkit-backdrop-filter: blur(24px) saturate(160%);
   }
 
-  /* Progressively fills from 0 on first paint/reveal — no JS required.
+  /* Progressively fills from 0 on first paint/reveal: no JS required.
      Animates transform (GPU), not width (layout): the element's real width is
      already its final target from inline style; scaleX only changes how it paints. */
   .bar-fill {
@@ -145,7 +179,7 @@
   }
 }
 
-/* Global search palette — materializes in, retraces the same path back out on close.
+/* Global search palette: materializes in, retraces the same path back out on close.
    Transitions (not keyframes) so a reopen mid-close can retarget smoothly instead of restarting. */
 .search-backdrop {
   opacity: 1;
@@ -173,7 +207,7 @@
   transition-duration: 160ms;
 }
 
-/* Native disclosure (details/summary) — fades/lifts in on open instead of snapping open */
+/* Native disclosure (details/summary): fades/lifts in on open instead of snapping open */
 details[open] > .details-panel {
   animation: details-in 220ms var(--ease-spring);
 }
@@ -182,14 +216,14 @@ details[open] > .details-panel {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Type tracking/leading — tighten as size grows, per Apple's optical-sizing guidance */
+/* Type tracking/leading: tighten as size grows, per Apple's optical-sizing guidance */
 h1 { letter-spacing: -0.025em; line-height: 1.08; }
 h2 { letter-spacing: -0.015em; line-height: 1.15; }
 h3 { letter-spacing: -0.01em;  line-height: 1.2; }
 
 @media (prefers-reduced-motion: reduce) {
   /* Movement-driven UI (drawer slide, dropdown scale, press, hover-lift) snaps straight
-     to its final state instead of animating — correct, not a loss of information. */
+     to its final state instead of animating: correct, not a loss of information. */
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
@@ -197,7 +231,7 @@ h3 { letter-spacing: -0.01em;  line-height: 1.2; }
     scroll-behavior: auto !important;
   }
   /* But keep opacity/color transitions that aid comprehension of a state change
-     (loading→content swaps, data reveals) — "gentler, not zero". */
+     (loading→content swaps, data reveals): "gentler, not zero". */
   .fade-swap, .bar-fill {
     transition-duration: 200ms !important;
   }

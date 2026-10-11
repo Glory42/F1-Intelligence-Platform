@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 import { Shield, User } from 'lucide-react';
+import { CompareSlotBadge } from './CompareSlotBadge';
 
 interface Props {
+  slot: 'A' | 'B';
   entityType: 'driver' | 'team';
   href: string;
   imageUrl: string | null;
@@ -12,16 +14,16 @@ interface Props {
   flag?: ReactNode;
 }
 
-export function CompareEntityCard({ entityType, href, imageUrl, imageAlt, borderColor, name, subtitle, flag }: Props) {
+export function CompareEntityCard({ slot, entityType, href, imageUrl, imageAlt, borderColor, name, subtitle, flag }: Props) {
   const isDriver = entityType === 'driver';
 
   return (
     <a
       href={href}
-      className="group border border-white/[0.06] bg-black hover:border-white/[0.12] hover:shadow-[0_0_15px_rgba(255,255,255,0.015)] p-5 flex items-center justify-between transition-all duration-300 transform hover:-translate-y-0.5"
+      className="group border border-white/[0.06] bg-black hover:border-white/[0.12] hover:shadow-[0_0_15px_rgba(255,255,255,0.015)] p-4 flex items-center justify-between gap-3 transition-all duration-300 transform hover:-translate-y-0.5"
       style={{ borderLeft: `3px solid ${borderColor}` }}
     >
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 min-w-0">
         <div
           className={
             isDriver
@@ -41,8 +43,11 @@ export function CompareEntityCard({ entityType, href, imageUrl, imageAlt, border
             <Shield size={28} className="text-white/20" />
           )}
         </div>
-        <div>
-          <h3 className="text-lg font-bold text-white leading-tight group-hover:text-[#a855f7] transition-colors">{name}</h3>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <CompareSlotBadge slot={slot} color={borderColor} />
+            <h3 className="text-base font-bold text-white leading-tight truncate group-hover:text-[#a855f7] transition-colors">{name}</h3>
+          </div>
           {subtitle}
         </div>
       </div>

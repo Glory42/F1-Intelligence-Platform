@@ -1,4 +1,4 @@
-# Web — Astro SSR on Cloudflare Pages
+# Web: Astro SSR on Cloudflare Pages
 
 Server-side rendered frontend for the F1 prediction platform.
 
@@ -30,7 +30,7 @@ cp .env.example .env
 ## Build
 
 ```bash
-bun run build    # production build — catches TypeScript errors
+bun run build    # production build: catches TypeScript errors
 ```
 
 ## Pages
@@ -49,11 +49,11 @@ bun run build    # production build — catches TypeScript errors
 
 ## Rules
 
-- All data fetching happens in Astro frontmatter (`---` blocks) — never in client islands
-- No chart libraries — `LapChart.astro` uses plain SVG
+- All data fetching happens in Astro frontmatter (`---` blocks): never in client islands
+- No chart libraries: `LapChart.astro` uses plain SVG
 - No heavy animation libraries
 - `.astro` components for display; `.tsx` for interactive Shadcn islands
 
 ## Deploy
 
-Push to GitHub — Cloudflare Pages deploys automatically. Never run `wrangler pages deploy` directly.
+Push to GitHub: Cloudflare Pages deploys automatically. Never run `wrangler pages deploy` directly.

@@ -1,135 +1,66 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { api } from '@/lib/api';
-import type { DriverStanding, SeasonSummary } from '@/types';
-import YearSelect from '@/components/shared/YearSelect.astro';
-import { Trophy, Users } from 'lucide-react';
-import { getTeamColor } from '@/lib/teamColors';
-import { getTeamLogo } from '@/lib/teamLogos';
-import { getNationalityFlag, getDriverFlagByCode, getDriverNationalityCode } from '@/lib/countryFlags';
+import type { DriverStanding, SeasonSummary, Race, TitleOddsResponse, RacecraftRow } from '@/types';
+import PageHeader from '@/components/page/PageHeader.astro';
+import PageTabs from '@/components/page/PageTabs.astro';
+import EmptyState from '@/components/page/EmptyState.astro';
+import YearSelect from '@/components/page/YearSelect.astro';
+import DriverStandingsTable from '@/features/standings/components/DriverStandingsTable.astro';
+import TitleFight from '@/features/standings/components/TitleFight.astro';
+import RacecraftTable from '@/features/standings/components/RacecraftTable.astro';
+import { resolveTab, TAB_PARAM } from '@/lib/pageTabs';
+
+const TABS = [
+  { id: 'standings', label: 'Standings' },
+  { id: 'title-fight', label: 'Title fight' },
+  { id: 'racecraft', label: 'Racecraft' },
+] as const;
 
 const year = Number(Astro.url.searchParams.get('year') ?? new Date().getFullYear());
+const tab = resolveTab(Astro.url, TABS);
 
-let standings: DriverStanding[] = [];
 let seasons: SeasonSummary[] = [];
+let standings: DriverStanding[] = [];
+let titleOdds: TitleOddsResponse | null = null;
+let races: Race[] = [];
+let racecraft: RacecraftRow[] = [];
 let error: string | null = null;
 try {
-  [standings, seasons] = await Promise.all([api.getDriverStandings(year), api.getSeasons()]);
+  [seasons, standings, titleOdds, races, racecraft] = await Promise.all([
+    api.getSeasons(),
+    tab === 'racecraft' ? [] : api.getDriverStandings(year),
+    tab === 'title-fight' ? api.getTitleOdds(year).catch(() => null) : null,
+    tab === 'title-fight' ? api.getRaces(year).catch(() => []) : [],
+    tab === 'racecraft' ? api.getRacecraft(year).catch(() => []) : [],
+  ]);
 } catch (e) {
   error = e instanceof Error ? e.message : 'Failed to load standings';
-}
-
-function isTopPos(pos: number | null, i: number) {
-  return (pos ?? i + 1) < 4;
-}
-function champPos(pos: number | null, i: number) {
-  return pos ?? i + 1;
 }
 ---
 
 <BaseLayout title={`${year} Driver Standings`}>
-  <div class="mt-7 space-y-8">
+  <div class="space-y-6">
+    <PageHeader kicker="./drivers" title={`${year} Drivers`} subtitle={`${year} championship`}>
+      <YearSelect slot="aside" years={seasons} currentYear={year} basePath="/drivers" extraParams={tab === TABS[0].id ? '' : `&${TAB_PARAM}=${tab}`} />
+    </PageHeader>
 
-    <div class="flex items-end justify-between gap-4 flex-wrap">
-      <div>
-        <div class="flex items-center gap-3 mb-2">
-          <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)"><Users size={11} />./drivers</span>
-          <div class="h-px w-16 bg-white/[0.05]" />
-        </div>
-        <h1 class="text-2xl font-bold">{year} Driver Standings</h1>
-        <p class="mt-1 font-mono text-[10px] text-muted-foreground tracking-widest uppercase">
-          {standings.length} drivers · {year} championship
-        </p>
-      </div>
-      <YearSelect years={seasons} currentYear={year} basePath="/drivers" />
-    </div>
+    <PageTabs tabs={TABS} active={tab} label="Drivers views" />
 
     {error ? (
-      <div class="border border-destructive/40 bg-destructive/10 p-8 text-center">
-        <p class="font-mono text-[10px] text-destructive tracking-widest uppercase">Error loading standings</p>
-      </div>
-    ) : standings.length === 0 ? (
-      <div class="border border-white/[0.06] p-10 text-center">
-        <p class="font-mono text-[9px] text-muted-foreground tracking-[0.25em] uppercase">No standings available for {year}</p>
-      </div>
+      <EmptyState tone="error" message="Couldn't load the drivers. Try again in a moment." />
+    ) : tab === 'standings' ? (
+      standings.length > 0
+        ? <DriverStandingsTable standings={standings} year={year} />
+        : <EmptyState message={`No standings for ${year} yet.`} />
+    ) : tab === 'title-fight' ? (
+      titleOdds && standings.length > 0
+        ? <TitleFight odds={titleOdds} standings={standings} races={races} year={year} />
+        : <EmptyState message={`No title odds for ${year} yet. They start after the first race.`} />
     ) : (
-      <div class="border border-white/[0.06]">
-        <!-- Table header -->
-        <div class="grid grid-cols-[40px_1fr_60px] sm:grid-cols-[40px_1fr_280px_60px_60px_60px] md:grid-cols-[40px_360px_280px_1fr_60px_60px_60px] lg:grid-cols-[40px_360px_280px_1fr_60px_60px_60px_60px_80px] gap-0 px-5 py-2.5 border-b border-white/[0.06]" style="border-left: 3px solid transparent;">
-          <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase">Pos</div>
-          <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase">Driver</div>
-          <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase hidden sm:block pr-4">Nationality</div>
-          <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase hidden md:block">Team</div>
-          <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right">Pts</div>
-          <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right hidden sm:block">W</div>
-          <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right hidden sm:block">Pod</div>
-          <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right hidden lg:block">Pole</div>
-          <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right hidden lg:block">Races</div>
-        </div>
-
-        {standings.map((s, i) => (
-            <a
-              href={`/drivers/${s.driver.id}?year=${year}`}
-              class={`grid grid-cols-[40px_1fr_60px] sm:grid-cols-[40px_1fr_280px_60px_60px_60px] md:grid-cols-[40px_360px_280px_1fr_60px_60px_60px] lg:grid-cols-[40px_360px_280px_1fr_60px_60px_60px_60px_80px] gap-0 items-start sm:items-center px-5 py-3.5 hover:bg-white/[0.02] transition-colors duration-150 group ${i !== 0 ? 'border-t border-white/[0.04]' : ''}`}
-              style={`border-left: 3px solid ${getTeamColor(s.driver.team.teamKey)};`}
-            >
-              <!-- Position — pt-1 aligns with name text -->
-              <div class={`font-mono text-sm font-bold pt-1 sm:pt-0 ${isTopPos(s.stats.championshipPosition, i) ? 'text-[#a855f7]' : 'text-muted-foreground'}`}>
-                {champPos(s.stats.championshipPosition, i) === 1 ? <Trophy size={14} /> : String(champPos(s.stats.championshipPosition, i)).padStart(2, '0')}
-              </div>
-              <!-- Driver -->
-              <div class="flex items-start sm:items-center gap-2.5 min-w-0">
-                {s.driver.headshotUrl ? (
-                  <img
-                    src={s.driver.headshotUrl}
-                    alt={s.driver.fullName}
-                    class="w-9 h-9 object-cover object-top border border-white/[0.08] shrink-0 bg-white/[0.02]"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div class="w-9 h-9 border border-white/[0.08] flex items-center justify-center shrink-0">
-                    <span class="font-mono text-[9px] font-bold text-muted-foreground">{s.driver.driverNumber}</span>
-                  </div>
-                )}
-                <div class="min-w-0">
-                  <div class="font-semibold text-sm leading-none group-hover:text-[#a855f7] transition-colors duration-150 truncate">{s.driver.fullName}</div>
-                  <!-- Team — own line, mobile only -->
-                  <div class="font-mono text-[8px] text-muted-foreground mt-1 md:hidden">{s.driver.team.name}</div>
-                  <!-- Stats — mobile only -->
-                  <div class="flex items-center gap-2 mt-0.5 sm:hidden font-mono text-[8px] text-muted-foreground/60">
-                    <span>{s.stats.wins}W</span>
-                    <span class="text-white/20">·</span>
-                    <span>{s.stats.podiums} Pod</span>
-                    <span class="text-white/20">·</span>
-                    <span>{s.stats.poles} Pole</span>
-                  </div>
-                </div>
-              </div>
-              <!-- Nationality (sm+) -->
-              <div class="hidden sm:flex items-center gap-1.5 min-w-0 pr-4">
-                <span class="text-sm select-none">{s.driver.nationality ? getNationalityFlag(s.driver.nationality) : getDriverFlagByCode(s.driver.code)}</span>
-                <span class="font-mono text-[9px] text-muted-foreground uppercase">{s.driver.nationality || getDriverNationalityCode(s.driver.code)}</span>
-              </div>
-              <!-- Team (md+) -->
-              <div class="hidden md:flex items-center gap-2 min-w-0">
-                {(() => { const logo = getTeamLogo(s.driver.team.teamKey); return logo ? (
-                  <img src={logo} alt={s.driver.team.name} class="h-4 w-8 object-contain shrink-0" loading="lazy" />
-                ) : null; })()}
-                <span class="font-mono text-[9px] text-muted-foreground truncate">{s.driver.team.name}</span>
-              </div>
-              <!-- Points -->
-              <div class="font-mono text-xs sm:text-sm font-bold text-right tabular-nums pt-1 sm:pt-0">{Math.round(Number(s.stats.totalPoints))}</div>
-              <!-- Wins -->
-              <div class="font-mono text-sm text-right hidden sm:block">{s.stats.wins}</div>
-              <!-- Podiums -->
-              <div class="font-mono text-sm text-right text-muted-foreground hidden sm:block">{s.stats.podiums}</div>
-              <!-- Poles -->
-              <div class="font-mono text-sm text-right text-muted-foreground hidden lg:block">{s.stats.poles}</div>
-              <!-- Races -->
-              <div class="font-mono text-sm text-right text-muted-foreground hidden lg:block">{s.stats.racesEntered}</div>
-            </a>
-        ))}
-      </div>
+      racecraft.length > 0
+        ? <RacecraftTable rows={racecraft} year={year} />
+        : <EmptyState message={`No overtake data for ${year} yet.`} />
     )}
   </div>
 </BaseLayout>

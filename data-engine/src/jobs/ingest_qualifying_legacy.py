@@ -41,14 +41,14 @@ def run(year: int, round_num: int) -> None:
         results_df = session.results
         is_fallback = False
         if results_df is None or results_df.empty:
-            print("  No qualifying results in Ergast — falling back to race grid positions")
+            print("  No qualifying results in Ergast: falling back to race grid positions")
             race_session = fastf1.get_session(year, round_num, "R")
             race_session.load(laps=False, telemetry=False, weather=False, messages=False)
             results_df = race_session.results
             is_fallback = True
 
         if results_df is None or results_df.empty:
-            print("  No qualifying or race data available — skipping")
+            print("  No qualifying or race data available: skipping")
             return
 
         rows_to_upsert = []

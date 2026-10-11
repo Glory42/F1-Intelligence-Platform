@@ -87,6 +87,27 @@ class TestComputeDriverStats:
         assert d2["poles"] == 1
 
     @patch("src.jobs.compute_season_stats.upsert")
+    def test_championship_position_counts_sprint_points(self, mock_upsert):
+        # Driver 1 leads on grand prix points (200 vs 195), but driver 2's 15 sprint points
+        # make it 200 vs 210 in the actual championship.
+        race_agg = {"races_entered": 10, "races_finished": 10, "wins": 0, "podiums": 0, "dnf_count": 0,
+                    "avg_finish": 5.0, "avg_gain": 0.0}
+        conn = FakeConnection([
+            [{"driver_id": 1, "total_points": "200.0", **race_agg}, {"driver_id": 2, "total_points": "195.0", **race_agg}],
+            [],
+            [{"driver_id": 2, "sprint_races_entered": 3, "sprint_wins": 1, "sprint_podiums": 2,
+              "sprint_total_points": "15.0", "sprint_avg_finish": 2.0}],
+            [],
+            [],
+        ])
+
+        _compute_driver_stats(conn, season_id=1)
+
+        _, _, rows, _ = mock_upsert.call_args[0]
+        positions = {r["driver_id"]: r["championship_position"] for r in rows}
+        assert positions == {2: 1, 1: 2}
+
+    @patch("src.jobs.compute_season_stats.upsert")
     def test_zero_races_entered_handles_dnf_rate_as_none(self, mock_upsert):
         conn = FakeConnection([
             [  # Driver with 0 entries
@@ -180,6 +201,20 @@ class TestComputeTeamStats:
         assert t2["dnf_count"] == 6
         assert t2["reliability_score"] == pytest.approx(1.0 - 6 / 24, abs=1e-4)
         assert t2["championship_position"] == 2
+
+    @patch("src.jobs.compute_season_stats.upsert")
+    def test_constructor_championship_position_counts_sprint_points(self, mock_upsert):
+        team_agg = {"races_completed": 10, "wins": 0, "podiums": 0, "dnf_count": 0, "total_entries": 20,
+                    "avg_finish": 5.0, "median_finish": 5.0, "avg_grid": 5.0}
+        conn = FakeConnection([
+            [{"team_id": 10, "total_points": "300.0", **team_agg}, {"team_id": 20, "total_points": "290.0", **team_agg}],
+            [{"team_id": 20, "sprint_wins": 2, "sprint_podiums": 4, "sprint_total_points": "30.0"}],
+        ])
+
+        _compute_team_stats(conn, season_id=1)
+
+        _, _, rows, _ = mock_upsert.call_args[0]
+        assert {r["team_id"]: r["championship_position"] for r in rows} == {20: 1, 10: 2}
 
     @patch("src.jobs.compute_season_stats.upsert")
     def test_empty_team_aggregates_skips_upsert(self, mock_upsert):

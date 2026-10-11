@@ -75,7 +75,7 @@ def run(race_id: int) -> None:
             start_pos = ctx.start_pos_map[driver_id]
             position_gain = clamp((avg_gain + 15.0) / 30.0)
 
-            # Circuit-context multiplier — shared with the sprint model, see feature_helpers.
+            # Circuit-context multiplier: shared with the sprint model, see feature_helpers.
             circuit_adj_start_pos = calc_circuit_adj_start_pos(start_pos, overtake_rate, sc_probability)
             # Position gain potential is only meaningful where overtaking is physically possible.
             circuit_adj_position_gain = clamp(position_gain * overtake_rate)
@@ -194,7 +194,7 @@ def blend_compound_slopes(
 ) -> float | None:
     """Lap-weighted average slope across (slope, lap_count) compound pairs meeting the
     per-compound floor, falling back to all compounds if total laps clear min_total_laps."""
-    # Primary path — only compounds meeting the per-compound floor
+    # Primary path: only compounds meeting the per-compound floor
     w_sum = 0.0
     w_total = 0
     for slope, n in compounds:
@@ -205,7 +205,7 @@ def blend_compound_slopes(
     if w_total > 0:
         return w_sum / w_total
 
-    # Fallback path — no single compound qualified; check total laps
+    # Fallback path: no single compound qualified; check total laps
     total_n = sum(n for _, n in compounds)
     if total_n >= min_total_laps:
         w_sum = 0.0
@@ -231,7 +231,7 @@ def _field_median(values: list[float]) -> float:
 
 
 def _compute_tyre_degradation(conn, driver_ids: list[int], race_id: int, circuit_id: int) -> dict[int, float]:
-    """Per-compound REGR_SLOPE, blended via blend_compound_slopes — avoids the ~0.5-0.9s
+    """Per-compound REGR_SLOPE, blended via blend_compound_slopes: avoids the ~0.5-0.9s
     cross-compound pace offset distorting the tyre-management signal. Lower slope = higher score."""
     with conn.cursor() as cur:
         cur.execute(

@@ -71,17 +71,17 @@ def run(year: int, round_num: int) -> None:
             results_row_label="sprint grid (SQ)",
             allowed_event_formats=SPRINT_FORMATS,
             format_error=(
-                "Round {round_num} has event_format='{event_format}' — not a sprint weekend. "
+                "Round {round_num} has event_format='{event_format}': not a sprint weekend. "
                 "Cannot run ingest_sprint_qualifying."
             ),
-            date_guard_error="Sprint qualifying for {year} R{round_num} is on {day} — not yet. Skipping.",
-            no_results_error="No SQ results for race {race_id} — all driver codes unknown",
+            date_guard_error="Sprint qualifying for {year} R{round_num} is on {day}: not yet. Skipping.",
+            no_results_error="No SQ results for race {race_id}: all driver codes unknown",
             session_type_for=_session_type_for,
             resolve_race=_resolve_race,
             rows_from_quali=_rows_from_quali,
             new_status="sprint_qualifying_done",
             status_guard=("scheduled",),
-            # Never overwrite sprint race finish data — only update grid/SQ columns.
+            # Never overwrite sprint race finish data: only update grid/SQ columns.
             exclude_update=["finish_position", "points", "status", "total_sprint_time_ms", "fastest_lap"],
         ),
     )

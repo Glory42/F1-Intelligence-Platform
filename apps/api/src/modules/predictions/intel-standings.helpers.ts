@@ -1,7 +1,7 @@
 import type { drivers, teams, driverPredictionFeatures } from '../../db/schema';
 import type { FeatureScores, IntelStandingRow } from '../../common/types';
 import { toDriver } from '../../common/mappers';
-import { GP_FEATURE_MANIFEST } from '../../common/featureManifest';
+import { GP_FEATURE_MANIFEST } from '../../common/feature-manifest';
 
 export interface SprintSeasonTotals {
   sprintWins: number;

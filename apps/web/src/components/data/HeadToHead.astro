@@ -1,0 +1,86 @@
+---
+// Driver-vs-driver bars, first built for the teams page; reused by the driver page's team-mate battle.
+import type { Driver } from '@/types';
+
+export interface HeadToHeadRow {
+  label: string;
+  v1: number;
+  v2: number;
+  lowerBetter?: boolean;
+  fmt?: (value: number) => string;
+}
+
+interface Props {
+  left: Driver;
+  right: Driver;
+  color: string;
+  rows: HeadToHeadRow[];
+  year: number;
+}
+
+const { left, right, color, rows, year } = Astro.props;
+---
+
+<div class="border border-white/[0.06]">
+  {/* Driver headers */}
+  <div class="grid grid-cols-[1fr_90px_1fr] border-b border-white/[0.06]">
+    <a href={`/drivers/${left.id}?year=${year}`} class="flex items-center gap-3 p-4 hover:bg-white/[0.02] transition-colors group" style={`border-left: 2px solid ${color};`}>
+      {left.headshotUrl ? (
+        <img src={left.headshotUrl} alt={left.fullName} class="w-12 h-12 object-cover object-top border border-white/[0.08] shrink-0" loading="lazy" />
+      ) : (
+        <div class="w-12 h-12 border border-white/[0.08] flex items-center justify-center shrink-0">
+          <span class="font-mono text-sm font-bold text-[#a855f7]">{left.driverNumber}</span>
+        </div>
+      )}
+      <div>
+        <div class="font-mono text-[8px] text-muted-foreground tracking-wider">{left.code} #{left.driverNumber}</div>
+        <div class="font-semibold group-hover:text-[#a855f7] transition-colors">{left.fullName}</div>
+        {left.nationality && <div class="font-mono text-[9px] text-muted-foreground">{left.nationality}</div>}
+      </div>
+    </a>
+    <div class="flex items-center justify-center text-[11px] text-muted-foreground border-x border-white/[0.06]">vs</div>
+    <a href={`/drivers/${right.id}?year=${year}`} class="flex items-center justify-end gap-3 p-4 hover:bg-white/[0.02] transition-colors group" style={`border-right: 2px solid ${color};`}>
+      <div class="text-right">
+        <div class="font-mono text-[8px] text-muted-foreground tracking-wider">{right.code} #{right.driverNumber}</div>
+        <div class="font-semibold group-hover:text-[#a855f7] transition-colors">{right.fullName}</div>
+        {right.nationality && <div class="font-mono text-[9px] text-muted-foreground">{right.nationality}</div>}
+      </div>
+      {right.headshotUrl ? (
+        <img src={right.headshotUrl} alt={right.fullName} class="w-12 h-12 object-cover object-top border border-white/[0.08] shrink-0" loading="lazy" />
+      ) : (
+        <div class="w-12 h-12 border border-white/[0.08] flex items-center justify-center shrink-0">
+          <span class="font-mono text-sm font-bold text-[#a855f7]">{right.driverNumber}</span>
+        </div>
+      )}
+    </a>
+  </div>
+  <!-- Stat rows -->
+  {rows.map((row, i) => {
+    const total = row.v1 + row.v2;
+    // A lower-is-better stat gives the bigger bar to the smaller value, so the longer bar always wins.
+    const share1 = row.lowerBetter ? row.v2 : row.v1;
+    const pct1 = total === 0 ? 50 : Math.round((share1 / total) * 100);
+    const pct2 = 100 - pct1;
+    const d1Wins = row.lowerBetter ? row.v1 < row.v2 : row.v1 > row.v2;
+    const d2Wins = row.lowerBetter ? row.v2 < row.v1 : row.v2 > row.v1;
+    const display1 = row.fmt ? row.fmt(row.v1) : row.v1;
+    const display2 = row.fmt ? row.fmt(row.v2) : row.v2;
+    return (
+      <div class={`grid grid-cols-[1fr_90px_1fr] ${i !== 0 ? 'border-t border-white/[0.04]' : ''}`}>
+        <div class="flex items-center gap-3 px-4 py-3">
+          <span class={`font-mono text-sm font-bold w-10 shrink-0 ${d1Wins ? 'text-white' : 'text-muted-foreground'}`}>{display1}</span>
+          <div class="flex-1 h-1.5 bg-white/[0.06] flex justify-end overflow-hidden">
+            <div class="h-full bar-fill bar-fill-end" style={`width:${pct1}%; background:${d1Wins ? color : 'rgba(255,255,255,0.12)'}`} />
+          </div>
+        </div>
+        <div class="flex items-center justify-center text-[11px] text-muted-foreground border-x border-white/[0.06]">{row.label}</div>
+        <div class="flex items-center gap-3 px-4 py-3">
+          <div class="flex-1 h-1.5 bg-white/[0.06] overflow-hidden">
+            <div class="h-full bar-fill" style={`width:${pct2}%; background:${d2Wins ? color : 'rgba(255,255,255,0.12)'}`} />
+          </div>
+          <span class={`font-mono text-sm font-bold w-10 shrink-0 text-right ${d2Wins ? 'text-white' : 'text-muted-foreground'}`}>{display2}</span>
+        </div>
+      </div>
+    );
+  })}
+</div>

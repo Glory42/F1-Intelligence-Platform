@@ -18,7 +18,7 @@ class SessionEntry:
 
 
 def _present(value: Any) -> bool:
-    # FastF1 returns NaN (truthy) for missing fields in old seasons — that once became code "NAN".
+    # FastF1 returns NaN (truthy) for missing fields in old seasons: that once became code "NAN".
     return value is not None and not (isinstance(value, float) and pd.isna(value)) and str(value).strip() != ""
 
 

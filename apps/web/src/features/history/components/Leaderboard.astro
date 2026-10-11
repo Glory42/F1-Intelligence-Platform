@@ -1,0 +1,86 @@
+---
+import { f1dbCountryFlag, f1dbCountryName } from '@/features/history/f1dbCountries';
+import { RANK_COLORS, barPercent } from '../historyView';
+import ActiveBadge from './ActiveBadge.astro';
+
+export interface LeaderboardEntry {
+  name: string;
+  value: number;
+  display?: string;
+  detail?: string;
+  nationality?: string | null;
+  href?: string;
+  active?: boolean;
+}
+
+interface Props {
+  title: string;
+  entries: LeaderboardEntry[];
+  visible?: number;
+  bars?: boolean;
+  note?: string;
+}
+
+const { title, entries, visible = 5, bars = true, note } = Astro.props;
+const max = Math.max(0, ...entries.map((e) => e.value));
+const shown = entries.slice(0, visible);
+const hidden = entries.slice(visible);
+---
+
+<div role="table" aria-label={title} class="border border-white/[0.06] bg-black p-5">
+  <div role="row" class="flex items-baseline justify-between gap-3 mb-4">
+    <h3 role="columnheader" class="font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground/70">{title}</h3>
+    {note && <span class="font-mono text-[8px] tracking-wider uppercase text-muted-foreground/50">{note}</span>}
+  </div>
+  {[shown, hidden].map((group, groupIdx) => {
+    const rows = group.map((e, j) => {
+      const i = groupIdx === 0 ? j : visible + j;
+      const rankColor = RANK_COLORS[i];
+      return (
+        <div role="row" class="group/row py-2">
+          <div class="flex items-center justify-between gap-3">
+            <div role="cell" class="flex items-center gap-3 min-w-0">
+              <span
+                class="font-mono text-[10px] w-5 shrink-0 tabular-nums"
+                style={`color: ${rankColor ?? 'rgba(255,255,255,0.35)'}`}
+              >{String(i + 1).padStart(2, '0')}</span>
+              {e.nationality !== undefined && (
+                <span class="shrink-0 text-sm" title={f1dbCountryName(e.nationality)}>{f1dbCountryFlag(e.nationality)}</span>
+              )}
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 min-w-0">
+                  {e.href
+                    ? <a href={e.href} class="text-xs font-medium truncate hover:text-[#a855f7] transition-colors">{e.name}</a>
+                    : <span class="text-xs font-medium truncate">{e.name}</span>}
+                  {e.active && <ActiveBadge compact />}
+                </div>
+                {e.detail && <div class="font-mono text-[8px] text-muted-foreground truncate mt-0.5">{e.detail}</div>}
+              </div>
+            </div>
+            <span role="cell" class={`font-mono text-[11px] font-bold shrink-0 tabular-nums ${i === 0 ? 'text-white' : 'text-white/80'}`}>
+              {e.display ?? e.value}
+            </span>
+          </div>
+          {bars && (
+            <div class="mt-1.5 ml-8 h-[3px] bg-white/[0.03] overflow-hidden" aria-hidden="true">
+              <div
+                class="h-full bar-fill"
+                style={`width: ${barPercent(e.value, max)}%; background: ${rankColor ?? 'rgba(168,85,247,0.45)'}`}
+              />
+            </div>
+          )}
+        </div>
+      );
+    });
+    if (groupIdx === 0) return <div class="divide-y divide-white/[0.03]">{rows}</div>;
+    return rows.length > 0 && (
+      <details class="group/more">
+        <summary class="mt-2 cursor-pointer list-none font-mono text-[8px] tracking-[0.18em] uppercase text-muted-foreground hover:text-foreground transition-colors [&::-webkit-details-marker]:hidden">
+          <span class="group-open/more:hidden">Show top {entries.length} ↓</span>
+          <span class="hidden group-open/more:inline">Show top {visible} ↑</span>
+        </summary>
+        <div class="divide-y divide-white/[0.03] border-t border-white/[0.03] mt-2">{rows}</div>
+      </details>
+    );
+  })}
+</div>

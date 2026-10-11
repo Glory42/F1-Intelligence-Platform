@@ -1,0 +1,133 @@
+---
+import { CheckCircle2, XCircle, Clock } from 'lucide-react';
+import StatTiles from '@/components/data/StatTiles.astro';
+import CalibrationChart from '@/features/predictions/components/CalibrationChart.astro';
+import { formatDate } from '@/lib/utils';
+import { brierScore, bestCall, worstMiss, longestStreak } from '@/lib/f1/predictionMath';
+import type { PredictionHistoryItem, SeasonAccuracy } from '@/types';
+
+interface Props {
+  history: PredictionHistoryItem[];
+  seasonAccuracy: SeasonAccuracy[];
+  year: number;
+}
+
+const { history, seasonAccuracy, year } = Astro.props;
+
+// Calibration buckets are noise below a handful of decided races.
+const MIN_RACES_FOR_CALIBRATION = 5;
+
+const ordered = [...history].sort((a, b) => a.roundNumber - b.roundNumber);
+const decided = ordered.filter((h) => h.correct !== null);
+const share = (n: number) => (decided.length > 0 ? `${Math.round((n / decided.length) * 100)}%` : '-');
+const winnerWithin = (n: number) =>
+  decided.filter((h) => h.actualWinnerPredictedPosition !== null && h.actualWinnerPredictedPosition <= n).length;
+const brier = brierScore(ordered);
+const best = bestCall(ordered);
+const worst = worstMiss(ordered);
+const streak = longestStreak(ordered);
+const hrefFor = (h: PredictionHistoryItem) => (h.isSprint ? `/prediction/sprint/${h.raceId}` : `/prediction/${h.raceId}`);
+---
+
+<section aria-labelledby="scorecard-heading" class="space-y-8">
+  <h2 id="scorecard-heading" class="sr-only">Scorecard</h2>
+
+  <StatTiles items={[
+    { label: 'P1 hit', value: share(decided.filter((h) => h.correct === true).length) },
+    { label: 'Top 3 hit', value: share(winnerWithin(3)) },
+    { label: 'Top 5 hit', value: share(winnerWithin(5)) },
+    { label: 'Brier', value: brier === null ? '-' : brier.toFixed(3) },
+  ]} />
+
+  {decided.length > 0 && (
+    <div class="grid grid-cols-1 gap-px bg-white/[0.06] sm:grid-cols-3">
+      <div class="bg-black p-4">
+        <div class="mb-1 text-[12px] text-muted-foreground">Best call</div>
+        {best ? (
+          <a href={hrefFor(best)} class="text-[13px] hover:text-[#a855f7] transition-colors duration-150">
+            {best.raceName}: backed {best.predictedWinner.code} at {Math.round(Number(best.winProbability) * 100)}%
+          </a>
+        ) : <p class="text-[13px] text-muted-foreground">No correct calls yet.</p>}
+      </div>
+      <div class="bg-black p-4">
+        <div class="mb-1 text-[12px] text-muted-foreground">Worst miss</div>
+        {worst ? (
+          <a href={hrefFor(worst)} class="text-[13px] hover:text-[#a855f7] transition-colors duration-150">
+            {worst.raceName}: had {worst.predictedWinner.code} at {Math.round(Number(worst.winProbability) * 100)}%{worst.actualWinner && `, ${worst.actualWinner.code} won`}
+          </a>
+        ) : <p class="text-[13px] text-muted-foreground">No misses. Every call landed.</p>}
+      </div>
+      <div class="bg-black p-4">
+        <div class="mb-1 text-[12px] text-muted-foreground">Longest streak</div>
+        <p class="text-[13px]"><span class="font-mono font-bold">{streak}</span> {streak === 1 ? 'winner' : 'winners'} in a row</p>
+      </div>
+    </div>
+  )}
+
+  <div>
+    <p class="mb-3 font-mono text-[9px] uppercase tracking-[0.25em]" style="color: rgba(168,85,247,0.55)">./race by race · {year}</p>
+    <ol aria-label="Race by race" class="border border-white/[0.06]">
+      {ordered.map((h, i) => (
+        <li class={i !== 0 ? 'border-t border-white/[0.04]' : ''}>
+        <a
+          href={hrefFor(h)}
+          class="group flex items-center gap-4 px-5 py-3 hover:bg-white/[0.02] transition-colors duration-150"
+        >
+          <div class="w-5 shrink-0 font-mono text-[9px] text-muted-foreground">{h.roundNumber.toString().padStart(2, '0')}</div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <span class="truncate text-[13px] font-medium group-hover:text-[#a855f7] transition-colors duration-150">{h.raceName}</span>
+              {h.isSprint && <span class="shrink-0 border border-orange-500/30 px-1.5 py-0.5 font-mono text-[7px] uppercase tracking-[0.1em] text-orange-400/70">sprint</span>}
+            </div>
+            <div class="mt-0.5 font-mono text-[10px] text-muted-foreground">
+              picked <span class="text-foreground">{h.predictedWinner.code}</span>
+              {h.actualWinner && <> · won <span class={h.correct === false ? 'text-red-400' : 'text-foreground'}>{h.actualWinner.code}</span></>}
+              {h.correct === false && h.actualWinnerPredictedPosition !== null && <> · model had them P{h.actualWinnerPredictedPosition}</>}
+            </div>
+          </div>
+          <div class="hidden shrink-0 font-mono text-[10px] text-muted-foreground sm:block">{formatDate(h.raceDate)}</div>
+          <div class="w-20 shrink-0 text-right font-mono text-[10px]">
+            {h.correct === true && <span class="flex items-center justify-end gap-1 text-green-400"><CheckCircle2 size={12} />hit</span>}
+            {h.correct === false && <span class="flex items-center justify-end gap-1 text-red-400"><XCircle size={12} />miss</span>}
+            {h.correct === null && <span class="flex items-center justify-end gap-1 text-muted-foreground"><Clock size={11} />{Math.round(Number(h.winProbability) * 100)}%</span>}
+          </div>
+        </a>
+        </li>
+      ))}
+    </ol>
+  </div>
+
+  <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+    {decided.length >= MIN_RACES_FOR_CALIBRATION && (
+      <div>
+        <p class="mb-3 font-mono text-[9px] uppercase tracking-[0.25em]" style="color: rgba(168,85,247,0.55)">./calibration</p>
+        <div class="border border-white/[0.06] p-5">
+          <CalibrationChart items={ordered} />
+        </div>
+      </div>
+    )}
+
+    {seasonAccuracy.length > 0 && (
+      <div>
+        <p class="mb-3 font-mono text-[9px] uppercase tracking-[0.25em]" style="color: rgba(168,85,247,0.55)">./every season</p>
+        <div class="border border-white/[0.06]">
+          <div class="grid grid-cols-[70px_1fr_1fr_1fr] border-b border-white/[0.06] px-5 py-2.5 font-mono text-[8px] uppercase tracking-widest text-muted-foreground">
+            <div>Season</div><div class="text-right">GP</div><div class="text-right">Sprint</div><div class="text-right">Overall</div>
+          </div>
+          {seasonAccuracy.map((s, i) => (
+            <a
+              href={`/prediction?tab=scorecard&year=${s.year}`}
+              aria-current={s.year === year ? 'page' : undefined}
+              class={`grid grid-cols-[70px_1fr_1fr_1fr] items-center px-5 py-2.5 font-mono text-[10px] hover:bg-white/[0.02] transition-colors duration-150 ${i !== 0 ? 'border-t border-white/[0.04]' : ''} ${s.year === year ? 'bg-white/[0.03]' : ''}`}
+            >
+              <div class="font-sans text-[13px] font-semibold">{s.year}</div>
+              <div class="text-right">{s.gp.races > 0 ? `${s.gp.correct}/${s.gp.races}` : '-'}</div>
+              <div class="text-right">{s.sprint.races > 0 ? `${s.sprint.correct}/${s.sprint.races}` : '-'}</div>
+              <div class="text-right font-bold text-[#a855f7]">{s.overall.races > 0 ? `${s.overall.accuracyPct}%` : '-'}</div>
+            </a>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+</section>

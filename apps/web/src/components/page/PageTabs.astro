@@ -1,0 +1,32 @@
+---
+import { tabHref, type PageTab } from '@/lib/pageTabs';
+
+interface Props {
+  tabs: readonly PageTab[];
+  active: string;
+  /** Names the tab row for assistive tech, e.g. "Drivers views". */
+  label: string;
+}
+
+const { tabs, active, label } = Astro.props;
+---
+
+<nav aria-label={label} class="scrollbar-none flex gap-6 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_rgba(255,255,255,0.06)]">
+  {tabs.map((t) => {
+    const current = t.id === active;
+    return (
+      <a
+        href={t.href ?? tabHref(Astro.url, tabs, t.id)}
+        aria-current={current ? 'page' : undefined}
+        class={`relative whitespace-nowrap py-2.5 text-[13px] transition-colors duration-150 ${
+          current ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+        }`}
+      >
+        {t.label}
+        {current && (
+          <span aria-hidden="true" transition:name="page-tab-indicator" class="absolute inset-x-0 bottom-0 h-0.5 bg-[#a855f7]" />
+        )}
+      </a>
+    );
+  })}
+</nav>

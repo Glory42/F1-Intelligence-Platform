@@ -3,7 +3,7 @@ name: backfill
 description: Run historical F1 data backfill jobs. Use when the user says "backfill", "run backfill", "populate data", or asks to ingest historical race/qualifying data for specific years.
 ---
 
-# Backfill Skill — F1 Prediction Data Engine
+# Backfill Skill: F1 Prediction Data Engine
 
 Run ETL jobs to populate historical race data, features, and predictions.
 
@@ -109,7 +109,7 @@ conn.close()
 
 ## Rules
 
-- Jobs are idempotent — safe to re-run
+- Jobs are idempotent: safe to re-run
 - `safe()` wrapper in `scripts/run_backfill.py` catches per-round failures and continues
-- Pre-2018 qualifying sessions may return 0 drivers (Ergast coverage is sparse) — this is expected
-- Do NOT deploy to Cloudflare after backfill — DB writes are live immediately
+- Pre-2018 qualifying sessions may return 0 drivers (Ergast coverage is sparse): this is expected
+- Do NOT deploy to Cloudflare after backfill: DB writes are live immediately

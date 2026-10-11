@@ -208,7 +208,7 @@ def compute_luck_score(conn, driver_ids: list[int], race_id: int, team_perf: dic
 
 def circuit_adj_start_pos(start_pos: float, overtake_rate: float, sc_probability: float) -> float:
     """Grid position matters more at low-overtake tracks; high SC probability bunches the
-    field, reducing it further. Shared by GP and sprint — same formula, different WEIGHTS."""
+    field, reducing it further. Shared by GP and sprint: same formula, different WEIGHTS."""
     return clamp(start_pos * (1 + (1 - overtake_rate)) * (1 - 0.3 * sc_probability))
 
 

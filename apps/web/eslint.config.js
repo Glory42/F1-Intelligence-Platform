@@ -2,7 +2,7 @@ import tseslint from 'typescript-eslint';
 import astro from 'eslint-plugin-astro';
 import reactHooks from 'eslint-plugin-react-hooks';
 
-// max-lines counts real code — blank lines and comments don't count toward the limit.
+// max-lines counts real code: blank lines and comments don't count toward the limit.
 const maxLines = (max) => ['error', { max, skipBlankLines: true, skipComments: true }];
 
 export default [
@@ -45,13 +45,13 @@ export default [
     rules: { 'max-lines': maxLines(300) },
   },
 
-  // components — display markup, plus room for one co-located <script>/<style>
+  // components: display markup, plus room for one co-located <script>/<style>
   {
     files: ['src/**/components/**/*.{astro,tsx}'],
     rules: { 'max-lines': maxLines(250) },
   },
 
-  // pure logic, hooks, lib helpers — keep these single-purpose (default 200 budget)
+  // pure logic, hooks, lib helpers: keep these single-purpose (default 200 budget)
 
   // no budget for type decls, tests, or config
   {

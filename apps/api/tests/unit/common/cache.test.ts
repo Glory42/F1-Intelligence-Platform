@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { CACHE_ACTIVE, CACHE_COMPLETED, cacheControlForStatus, cacheControlForYear } from '../../../src/common/cache';
+import { CACHE_ACTIVE, CACHE_COMPLETED, cacheControlForStatus, cacheControlForYear, cacheIfData } from '../../../src/common/cache';
 
 describe('cacheControlForStatus', () => {
   test('completed races get the long immutable cache', () => {
@@ -26,5 +26,15 @@ describe('cacheControlForYear', () => {
 
   test('a future year gets the short active cache', () => {
     expect(cacheControlForYear(2027, now)).toBe(CACHE_ACTIVE);
+  });
+});
+
+describe('cacheIfData', () => {
+  test('a response with data keeps the cache rule it was given', () => {
+    expect(cacheIfData(CACHE_COMPLETED, true)).toBe(CACHE_COMPLETED);
+  });
+
+  test('an empty response is only cached briefly, so a later backfill or import shows up at once', () => {
+    expect(cacheIfData(CACHE_COMPLETED, false)).toBe(CACHE_ACTIVE);
   });
 });

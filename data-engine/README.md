@@ -1,4 +1,4 @@
-# Data Engine — Python ETL on Render
+# Data Engine: Python ETL on Render
 
 Batch ETL jobs that ingest F1 data from FastF1/Ergast and compute race predictions. Runs on Render as cron jobs; writes directly to Neon PostgreSQL via psycopg2.
 
@@ -31,7 +31,7 @@ python -m src.main --job compute_sprint_features  --race_id 55
 python -m src.main --job compute_sprint_predictions --race_id 55
 python -m src.main --job ingest_sprint            --year 2026 --round 9
 
-# Pre-2018 legacy jobs (Ergast — no lap data)
+# Pre-2018 legacy jobs (Ergast: no lap data)
 python -m src.main --job ingest_qualifying_legacy --year 2010 --round 5
 python -m src.main --job ingest_race_legacy       --year 2010 --round 5
 ```
@@ -39,17 +39,17 @@ python -m src.main --job ingest_race_legacy       --year 2010 --round 5
 ## Historical Backfill
 
 ```bash
-# Full backfill — sync + all rounds + sprint pipeline + predictions
+# Full backfill: sync + all rounds + sprint pipeline + predictions
 python scripts/backfill_full.py --start 2018           # recommended: full FastF1 coverage
 python scripts/backfill_full.py --start 2000           # 2000–2026, older years skip gracefully
 
-# Sprint-only backfill — re-run sprint pipeline for specific years
+# Sprint-only backfill: re-run sprint pipeline for specific years
 python scripts/backfill_sprint.py --years 2021 2022 2024 2026
 ```
 
 Data coverage:
 - **2018–present**: FastF1 full timing (qualifying, lap times, sprint lap times, conditions)
-- **2000–2017**: Ergast results only (no lap times; no sprint — format started 2021)
+- **2000–2017**: Ergast results only (no lap times; no sprint, format started 2021)
 
 ## Cron Schedule (Render)
 
@@ -88,9 +88,9 @@ The `cache/` directory is gitignored. Already enabled via `src/config.py`.
 
 ## Rules
 
-- All jobs are idempotent — safe to re-run (`INSERT ... ON CONFLICT DO UPDATE`)
+- All jobs are idempotent: safe to re-run (`INSERT ... ON CONFLICT DO UPDATE`)
 - Sprint qualifying ingest never overwrites existing sprint race finish positions (`exclude_update` guard)
 - Jobs exit with code 1 on failure (Render marks the job failed for manual retrigger)
-- No `sleep()` inside jobs — Render has a job timeout
+- No `sleep()` inside jobs: Render has a job timeout
 - Structured logging: `{"job": "ingest_race", "round": 14, "status": "failed", "error": "..."}`
-- Never write through the Hono API — connect directly to Neon
+- Never write through the Hono API: connect directly to Neon

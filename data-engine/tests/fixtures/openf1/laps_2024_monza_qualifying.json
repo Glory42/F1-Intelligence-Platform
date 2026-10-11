@@ -1,0 +1,219 @@
+[
+{
+"driver_number": 4,
+"lap_number": 1,
+"date_start": "2024-08-31T14:03:14.074000+00:00",
+"is_pit_out_lap": true,
+"lap_duration": null
+},
+{
+"driver_number": 81,
+"lap_number": 1,
+"date_start": "2024-08-31T14:03:18.086000+00:00",
+"is_pit_out_lap": true,
+"lap_duration": null
+},
+{
+"driver_number": 4,
+"lap_number": 2,
+"date_start": "2024-08-31T14:05:09.910000+00:00",
+"is_pit_out_lap": false,
+"lap_duration": 79.911
+},
+{
+"driver_number": 81,
+"lap_number": 2,
+"date_start": "2024-08-31T14:05:20.436000+00:00",
+"is_pit_out_lap": false,
+"lap_duration": 110.311
+},
+{
+"driver_number": 4,
+"lap_number": 3,
+"date_start": "2024-08-31T14:06:29.849000+00:00",
+"is_pit_out_lap": false,
+"lap_duration": 111.021
+},
+{
+"driver_number": 81,
+"lap_number": 3,
+"date_start": "2024-08-31T14:07:10.881000+00:00",
+"is_pit_out_lap": false,
+"lap_duration": 80.488
+},
+{
+"driver_number": 81,
+"lap_number": 4,
+"date_start": "2024-08-31T14:08:31.288000+00:00",
+"is_pit_out_lap": false,
+"lap_duration": 110.151
+},
+{
+"driver_number": 81,
+"lap_number": 5,
+"date_start": "2024-08-31T14:14:50.558000+00:00",
+"is_pit_out_lap": true,
+"lap_duration": 387.092
+},
+{
+"driver_number": 81,
+"lap_number": 6,
+"date_start": "2024-08-31T14:16:48.677000+00:00",
+"is_pit_out_lap": false,
+"lap_duration": 80.076
+},
+{
+"driver_number": 81,
+"lap_number": 7,
+"date_start": "2024-08-31T14:18:08.654000+00:00",
+"is_pit_out_lap": false,
+"lap_duration": 110.213
+},
+{
+"driver_number": 81,
+"lap_number": 8,
+"date_start": "2024-08-31T14:30:26.749000+00:00",
+"is_pit_out_lap": true,
+"lap_duration": 736.087
+},
+{
+"driver_number": 4,
+"lap_number": 4,
+"date_start": "2024-08-31T14:30:37.907000+00:00",
+"is_pit_out_lap": true,
+"lap_duration": 1446.253
+},
+{
+"driver_number": 81,
+"lap_number": 9,
+"date_start": "2024-08-31T14:32:15.013000+00:00",
+"is_pit_out_lap": false,
+"lap_duration": 79.808
+},
+{
+"driver_number": 4,
+"lap_number": 5,
+"date_start": "2024-08-31T14:32:27.211000+00:00",
+"is_pit_out_lap": false,
+"lap_duration": 79.727
+},
+{
+"driver_number": 81,
+"lap_number": 10,
+"date_start": "2024-08-31T14:33:34.898000+00:00",
+"is_pit_out_lap": false,
+"lap_duration": 112.538
+},
+{
+"driver_number": 4,
+"lap_number": 6,
+"date_start": "2024-08-31T14:33:47.105000+00:00",
+"is_pit_out_lap": false,
+"lap_duration": 109.446
+},
+{
+"driver_number": 81,
+"lap_number": 11,
+"date_start": "2024-08-31T14:39:34.527000+00:00",
+"is_pit_out_lap": true,
+"lap_duration": 349.297
+},
+{
+"driver_number": 81,
+"lap_number": 12,
+"date_start": "2024-08-31T14:41:16.597000+00:00",
+"is_pit_out_lap": false,
+"lap_duration": 79.845
+},
+{
+"driver_number": 81,
+"lap_number": 13,
+"date_start": "2024-08-31T14:42:36.448000+00:00",
+"is_pit_out_lap": false,
+"lap_duration": 113.795
+},
+{
+"driver_number": 81,
+"lap_number": 14,
+"date_start": "2024-08-31T14:52:28.882000+00:00",
+"is_pit_out_lap": true,
+"lap_duration": 602.578
+},
+{
+"driver_number": 4,
+"lap_number": 7,
+"date_start": "2024-08-31T14:52:41.179000+00:00",
+"is_pit_out_lap": true,
+"lap_duration": 1147.514
+},
+{
+"driver_number": 81,
+"lap_number": 15,
+"date_start": "2024-08-31T14:54:32.811000+00:00",
+"is_pit_out_lap": false,
+"lap_duration": 79.436
+},
+{
+"driver_number": 4,
+"lap_number": 8,
+"date_start": "2024-08-31T14:54:43.841000+00:00",
+"is_pit_out_lap": false,
+"lap_duration": 79.401
+},
+{
+"driver_number": 81,
+"lap_number": 16,
+"date_start": "2024-08-31T14:55:52.419000+00:00",
+"is_pit_out_lap": false,
+"lap_duration": 105.672
+},
+{
+"driver_number": 4,
+"lap_number": 9,
+"date_start": "2024-08-31T14:56:03.399000+00:00",
+"is_pit_out_lap": false,
+"lap_duration": 107.128
+},
+{
+"driver_number": 4,
+"lap_number": 10,
+"date_start": "2024-08-31T15:00:54.839000+00:00",
+"is_pit_out_lap": true,
+"lap_duration": 300.137
+},
+{
+"driver_number": 81,
+"lap_number": 17,
+"date_start": "2024-08-31T15:01:01.489000+00:00",
+"is_pit_out_lap": true,
+"lap_duration": 321.707
+},
+{
+"driver_number": 4,
+"lap_number": 11,
+"date_start": "2024-08-31T15:02:50.589000+00:00",
+"is_pit_out_lap": false,
+"lap_duration": 79.327
+},
+{
+"driver_number": 81,
+"lap_number": 18,
+"date_start": "2024-08-31T15:02:59.695000+00:00",
+"is_pit_out_lap": false,
+"lap_duration": 79.661
+},
+{
+"driver_number": 4,
+"lap_number": 12,
+"date_start": "2024-08-31T15:04:09.890000+00:00",
+"is_pit_out_lap": false,
+"lap_duration": null
+},
+{
+"driver_number": 81,
+"lap_number": 19,
+"date_start": "2024-08-31T15:04:19.342000+00:00",
+"is_pit_out_lap": false,
+"lap_duration": null
+}
+]

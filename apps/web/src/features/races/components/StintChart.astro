@@ -1,0 +1,84 @@
+---
+import { linearScale, niceTicks } from '@/components/data/chartScale';
+import { compoundToken } from '@/lib/f1/tyres';
+import type { DriverStrategy } from '@/types';
+
+interface Props {
+  drivers: DriverStrategy[];
+  approximate: boolean;
+  year: number;
+}
+
+const { drivers, approximate, year } = Astro.props;
+
+const ROW_H = 16;
+const ROW_GAP = 6;
+const LABEL_W = 44;
+const PAD = { top: 8, right: 12, bottom: 26 };
+// Drawn at roughly its on-screen width so labels keep the site's small mono sizes.
+const WIDTH = 1100;
+
+const totalLaps = Math.max(1, ...drivers.flatMap((d) => d.stints.map((s) => s.lapEnd ?? 0)));
+const x = linearScale([0, totalLaps], [LABEL_W, WIDTH - PAD.right]);
+const height = PAD.top + drivers.length * (ROW_H + ROW_GAP) + PAD.bottom;
+const ticks = niceTicks(0, totalLaps, 6);
+const rowY = (i: number) => PAD.top + i * (ROW_H + ROW_GAP);
+
+const compoundsUsed = [...new Set(drivers.flatMap((d) => d.stints.map((s) => s.compound ?? 'UNKNOWN')))];
+const anyUsedSets = drivers.some((d) => d.stints.some((s) => (s.tyreAgeAtStart ?? 0) > 0));
+
+const stintLabel = (code: string, compound: string | null, used: boolean, lapStart: number, lapEnd: number) =>
+  `${code}: ${compound ?? 'UNKNOWN'}${used ? ' (used)' : ''}, laps ${lapStart}–${lapEnd}`;
+---
+
+<div class="overflow-x-auto">
+  <ul class="flex flex-wrap gap-4 mb-4 font-mono text-[8px] tracking-widest uppercase text-muted-foreground" aria-label="Compounds">
+    {compoundsUsed.map((c) => (
+      <li class="flex items-center gap-1.5">
+        <span class="inline-block w-2.5 h-2.5" style={`background:hsl(var(--${compoundToken(c, year)}))`} />{c}
+      </li>
+    ))}
+    {anyUsedSets && (
+      <li class="flex items-center gap-1.5">
+        <span class="inline-block w-2.5 h-2.5 bg-white/60" style="background-image:repeating-linear-gradient(45deg,rgba(0,0,0,.55) 0 2px,transparent 2px 4px)" />Used set
+      </li>
+    )}
+  </ul>
+  <svg viewBox={`0 0 ${WIDTH} ${height}`} width="100%" style="min-width:640px;display:block" aria-label="Tyre strategy per driver">
+    <defs>
+      <pattern id="used-set" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="3" height="6" fill="rgba(0,0,0,0.45)" />
+      </pattern>
+    </defs>
+
+    {ticks.map((t) => (
+      <g>
+        <line x1={x(t)} x2={x(t)} y1={PAD.top} y2={height - PAD.bottom} stroke="hsl(var(--chart-grid))" />
+        <text x={x(t)} y={height - 8} text-anchor="middle" class="fill-muted-foreground font-mono" font-size="9">{t}</text>
+      </g>
+    ))}
+
+    {drivers.map((d, i) => (
+      <g>
+        <text x={0} y={rowY(i) + ROW_H / 2 + 3} class="fill-foreground font-mono" font-size="10">{d.driver.code}</text>
+        {d.stints.filter((s) => s.lapStart != null && s.lapEnd != null).map((s) => {
+          const used = (s.tyreAgeAtStart ?? 0) > 0;
+          const barX = x(s.lapStart! - 1);
+          const barW = Math.max(1, x(s.lapEnd!) - barX - 1);
+          return (
+            <g role="img" aria-label={stintLabel(d.driver.code, s.compound, used, s.lapStart!, s.lapEnd!)}>
+              <title>{stintLabel(d.driver.code, s.compound, used, s.lapStart!, s.lapEnd!)}</title>
+              <rect x={barX} y={rowY(i)} width={barW} height={ROW_H} fill={`hsl(var(--${compoundToken(s.compound, year)}))`} />
+              {used && <rect x={barX} y={rowY(i)} width={barW} height={ROW_H} fill="url(#used-set)" />}
+            </g>
+          );
+        })}
+      </g>
+    ))}
+  </svg>
+  {approximate && (
+    <p class="mt-3 font-mono text-[7px] text-muted-foreground/50 leading-relaxed">
+      Approximate: rebuilt from timed laps; pit in/out laps and tyre age aren't recorded for this race.
+    </p>
+  )}
+</div>

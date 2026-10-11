@@ -46,18 +46,18 @@ def run_year(year: int) -> None:
     print(f"  SPRINT BACKFILL  {year}")
     print(f"{'='*48}")
 
-    # Step 1 — sync schedule to populate sprint dates + event_format
+    # Step 1: sync schedule to populate sprint dates + event_format
     print(f"\n-> sync_schedule {year}")
     from src.jobs.sync_schedule import run as sync_run
     sync_run(year)
 
-    # Step 2 — find completed sprint rounds
+    # Step 2: find completed sprint rounds
     conn = get_conn()
     rounds = get_completed_sprint_rounds(conn, year)
     conn.close()
 
     if not rounds:
-        print(f"  No completed sprint rounds for {year} — nothing to backfill")
+        print(f"  No completed sprint rounds for {year}: nothing to backfill")
         return
 
     print(f"  Found {len(rounds)} completed sprint rounds: rounds {[r[0] for r in rounds]}")
@@ -73,7 +73,7 @@ def run_year(year: int) -> None:
         try:
             sprint_run(year, round_num)
         except Exception as e:
-            print(f"    WARN: ingest_sprint failed ({e}) — skipping this round")
+            print(f"    WARN: ingest_sprint failed ({e}), skipping this round")
             continue
 
         print(f"  [{year} R{round_num:02d}] ── sprint features ──")
@@ -95,7 +95,7 @@ def run_year(year: int) -> None:
         except Exception as e:
             print(f"    WARN: ingest_sprint failed ({e})")
 
-    # Step 4 — recompute season stats to include sprint aggregates
+    # Step 4: recompute season stats to include sprint aggregates
     print(f"\n-> compute_season_stats {year}  (includes sprint aggregates)")
     from src.jobs.compute_season_stats import run as css_run
     css_run(year)

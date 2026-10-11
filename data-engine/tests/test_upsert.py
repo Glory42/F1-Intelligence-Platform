@@ -3,7 +3,7 @@ from src.utils.upsert import upsert
 from tests.support.fake_db import FakeConnection
 
 # execute_batch renders SQL via psycopg2's C extension, which requires a real
-# connection even just to quote identifiers — so, like test_ingest_runner.py's
+# connection even just to quote identifiers: so, like test_ingest_runner.py's
 # headshot-backfill test, we monkeypatch execute_batch itself and assert on the
 # params it receives rather than trying to render the query text.
 

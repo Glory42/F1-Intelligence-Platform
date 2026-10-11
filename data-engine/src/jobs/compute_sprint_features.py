@@ -14,7 +14,7 @@ from src.utils.feature_helpers import (
 )
 from src.utils.feature_manifest import SPRINT_FEATURES, SPRINT_WEIGHTS as WEIGHTS, assemble_scores
 
-# Sprint races are ~17 laps with no pit strategy — grid position dominates over strategy.
+# Sprint races are ~17 laps with no pit strategy: grid position dominates over strategy.
 
 
 def run(race_id: int) -> None:
@@ -25,14 +25,14 @@ def run(race_id: int) -> None:
         def _validate_sprint_weekend(race: dict[str, Any]) -> None:
             if race["event_format"] not in ("sprint", "sprint_qualifying", "sprint_shootout"):
                 raise ValueError(
-                    f"Race {race_id} has event_format='{race['event_format']}' — "
+                    f"Race {race_id} has event_format='{race['event_format']}': "
                     "compute_sprint_features only runs on sprint weekends"
                 )
 
         ctx = build_feature_context(
             conn, race_id,
             grid_table="sprint_results",
-            grid_not_found_message=f"No sprint results (grid) for race {race_id} — run ingest_sprint first",
+            grid_not_found_message=f"No sprint results (grid) for race {race_id}: run ingest_sprint first",
             validate_race=_validate_sprint_weekend,
         )
 
@@ -86,7 +86,7 @@ def run(race_id: int) -> None:
 
             start_pos = ctx.start_pos_map[driver_id]
 
-            # Circuit-context multiplier — shared with the GP model, see feature_helpers.
+            # Circuit-context multiplier: shared with the GP model, see feature_helpers.
             circuit_adj_start_pos = calc_circuit_adj_start_pos(start_pos, overtake_rate, sc_probability)
 
             short_run     = short_run_map.get(driver_id, 0.5)

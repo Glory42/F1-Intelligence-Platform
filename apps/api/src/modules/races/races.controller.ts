@@ -14,23 +14,9 @@ export const RacesController = {
       return c.json({ data: null, error: { code: 'INVALID_YEAR', message: 'year must be a number' } }, 400);
     }
     const data = await service.findAll(createDb(c.env.DATABASE_URL), year, status);
-    // Only a status=completed filter guarantees every row in the list is immutable —
+    // Only a status=completed filter guarantees every row in the list is immutable:
     // an unfiltered or non-completed filter can include a race that's still in progress.
     c.header('Cache-Control', cacheControlForStatus(status ?? ''));
-    return c.json({ data, error: null });
-  },
-
-  getAllCircuits: async (c: Context<{ Bindings: Bindings }>) => {
-    const data = await service.findAllCircuits(createDb(c.env.DATABASE_URL));
-    return c.json({ data, error: null });
-  },
-
-  getCircuitDetails: async (c: Context<{ Bindings: Bindings }>) => {
-    const circuitKey = c.req.param('circuitKey') ?? '';
-    const data = await service.findCircuitDetails(createDb(c.env.DATABASE_URL), circuitKey);
-    if (!data) {
-      return c.json({ data: null, error: { code: 'NOT_FOUND', message: `Circuit ${circuitKey} not found` } }, 404);
-    }
     return c.json({ data, error: null });
   },
 

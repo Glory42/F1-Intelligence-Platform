@@ -1,0 +1,78 @@
+---
+import HomeBlock from './HomeBlock.astro';
+import { championshipPoints, formatTitleOdds } from '@/lib/f1/championshipMath';
+import { getTeamColor } from '@/lib/f1/teamColors';
+import type { DriverStanding, TeamStanding, TitleOddsResponse } from '@/types';
+
+interface Props {
+  drivers: DriverStanding[];
+  teams: TeamStanding[];
+  titleOdds: TitleOddsResponse | null;
+  roundsLeft: number;
+}
+
+const { drivers, teams, titleOdds, roundsLeft } = Astro.props;
+const TOP = 5;
+
+interface Row { key: number; href: string; code: string; name: string; color: string; points: number; odds: number | null }
+
+const driverOdds = new Map(titleOdds?.drivers.map((d) => [d.driver.id, d.titleProbability]) ?? []);
+const teamOdds = new Map(titleOdds?.teams.map((t) => [t.team.id, t.titleProbability]) ?? []);
+
+const topDrivers: Row[] = drivers.slice(0, TOP).map((s) => ({
+  key: s.driver.id, href: `/drivers/${s.driver.id}`, code: s.driver.code, name: s.driver.fullName,
+  color: getTeamColor(s.driver.team.teamKey), points: championshipPoints(s.stats), odds: driverOdds.get(s.driver.id) ?? null,
+}));
+const topTeams: Row[] = teams.slice(0, TOP).map((s) => ({
+  key: s.team.id, href: `/teams/${s.team.id}`, code: '', name: s.team.name,
+  color: getTeamColor(s.team.teamKey), points: championshipPoints(s.stats), odds: teamOdds.get(s.team.id) ?? null,
+}));
+const tables = [
+  { label: 'Drivers', rows: topDrivers },
+  { label: 'Teams', rows: topTeams },
+].filter((t) => t.rows.length > 0);
+const showOdds = titleOdds != null;
+const subtitle = [
+  titleOdds && `after round ${titleOdds.afterRound}`,
+  roundsLeft > 0 && `${roundsLeft} ${roundsLeft === 1 ? 'round' : 'rounds'} left`,
+].filter(Boolean).join(' · ');
+---
+
+<HomeBlock title="Championship" id="home-championship" links={[{ href: '/drivers', label: 'Drivers' }, { href: '/teams', label: 'Teams' }, { href: '/drivers?tab=title-fight', label: 'Title fight' }]}>
+  {subtitle && <p class="-mt-2 mb-4 text-[12px] text-muted-foreground">{subtitle}</p>}
+  {tables.length > 0 ? (
+    <div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
+      {tables.map((t) => {
+        const leader = t.rows[0].points || 1;
+        return (
+          <div>
+            <div class="mb-2 flex items-center gap-3 text-[11px] text-muted-foreground">
+              <span class="flex-1">{t.label}</span>
+              <span class="w-12 text-right">Points</span>
+              <span class="w-12 text-right">Gap</span>
+              {showOdds && <span class="w-12 text-right">Title</span>}
+            </div>
+            <ol class="space-y-1" aria-label={`${t.label} standings`}>
+              {t.rows.map((r, i) => (
+                <li>
+                  <a href={r.href} class="relative flex items-center gap-3 border-l-[3px] py-1.5 pl-3 text-[13px] hover:bg-white/[0.02] transition-colors duration-150" style={`border-color: ${r.color}`}>
+                    <span aria-hidden="true" class="absolute inset-y-0 left-0 opacity-[0.06]" style={`width: ${(r.points / leader) * 100}%; background: ${r.color}`} />
+                    <span class="relative w-4 font-mono text-[11px] text-muted-foreground">{i + 1}</span>
+                    {r.code && <span class="relative w-10 font-mono font-bold">{r.code}</span>}
+                    <span class:list={['relative flex-1 truncate', r.code && 'hidden text-muted-foreground sm:block']}>{r.name}</span>
+                    {r.code && <span class="flex-1 sm:hidden" />}
+                    <span class="relative w-12 text-right font-mono font-bold tabular-nums">{Math.round(r.points)}</span>
+                    <span class="relative w-12 text-right font-mono tabular-nums text-muted-foreground">{i === 0 ? '-' : `−${Math.round(t.rows[0].points - r.points)}`}</span>
+                    {showOdds && <span class="relative w-12 text-right font-mono tabular-nums text-[#a855f7]">{r.odds != null ? formatTitleOdds(r.odds) : '-'}</span>}
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </div>
+        );
+      })}
+    </div>
+  ) : (
+    <p class="text-[13px] text-muted-foreground">Standings appear after the first race.</p>
+  )}
+</HomeBlock>

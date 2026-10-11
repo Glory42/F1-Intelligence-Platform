@@ -23,7 +23,7 @@ export function sortByChampionshipStanding<T extends { stats: ChampionshipStats 
 
 // The domain-constant half of a standings/career aggregation: how to key an entity
 // and its stats row, how to map a row to stats, and the sentinel for "no row". The
-// per-endpoint output shape stays a separate `toOutput` arg — it varies by route.
+// per-endpoint output shape stays a separate `toOutput` arg: it varies by route.
 export type StatsAdapter<Entity, StatsRow, Stats> = {
   entityId: (entity: Entity) => number;
   statsEntityId: (statsRow: StatsRow) => number;

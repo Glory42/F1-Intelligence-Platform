@@ -1,11 +1,11 @@
 ---
 name: refactor-hunt
-description: Finds refactoring opportunities in F1 Prediction — duplicated logic between the GP and sprint model pipelines, repeated Map-aggregation patterns in Hono services, duplicate frontend API callers, and helpers that belong in a shared layer. Use when the user says "find refactoring opportunities", "look for duplication", "/refactor-hunt", or after adding a new feature/prediction pipeline alongside an existing one.
+description: Finds refactoring opportunities in F1 Prediction, duplicated logic between the GP and sprint model pipelines, repeated Map-aggregation patterns in Hono services, duplicate frontend API callers, and helpers that belong in a shared layer. Use when the user says "find refactoring opportunities", "look for duplication", "/refactor-hunt", or after adding a new feature/prediction pipeline alongside an existing one.
 ---
 
-# Refactor Hunt — F1 Prediction
+# Refactor Hunt: F1 Prediction
 
-Scans for code that would benefit from simplification, consolidation, or better placement. This skill finds opportunities — it does not apply fixes unless explicitly asked.
+Scans for code that would benefit from simplification, consolidation, or better placement. This skill finds opportunities: it does not apply fixes unless explicitly asked.
 
 ## Scope
 
@@ -19,15 +19,15 @@ If the user says "hunt in the sprint pipeline" or names a module, scope to that.
 
 ### 1. GP/sprint pipeline drift (data-engine/)
 
-This codebase runs two parallel model pipelines — GP (`weighted-v3`) and sprint (`sprint-v2`) — that mirror each other structurally:
+This codebase runs two parallel model pipelines, GP (`weighted-v3`) and sprint (`sprint-v2`), that mirror each other structurally:
 - `compute_features.py` / `compute_sprint_features.py`
 - `compute_predictions.py` / `compute_sprint_predictions.py`
 - `ingest_qualifying.py` / `ingest_sprint_qualifying.py`
 - `ingest_race.py` / `ingest_sprint.py`
 
-Diff the shared logic between each pair (query shape, normalization calls, softmax call, upsert call). Where both files repeat the exact same computation with only the input table changed (e.g. both call `normalize_minmax()` → `clamp()` → `softmax(..., 0.3)` the same way), flag it as a candidate for a shared helper in `data-engine/src/utils/`. Do **not** flag the weight tables (`WEIGHTS` dicts) themselves — those are intentionally distinct per CLAUDE.md's model spec — only flag the surrounding mechanical logic (grid fetch, DB row assembly, upsert call shape).
+Diff the shared logic between each pair (query shape, normalization calls, softmax call, upsert call). Where both files repeat the exact same computation with only the input table changed (e.g. both call `normalize_minmax()` → `clamp()` → `softmax(..., 0.3)` the same way), flag it as a candidate for a shared helper in `data-engine/src/utils/`. Do **not** flag the weight tables (`WEIGHTS` dicts) themselves, since those are intentionally distinct per CLAUDE.md's model spec. Only flag the surrounding mechanical logic (grid fetch, DB row assembly, upsert call shape).
 
-Also check `math_utils.py` — if a new normalization/scoring formula is added to one job, check whether the equivalent already exists there under a different name before it gets reimplemented inline.
+Also check `math_utils.py`: if a new normalization/scoring formula is added to one job, check whether the equivalent already exists there under a different name before it gets reimplemented inline.
 
 ### 2. Repeated Map-aggregation pattern in Hono services
 
@@ -35,15 +35,15 @@ Also check `math_utils.py` — if a new normalization/scoring formula is added t
 
 ### 3. Duplicate mapper logic
 
-`apps/api/src/common/mappers.ts` holds `toDriver`, `toRace`, `toCircuit` — the canonical row-to-response-shape converters. Grep service files for inline object construction that duplicates what a mapper already does (e.g. manually building a `{ id, name, ... }` driver-shaped object instead of calling `toDriver(row.drivers, row.teams)`). Flag any service file reconstructing a shape mappers.ts already covers.
+`apps/api/src/common/mappers.ts` holds `toDriver`, `toRace`, `toCircuit`: the canonical row-to-response-shape converters. Grep service files for inline object construction that duplicates what a mapper already does (e.g. manually building a `{ id, name, ... }` driver-shaped object instead of calling `toDriver(row.drivers, row.teams)`). Flag any service file reconstructing a shape mappers.ts already covers.
 
 ### 4. Frontend: duplicate API caller definitions
 
-`apps/web/src/lib/api.ts` is the single source of truth for backend calls — every method is a one-liner around the shared `get<T>()` helper. Grep `apps/web/src/pages/**/*.astro` and `apps/web/src/components/**/*.tsx` for raw `fetch(` calls that bypass `api.ts`. Every backend route should have exactly one caller definition there; pages/components should only import from `api`.
+`apps/web/src/lib/api.ts` is the single source of truth for backend calls: every method is a one-liner around the shared `get<T>()` helper. Grep `apps/web/src/pages/**/*.astro` and `apps/web/src/components/**/*.tsx` for raw `fetch(` calls that bypass `api.ts`. Every backend route should have exactly one caller definition there; pages/components should only import from `api`.
 
 ### 5. Frontend: duplicate display-formatting logic
 
-`apps/web/src/lib/teamColors.ts`, `teamLogos.ts`, `countryFlags.ts`, `circuitMetadata.ts` are the canonical lookup tables for team/country/circuit display data. Grep components for inline color hex codes, flag emoji, or circuit stat literals that duplicate what's already in one of these files (a sign a lookup was hand-rolled instead of imported).
+`apps/web/src/lib/f1/teamColors.ts`, `teamLogos.ts`, `countryFlags.ts` are the canonical lookup tables for team/country/circuit display data. Grep components for inline color hex codes, flag emoji, or circuit stat literals that duplicate what's already in one of these files (a sign a lookup was hand-rolled instead of imported).
 
 ### 6. Compare-tool duplication
 
@@ -51,11 +51,11 @@ Also check `math_utils.py` — if a new normalization/scoring formula is added t
 
 ### 7. Premature abstraction / over-engineered indirection
 
-Flag any service method that only forwards to another method with no added logic (a one-line passthrough with no transformation), or any new module folder created for a single trivial route. NestJS-style module/controller/service separation is the convention here — but a controller method should still do real parsing/validation, not just `return service.x(c.req.query('y'))` with zero logic duplicated three times where a shared query-param helper would do.
+Flag any service method that only forwards to another method with no added logic (a one-line passthrough with no transformation), or any new module folder created for a single trivial route. NestJS-style module/controller/service separation is the convention here: but a controller method should still do real parsing/validation, not just `return service.x(c.req.query('y'))` with zero logic duplicated three times where a shared query-param helper would do.
 
 ### 8. Dead parameters
 
-Look for function parameters (TS or Python) accepted but never read in the body — including service methods where a `year` or `status` filter param is accepted but never applied to the query. These create a false API contract.
+Look for function parameters (TS or Python) accepted but never read in the body: including service methods where a `year` or `status` filter param is accepted but never applied to the query. These create a false API contract.
 
 ---
 
@@ -64,8 +64,8 @@ Look for function parameters (TS or Python) accepted but never read in the body 
 Group by category. For each finding:
 - **File(s)** with line numbers
 - **One-line description** of the duplication or smell
-- **Suggested consolidation**: where the shared version should live and what it should look like (a function signature is enough — no need to write the full implementation)
+- **Suggested consolidation**: where the shared version should live and what it should look like (a function signature is enough, no need to write the full implementation)
 
-Prioritise findings where consolidation removes the most lines or prevents the most future drift between the GP and sprint pipelines specifically — that's the pairing most likely to silently diverge as one side gets a bugfix the other doesn't.
+Prioritise findings where consolidation removes the most lines or prevents the most future drift between the GP and sprint pipelines specifically: that's the pairing most likely to silently diverge as one side gets a bugfix the other doesn't.
 
 End with: "X consolidation opportunities found across Y categories."

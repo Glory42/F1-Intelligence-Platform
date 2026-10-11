@@ -6,12 +6,20 @@ import type {
   TeamDetailResponse, DriverStanding,
   SprintFeatureScores, DriverSprintPrediction, SprintPredictionResponse,
   SprintResult, SprintDetailResponse, RaceControlMessage, RaceOvertake, TeamRadioClip,
+  StrategyResponse, FridayPaceRow, PitCrewRanking, TeamStanding, TitleOddsResponse,
+  RacecraftRow, TeammateBattle, RaceStoryResponse, TelemetryResponse, LapTelemetrySamples,
+  HistoryRecords, HistoryMilestones, ConstructorLineage, DriverHistory, TeamHistory, RaceRecap, OnThisDay, TeamPitStop, CircuitTelemetry,
 } from '../../web/src/types';
 
 export const circuit: Circuit = {
   id: 5, circuitKey: 'monza', name: 'Autodromo Nazionale Monza', country: 'Italy', city: 'Monza',
   lapCount: 53, trackLengthKm: '5.793', overtakeRate: '0.850',
   numberOfCorners: 11, drsZones: 2, scProbability: '0.300', imageUrl: null,
+};
+
+// Raced before but not on the current calendar: splits "this season" from "all circuits".
+export const pastCircuit: Circuit = {
+  ...circuit, id: 6, circuitKey: 'hockenheimring', name: 'Hockenheimring', country: 'Germany', city: 'Hockenheim',
 };
 
 export const team: Team = {
@@ -113,6 +121,15 @@ export const predictionHistory: PredictionHistoryItem[] = [
   },
 ];
 
+// 2026: the model called round 18 but tipped VER for round 19, which LEC won from VER's #2 spot.
+export const predictionHistory2026: PredictionHistoryItem[] = [
+  { ...predictionHistory[0], raceId: 29, roundNumber: 18 },
+  {
+    ...predictionHistory[0], raceId: 30, roundNumber: 19, actualWinner: driverB, correct: false,
+    actualWinnerPredictedPosition: 2,
+  },
+];
+
 export const intelStandings: IntelStandingRow[] = [
   {
     driver, features: featureScores, rawWeightedScore: '0.680000',
@@ -137,7 +154,7 @@ const driverSeasonStats: DriverSeasonStats = {
   racesEntered: 16, racesFinished: 15, wins: 8, podiums: 12, poles: 6,
   totalPoints: '350', championshipPosition: 1, avgFinishPosition: '2.1',
   winRate: '0.500', avgPositionGain: '1.2', dnfCount: 1, dnfRate: '0.06',
-  avgSector1Ms: null, avgSector2Ms: null, avgSector3Ms: null, topSpeedAvg: null, teammateQualiDelta: null,
+  avgSector1Ms: null, avgSector2Ms: null, avgSector3Ms: null, topSpeedAvg: null, teammateQualiDelta: null, sprintTotalPoints: '0',
 };
 
 const driverBSeasonStats: DriverSeasonStats = {
@@ -171,11 +188,18 @@ export const driverBDetailResponse: DriverDetailResponse = {
 const teamSeasonStats: TeamSeasonStats = {
   racesCompleted: 16, wins: 8, podiums: 15, totalPoints: '600',
   championshipPosition: 1, avgFinishPosition: '3.5', carPerformanceScore: '0.85',
-  dnfCount: 2, reliabilityScore: '0.90',
+  dnfCount: 2, reliabilityScore: '0.90', sprintTotalPoints: '0',
 };
 
 export const teamCareer: TeamYearStats[] = [
   { year: 2026, teamId: 1, stats: teamSeasonStats },
+];
+
+// Red Bull's 2026 stops: median 2.45 s, best 2.04 s, matching its pit crew ranking row.
+export const teamPitStops: TeamPitStop[] = [
+  { raceId: 30, roundNumber: 19, raceName: 'Italian Grand Prix', driver, lapNumber: 18, stationaryMs: 2450 },
+  { raceId: 30, roundNumber: 19, raceName: 'Italian Grand Prix', driver, lapNumber: 36, stationaryMs: 2040 },
+  { raceId: 31, roundNumber: 20, raceName: 'Italian Grand Prix', driver, lapNumber: 22, stationaryMs: 2600 },
 ];
 
 export const teamDetailResponse: TeamDetailResponse = {
@@ -207,6 +231,7 @@ export const driversListResponse: Driver[] = [driver, driverB];
 export const globalSearchResponse = { drivers: [driver, driverB], teams: [team, teamB], circuits: [circuit] };
 
 export const circuitDetailResponse: CircuitDetailResponse = {
+  outlinePath: 'M0,750L1000,750L1000,250L0,250Z',
   circuit,
   history: [
     { raceId: 1, raceName: 'Italian Grand Prix', raceDate: '2025-09-07', year: 2025, hasSprint: false, winner: driver },
@@ -270,3 +295,245 @@ export const sprintDetailResponse: SprintDetailResponse = {
   results: sprintResults,
   laps: [],
 };
+
+export const sprintWeekendRaceDetailResponse: RaceDetailResponse = {
+  race: { ...sprintRace, status: 'completed' },
+  results: raceResults.map((r) => ({ ...r, raceId: 2 })),
+  qualifying: qualifyingResults.map((q) => ({ ...q, raceId: 2 })),
+  laps: [],
+};
+
+export const sprintRaceControlMessages: RaceControlMessage[] = [
+  {
+    id: 3, raceId: 2, date: '2025-11-08T14:03:00.000Z', category: 'Flag',
+    flag: 'DOUBLE YELLOW', lapNumber: 2, driverNumber: null, scope: 'Sector', sector: 1,
+    message: 'DOUBLE YELLOW IN TRACK SECTOR 1',
+  },
+];
+
+export const raceStrategyResponse: StrategyResponse = {
+  source: 'openf1',
+  drivers: [
+    {
+      driver, finishPosition: 1,
+      stints: [
+        { stintNumber: 1, compound: 'MEDIUM', lapStart: 1, lapEnd: 20, tyreAgeAtStart: 0 },
+        { stintNumber: 2, compound: 'HARD', lapStart: 21, lapEnd: 53, tyreAgeAtStart: 0 },
+      ],
+      pitStops: [{ lapNumber: 20, pitLaneMs: 22340, stationaryMs: 2300 }],
+    },
+    {
+      driver: driverB, finishPosition: 2,
+      stints: [{ stintNumber: 1, compound: 'HARD', lapStart: 1, lapEnd: 53, tyreAgeAtStart: 3 }],
+      pitStops: [],
+    },
+  ],
+};
+
+export const fridayPaceRows: FridayPaceRow[] = [
+  { driver: driverB, compound: 'MEDIUM', sessionType: 'FP2', medianLapMs: 84120, stintLength: 9, deltaToFastestMs: 0 },
+  { driver, compound: 'HARD', sessionType: 'FP2', medianLapMs: 84350, stintLength: 11, deltaToFastestMs: 230 },
+];
+
+export const pitCrewRankings: PitCrewRanking[] = [
+  { team: teamB, stops: 41, medianStationaryMs: 2310, fastestStationaryMs: 1980 },
+  { team, stops: 38, medianStationaryMs: 2450, fastestStationaryMs: 2040 },
+];
+
+export const teamStandingsResponse: TeamStanding[] = [{ team, stats: teamSeasonStats }];
+
+export const race2026DetailResponse: RaceDetailResponse = {
+  race: { ...race, id: 3, roundNumber: 3, name: 'Japanese Grand Prix', raceDate: '2026-03-29', raceDateUtc: '2026-03-29T05:00:00.000Z' },
+  // LEC qualified 2nd but took a 10-place grid drop.
+  results: raceResults.map((r) => ({ ...r, raceId: 3, gridPosition: r.driverId === 11 ? 12 : r.gridPosition })),
+  qualifying: qualifyingResults,
+  laps: [],
+};
+
+// 2026 with five grands prix left: VER 350 vs LEC 210, a 140-point gap LEC can no longer close.
+export const races2026: Race[] = [
+  { ...race, id: 30, roundNumber: 19, status: 'completed' },
+  ...[20, 21, 22, 23, 24].map((round) => ({ ...race, id: 10 + round, roundNumber: round, status: 'scheduled' as const })),
+];
+
+// The last completed 2026 race: LEC beat VER from pole, matching lastRaceRecap.
+export const lastRaceDetailResponse: RaceDetailResponse = {
+  race: races2026[0],
+  results: [
+    { ...raceResults[1], raceId: 30, finishPosition: 1, gridPosition: 1, fastestLap: true },
+    { ...raceResults[0], raceId: 30, finishPosition: 2, gridPosition: 2, fastestLap: false },
+  ],
+  qualifying: [
+    { ...qualifyingResults[1], gridPosition: 1 },
+    { ...qualifyingResults[0], gridPosition: 2 },
+  ],
+  laps: [],
+};
+
+export const titleOddsResponse: TitleOddsResponse = {
+  afterRound: 19,
+  drivers: [
+    { driver, titleProbability: 1, expectedPoints: 452.3, pointsP10: 420, pointsP90: 475 },
+    { driver: driverB, titleProbability: 0, expectedPoints: 268.1, pointsP10: 240, pointsP90: 300 },
+  ],
+  teams: [
+    { team, titleProbability: 0.81, expectedPoints: 690, pointsP10: 650, pointsP90: 720 },
+    { team: teamB, titleProbability: 0.19, expectedPoints: 640, pointsP10: 600, pointsP90: 680 },
+  ],
+  history: [
+    { afterRound: 18, driverId: 10, titleProbability: 0.93 },
+    { afterRound: 18, driverId: 11, titleProbability: 0.07 },
+    { afterRound: 19, driverId: 10, titleProbability: 1 },
+    { afterRound: 19, driverId: 11, titleProbability: 0 },
+  ],
+};
+
+export const racecraftRows: RacecraftRow[] = [
+  { driver: driverB, made: 41, suffered: 22, net: 19 },
+  { driver, made: 30, suffered: 18, net: 12 },
+];
+
+export const teammateBattle: TeammateBattle = {
+  teammate: { ...driverB, fullName: 'Yuki Tsunoda', code: 'TSU' },
+  sharedRaces: 16,
+  qualifying: { driver: 14, teammate: 2 },
+  race: { driver: 12, teammate: 1 },
+  points: { driver: 350, teammate: 48 },
+  medianQualiGapMs: -214,
+  races: [
+    {
+      raceId: 40, roundNumber: 1, raceName: 'Australian Grand Prix', qualiGapMs: -312,
+      driver: { qualiPosition: 1, finishPosition: 1, status: 'Finished', points: 25 },
+      teammate: { qualiPosition: 5, finishPosition: 4, status: 'Finished', points: 12 },
+    },
+    {
+      raceId: 41, roundNumber: 2, raceName: 'Chinese Grand Prix', qualiGapMs: 80,
+      driver: { qualiPosition: 2, finishPosition: null, status: 'Retired', points: 0 },
+      teammate: { qualiPosition: 1, finishPosition: 3, status: 'Finished', points: 15 },
+    },
+  ],
+};
+
+export const raceStoryResponse: RaceStoryResponse = {
+  drivers: [
+    { driver, finishPosition: 1, positions: [2, 1, 1, 1], gapsMs: [800, 0, 0, 0], intervalsMs: [800, null, null, null], lapsDown: [0, 0, 0, 0] },
+    { driver: driverB, finishPosition: 2, positions: [1, 2, 2, 2], gapsMs: [0, 600, 900, 1400], intervalsMs: [null, 600, 900, 1400], lapsDown: [0, 0, 0, 0] },
+  ],
+  battles: [{ chaser: driverB, leader: driver, lapStart: 2, lapEnd: 4, minGapMs: 600 }],
+  weather: {
+    minuteOffsets: [0, 1, 2, 3, 4],
+    airTempC: [24, 24, 23.5, 23, 23],
+    trackTempC: [38, 37.2, 34, 31.5, 30],
+    rainfall: [false, false, true, true, false],
+  },
+};
+
+// 26 points = 25 mini-sectors. VER alternates 1.00 s / 1.10 s per segment against LEC's steady
+// 1.05 s, so VER takes the 13 even-numbered segments.
+function fixtureLap(segmentMs: (k: number) => number, topSpeed: number): LapTelemetrySamples {
+  const points = Array.from({ length: 26 }, (_, i) => i);
+  const timeMs = points.map((i) => Array.from({ length: i }, (_, k) => segmentMs(k)).reduce((a, b) => a + b, 0));
+  return {
+    distanceM: points.map((i) => i * 200), timeMs,
+    speed: points.map((i) => topSpeed - (i % 5) * 40), throttle: points.map((i) => (i % 5 === 4 ? 0 : 100)),
+    brake: points.map((i) => (i % 5 === 4 ? 100 : 0)), gear: points.map(() => 7),
+    x: points.map((i) => Math.round(1000 * Math.cos((2 * Math.PI * i) / 25))),
+    y: points.map((i) => Math.round(600 * Math.sin((2 * Math.PI * i) / 25))),
+  };
+}
+
+export const circuitTelemetry: CircuitTelemetry = {
+  raceId: 1, year: 2025, raceName: 'Italian Grand Prix', driver, lapTimeMs: 78_792, isPoleLap: true,
+  profile: { fullThrottlePct: 81, longestFullThrottleM: 1120, topSpeedKph: 345, brakingZones: 6, corners: { low: 2, medium: 4, high: 3 } },
+  trace: { distanceM: [0, 50, 100, 150], speed: [320, 340, 150, 280], throttle: [100, 100, 0, 100], brake: [0, 0, 100, 0] },
+};
+
+export const telemetryResponse: TelemetryResponse = {
+  session: 'Q',
+  drivers: [{ driver, lapTimeMs: 26_250 }, { driver: driverB, lapTimeMs: 26_250 }],
+  laps: [
+    { driver, lapNumber: 12, lapTimeMs: 26_250, samples: fixtureLap((k) => (k % 2 === 0 ? 1_000 : 1_100), 330) },
+    { driver: driverB, lapNumber: 14, lapTimeMs: 26_250, samples: fixtureLap(() => 1_050, 325) },
+  ],
+};
+
+const leader = (f1dbId: string, name: string, value: number, nationality: string | null = null, coreId: number | null = null, active = false) => ({
+  f1dbId, name, value, nationality, coreId, active,
+});
+const hamilton = (value: number) => leader('lewis-hamilton', 'Lewis Hamilton', value, 'united-kingdom');
+const verstappen = (value: number) => leader('max-verstappen', 'Max Verstappen', value, 'netherlands', 10, true);
+const schumacher = (value: number) => leader('michael-schumacher', 'Michael Schumacher', value, 'germany', 20);
+export const historyRecords: HistoryRecords = {
+  drivers: {
+    wins: [hamilton(106), schumacher(91), verstappen(72)],
+    championships: [hamilton(7), schumacher(7), verstappen(4)],
+    poles: [hamilton(104), verstappen(49)],
+    podiums: [hamilton(202), verstappen(135)],
+    starts: [leader('fernando-alonso', 'Fernando Alonso', 425, 'spain'), hamilton(380)],
+  },
+  constructors: {
+    wins: [leader('ferrari', 'Ferrari', 250, 'italy')],
+    championships: [leader('ferrari', 'Ferrari', 16, 'italy')],
+    poles: [leader('ferrari', 'Ferrari', 254, 'italy')],
+  },
+  rates: {
+    winRate: [leader('juan-manuel-fangio', 'Juan Manuel Fangio', 0.4706, 'argentina')],
+    poleRate: [leader('juan-manuel-fangio', 'Juan Manuel Fangio', 0.5686, 'argentina')],
+    podiumRate: [leader('juan-manuel-fangio', 'Juan Manuel Fangio', 0.6863, 'argentina')],
+  },
+  rateMinStarts: 50,
+  chases: [{ stat: 'wins', record: hamilton(106), chaser: verstappen(72) }],
+};
+
+const milestone = (f1dbId: string, name: string, days: number, raceName: string, nationality: string, coreId: number | null = null) => ({
+  f1dbId, name, days, raceName, nationality, coreId, active: coreId === 10,
+});
+export const historyMilestones: HistoryMilestones = {
+  youngestWinner: [milestone('max-verstappen', 'Max Verstappen', 6802, 'Formula 1 Gran Premio de España Pirelli 2016', 'netherlands', 10)],
+  youngestPole: [milestone('sebastian-vettel', 'Sebastian Vettel', 7744, 'Gran Premio d\'Italia 2008', 'germany')],
+  youngestPodium: [milestone('max-verstappen', 'Max Verstappen', 6802, 'Formula 1 Gran Premio de España Pirelli 2016', 'netherlands', 10)],
+  youngestStarter: [milestone('max-verstappen', 'Max Verstappen', 6375, '2015 Formula 1 Rolex Australian Grand Prix', 'netherlands', 10)],
+  oldestFirstWin: [milestone('luigi-fagioli', 'Luigi Fagioli', 19379, 'Grand Prix de France 1951', 'italy')],
+  longestWaitForWin: [milestone('sergio-perez', 'Sergio Pérez', 3542, 'Formula 1 Rolex Sakhir Grand Prix 2020', 'mexico')],
+};
+
+export const constructorLineages: ConstructorLineage[] = [{
+  f1dbId: 'red-bull', name: 'Red Bull', coreTeam: { id: 1, teamKey: 'red_bull' }, active: true,
+  members: [
+    { f1dbId: 'stewart', name: 'Stewart', yearFrom: 1997, yearTo: 1999, raceWins: 1, championships: 0, coreId: null },
+    { f1dbId: 'jaguar', name: 'Jaguar', yearFrom: 2000, yearTo: 2004, raceWins: 0, championships: 0, coreId: 5 },
+    { f1dbId: 'red-bull', name: 'Red Bull', yearFrom: 2005, yearTo: null, raceWins: 130, championships: 6, coreId: 1 },
+  ],
+}];
+
+export const driverHistory: DriverHistory = {
+  f1dbId: 'max-verstappen', name: 'Max Verstappen', dateOfBirth: '1997-09-30', nationality: 'netherlands',
+  championships: 4, raceStarts: 249, raceWins: 72, podiums: 135, polePositions: 49, fastestLaps: 38,
+  careerPoints: 3632.5, sprintWins: 13, grandSlams: 6,
+  firstRaceDate: '2015-03-15', firstRaceName: '2015 Formula 1 Rolex Australian Grand Prix',
+  firstWinDate: '2016-05-15', firstWinName: 'Formula 1 Gran Premio de España Pirelli 2016',
+  firstPodiumDate: '2016-05-15', firstPodiumName: 'Formula 1 Gran Premio de España Pirelli 2016',
+  firstPoleDate: '2019-08-04', firstPoleName: 'Formula 1 Rolex Magyar Nagydíj 2019',
+};
+
+export const teamHistory: TeamHistory = {
+  constructor: { f1dbId: 'red-bull', name: 'Red Bull', championships: 6, raceStarts: 400, raceWins: 130, podiums: 290, polePositions: 110 },
+  seasons: [{ year: 2026, chassis: 'RB22', engine: 'Red Bull Ford' }, { year: 2025, chassis: 'RB21', engine: 'Honda RBPT' }],
+};
+
+export const lastRaceRecap: RaceRecap = {
+  winner: driverB,
+  predictedWinner: driver,
+  predictionHit: false,
+  fastestStop: { driver: driverB, stationaryMs: 1_980 },
+  topBattle: { chaser: driver, leader: driverB, lapStart: 41, lapEnd: 53, minGapMs: 280 },
+};
+
+// Echoes the requested date so the page can be driven to any day; 12-25 exercises the nearest-date fallback.
+export function onThisDay(requested: string): OnThisDay {
+  return {
+    requested,
+    date: requested === '12-25' ? '12-13' : requested,
+    races: [{ raceId: 1, year: 2019, name: 'Italian Grand Prix', winner: driverB }],
+  };
+}

@@ -22,7 +22,7 @@ describe('drivers (integration)', () => {
     const driverA = await createDriver(db, season.id, teamA.id, { driverNumber: 1, code: 'AAA', firstName: 'Ada', lastName: 'Alpha' });
     const driverB = await createDriver(db, season.id, teamB.id, { driverNumber: 2, code: 'BBB', firstName: 'Bo', lastName: 'Beta' });
 
-    await createDriverSeasonStats(db, season.id, driverA.id, { wins: 5, totalPoints: '300.0', championshipPosition: 1 });
+    await createDriverSeasonStats(db, season.id, driverA.id, { wins: 5, totalPoints: '300.0', sprintTotalPoints: '24.0', championshipPosition: 1 });
     await createDriverSeasonStats(db, season.id, driverB.id, { wins: 1, totalPoints: '120.0', championshipPosition: 2 });
 
     const circuit = await createCircuit(db, { circuitKey: 'drivers-test-circuit' });
@@ -62,6 +62,12 @@ describe('drivers (integration)', () => {
     const { data } = (await res.json()) as { data: Array<{ driver: { code: string } }> };
     expect(data[0].driver.code).toBe('AAA');
     expect(data[1].driver.code).toBe('BBB');
+  });
+
+  it('reports sprint points alongside grand prix points', async () => {
+    const res = await apiRequest('/api/drivers/standings?year=2098');
+    const { data } = (await res.json()) as { data: Array<{ stats: { totalPoints: string; sprintTotalPoints: string } }> };
+    expect([data[0].stats.totalPoints, data[0].stats.sprintTotalPoints]).toEqual(['300.0', '24.0']);
   });
 
   it('returns driver detail with season stats and recent results', async () => {

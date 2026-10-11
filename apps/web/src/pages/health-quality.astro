@@ -2,10 +2,10 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { api } from '@/lib/api';
 import type { QualityReport, SeasonSummary } from '@/types';
-import YearSelect from '@/components/shared/YearSelect.astro';
-import { Cpu, ShieldAlert, ShieldCheck, Wrench, TriangleAlert, CircleAlert, Info } from 'lucide-react';
+import YearSelect from '@/components/page/YearSelect.astro';
+import { ShieldCheck, Wrench, TriangleAlert, CircleAlert, Info } from 'lucide-react';
 
-// Dev-only dashboard — a production request short-circuits to a real 404 before
+// Dev-only dashboard: a production request short-circuits to a real 404 before
 // any data is fetched, since SSR would otherwise run this on every request.
 if (!import.meta.env.DEV) {
   return new Response('Not found', { status: 404 });
@@ -43,13 +43,13 @@ const tableNames: Record<string, string> = {
 ---
 
 <BaseLayout title={`${year} Data Quality`}>
-  <div class="mt-7 space-y-10">
+  <div class="space-y-10">
 
     <!-- Header -->
     <div class="flex items-end justify-between gap-4 flex-wrap">
       <div>
         <div class="flex items-center gap-3 mb-2">
-          <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)"><Cpu size={11} />./data-quality · dev</span>
+          <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">./data-quality · dev</span>
           <div class="h-px w-16 bg-white/[0.05]" />
         </div>
         <h1 class="text-2xl font-bold">{year} Data Quality</h1>
@@ -65,7 +65,7 @@ const tableNames: Record<string, string> = {
         <!-- Overall score -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div class="panel p-6">
-            <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase mb-2">health score</div>
+            <div class="text-[11px] text-muted-foreground mb-2">health score</div>
             <div class={`text-5xl font-bold ${scoreColor}`}>{score}</div>
             <div class="w-full h-1 bg-white/[0.06] mt-3">
               <div class={`h-full ${score! >= 80 ? 'bg-[#a855f7]' : score! >= 50 ? 'bg-amber-400' : 'bg-red-400'} bar-fill`} style={`width:${score}%`} />
@@ -73,12 +73,12 @@ const tableNames: Record<string, string> = {
             <div class="mt-3 font-mono text-[8px] text-muted-foreground/60">mean of per-race 100 − severity points</div>
           </div>
           <div class="panel p-6">
-            <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase mb-2">races audited</div>
+            <div class="text-[11px] text-muted-foreground mb-2">races audited</div>
             <div class="text-5xl font-bold">{report.racesAudited}</div>
             <div class="mt-3 font-mono text-[9px] text-muted-foreground">across {year}</div>
           </div>
           <div class="panel p-6">
-            <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase mb-2">open issues</div>
+            <div class="text-[11px] text-muted-foreground mb-2">open issues</div>
             <div class="text-5xl font-bold">{report.issueCount}</div>
             <div class="mt-3 flex items-center gap-2 font-mono text-[9px]">
               <span class="text-red-400">{report.bySeverity.high} high</span>
@@ -87,7 +87,7 @@ const tableNames: Record<string, string> = {
             </div>
           </div>
           <div class="panel p-6">
-            <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase mb-2">fixable gaps</div>
+            <div class="text-[11px] text-muted-foreground mb-2">fixable gaps</div>
             <div class="text-5xl font-bold text-[#a855f7]">{report.fixableCount}</div>
             <div class="mt-3 font-mono text-[9px] text-muted-foreground">re-ingest / recompute via data_quality_repair</div>
           </div>
@@ -96,7 +96,7 @@ const tableNames: Record<string, string> = {
         <!-- Per-table breakdown -->
         <div>
           <div class="flex items-center gap-3 mb-4">
-            <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)"><ShieldAlert size={11} />./by table</span>
+            <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">./by table</span>
             <div class="h-px flex-1 bg-white/[0.05]" />
           </div>
           <div class="border border-white/[0.06]">
@@ -121,7 +121,7 @@ const tableNames: Record<string, string> = {
         <!-- Issue list -->
         <div>
           <div class="flex items-center gap-3 mb-4">
-            <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)"><ShieldCheck size={11} />./issues</span>
+            <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">./issues</span>
             <div class="h-px flex-1 bg-white/[0.05]" />
           </div>
           <div class="border border-white/[0.06]">

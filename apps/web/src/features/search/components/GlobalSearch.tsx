@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Command } from "cmdk";
 import { Search, Building2 } from "lucide-react";
-import { getTeamLogo } from "@/lib/teamLogos";
-import { getCountryFlag } from "@/lib/countryFlags";
+import { getTeamLogo } from "@/lib/f1/teamLogos";
+import { getCountryFlag } from "@/lib/f1/countryFlags";
 import { useGlobalSearch } from "@/features/search/useGlobalSearch";
 
 export function GlobalSearch() {

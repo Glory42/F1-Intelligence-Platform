@@ -1,6 +1,6 @@
 ---
 import { Zap } from 'lucide-react';
-import ConfidenceBadge from '@/components/shared/ConfidenceBadge.astro';
+import ConfidenceBadge from '@/features/predictions/components/ConfidenceBadge.astro';
 import type { PredictionAccent } from '../types';
 
 interface DriverRow {
@@ -47,7 +47,7 @@ const confidence = Math.round(p1 * 100);
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
     <div class="sm:col-span-2 space-y-4">
       <div>
-        <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase mb-1">{winnerLabel}</div>
+        <div class="text-[11px] text-muted-foreground mb-1">{winnerLabel}</div>
         <div class="text-2xl font-bold">{winnerName}</div>
         <div class="font-mono text-[9px] text-muted-foreground">{teamName} · {confidence}% win probability</div>
       </div>
@@ -68,7 +68,7 @@ const confidence = Math.round(p1 * 100);
       </div>
     </div>
     <div class="flex flex-col items-center justify-center gap-2 border-l border-white/[0.06] pl-6">
-      <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase">{confidenceLabel}</div>
+      <div class="text-[11px] text-muted-foreground">{confidenceLabel}</div>
       <div class="text-5xl font-bold" style={`color:${accent.hex}`}>{confidence}</div>
       <div class="font-mono text-[8px] text-muted-foreground">%</div>
       <ConfidenceBadge p1={p1} p2={p2} class="mt-1" />

@@ -1,0 +1,120 @@
+---
+import HeadToHead, { type HeadToHeadRow } from '../../../components/data/HeadToHead.astro';
+import StatTiles from '@/components/data/StatTiles.astro';
+import TabIntro from '@/components/page/TabIntro.astro';
+import DataList from '@/components/data/DataList.astro';
+import DataRow from '@/components/data/DataRow.astro';
+import { isClassified, teammateTally } from '../teammateTally';
+import { getTeamColor } from '@/lib/f1/teamColors';
+import type { Driver, TeammateBattle, TeammateOuting } from '@/types';
+
+interface Props {
+  battle: TeammateBattle;
+  driver: Driver;
+  year: number;
+}
+
+const { battle, driver, year } = Astro.props;
+const mate = battle.teammate;
+const tally = teammateTally(battle.races);
+const color = getTeamColor(driver.team.teamKey);
+
+const position = (p: number) => `P${p}`;
+const oneDecimal = (v: number) => v.toFixed(1);
+const optionalRows: Array<HeadToHeadRow | null> = [
+  { label: 'Podiums', v1: tally.driver.podiums, v2: tally.teammate.podiums },
+  tally.driver.bestFinish != null && tally.teammate.bestFinish != null
+    ? { label: 'Best finish', v1: tally.driver.bestFinish, v2: tally.teammate.bestFinish, lowerBetter: true, fmt: position }
+    : null,
+  tally.driver.avgQuali != null && tally.teammate.avgQuali != null
+    ? { label: 'Avg qualifying', v1: tally.driver.avgQuali, v2: tally.teammate.avgQuali, lowerBetter: true, fmt: oneDecimal }
+    : null,
+  tally.driver.avgFinish != null && tally.teammate.avgFinish != null
+    ? { label: 'Avg finish', v1: tally.driver.avgFinish, v2: tally.teammate.avgFinish, lowerBetter: true, fmt: oneDecimal }
+    : null,
+  { label: 'Retirements', v1: tally.driver.retirements, v2: tally.teammate.retirements, lowerBetter: true },
+];
+const rows: HeadToHeadRow[] = [
+  { label: 'Qualifying', v1: battle.qualifying.driver, v2: battle.qualifying.teammate },
+  { label: 'Race', v1: battle.race.driver, v2: battle.race.teammate },
+  { label: 'GP points', v1: Math.round(battle.points.driver), v2: Math.round(battle.points.teammate) },
+  ...(battle.races.length > 0 ? optionalRows.filter((r): r is HeadToHeadRow => r != null) : []),
+];
+
+const gap = battle.medianQualiGapMs;
+const gapLabel = gap == null || !mate
+  ? '-'
+  : gap === 0 ? 'Level' : `${gap < 0 ? driver.code : mate.code} ${(Math.abs(gap) / 1000).toFixed(3)}s faster`;
+const pointsGap = Math.round(battle.points.driver - battle.points.teammate);
+
+// Each pair reads driver · team-mate; the one who came out ahead is bright.
+const finishLabel = (o: TeammateOuting) => (o.finishPosition != null && isClassified(o.status) ? position(o.finishPosition) : 'DNF');
+const finishRank = (o: TeammateOuting) => (o.finishPosition != null && isClassified(o.status) ? o.finishPosition : 99);
+const pair = (mine: number | null, theirs: number | null) => ({
+  mineAhead: mine != null && (theirs == null || mine < theirs),
+  theirsAhead: theirs != null && (mine == null || theirs < mine),
+});
+const COLUMNS = 'grid-cols-[32px_minmax(0,1fr)_84px_84px] sm:grid-cols-[40px_minmax(0,1fr)_96px_96px_80px_80px]';
+---
+
+{mate && battle.sharedRaces > 0 && (
+  <section aria-label="Team-mate battle" class="space-y-6">
+    <TabIntro
+      lead={`${battle.sharedRaces} grands prix together in ${year}.`}
+      terms={[
+        { term: 'Race head-to-head', meaning: 'only races both finished' },
+        { term: 'Quali gap', meaning: 'median lap-time gap, in the deepest session both reached' },
+      ]}
+    />
+
+    <StatTiles
+      cols="grid-cols-1 sm:grid-cols-3"
+      items={[
+        { label: 'Qualifying gap', value: gapLabel },
+        { label: 'Grands prix together', value: battle.sharedRaces },
+        { label: `Points gap to ${mate.code}`, value: pointsGap > 0 ? `+${pointsGap}` : String(pointsGap) },
+      ]}
+    />
+
+    <HeadToHead left={driver} right={mate} color={color} rows={rows} year={year} />
+
+    {battle.races.length > 0 && (
+      <div>
+        <p class="mb-2 text-[12px] text-muted-foreground">Race by race · {driver.code} · {mate.code}</p>
+        <DataList
+          label="Race by race"
+          columns={COLUMNS}
+          headers={[
+            { label: 'Rnd' }, { label: 'Grand prix' }, { label: 'Quali' }, { label: 'Finish' },
+            { label: 'Points', class: 'hidden sm:block' }, { label: 'Quali gap', class: 'hidden sm:block text-right' },
+          ]}
+        >
+          {battle.races.map((r, i) => {
+            const quali = pair(r.driver.qualiPosition, r.teammate.qualiPosition);
+            const finish = pair(finishRank(r.driver), finishRank(r.teammate));
+            const points = pair(-r.driver.points, -r.teammate.points);
+            const cell = (mine: string, theirs: string, ahead: { mineAhead: boolean; theirsAhead: boolean }, extra = '') => (
+              <div role="cell" class={`font-mono text-[13px] tabular-nums ${extra}`}>
+                <span class={ahead.mineAhead ? 'font-bold text-foreground' : 'text-muted-foreground'}>{mine}</span>
+                <span class="text-white/20"> · </span>
+                <span class={ahead.theirsAhead ? 'font-bold text-foreground' : 'text-muted-foreground'}>{theirs}</span>
+              </div>
+            );
+            return (
+              <DataRow columns={COLUMNS} first={i === 0} class="py-2.5">
+                <div role="cell" class="font-mono text-[11px] text-muted-foreground">{r.roundNumber}</div>
+                <div role="cell" class="truncate pr-3 text-[13px]"><a href={`/races/${r.raceId}`} class="hover:text-[#a855f7] transition-colors duration-150">{r.raceName}</a></div>
+                {cell(r.driver.qualiPosition != null ? position(r.driver.qualiPosition) : '-', r.teammate.qualiPosition != null ? position(r.teammate.qualiPosition) : '-', quali)}
+                {cell(finishLabel(r.driver), finishLabel(r.teammate), finish)}
+                {cell(String(Math.round(r.driver.points)), String(Math.round(r.teammate.points)), points, 'hidden sm:block')}
+                <div role="cell" class={`hidden sm:block text-right font-mono text-[12px] tabular-nums ${r.qualiGapMs != null && r.qualiGapMs < 0 ? 'text-[#a855f7]' : 'text-muted-foreground'}`}>
+                  {r.qualiGapMs == null ? '-' : `${r.qualiGapMs > 0 ? '+' : r.qualiGapMs < 0 ? '−' : ''}${(Math.abs(r.qualiGapMs) / 1000).toFixed(3)}`}
+                </div>
+              </DataRow>
+            );
+          })}
+        </DataList>
+      </div>
+    )}
+  </section>
+)}

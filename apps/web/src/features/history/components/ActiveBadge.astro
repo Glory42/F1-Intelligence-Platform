@@ -1,0 +1,17 @@
+---
+interface Props {
+  compact?: boolean;
+}
+
+const { compact = false } = Astro.props;
+---
+
+{compact ? (
+  <span class="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" title="On the current grid">
+    <span class="sr-only">active</span>
+  </span>
+) : (
+  <span class="inline-flex items-center gap-1 shrink-0 border border-emerald-400/30 bg-emerald-400/[0.06] px-1 py-px font-mono text-[7px] tracking-[0.15em] uppercase text-emerald-300">
+    <span class="h-1 w-1 rounded-full bg-emerald-300" aria-hidden="true" />active
+  </span>
+)}

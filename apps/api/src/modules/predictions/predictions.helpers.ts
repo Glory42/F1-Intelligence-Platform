@@ -5,7 +5,7 @@ import {
 } from '../../db/schema';
 import type { PredictionResponse, FeatureScores } from '../../common/types';
 import { buildPredictionResponse } from '../../common/prediction-response';
-import { GP_FEATURE_MANIFEST, mapFeatureRow } from '../../common/featureManifest';
+import { GP_FEATURE_MANIFEST, mapFeatureRow } from '../../common/feature-manifest';
 
 export function toFeatures(f: typeof driverPredictionFeatures.$inferSelect): FeatureScores {
   return mapFeatureRow(f, GP_FEATURE_MANIFEST);

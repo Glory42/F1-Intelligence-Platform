@@ -1,0 +1,45 @@
+---
+import TabIntro from '@/components/page/TabIntro.astro';
+import DataList from '@/components/data/DataList.astro';
+import DataRow from '@/components/data/DataRow.astro';
+import TeamIdentity from '@/components/identity/TeamIdentity.astro';
+import RankCell from '@/components/data/RankCell.astro';
+import ShareBar from '@/features/standings/components/ShareBar.astro';
+import { getTeamColor } from '@/lib/f1/teamColors';
+import { formatTitleOdds } from '@/lib/f1/championshipMath';
+import type { TitleOddsResponse } from '@/types';
+
+interface Props {
+  odds: TitleOddsResponse;
+  year: number;
+}
+
+const { odds, year } = Astro.props;
+const COLUMNS = 'grid-cols-[40px_1fr_140px] md:grid-cols-[40px_1fr_220px_120px]';
+---
+
+{odds.teams.length > 0 && (
+  <section>
+    <TabIntro
+      lead={`After round ${odds.afterRound}: 10,000 simulated finishes of the remaining races, using the model's win probabilities.`}
+      terms={[
+        { term: 'Title odds', meaning: 'share of simulations won' },
+        { term: 'Likely final', meaning: '10th–90th percentile points' },
+      ]}
+    />
+    <DataList
+      label="Constructors' title odds"
+      columns={COLUMNS}
+      headers={[{ label: 'Pos' }, { label: 'Constructor' }, { label: 'Title odds' }, { label: 'Likely final', class: 'text-right hidden md:block' }]}
+    >
+      {odds.teams.map((t, i) => (
+        <DataRow columns={COLUMNS} first={i === 0} accent={getTeamColor(t.team.teamKey)}>
+          <RankCell rank={i + 1} />
+          <TeamIdentity team={t.team} year={year} />
+          <ShareBar share={t.titleProbability} color={getTeamColor(t.team.teamKey)} label={formatTitleOdds(t.titleProbability)} />
+          <div role="cell" class="font-mono text-[10px] text-muted-foreground text-right hidden md:block">{Math.round(t.pointsP10)}–{Math.round(t.pointsP90)}</div>
+        </DataRow>
+      ))}
+    </DataList>
+  </section>
+)}

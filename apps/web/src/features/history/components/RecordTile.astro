@@ -1,0 +1,39 @@
+---
+import { f1dbCountryFlag, f1dbCountryName } from '@/features/history/f1dbCountries';
+import ActiveBadge from './ActiveBadge.astro';
+
+interface Holder {
+  name: string;
+  nationality: string | null;
+  href?: string;
+  active?: boolean;
+}
+
+interface Props {
+  label: string;
+  value: string;
+  holders: Holder[];
+  detail?: string;
+  accent?: string;
+}
+
+const { label, value, holders, detail, accent = '#a855f7' } = Astro.props;
+---
+
+<div class="relative overflow-hidden border border-white/[0.06] bg-black p-5" aria-label={`${label}: ${value}`} role="group">
+  <div class="absolute inset-x-0 top-0 h-px" style={`background: linear-gradient(90deg, ${accent}, transparent)`} />
+  <div class="font-mono text-[9px] tracking-[0.2em] uppercase text-muted-foreground/70">{label}</div>
+  <div class="mt-2 text-4xl font-bold tabular-nums leading-none" style={`color: ${accent}`}>{value}</div>
+  <div class="mt-3 space-y-1">
+    {holders.map((h) => (
+      <div class="flex items-center gap-2 text-[13px] min-w-0">
+        <span class="shrink-0" title={f1dbCountryName(h.nationality)}>{f1dbCountryFlag(h.nationality)}</span>
+        {h.href
+          ? <a href={h.href} class="truncate font-medium hover:text-[#a855f7] transition-colors">{h.name}</a>
+          : <span class="truncate font-medium">{h.name}</span>}
+        {h.active && <ActiveBadge />}
+      </div>
+    ))}
+  </div>
+  {detail && <div class="mt-2 font-mono text-[8px] tracking-wider uppercase text-muted-foreground truncate">{detail}</div>}
+</div>

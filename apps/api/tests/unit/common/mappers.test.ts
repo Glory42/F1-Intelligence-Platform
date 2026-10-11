@@ -70,7 +70,7 @@ const race: RaceRow = {
   sprintVscLaps: null,
   sprintAirTempAvg: null,
   sprintTrackTempAvg: null,
-  sprintHumidityAvg: null,
+  sprintHumidityAvg: null, openf1RaceSessionKey: null, openf1SprintSessionKey: null,
   createdAt: new Date('2025-01-01T00:00:00Z'),
 };
 

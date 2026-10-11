@@ -54,7 +54,7 @@ const timeLabelY = barBaseY + 22;
               width={BAR_WIDTH} height={barH}
               fill={isWinner ? '#a855f7' : 'rgba(255,255,255,0.08)'}
             />
-            {/* Driver code — horizontal, just below bar */}
+            {/* Driver code: horizontal, just below bar */}
             <text
               x={cx}
               y={barBaseY + 13}
@@ -66,7 +66,7 @@ const timeLabelY = barBaseY + 22;
               {lap.driver?.code ?? '???'}
             </text>
             {/*
-              Lap time — rotated -90° (counterclockwise in SVG).
+              Lap time: rotated -90° (counterclockwise in SVG).
               text-anchor="end" with rotate(-90) places the anchor at the TOP of the
               rotated text, so the label extends DOWNWARD below the axis line.
             */}

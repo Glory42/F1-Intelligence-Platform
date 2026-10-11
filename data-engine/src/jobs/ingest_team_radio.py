@@ -25,7 +25,7 @@ def _to_rows(
 
 def run(year: int, round_num: int, session_name: str = "Race") -> None:
     # F1 doesn't release radio for every session, so an empty or partial result here is
-    # a normal outcome, not an error — run_openf1_job's skip-count logging covers this.
+    # a normal outcome, not an error: run_openf1_job's skip-count logging covers this.
     run_openf1_job(
         year, round_num,
         OpenF1JobConfig(

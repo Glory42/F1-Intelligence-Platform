@@ -4,7 +4,7 @@ import { drivers, teams, seasons, driverSeasonStats, raceResults, races } from '
 import type { Driver, DriverDetailResponse, DriverStanding, DriverYearStats } from '../../common/types';
 import { toDriver } from '../../common/mappers';
 import { resolveSeason, buildStandings, buildCareerStats, type StatsAdapter } from '../../common/standings';
-import { isSamePerson } from '../../common/driverIdentity';
+import { isSamePerson } from '../../common/driver-identity';
 
 function toDriverStats(s: typeof driverSeasonStats.$inferSelect) {
   return {
@@ -16,6 +16,7 @@ function toDriverStats(s: typeof driverSeasonStats.$inferSelect) {
     avgSector1Ms: s.avgSector1Ms ?? null, avgSector2Ms: s.avgSector2Ms ?? null,
     avgSector3Ms: s.avgSector3Ms ?? null, topSpeedAvg: s.topSpeedAvg ?? null,
     teammateQualiDelta: s.teammateQualiDelta ?? null,
+    sprintTotalPoints: s.sprintTotalPoints,
   };
 }
 
@@ -24,7 +25,7 @@ const emptyDriverStats = {
   totalPoints: '0', championshipPosition: null, avgFinishPosition: null,
   winRate: null, avgPositionGain: null, dnfCount: 0, dnfRate: null,
   avgSector1Ms: null, avgSector2Ms: null, avgSector3Ms: null,
-  topSpeedAvg: null, teammateQualiDelta: null,
+  topSpeedAvg: null, teammateQualiDelta: null, sprintTotalPoints: '0',
 };
 
 const driverStatsAdapter: StatsAdapter<
@@ -124,7 +125,7 @@ export class DriversService {
     );
   }
 
-  // `drivers` rows are season-scoped, so driverId alone already pins the season — no `year` param needed.
+  // `drivers` rows are season-scoped, so driverId alone already pins the season: no `year` param needed.
   async findById(db: Db, driverId: number): Promise<DriverDetailResponse | null> {
     const driverRows = await db
       .select()

@@ -1,9 +1,9 @@
 ---
 name: commit
-description: Commit code changes with conventional commit messages using F1 Prediction project scopes. Use when the user says "commit", "commit this", "save changes", or "/commit". ALWAYS use this skill for commits — never add Co-Authored-By lines.
+description: Commit code changes with conventional commit messages using F1 Prediction project scopes. Use when the user says "commit", "commit this", "save changes", or "/commit". ALWAYS use this skill for commits: never add Co-Authored-By lines.
 ---
 
-# Conventional Commit Skill — F1 Prediction
+# Conventional Commit Skill: F1 Prediction
 
 Create git commits following Conventional Commits with project-specific scopes.
 
@@ -22,7 +22,7 @@ Create git commits following Conventional Commits with project-specific scopes.
 | `feat` | New feature or capability |
 | `fix` | Bug fix |
 | `refactor` | Code restructuring without behavior change |
-| `style` | CSS, Tailwind, visual changes — no logic change |
+| `style` | CSS, Tailwind, visual changes: no logic change |
 | `chore` | Build config, dependencies, seed data, tooling |
 | `perf` | Performance improvement |
 | `data` | ETL jobs, backfill scripts, DB seed, data pipeline |
@@ -31,16 +31,16 @@ Create git commits following Conventional Commits with project-specific scopes.
 
 | Scope | Covers |
 |-------|--------|
-| `web` | Astro frontend — pages, layouts, components |
-| `api` | Hono API — modules, services, controllers, routes |
+| `web` | Astro frontend: pages, layouts, components |
+| `api` | Hono API: modules, services, controllers, routes |
 | `db` | Drizzle schema, migrations, seed |
-| `etl` | Python data-engine — ingest, compute, sync jobs |
+| `etl` | Python data-engine: ingest, compute, sync jobs |
 | `navbar` | Navigation bar, mobile tab bar, car animation |
 | `prediction` | Prediction pages, model, standings, compare tool |
 | `races` | Race pages, calendar, results table |
 | `drivers` | Driver pages, standings, career stats |
 | `teams` | Team pages, standings, constructor stats |
-| `ui` | Shared components — YearSelect, LapChart, tables |
+| `ui` | Shared components: YearSelect, LapChart, tables |
 | `config` | wrangler, astro.config, tsconfig, drizzle.config |
 
 If changes span multiple areas, use the primary one. For broad cross-cutting changes, omit the scope.
@@ -48,9 +48,9 @@ If changes span multiple areas, use the primary one. For broad cross-cutting cha
 ## Rules
 
 1. **Description**: lowercase, imperative mood, no period. Max 72 chars.
-2. **Body**: recommended for non-trivial commits — explain *why*, not what.
+2. **Body**: recommended for non-trivial commits, explain *why*, not what.
 3. **No Co-Authored-By**: Never add co-author lines.
-4. **Never deploy**: Do not run `wrangler deploy` or `bun run deploy` — user pushes to GitHub for Cloudflare to pick up.
+4. **Never deploy**: Do not run `wrangler deploy` or `bun run deploy`, user pushes to GitHub for Cloudflare to pick up.
 5. **Scope from diff**: Always read `git diff --staged` to determine the correct scope.
 6. **Specific files**: Stage with `git add <specific files>`, never `git add .` or `git add -A`.
 7. **CODEMAP.md**: After reviewing the diff, check whether any new files, directories, routes, or components were added or removed. If so, update `CODEMAP.md` to reflect the change before staging it alongside the other files.
@@ -58,9 +58,9 @@ If changes span multiple areas, use the primary one. For broad cross-cutting cha
 
 ## Workflow
 
-1. `git status` — see what changed
-2. `git diff --staged` (or `git diff` if nothing staged) — understand the change
-3. `git log --oneline -5` — match recent commit style
+1. `git status`: see what changed
+2. `git diff --staged` (or `git diff` if nothing staged): understand the change
+3. `git log --oneline -5`: match recent commit style
 4. Determine type + scope from diff
 5. Stage relevant files: `git add <specific files>`
 6. Commit with heredoc:

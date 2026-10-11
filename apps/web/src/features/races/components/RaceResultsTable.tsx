@@ -1,6 +1,6 @@
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import type { RaceResult, LapSummary } from '@/types';
-import { getTeamColor } from '@/lib/teamColors';
+import { getTeamColor } from '@/lib/f1/teamColors';
 import { formatMs } from '@/lib/utils';
 
 interface Props {

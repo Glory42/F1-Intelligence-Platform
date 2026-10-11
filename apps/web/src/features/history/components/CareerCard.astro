@@ -1,0 +1,46 @@
+---
+import SectionKicker from '@/components/page/SectionKicker.astro';
+import StatTiles from '@/components/data/StatTiles.astro';
+import DataList from '@/components/data/DataList.astro';
+import DataRow from '@/components/data/DataRow.astro';
+import F1dbCredit from './F1dbCredit.astro';
+import { formatDate } from '@/lib/utils';
+import type { DriverHistory } from '@/types';
+
+interface Props {
+  history: DriverHistory;
+}
+
+const { history } = Astro.props;
+const COLUMNS = 'grid-cols-[110px_120px_1fr]';
+const milestones = [
+  ['Debut', history.firstRaceDate, history.firstRaceName],
+  ['First podium', history.firstPodiumDate, history.firstPodiumName],
+  ['First pole', history.firstPoleDate, history.firstPoleName],
+  ['First win', history.firstWinDate, history.firstWinName],
+].filter((m): m is [string, string, string] => m[1] != null);
+---
+
+<section aria-label="All-time career" class="space-y-4">
+  <SectionKicker label="./career · all-time" class="" />
+  <StatTiles
+    cols="grid-cols-3 sm:grid-cols-6"
+    items={[
+      { label: 'Titles', value: history.championships }, { label: 'Starts', value: history.raceStarts },
+      { label: 'Wins', value: history.raceWins }, { label: 'Podiums', value: history.podiums },
+      { label: 'Poles', value: history.polePositions }, { label: 'Fastest laps', value: history.fastestLaps },
+    ]}
+  />
+  {milestones.length > 0 && (
+    <DataList label="Career milestones" columns={COLUMNS} headers={[{ label: 'Milestone' }, { label: 'Date' }, { label: 'Race' }]}>
+      {milestones.map(([label, date, name], i) => (
+        <DataRow columns={COLUMNS} first={i === 0} accent={label === 'First win' ? '#a855f7' : 'transparent'}>
+          <div role="cell" class="font-mono text-[9px] tracking-widest uppercase text-muted-foreground">{label}</div>
+          <div role="cell" class="font-mono text-[10px]">{formatDate(date)}</div>
+          <div role="cell" class="text-sm truncate">{name}</div>
+        </DataRow>
+      ))}
+    </DataList>
+  )}
+  <F1dbCredit />
+</section>

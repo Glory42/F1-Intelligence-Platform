@@ -1,0 +1,51 @@
+---
+import TabIntro from '@/components/page/TabIntro.astro';
+import DataList from '@/components/data/DataList.astro';
+import DataRow from '@/components/data/DataRow.astro';
+import TeamIdentity from '@/components/identity/TeamIdentity.astro';
+import RankCell from '@/components/data/RankCell.astro';
+import { formatStopSeconds } from '@/lib/utils';
+import { getTeamColor } from '@/lib/f1/teamColors';
+import type { PitCrewRanking } from '@/types';
+
+interface Props {
+  rankings: PitCrewRanking[];
+  year: number;
+  highlightTeamId?: number;
+  intro?: boolean;
+}
+
+const { rankings, year, highlightTeamId, intro = true } = Astro.props;
+const COLUMNS = 'grid-cols-[40px_1fr_80px] sm:grid-cols-[40px_1fr_90px_90px_70px]';
+---
+
+{rankings.length > 0 && (
+  <section id="pit-crews">
+    {intro && <TabIntro
+      lead="Time stationary in the box, from OpenF1 (2024 US GP onwards). Ranked by the median, so one botched stop can't skew it."
+      terms={[
+        { term: 'Median', meaning: 'typical stop' },
+        { term: 'Best', meaning: 'fastest single stop' },
+        { term: 'Stops', meaning: 'stops counted' },
+      ]}
+    />}
+    <DataList
+      label="Pit crew ranking"
+      columns={COLUMNS}
+      headers={[
+        { label: 'Pos' }, { label: 'Constructor' }, { label: 'Median', class: 'text-right' },
+        { label: 'Best', class: 'text-right hidden sm:block' }, { label: 'Stops', class: 'text-right hidden sm:block' },
+      ]}
+    >
+      {rankings.map((r, i) => (
+        <DataRow columns={COLUMNS} first={i === 0} accent={getTeamColor(r.team.teamKey)} class={r.team.id === highlightTeamId ? 'bg-white/[0.04]' : ''}>
+          <RankCell rank={i + 1} />
+          <TeamIdentity team={r.team} year={year} />
+          <div role="cell" class="font-mono text-sm font-bold text-right">{formatStopSeconds(r.medianStationaryMs)}</div>
+          <div role="cell" class="font-mono text-sm text-right text-muted-foreground hidden sm:block">{formatStopSeconds(r.fastestStationaryMs)}</div>
+          <div role="cell" class="font-mono text-sm text-right text-muted-foreground hidden sm:block">{r.stops}</div>
+        </DataRow>
+      ))}
+    </DataList>
+  </section>
+)}

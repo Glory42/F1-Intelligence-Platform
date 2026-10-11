@@ -3,19 +3,38 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import { DriverStatsGrid } from '@/features/drivers/components/DriverStatsGrid';
 import { RecentResultsTable } from '@/features/drivers/components/RecentResultsTable';
 import { api } from '@/lib/api';
-import type { DriverYearStats } from '@/types';
-import { BarChart2, History, ChevronRight, Trophy, Cpu, CheckCircle2, XCircle, Clock } from 'lucide-react';
-import YearSelectLinks from '@/components/shared/YearSelectLinks.astro';
-import { getTeamColor } from '@/lib/teamColors';
-import { driverPredictionRecord } from '@/lib/predictionMath';
-import { getNationalityFlag, getDriverFlagByCode } from '@/lib/countryFlags';
+import type { DriverYearStats, TeammateBattle, DriverHistory } from '@/types';
+import TeammateBattleCard from '@/features/drivers/components/TeammateBattleCard.astro';
+import CareerCard from '@/features/history/components/CareerCard.astro';
+import DriverCareerTable from '@/features/drivers/components/DriverCareerTable.astro';
+import ModelTrackRecord from '@/features/drivers/components/ModelTrackRecord.astro';
+import { Trophy } from 'lucide-react';
+import YearSelectLinks from '@/components/page/YearSelectLinks.astro';
+import PageTabs from '@/components/page/PageTabs.astro';
+import EmptyState from '@/components/page/EmptyState.astro';
+import { getTeamColor } from '@/lib/f1/teamColors';
+import { driverPredictionRecord } from '@/lib/f1/predictionMath';
+import { resolveTab, TAB_PARAM } from '@/lib/pageTabs';
+import { getNationalityFlag, getDriverFlagByCode } from '@/lib/f1/countryFlags';
+
+const TABS = [
+  { id: 'season', label: 'This season' },
+  { id: 'teammate', label: 'Teammate battle' },
+  { id: 'career', label: 'Career' },
+  { id: 'model', label: 'Model' },
+] as const;
 
 const { id } = Astro.params;
+const tab = resolveTab(Astro.url, TABS);
+const tabSuffix = tab === TABS[0].id ? '' : `&${TAB_PARAM}=${tab}`;
 let year = Number(Astro.url.searchParams.get('year') ?? new Date().getFullYear());
 
 let data = null;
 let career: DriverYearStats[] = [];
 let error = null;
+let predictionRecord: ReturnType<typeof driverPredictionRecord> | null = null;
+let teammateBattle: TeammateBattle | null = null;
+let driverHistory: DriverHistory | null = null;
 
 try {
   career = await api.getDriverCareer(Number(id));
@@ -28,22 +47,23 @@ try {
       : (activeYears.includes(new Date().getFullYear()) ? new Date().getFullYear() : Math.max(...activeYears));
     
     year = targetYear;
-    data = await api.getDriverById(Number(id), targetYear);
+    const careerYear = career.find((y) => y.year === targetYear);
+    const [driverResult, historyResult, battleResult, careerHistoryResult] = await Promise.allSettled([
+      api.getDriverById(Number(id), targetYear),
+      tab === 'model' ? api.getPredictionHistory(targetYear) : null,
+      tab === 'teammate' ? api.getTeammateBattle(careerYear?.driverId ?? Number(id), targetYear) : null,
+      tab === 'career' ? api.getDriverHistory(careerYear?.driverId ?? Number(id)) : null,
+    ]);
+    if (driverResult.status === 'rejected') throw driverResult.reason;
+    data = driverResult.value;
+    predictionRecord = historyResult.status === 'fulfilled' && historyResult.value ? driverPredictionRecord(historyResult.value, Number(id)) : null;
+    teammateBattle = battleResult.status === 'fulfilled' ? battleResult.value : null;
+    driverHistory = careerHistoryResult.status === 'fulfilled' ? careerHistoryResult.value : null;
   } else {
     error = 'Driver has no career records';
   }
 } catch (e) {
   error = e instanceof Error ? e.message : 'Failed to load driver';
-}
-
-let predictionRecord: ReturnType<typeof driverPredictionRecord> | null = null;
-if (data) {
-  try {
-    const predictionHistory = await api.getPredictionHistory(year);
-    predictionRecord = driverPredictionRecord(predictionHistory, Number(id));
-  } catch {
-    predictionRecord = null;
-  }
 }
 
 const driver = data?.driver;
@@ -57,7 +77,7 @@ const nationalityFlag = driver
 ---
 
 <BaseLayout title={driver?.fullName ?? 'Driver'}>
-  <div class="mt-7">
+  <div>
     <div class="mb-6 flex items-center gap-4">
       <a href={`/drivers?year=${year}`} class="font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground hover:text-foreground transition-colors duration-150">
         ← all drivers
@@ -65,7 +85,7 @@ const nationalityFlag = driver
       {careerWithStats.length > 1 && (
         <div class="ml-auto">
           <YearSelectLinks
-            items={careerWithStats.map((y) => ({ year: y.year, href: `/drivers/${y.driverId}?year=${y.year}` }))}
+            items={careerWithStats.map((y) => ({ year: y.year, href: `/drivers/${y.driverId}?year=${y.year}${tabSuffix}` }))}
             currentYear={year}
           />
         </div>
@@ -121,110 +141,42 @@ const nationalityFlag = driver
           </div>
         </div>
 
-        <!-- Current year stats -->
-        <div>
-          <div class="flex items-center gap-3 mb-4">
-            <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)"><BarChart2 size={11} />./stats · {year}</span>
-            <div class="h-px flex-1 bg-white/[0.05]" />
-          </div>
-          <DriverStatsGrid stats={data.seasonStats} />
-        </div>
+        <PageTabs tabs={TABS} active={tab} label="Driver views" />
 
-        <!-- Recent results -->
-        {data.recentResults.length > 0 && (
-          <div>
-            <div class="flex items-center gap-3 mb-4">
-              <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)"><ChevronRight size={11} />./recent results</span>
-              <div class="h-px flex-1 bg-white/[0.05]" />
-            </div>
-            <div class="border border-white/[0.06] overflow-hidden">
-              <RecentResultsTable results={data.recentResults} />
-            </div>
-          </div>
-        )}
-
-        <!-- Model track record -->
-        {predictionRecord && (
-          <div>
-            <div class="flex items-center gap-3 mb-4">
-              <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)"><Cpu size={11} />./model track record · {year}</span>
-              <div class="h-px flex-1 bg-white/[0.05]" />
-              {predictionRecord.tipped > 0 && (
-                <span class="font-mono text-[9px] text-muted-foreground">
-                  tipped <span class="text-[#a855f7] font-bold">{predictionRecord.tipped}×</span>
-                  {predictionRecord.decided > 0 && <> · <span class="text-[#a855f7] font-bold">{predictionRecord.correct}</span> correct</>}
-                </span>
-              )}
-            </div>
-            {predictionRecord.tipped === 0 ? (
-              <div class="border border-white/[0.06] px-5 py-6 text-center">
-                <p class="font-mono text-[9px] text-muted-foreground tracking-[0.15em] uppercase">The model hasn't picked {driver.code} to win a race in {year}</p>
+        {tab === 'season' ? (
+          <div class="space-y-8">
+            <div>
+              <div class="flex items-center gap-3 mb-4">
+                <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">./stats · {year}</span>
+                <div class="h-px flex-1 bg-white/[0.05]" />
               </div>
-            ) : (
-            <div class="border border-white/[0.06]">
-              {predictionRecord.races.map((r, i) => (
-                <a
-                  href={r.isSprint ? `/prediction/sprint/${r.raceId}` : `/prediction/${r.raceId}`}
-                  class={`flex items-center gap-4 px-5 py-3 hover:bg-white/[0.02] transition-colors duration-150 group ${i !== 0 ? 'border-t border-white/[0.04]' : ''}`}
-                >
-                  <div class="font-mono text-[9px] text-muted-foreground w-5 shrink-0">{r.roundNumber.toString().padStart(2, '0')}</div>
-                  <div class="flex-1 min-w-0 flex items-center gap-2">
-                    <span class="font-semibold text-sm truncate group-hover:text-[#a855f7] transition-colors duration-150">{r.raceName}</span>
-                    {r.isSprint && <span class="font-mono text-[7px] tracking-[0.1em] uppercase px-1.5 py-0.5 border border-orange-500/30 text-orange-400/70 shrink-0">sprint</span>}
-                  </div>
-                  <div class="shrink-0 font-mono text-[9px] font-bold w-20 text-right">
-                    {r.correct === true && <span class="flex items-center justify-end gap-1 text-green-400"><CheckCircle2 size={12} />won</span>}
-                    {r.correct === false && <span class="flex items-center justify-end gap-1 text-red-400"><XCircle size={12} />missed</span>}
-                    {r.correct === null && <span class="flex items-center justify-end gap-1 text-muted-foreground"><Clock size={11} />pending</span>}
-                  </div>
-                </a>
-              ))}
+              <DriverStatsGrid stats={data.seasonStats} />
             </div>
+            {data.recentResults.length > 0 && (
+              <div>
+                <div class="flex items-center gap-3 mb-4">
+                  <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">./recent results</span>
+                  <div class="h-px flex-1 bg-white/[0.05]" />
+                </div>
+                <div class="border border-white/[0.06] overflow-hidden">
+                  <RecentResultsTable results={data.recentResults} />
+                </div>
+              </div>
             )}
           </div>
-        )}
-
-        <!-- Career history -->
-        {careerWithStats.length > 0 && (
-          <div>
-            <div class="flex items-center gap-3 mb-4">
-              <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)"><History size={11} />./career history</span>
-              <div class="h-px flex-1 bg-white/[0.05]" />
-            </div>
-            <div class="border border-white/[0.06]">
-              <div class="grid grid-cols-[60px_1fr_80px_50px_50px_50px_50px] gap-0 px-5 py-2.5 border-b border-white/[0.06]">
-                <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase">Year</div>
-                <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase">Team</div>
-                <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right">Pts</div>
-                <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right">Pos</div>
-                <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right hidden sm:block">W</div>
-                <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right hidden sm:block">Pod</div>
-                <div class="font-mono text-[8px] text-muted-foreground tracking-widest uppercase text-right hidden md:block">Pole</div>
-              </div>
-              {careerWithStats.map((y, i) => (
-                <a
-                  href={`/drivers/${y.driverId}?year=${y.year}`}
-                  class={`grid grid-cols-[60px_1fr_80px_50px_50px_50px_50px] gap-0 items-center px-5 py-3 hover:bg-white/[0.02] transition-colors duration-150 group ${i !== 0 ? 'border-t border-white/[0.04]' : ''} ${y.year === year ? 'bg-[rgba(168,85,247,0.03)]' : ''}`}
-                >
-                  <div class={`font-mono text-sm font-bold ${y.year === year ? 'text-[#a855f7]' : 'text-muted-foreground'}`}>{y.year}</div>
-                  <div class="inline-flex items-center gap-1.5 font-mono text-[9px] text-muted-foreground group-hover:text-foreground transition-colors min-w-0">
-                    <span class="w-1.5 h-1.5 rounded-full shrink-0" style={`background: ${getTeamColor(y.teamName.toLowerCase().replace(/[\s\-\.]+/g, '_'))};`} />
-                    <span class="truncate">{y.teamName}</span>
-                    {y.year < thisYear && y.stats?.championshipPosition === 1 && (
-                      <Trophy size={11} color="#a855f7" className="shrink-0" />
-                    )}
-                  </div>
-                  <div class="font-bold text-sm text-right">{y.stats ? Math.round(Number(y.stats.totalPoints)) : '—'}</div>
-                  <div class="font-mono text-sm text-right text-muted-foreground">
-                    {y.stats?.championshipPosition ? `P${y.stats.championshipPosition}` : '—'}
-                  </div>
-                  <div class="font-mono text-sm text-right text-muted-foreground hidden sm:block">{y.stats?.wins ?? '—'}</div>
-                  <div class="font-mono text-sm text-right text-muted-foreground hidden sm:block">{y.stats?.podiums ?? '—'}</div>
-                  <div class="font-mono text-sm text-right text-muted-foreground hidden md:block">{y.stats?.poles ?? '—'}</div>
-                </a>
-              ))}
-            </div>
+        ) : tab === 'teammate' ? (
+          teammateBattle
+            ? <TeammateBattleCard battle={teammateBattle} driver={driver} year={year} />
+            : <EmptyState message={`No teammate battle for ${driver.code} in ${year}.`} />
+        ) : tab === 'career' ? (
+          <div class="space-y-8">
+            {driverHistory && <CareerCard history={driverHistory} />}
+            <DriverCareerTable career={careerWithStats} year={year} />
           </div>
+        ) : (
+          predictionRecord
+            ? <ModelTrackRecord record={predictionRecord} driverCode={driver.code} year={year} />
+            : <EmptyState message={`No predictions for ${year} yet.`} />
         )}
 
       </div>

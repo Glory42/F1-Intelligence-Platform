@@ -4,7 +4,7 @@ import { circuits, seasons } from './schema';
 
 const R2_BASE = '/circuits';
 
-// Static track categorization — which characteristic dominates at this circuit.
+// Static track categorization: which characteristic dominates at this circuit.
 // Drives car_performance_at_circuit (blend of season + category-specific pace).
 const TRACK_CATEGORY: Record<string, string> = {
   a1_ring: 'high_speed', adelaide: 'street', albert_park: 'street', austin: 'balanced',

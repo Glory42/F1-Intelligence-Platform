@@ -49,7 +49,7 @@ export type CompareAction<T, TDetail, TYearStats> =
   | { type: 'DETAIL_LOADED'; requestId: number; result: CompareResult<TDetail, TYearStats> }
   | { type: 'DETAIL_FAILED'; requestId: number; message: string };
 
-// Arms the (only) detail fetch, or clears it while a/b are still mid-hydration —
+// Arms the (only) detail fetch, or clears it while a/b are still mid-hydration:
 // pendingAId/pendingBId being set means ITEMS_LOADED hasn't resolved them onto a/b yet.
 function armDetailFetch<T extends { id: number }, TDetail, TYearStats>(
   state: CompareState<T, TDetail, TYearStats>,

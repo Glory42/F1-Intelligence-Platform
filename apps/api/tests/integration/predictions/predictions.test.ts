@@ -32,7 +32,7 @@ describe('predictions (integration)', () => {
     await createDriverPredictionFeatures(db, upcoming.id, winner.id, { winProbability: '0.55000', predictedPosition: 1 });
     await createDriverPredictionFeatures(db, upcoming.id, other.id, { winProbability: '0.20000', predictedPosition: 2 });
 
-    // Completed prior round with a correct prediction — feeds history + accuracy.
+    // Completed prior round with a correct prediction: feeds history + accuracy.
     const completed = await createRace(db, season.id, circuit.id, {
       roundNumber: 2, name: 'Completed GP', raceDate: '2099-02-01', status: 'completed',
     });

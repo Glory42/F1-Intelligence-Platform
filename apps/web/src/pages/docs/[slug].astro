@@ -1,8 +1,7 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
-import OnThisPage from '@/components/docs/OnThisPage.astro';
+import OnThisPage from '@/features/docs/components/OnThisPage.astro';
 import { getCollection, render } from 'astro:content';
-import { BookOpen } from 'lucide-react';
 
 export const prerender = true;
 
@@ -26,8 +25,8 @@ const { Content, headings } = await render(entry);
 const sections = headings.filter(h => h.depth === 2);
 ---
 
-<BaseLayout title={`${entry.data.title} — Docs`}>
-  <div class="mt-7">
+<BaseLayout title={`${entry.data.title} | Docs`}>
+  <div>
 
     <!-- breadcrumb -->
     <div class="flex items-center gap-2 mb-8">
@@ -36,7 +35,7 @@ const sections = headings.filter(h => h.depth === 2);
         class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase transition-colors hover:text-[#a855f7]"
         style="color: rgba(168,85,247,0.55)"
       >
-        <BookOpen size={11} />./docs
+        ./docs
       </a>
       <span class="font-mono text-[9px] text-muted-foreground/40">/</span>
       <span class="font-mono text-[9px] text-muted-foreground tracking-[0.2em] uppercase">{slug}</span>

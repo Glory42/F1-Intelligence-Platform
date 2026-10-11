@@ -3,6 +3,9 @@ import { drivers } from '../../../src/db/schema';
 
 type DriverInsert = typeof drivers.$inferInsert;
 
+// drivers is unique per (season, first name, last name), so each default driver is its own person.
+let sequence = 0;
+
 export async function createDriver(
   db: Db,
   seasonId: number,
@@ -17,7 +20,7 @@ export async function createDriver(
       driverNumber: 1,
       code: 'TST',
       firstName: 'Test',
-      lastName: 'Driver',
+      lastName: `Driver ${++sequence}`,
       nationality: 'Testland',
       headshotUrl: null,
       ...overrides,

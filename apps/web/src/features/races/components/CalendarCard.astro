@@ -1,0 +1,74 @@
+---
+import { MapPin, CalendarDays, Flag, Zap } from 'lucide-react';
+import { formatDate } from '@/lib/utils';
+import type { CalendarEntry } from '../calendar';
+
+interface Props {
+  entry: CalendarEntry;
+}
+
+const { entry } = Astro.props;
+const { race, sprint: isSprint, href, date } = entry;
+const isQualiDone = race.status === 'qualifying_done';
+const isSprintDone = race.status === 'sprint_done';
+const isSQDone = race.status === 'sprint_qualifying_done';
+---
+
+<div class={`relative p-5 transition-colors duration-150 group ${isSprint ? 'bg-[rgba(249,115,22,0.03)] hover:bg-[rgba(249,115,22,0.05)] border-l-2 border-l-orange-500/30' : 'bg-black hover:bg-white/[0.02]'}`}>
+  <a href={href} class="absolute inset-0 z-0" aria-label={race.name} />
+  <div class="flex items-start justify-between gap-2 mb-3">
+    <div class="flex items-center gap-2">
+      <span class={`flex items-center gap-1.5 font-mono text-[9px] tracking-[0.18em] uppercase ${isSprint ? 'text-orange-400/60' : 'text-muted-foreground'}`}>
+        <Flag size={10} />R{race.roundNumber.toString().padStart(2, '0')}
+      </span>
+      {isSprint && (
+        <span class="font-mono text-[7px] tracking-[0.15em] uppercase px-1.5 py-0.5 border border-orange-500/35 text-orange-400/75">
+          SPRINT
+        </span>
+      )}
+    </div>
+    {(isQualiDone || isSprintDone || isSQDone) && (
+      <span class={`flex items-center gap-1 font-mono text-[8px] tracking-[0.12em] uppercase px-1.5 py-0.5 border ${
+        isQualiDone && !isSprint
+          ? 'border-[rgba(168,85,247,0.3)] text-[rgba(168,85,247,0.7)]'
+          : 'border-orange-500/30 text-orange-400/70'
+      }`}>
+        {isQualiDone && !isSprint  ? <><Zap size={9} />quali done</>   :
+         isSQDone && isSprint       ? <><Zap size={9} />sq done</>      :
+                                      <><Zap size={9} />sprint done</>}
+      </span>
+    )}
+  </div>
+  <span class={`font-semibold text-sm leading-snug block mb-1 transition-colors duration-150 ${isSprint ? 'group-hover:text-orange-400' : 'group-hover:text-[#a855f7]'}`}>
+    {race.name}
+  </span>
+  <div class="relative z-10 flex items-center gap-1 font-mono text-[9px] text-muted-foreground mb-3">
+    <MapPin size={9} />
+    <a href={`/circuits/${race.circuit.circuitKey}`} class="hover:text-white underline decoration-white/30 underline-offset-[2px] transition-all">
+      {race.circuit.city}, {race.circuit.country}
+    </a>
+  </div>
+  <div class="flex items-center gap-1 font-mono text-[9px] text-muted-foreground tracking-widest">
+    <CalendarDays size={10} />{formatDate(date)}
+  </div>
+  {/* Action links: relative z-10 to sit above the stretched overlay */}
+  {((isQualiDone && !isSprint) || ((isSQDone || isSprintDone || isQualiDone) && isSprint)) && (
+    <div class="relative z-10 mt-4 pt-3 border-t border-white/[0.06]">
+      {isQualiDone && !isSprint && (
+        <a href="/prediction" class="flex items-center gap-1 font-mono text-[9px] tracking-[0.15em] uppercase text-[rgba(168,85,247,0.7)] hover:text-[#a855f7] transition-colors duration-150">
+          <Zap size={10} />race prediction
+        </a>
+      )}
+      {isSQDone && isSprint && (
+        <a href={`/races/${race.id}/sprint`} class="flex items-center gap-1 font-mono text-[9px] tracking-[0.15em] uppercase text-orange-400/70 hover:text-orange-400 transition-colors duration-150">
+          <Zap size={10} />sprint prediction
+        </a>
+      )}
+      {(isSprintDone || isQualiDone) && isSprint && (
+        <a href={`/races/${race.id}/sprint`} class="flex items-center gap-1 font-mono text-[9px] tracking-[0.15em] uppercase text-orange-400/70 hover:text-orange-400 transition-colors duration-150">
+          <Zap size={10} />sprint results
+        </a>
+      )}
+    </div>
+  )}
+</div>

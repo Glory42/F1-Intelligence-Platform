@@ -1,0 +1,128 @@
+---
+import { Zap, AlertTriangle } from 'lucide-react';
+import CircuitTrackCard from './CircuitTrackCard.astro';
+import { WeatherForecast } from './WeatherForecast';
+import { weatherSplit } from '../circuitView';
+import type { ForecastDay } from '../weather';
+import type { CircuitDetailResponse } from '@/types';
+
+interface Props {
+  details: CircuitDetailResponse;
+  lat: number;
+  lng: number;
+  showForecast: boolean;
+  forecast: ForecastDay[] | null;
+}
+
+const { details, lat, lng, showForecast, forecast } = Astro.props;
+const { circuit, outlinePath, safetyCarStats } = details;
+const split = weatherSplit(details.weatherStats);
+---
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+  <!-- Left Column: Stats & Model Info -->
+  <div class="space-y-6 lg:col-span-2">
+
+    {/* Nested Grid for Track Image & Key Stats */}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+      {/* Track Layout Card (Bigger and Left Aligned) */}
+      <CircuitTrackCard name={circuit.name} imageUrl={circuit.imageUrl || null} outlinePath={outlinePath} lat={lat} lng={lng} />
+
+      {/* Stats and Model Insights */}
+      <div class="space-y-6">
+        <div class="grid grid-cols-2 gap-px bg-white/[0.06] border border-white/[0.06]">
+          <div class="bg-black p-4">
+            <span class="block font-mono text-[9px] text-muted-foreground tracking-widest uppercase mb-1">Laps</span>
+            <span class="text-xl font-medium">{circuit.lapCount}</span>
+          </div>
+          <div class="bg-black p-4">
+            <span class="block font-mono text-[9px] text-muted-foreground tracking-widest uppercase mb-1">Length</span>
+            <span class="text-xl font-medium">{circuit.trackLengthKm} <span class="text-xs text-muted-foreground">km</span></span>
+          </div>
+          <div class="bg-black p-4">
+            <span class="block font-mono text-[9px] text-muted-foreground tracking-widest uppercase mb-1">Corners</span>
+            <span class="text-xl font-medium">{circuit.numberOfCorners || '-'}</span>
+          </div>
+          <div class="bg-black p-4">
+            <span class="block font-mono text-[9px] text-muted-foreground tracking-widest uppercase mb-1">DRS Zones</span>
+            <span class="text-xl font-medium">{circuit.drsZones || '-'}</span>
+          </div>
+        </div>
+
+        <!-- Model Insights & Qualifying Impact -->
+        <div class="border border-purple-500/20 bg-purple-500/[0.02] p-5">
+          <h2 class="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] uppercase text-purple-400 mb-4">
+            <Zap size={12} /> Model Insights
+          </h2>
+          <div class="space-y-4">
+            <div class="flex items-baseline justify-between border-b border-white/[0.04] pb-1.5">
+              <span class="font-mono text-[9px] text-muted-foreground uppercase">Overtake Rate</span>
+              <span class="font-mono text-sm font-semibold text-white">{circuit.overtakeRate || '-'}</span>
+            </div>
+            <div class="flex items-baseline justify-between">
+              <span class="font-mono text-[9px] text-muted-foreground uppercase">Seeded SC Prob</span>
+              <span class="font-mono text-sm font-semibold text-white">{circuit.scProbability ? `${(Number(circuit.scProbability) * 100).toFixed(0)}%` : '-'}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Right Column: Context & Records -->
+  <div class="space-y-6">
+
+    <!-- Live Weather Forecast Widget -->
+    {showForecast && (
+      <WeatherForecast lat={lat} lng={lng} cityName={circuit.city} forecast={forecast} />
+    )}
+
+
+    <!-- Safety Car Stats -->
+    <div class="border border-white/[0.06] bg-black p-5">
+      <h2 class="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mb-4">
+        <AlertTriangle size={11} className="text-yellow-500/70" /> Safety Car Stats
+      </h2>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="bg-white/[0.01] p-3 border border-white/[0.03]">
+          <span class="block text-[11px] text-muted-foreground mb-1">Avg SC Laps</span>
+          <span class="text-lg font-semibold text-white">{safetyCarStats.avgScLaps.toFixed(1)} <span class="text-[10px] text-muted-foreground font-normal">laps</span></span>
+        </div>
+        <div class="bg-white/[0.01] p-3 border border-white/[0.03]">
+          <span class="block text-[11px] text-muted-foreground mb-1">Safety Car Rate</span>
+          <span class="text-lg font-semibold text-white">{Math.round(safetyCarStats.scRaceRate * 100)}% <span class="text-[10px] text-muted-foreground font-normal">races</span></span>
+        </div>
+      </div>
+      <p class="mt-3 text-[10px] text-muted-foreground leading-relaxed">
+        Derived from historical safety car lap counters. A higher rate indicates a chaotic race environment with frequent yellow flags.
+      </p>
+    </div>
+
+    <!-- Weather Split -->
+    <div class="border border-white/[0.06] bg-black p-5">
+      <h2 class="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mb-4">Historical Weather</h2>
+      {split.total > 0 ? (
+        <>
+          <div class="h-2 w-full flex rounded-full overflow-hidden mb-3">
+            {split.dry > 0 && <div class="bg-yellow-500/80 bar-fill" style={`width: ${split.dry}%`} />}
+            {split.mixed > 0 && <div class="bg-blue-400/80 bar-fill" style={`width: ${split.mixed}%`} />}
+            {split.wet > 0 && <div class="bg-blue-600/80 bar-fill" style={`width: ${split.wet}%`} />}
+          </div>
+          <div class="flex justify-between font-mono text-[9px] tracking-widest uppercase text-muted-foreground">
+            <span class={split.dry > 0 ? "text-yellow-500/80" : "hidden"}>Dry {split.dry}%</span>
+            <span class={split.mixed > 0 ? "text-blue-400/80" : "hidden"}>Mixed {split.mixed}%</span>
+            <span class={split.wet > 0 ? "text-blue-600/80" : "hidden"}>Wet {split.wet}%</span>
+          </div>
+        </>
+      ) : (
+        <span class="text-sm text-muted-foreground">No data available</span>
+      )}
+    </div>
+
+
+  </div>
+</div>

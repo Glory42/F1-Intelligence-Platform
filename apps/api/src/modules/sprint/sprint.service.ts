@@ -11,7 +11,7 @@ import type {
 import { SPRINT_FORMATS } from '../../common/constants';
 import { toDriver, toRace, toSprintResult } from '../../common/mappers';
 import { buildPredictionResponse as buildSharedPredictionResponse } from '../../common/prediction-response';
-import { SPRINT_FEATURE_MANIFEST, mapFeatureRow } from '../../common/featureManifest';
+import { SPRINT_FEATURE_MANIFEST, mapFeatureRow } from '../../common/feature-manifest';
 
 function toSprintFeatures(f: typeof driverSprintFeatures.$inferSelect): SprintFeatureScores {
   return mapFeatureRow(f, SPRINT_FEATURE_MANIFEST);

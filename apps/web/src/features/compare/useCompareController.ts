@@ -65,7 +65,7 @@ export function useCompareController<T extends { id: number }, TDetail, TYearSta
     createInitialCompareState<T, TDetail, TYearStats>(reducerConfig),
   );
 
-  // Effects read config/adapter via these refs, not as deps — no re-fetch on a fresh
+  // Effects read config/adapter via these refs, not as deps: no re-fetch on a fresh
   // per-render identity, and no eslint-disable needed.
   const configRef = useRef(config);
   configRef.current = config;

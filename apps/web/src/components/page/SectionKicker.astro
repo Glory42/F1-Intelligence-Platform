@@ -1,0 +1,25 @@
+---
+import { ChevronRight } from 'lucide-react';
+
+interface Props {
+  label: string;
+  accentRgb?: string;
+  href?: string;
+  linkLabel?: string;
+  class?: string;
+}
+
+const { label, accentRgb = '168,85,247', href, linkLabel = 'view all', class: className = 'mb-4' } = Astro.props;
+---
+
+<div class={`flex items-center gap-3 ${className}`}>
+  <span class="font-mono text-[9px] tracking-[0.25em] uppercase" style={`color: rgba(${accentRgb},0.55)`}>
+    {label}
+  </span>
+  <div class="h-px flex-1 bg-white/[0.05]" />
+  {href && (
+    <a href={href} class="flex items-center gap-1 font-mono text-[8px] tracking-[0.18em] text-muted-foreground hover:text-foreground uppercase transition-colors duration-150">
+      {linkLabel} <ChevronRight size={10} />
+    </a>
+  )}
+</div>

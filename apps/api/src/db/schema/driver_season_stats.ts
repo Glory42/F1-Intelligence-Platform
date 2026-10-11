@@ -23,7 +23,7 @@ export const driverSeasonStats = pgTable('driver_season_stats', {
   avgSector3Ms: integer('avg_sector3_ms'),
   topSpeedAvg: numeric('top_speed_avg', { precision: 5, scale: 1 }),
   teammateQualiDelta: numeric('teammate_quali_delta', { precision: 6, scale: 4 }),
-  // Sprint-specific aggregates — kept separate because sprint max points (8) ≠ race max points (25)
+  // Sprint-specific aggregates: kept separate because sprint max points (8) ≠ race max points (25)
   sprintRacesEntered: integer('sprint_races_entered').notNull().default(0),
   sprintWins: integer('sprint_wins').notNull().default(0),
   sprintPodiums: integer('sprint_podiums').notNull().default(0),

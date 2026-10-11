@@ -1,0 +1,30 @@
+# Local stand-in for the Neon test branch so apps/api integration tests never spend Neon Free
+# CU-hours. @neondatabase/serverless only speaks Neon's HTTP protocol, so the proxy bridges it to Postgres.
+name: f1-intelligence-test
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: f1
+      POSTGRES_PASSWORD: f1
+      POSTGRES_DB: f1_test
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U f1 -d f1_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+
+  db-proxy:
+    image: ghcr.io/timowilhelm/local-neon-http-proxy:main
+    environment:
+      PG_CONNECTION_STRING: postgres://f1:f1@postgres:5432/f1_test
+    ports:
+      - "4445:4444"
+    depends_on:
+      postgres:
+        condition: service_healthy

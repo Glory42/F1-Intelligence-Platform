@@ -3,7 +3,7 @@ import pandas as pd
 from src.db.client import get_conn
 from src.utils.upsert import upsert
 
-# FastF1 uses Location (city-level) — map to our circuit_key
+# FastF1 uses Location (city-level): map to our circuit_key
 LOCATION_TO_CIRCUIT_KEY: dict[str, str] = {
     # Current calendar
     "Sakhir": "bahrain",
@@ -134,7 +134,7 @@ def run(year: int, schedule: pd.DataFrame | None = None) -> None:
             cur.execute("SELECT id FROM seasons WHERE year = %s", (year,))
             row = cur.fetchone()
         if not row:
-            raise ValueError(f"Season {year} not found — run db:seed first")
+            raise ValueError(f"Season {year} not found: run db:seed first")
         season_id = row["id"]
 
         with conn.cursor() as cur:
@@ -161,7 +161,7 @@ def run(year: int, schedule: pd.DataFrame | None = None) -> None:
 
             circuit_id = circuit_map.get(circuit_key)
             if not circuit_id:
-                print(f"  [warn] circuit_key '{circuit_key}' not in DB — run db:seed first")
+                print(f"  [warn] circuit_key '{circuit_key}' not in DB: run db:seed first")
                 continue
 
             event_date = event["EventDate"]
@@ -205,7 +205,7 @@ def run(year: int, schedule: pd.DataFrame | None = None) -> None:
             sprint_count = sum(1 for r in rows_to_upsert if r["sprint_date"])
             print(f"  Synced {len(rows_to_upsert)} races ({sprint_count} sprint weekends) for {year}")
         else:
-            print("  No races synced — check LOCATION_TO_CIRCUIT_KEY mapping")
+            print("  No races synced: check LOCATION_TO_CIRCUIT_KEY mapping")
 
     finally:
         conn.close()

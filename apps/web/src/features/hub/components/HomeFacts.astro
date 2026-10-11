@@ -1,0 +1,21 @@
+---
+import type { HomeFact } from '../types';
+
+interface Props {
+  facts: HomeFact[];
+  cols?: string;
+}
+
+const { facts, cols = 'grid-cols-2 sm:grid-cols-4' } = Astro.props;
+---
+
+{facts.length > 0 && (
+  <dl class={`grid ${cols} gap-px bg-white/[0.06]`}>
+    {facts.map((f) => (
+      <div class="bg-black px-3 py-2.5">
+        <dt class="text-[11px] text-muted-foreground">{f.label}</dt>
+        <dd class="mt-0.5 font-mono text-[13px] font-bold tabular-nums">{f.value}</dd>
+      </div>
+    ))}
+  </dl>
+)}

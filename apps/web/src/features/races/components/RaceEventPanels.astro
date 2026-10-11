@@ -1,0 +1,66 @@
+---
+import RaceTabPanel from './RaceTabPanel.astro';
+import StintChart from './StintChart.astro';
+import { PitStopTable } from './PitStopTable';
+import RaceControlTimeline from './RaceControlTimeline.astro';
+import OvertakesList from './OvertakesList.astro';
+import TeamRadioList from './TeamRadioList.astro';
+import type { RaceEvents, RaceEventTab } from '../loadRaceEvents';
+import type { Driver } from '@/types';
+
+interface Props {
+  events: RaceEvents;
+  tabs: RaceEventTab[];
+  defaultTab: string;
+  namespace?: string;
+  driverMap: Map<number, Driver>;
+  year: number;
+}
+
+const { events, tabs, defaultTab, namespace = '', driverMap, year } = Astro.props;
+const shown = new Set(tabs.map((t) => t.id));
+const { strategy, raceControlMessages, overtakes, teamRadio } = events;
+---
+
+{shown.has('strategy') && strategy && (
+  <RaceTabPanel id="strategy" defaultTab={defaultTab} namespace={namespace}>
+    <div class="space-y-4">
+      <div class="border border-white/[0.06] p-5">
+        <StintChart drivers={strategy.drivers} approximate={strategy.source === 'derived'} year={year} />
+      </div>
+      <div class="border border-white/[0.06] overflow-hidden">
+        <PitStopTable drivers={strategy.drivers} year={year} />
+      </div>
+    </div>
+  </RaceTabPanel>
+)}
+
+{shown.has('incidents') && (
+  <RaceTabPanel id="incidents" defaultTab={defaultTab} namespace={namespace}>
+    <div class="border border-white/[0.06] overflow-hidden">
+      <RaceControlTimeline messages={raceControlMessages} />
+    </div>
+  </RaceTabPanel>
+)}
+
+{shown.has('overtakes') && (
+  <RaceTabPanel id="overtakes" defaultTab={defaultTab} namespace={namespace}>
+    <div class="border border-white/[0.06] overflow-hidden">
+      <OvertakesList overtakes={overtakes} driverMap={driverMap} />
+    </div>
+  </RaceTabPanel>
+)}
+
+{shown.has('team-radio') && (
+  <RaceTabPanel id="team-radio" defaultTab={defaultTab} namespace={namespace}>
+    <div class="border border-white/[0.06] overflow-hidden">
+      {teamRadio.length > 0 ? (
+        <TeamRadioList clips={teamRadio} driverMap={driverMap} />
+      ) : (
+        <p class="px-4 py-6 text-sm text-muted-foreground">
+          F1 has published far fewer team radio clips since 2026: none were released for this race.
+        </p>
+      )}
+    </div>
+  </RaceTabPanel>
+)}

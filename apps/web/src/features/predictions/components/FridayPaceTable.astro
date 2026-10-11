@@ -1,0 +1,50 @@
+---
+import SectionKicker from '@/components/page/SectionKicker.astro';
+import DataList from '@/components/data/DataList.astro';
+import DataRow from '@/components/data/DataRow.astro';
+import DriverIdentity from '@/components/identity/DriverIdentity.astro';
+import RankCell from '@/components/data/RankCell.astro';
+import { compoundToken } from '@/lib/f1/tyres';
+import { getTeamColor } from '@/lib/f1/teamColors';
+import { formatMs } from '@/lib/utils';
+import type { PredictionAccent } from '../types';
+import type { FridayPaceRow } from '@/types';
+
+interface Props {
+  rows: FridayPaceRow[];
+  accent: PredictionAccent;
+  year: number;
+}
+
+const { rows, accent, year } = Astro.props;
+const COLUMNS = 'grid-cols-[40px_1fr_90px_70px] md:grid-cols-[40px_1fr_110px_100px_80px_60px]';
+const formatDelta = (ms: number) => (ms === 0 ? '-' : `+${(ms / 1000).toFixed(3)}`);
+---
+
+<section>
+  <SectionKicker label="./friday-pace · long runs" accentRgb={accent.rgb} />
+  <DataList
+    label="Friday long-run pace"
+    columns={COLUMNS}
+    headers={[
+      { label: 'Pos' }, { label: 'Driver' }, { label: 'Compound', class: 'hidden md:block' },
+      { label: 'Median lap', class: 'text-right' }, { label: 'Gap', class: 'text-right' }, { label: 'Laps', class: 'text-right hidden md:block' },
+    ]}
+  >
+    {rows.map((r, i) => (
+      <DataRow columns={COLUMNS} first={i === 0} accent={getTeamColor(r.driver.team.teamKey)}>
+        <RankCell rank={i + 1} />
+        <DriverIdentity driver={r.driver} year={year} />
+        <div role="cell" class="hidden md:flex items-center gap-1.5 font-mono text-[9px] tracking-widest uppercase text-muted-foreground">
+          <span class="w-2 h-2 rounded-full" style={`background:hsl(var(--${compoundToken(r.compound, year)}))`} />{r.compound}
+        </div>
+        <div role="cell" class="font-mono text-sm font-bold text-right">{formatMs(r.medianLapMs)}</div>
+        <div role="cell" class="font-mono text-sm text-right text-muted-foreground">{formatDelta(r.deltaToFastestMs)}</div>
+        <div role="cell" class="font-mono text-sm text-right text-muted-foreground hidden md:block">{r.stintLength ?? '-'}{r.sessionType !== 'FP2' && <span class="text-[8px]"> {r.sessionType}</span>}</div>
+      </DataRow>
+    ))}
+  </DataList>
+  <p class="font-mono text-[7px] text-muted-foreground/50 mt-3 leading-relaxed">
+    Median lap of each driver's quickest practice long run: the raw input behind the Long Run Pace feature.
+  </p>
+</section>

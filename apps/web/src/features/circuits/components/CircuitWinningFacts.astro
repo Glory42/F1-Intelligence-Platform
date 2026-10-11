@@ -1,0 +1,56 @@
+---
+import { winnerFacts } from '../winnerFacts';
+import type { CircuitHistoryItem } from '@/types';
+
+interface Props {
+  history: CircuitHistoryItem[];
+  poleToWinRate: number;
+  avgWinnerGridPos: number;
+  fastestLap: { timeMs: number; year: number; driver: { fullName: string; team: { name: string } } } | null;
+}
+
+const { history, poleToWinRate, avgWinnerGridPos, fastestLap } = Astro.props;
+const facts = winnerFacts(history);
+const streak = facts.longestStreak;
+
+const lapTime = (ms: number) =>
+  `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}.${String(ms % 1000).padStart(3, '0')}`;
+
+const tiles = [
+  { label: 'Pole to win', value: `${Math.round(poleToWinRate * 100)}%` },
+  { label: 'Avg winner start', value: `P${avgWinnerGridPos.toFixed(1)}` },
+  { label: 'Different winners', value: `${facts.differentWinners} / ${facts.races}` },
+  { label: 'Longest streak', value: streak ? `${streak.wins} in a row` : '-' },
+];
+---
+
+<aside class="space-y-6" aria-label="How races here are won">
+  <div class="border border-white/[0.06] p-5">
+    <p class="mb-3 text-[12px] text-muted-foreground">Fastest lap record</p>
+    {fastestLap ? (
+      <div>
+        <p class="font-mono text-3xl font-bold tabular-nums">{lapTime(fastestLap.timeMs)}</p>
+        <p class="mt-2 text-[13px]">{fastestLap.driver.fullName} <span class="text-muted-foreground">· {fastestLap.driver.team.name} · {fastestLap.year}</span></p>
+      </div>
+    ) : (
+      <p class="text-[13px] text-muted-foreground">No lap times recorded here yet.</p>
+    )}
+  </div>
+
+  <div>
+    <p class="mb-2 text-[12px] text-muted-foreground">How races here are won</p>
+    <dl class="grid grid-cols-2 gap-px bg-white/[0.06] border border-white/[0.06]">
+      {tiles.map((t) => (
+        <div class="bg-black p-4">
+          <dt class="text-[11px] text-muted-foreground">{t.label}</dt>
+          <dd class="mt-1 font-mono text-lg font-bold tabular-nums">{t.value}</dd>
+        </div>
+      ))}
+    </dl>
+    {streak && (
+      <p class="mt-2 text-[12px] text-muted-foreground">
+        {streak.fullName} won {streak.wins} in a row, {streak.fromYear}–{streak.toYear}.
+      </p>
+    )}
+  </div>
+</aside>

@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { getCollection } from 'astro:content';
-import { BookOpen, Github } from 'lucide-react';
+import { Github } from 'lucide-react';
 
 export const prerender = true;
 
@@ -30,14 +30,14 @@ const pipeline = [
 ---
 
 <BaseLayout title="Documentation">
-  <div class="mt-7 space-y-14">
+  <div class="space-y-14">
 
     <!-- header -->
     <div class="flex items-start justify-between gap-6">
       <div>
         <div class="flex items-center gap-3 mb-2">
           <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">
-            <BookOpen size={11} />./docs
+            ./docs
           </span>
           <div class="h-px w-16 bg-white/[0.05]" />
         </div>
@@ -73,7 +73,7 @@ const pipeline = [
             score for each driver, and applies a softmax function to produce win probabilities.
           </p>
           <p class="text-sm text-muted-foreground leading-relaxed">
-            Sprint weekends run a separate 8-feature model tuned for the shorter format — heavier
+            Sprint weekends run a separate 8-feature model tuned for the shorter format: heavier
             weight on grid position and car pace, no tyre degradation or long-run pace signals since
             there are no pit stops in a sprint.
           </p>
@@ -85,16 +85,16 @@ const pipeline = [
           <h2 class="text-sm font-semibold">What data is used?</h2>
           <div class="space-y-2.5">
             {[
-              ['FastF1', 'Lap times, sector splits, tyre data, qualifying times, race results, weather — all from the official F1 timing feed'],
+              ['FastF1', 'Lap times, sector splits, tyre data, qualifying times, race results, weather: all from the official F1 timing feed'],
               ['Historical data', '2018–present with full lap telemetry; 1980–2017 with race/qualifying results only'],
-              ['Static circuit data', 'Overtake rate and safety car probability seeded once per track — never changes at runtime'],
+              ['Static circuit data', 'Overtake rate and safety car probability seeded once per track: never changes at runtime'],
               ['No external APIs', 'FastF1 is the sole data source. Everything else is computed or static'],
             ].map(([label, desc]) => (
               <div class="flex gap-3">
                 <span class="font-mono text-[9px] text-[#a855f7]/60 mt-0.5 shrink-0">▸</span>
                 <div>
                   <span class="font-mono text-[10px] text-foreground/80">{label}</span>
-                  <span class="font-mono text-[10px] text-muted-foreground"> — {desc}</span>
+                  <span class="font-mono text-[10px] text-muted-foreground">: {desc}</span>
                 </div>
               </div>
             ))}
@@ -127,7 +127,7 @@ const pipeline = [
         {[
           ['After qualifying', 'FastF1 pulls Q1/Q2/Q3 lap times, sector splits, and grid positions. FP2 long-run stint data is also ingested for race pace estimation.'],
           ['Feature computation', 'compute_features scores each driver across 12 dimensions: car pace, tyre deg, reliability, qualifying delta vs teammate, win rate, luck factor, sector strength, and more.'],
-          ['Prediction', 'Scores are passed through softmax at temperature T=0.3. Lower temperature = more decisive — small score gaps produce clear probability differences.'],
+          ['Prediction', 'Scores are passed through softmax at temperature T=0.3. Lower temperature = more decisive: small score gaps produce clear probability differences.'],
           ['After the race', 'compute_season_stats re-aggregates driver and team season totals. DNF counts, win rates, and car performance scores update for the next prediction.'],
           ['Sprint weekends', 'Run an extra ingest + prediction cycle on Friday for the sprint session. The sprint model uses SQ qualifying times and grid position as the dominant signals.'],
           ['Historical accuracy', 'Past predictions are stored alongside actual race results so you can see how the model performed over the season.'],

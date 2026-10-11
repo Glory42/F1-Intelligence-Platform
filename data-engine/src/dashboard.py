@@ -155,7 +155,7 @@ def render_login(error=None):
   </form>
 </div></div>
 """
-    return _page("Data Engine — Sign in", body, css_extra=_LOGIN_CSS)
+    return _page("Data Engine: Sign in", body, css_extra=_LOGIN_CSS)
 
 
 def _status_meta(status):
@@ -208,7 +208,7 @@ def render_dashboard(state):
 {_TIME_SCRIPT}
 """
     return _page(
-        "F1 Data Engine — Status",
+        "F1 Data Engine: Status",
         body,
         head_extra='<meta http-equiv="refresh" content="30">',
         css_extra=_DASH_CSS,

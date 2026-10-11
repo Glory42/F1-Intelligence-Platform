@@ -1,0 +1,15 @@
+---
+import { Trophy } from 'lucide-react';
+
+interface Props {
+  rank: number;
+  highlightTop?: number;
+}
+
+const { rank, highlightTop = 3 } = Astro.props;
+---
+
+<div role="cell" class={`font-mono text-sm font-bold ${rank <= highlightTop ? 'text-[#a855f7]' : 'text-muted-foreground'}`}>
+  {rank === 1 ? <Trophy size={14} /> : <span>{String(rank).padStart(2, '0')}</span>}
+  <span class="sr-only">{rank}</span>
+</div>

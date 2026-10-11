@@ -4,7 +4,7 @@ import sys
 import traceback
 
 sys.path.insert(0, ".")
-import src.config  # noqa — triggers FastF1 cache setup
+import src.config  # noqa: triggers FastF1 cache setup
 
 from src.db.client import get_conn
 from src.jobs.sync_schedule import run as sync_schedule

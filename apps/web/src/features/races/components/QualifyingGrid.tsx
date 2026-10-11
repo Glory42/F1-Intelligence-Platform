@@ -1,10 +1,10 @@
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { formatMs } from '@/lib/utils';
 import type { QualifyingResult } from '@/types';
-import { getTeamColor } from '@/lib/teamColors';
+import { getTeamColor } from '@/lib/f1/teamColors';
 
 function fmtSector(ms: number | null): string {
-  if (!ms) return '—';
+  if (!ms) return '-';
   return (ms / 1000).toFixed(3);
 }
 
@@ -84,7 +84,7 @@ export function QualifyingGrid({ qualifying, year, labelPrefix = 'Q' }: Props) {
                     {fmtSector(q.sector3Ms)}
                   </TableCell>
                   <TableCell className="text-right font-mono text-xs text-muted-foreground hidden xl:table-cell">
-                    {q.speedSt ? Math.round(Number(q.speedSt)) : '—'}
+                    {q.speedSt ? Math.round(Number(q.speedSt)) : '-'}
                   </TableCell>
                 </>
               )}

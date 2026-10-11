@@ -1,299 +1,82 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { api } from '@/lib/api';
-import { MapPin, Zap, AlertTriangle } from 'lucide-react';
-import { getCountryFlag } from '@/lib/countryFlags';
-import { getCircuitMetadata } from '@/features/circuits/circuitMetadata';
-import { WeatherForecast } from '@/features/circuits/components/WeatherForecast';
-import CircuitTelemetryCard from '@/features/circuits/components/CircuitTelemetryCard.astro';
+import { MapPin } from 'lucide-react';
+import { getCountryFlag } from '@/lib/f1/countryFlags';
+import { getCircuitCoordinates } from '@/features/circuits/circuitCoordinates';
+import CircuitOverview from '@/features/circuits/components/CircuitOverview.astro';
+import { isRaceWeekCircuit } from '@/features/circuits/circuitView';
+import CircuitTelemetryProfile from '@/features/circuits/components/CircuitTelemetryProfile.astro';
+import EmptyState from '@/components/page/EmptyState.astro';
 import CircuitWinnersTable from '@/features/circuits/components/CircuitWinnersTable.astro';
+import CircuitWinningFacts from '@/features/circuits/components/CircuitWinningFacts.astro';
 import DominanceCard from '@/features/circuits/components/DominanceCard.astro';
 import { getWeatherForecast, type ForecastDay } from '@/features/circuits/weather';
+import PageTabs from '@/components/page/PageTabs.astro';
+import { resolveTab } from '@/lib/pageTabs';
+
+const TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'winners', label: 'Winners' },
+  { id: 'dominance', label: 'Dominance' },
+  { id: 'telemetry', label: 'Telemetry' },
+] as const;
+const tab = resolveTab(Astro.url, TABS);
 
 const { key } = Astro.params;
 if (!key) return Astro.redirect('/races');
 
-const currentYear = new Date().getFullYear();
-const [detailsResult, racesResult] = await Promise.allSettled([
+const [detailsResult, racesResult, telemetryResult] = await Promise.allSettled([
   api.getCircuitDetails(key),
-  api.getRaces(currentYear),
+  tab === 'overview' ? api.getRaces(new Date().getFullYear()) : Promise.resolve([]),
+  tab === 'telemetry' ? api.getCircuitTelemetry(key) : Promise.resolve(null),
 ]);
+if (detailsResult.status === 'rejected') return Astro.redirect('/races');
 
-const details = detailsResult.status === 'fulfilled' ? detailsResult.value : undefined;
-let error: string | null = null;
-let isUpcomingCircuit = false;
-
-if (detailsResult.status === 'rejected') {
-  const e = detailsResult.reason;
-  error = e instanceof Error ? e.message : 'Failed to load circuit';
-}
-
-if (details) {
-  if (racesResult.status === 'fulfilled') {
-    const races = racesResult.value;
-    if (races && races.length > 0) {
-      const futureRaces = races
-        .filter(r => r.status !== 'completed')
-        .sort((a, b) => new Date(a.raceDate).getTime() - new Date(b.raceDate).getTime());
-
-      if (futureRaces.length > 0) {
-        isUpcomingCircuit = futureRaces[0].circuit.circuitKey === details.circuit.circuitKey;
-      } else {
-        const sorted = [...races].sort((a, b) => new Date(b.raceDate).getTime() - new Date(a.raceDate).getTime());
-        if (sorted.length > 0) {
-          isUpcomingCircuit = sorted[0].circuit.circuitKey === details.circuit.circuitKey;
-        }
-      }
-    }
-  } else {
-    console.error("Failed to check upcoming calendar race for weather forecast", racesResult.reason);
-  }
-}
-
-if (!details) {
-  return Astro.redirect('/races');
-}
-
-const { circuit, history, fastestLap, dominance, weatherStats, qualifyingImpact, safetyCarStats } = details;
-const totalWeather = weatherStats.dry + weatherStats.wet + weatherStats.mixed;
-const dryPct = totalWeather ? Math.round((weatherStats.dry / totalWeather) * 100) : 0;
-const wetPct = totalWeather ? Math.round((weatherStats.wet / totalWeather) * 100) : 0;
-const mixedPct = totalWeather ? Math.round((weatherStats.mixed / totalWeather) * 100) : 0;
-
-const meta = getCircuitMetadata(circuit.circuitKey, Number(circuit.trackLengthKm), circuit.numberOfCorners || 15);
-const { lat, lng } = meta;
-
-let forecast: ForecastDay[] | null = null;
-if (isUpcomingCircuit && lat !== 0 && lng !== 0) {
-  try {
-    forecast = await getWeatherForecast(lat, lng);
-  } catch {
-    forecast = null;
-  }
-}
-
-const imageUrl = circuit.imageUrl || null;
-
-function formatLapTime(ms: number) {
-  const m = Math.floor(ms / 60000);
-  const s = Math.floor((ms % 60000) / 1000);
-  const msRem = ms % 1000;
-  return `${m}:${s.toString().padStart(2, '0')}.${msRem.toString().padStart(3, '0')}`;
-}
+const details = detailsResult.value;
+const { circuit, history, fastestLap, dominance, qualifyingImpact } = details;
+const telemetry = telemetryResult.status === 'fulfilled' ? telemetryResult.value : null;
+const { lat, lng } = getCircuitCoordinates(circuit.circuitKey);
+const showForecast = racesResult.status === 'fulfilled' && isRaceWeekCircuit(racesResult.value, circuit.circuitKey);
+const forecast: ForecastDay[] | null = showForecast && lat !== 0 && lng !== 0
+  ? await getWeatherForecast(lat, lng).catch(() => null)
+  : null;
 ---
 
 <BaseLayout title={`${circuit.name} - Circuit Details`}>
-  <div class="mt-7 space-y-8">
-    <!-- Header -->
+  <div class="space-y-6">
     <div>
-      <div class="flex items-center gap-3 mb-2">
-        <a href="/races" class="font-mono text-[9px] tracking-[0.25em] uppercase hover:text-white transition-colors" style="color: rgba(168,85,247,0.55)">./races</a>
-        <span class="font-mono text-[9px] tracking-[0.25em] uppercase text-muted-foreground">/</span>
-        <span class="font-mono text-[9px] tracking-[0.25em] uppercase text-white">circuit</span>
-        <div class="h-px w-16 bg-white/[0.05]" />
-      </div>
-      <h1 class="text-3xl font-bold">
-        {circuit.name} <span class="text-2xl ml-1.5 align-middle select-none">{getCountryFlag(circuit.country)}</span>
+      <a href="/circuits" class="font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground hover:text-foreground transition-colors duration-150">← all circuits</a>
+      <h1 class="mt-4 text-2xl font-bold">
+        {circuit.name} <span class="text-xl ml-1.5 align-middle select-none">{getCountryFlag(circuit.country)}</span>
       </h1>
-      <div class="flex items-center gap-2 mt-2 font-mono text-[10px] text-muted-foreground tracking-widest uppercase">
+      <div class="flex items-center gap-2 mt-1 font-mono text-[10px] text-muted-foreground tracking-widest uppercase">
         <MapPin size={10} /> {circuit.city}, {circuit.country}
       </div>
     </div>
 
-    {error ? (
-      <div class="border border-destructive/40 bg-destructive/10 p-8 text-center">
-        <p class="font-mono text-[10px] text-destructive tracking-widest uppercase">Error loading circuit</p>
-        <p class="mt-2 font-mono text-[9px] text-muted-foreground">{error}</p>
-      </div>
-    ) : (
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <PageTabs tabs={TABS} active={tab} label="Circuit views" />
 
-        <!-- Left Column: Stats & Model Info -->
-        <div class="space-y-6 lg:col-span-2">
-
-          {/* Nested Grid for Track Image & Key Stats */}
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-            {/* Track Layout Card (Bigger and Left Aligned) */}
-            <div class="relative w-full aspect-square bg-black border border-white/[0.06] overflow-hidden flex items-center justify-center group">
-              <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.01)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.01)_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none" />
-              <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(168,85,247,0.05),transparent_70%)]" />
-
-              {imageUrl && (
-                <img
-                  id="circuit-img"
-                  src={imageUrl}
-                  alt={`${circuit.name} track layout`}
-                  class="max-h-[92%] max-w-[92%] object-contain p-4 z-10 transition-transform duration-500 group-hover:scale-105"
-                  onerror="this.style.display='none'; document.getElementById('circuit-svg-fallback').classList.remove('hidden');"
-                />
-              )}
-
-              <div id="circuit-svg-fallback" class:list={["absolute inset-0 z-10 flex items-center justify-center p-8 select-none", { "hidden": !!imageUrl }]}>
-                <svg class="w-20 h-20 opacity-20 animate-pulse" viewBox="0 0 100 100" fill="none" stroke="#a855f7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M 20,50 C 20,30 40,20 60,30 C 80,40 90,60 70,80 C 50,100 30,80 20,50 Z" />
-                  <path d="M 30,50 C 30,40 45,35 60,40 C 70,45 75,55 65,65 C 55,75 40,65 30,50 Z" stroke-dasharray="2 2" opacity="0.5" />
-                </svg>
-                <span class="absolute bottom-4 font-mono text-[7px] tracking-[0.25em] text-muted-foreground/40 uppercase">circuit footprint off-grid</span>
-              </div>
-
-              {lat !== 0 && (
-                <div class="absolute bottom-3 left-4 font-mono text-[8px] tracking-widest text-muted-foreground/60 select-none hidden sm:block">
-                  LAT_LNG: <span class="text-[#a855f7]/80">{lat.toFixed(4)}N / {lng.toFixed(4)}E</span>
-                </div>
-              )}
-              <div class="absolute bottom-3 right-4 font-mono text-[8px] tracking-widest text-muted-foreground/60 select-none hidden sm:block">
-                SYSTEM // ACTIVE
-              </div>
-            </div>
-
-            {/* Stats and Model Insights */}
-            <div class="space-y-6">
-              <div class="grid grid-cols-2 gap-px bg-white/[0.06] border border-white/[0.06]">
-                <div class="bg-black p-4">
-                  <span class="block font-mono text-[9px] text-muted-foreground tracking-widest uppercase mb-1">Laps</span>
-                  <span class="text-xl font-medium">{circuit.lapCount}</span>
-                </div>
-                <div class="bg-black p-4">
-                  <span class="block font-mono text-[9px] text-muted-foreground tracking-widest uppercase mb-1">Length</span>
-                  <span class="text-xl font-medium">{circuit.trackLengthKm} <span class="text-xs text-muted-foreground">km</span></span>
-                </div>
-                <div class="bg-black p-4">
-                  <span class="block font-mono text-[9px] text-muted-foreground tracking-widest uppercase mb-1">Corners</span>
-                  <span class="text-xl font-medium">{circuit.numberOfCorners || '-'}</span>
-                </div>
-                <div class="bg-black p-4">
-                  <span class="block font-mono text-[9px] text-muted-foreground tracking-widest uppercase mb-1">DRS Zones</span>
-                  <span class="text-xl font-medium">{circuit.drsZones || '-'}</span>
-                </div>
-              </div>
-
-              <!-- Model Insights & Qualifying Impact -->
-              <div class="border border-purple-500/20 bg-purple-500/[0.02] p-5">
-                <h2 class="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] uppercase text-purple-400 mb-4">
-                  <Zap size={12} /> Model Insights
-                </h2>
-                <div class="space-y-4">
-                  <div class="flex items-baseline justify-between border-b border-white/[0.04] pb-1.5">
-                    <span class="font-mono text-[9px] text-muted-foreground uppercase">Overtake Rate</span>
-                    <span class="font-mono text-sm font-semibold text-white">{circuit.overtakeRate || '-'}</span>
-                  </div>
-                  <div class="flex items-baseline justify-between border-b border-white/[0.04] pb-1.5">
-                    <span class="font-mono text-[9px] text-muted-foreground uppercase">Pole to Win</span>
-                    <span class="font-mono text-sm font-semibold text-white">{Math.round(qualifyingImpact.poleToWinRate * 100)}%</span>
-                  </div>
-                  <div class="flex items-baseline justify-between border-b border-white/[0.04] pb-1.5">
-                    <span class="font-mono text-[9px] text-muted-foreground uppercase">Seeded SC Prob</span>
-                    <span class="font-mono text-sm font-semibold text-white">{circuit.scProbability ? `${(Number(circuit.scProbability) * 100).toFixed(0)}%` : '-'}</span>
-                  </div>
-                  <div class="flex items-baseline justify-between">
-                    <span class="font-mono text-[9px] text-muted-foreground uppercase">Avg Winner Start</span>
-                    <span class="font-mono text-sm font-semibold text-white">Grid P{qualifyingImpact.avgWinnerGridPos.toFixed(1)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
+    {tab === 'overview' ? (
+      <CircuitOverview details={details} lat={lat} lng={lng} showForecast={showForecast} forecast={forecast} />
+    ) : tab === 'winners' ? (
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div class="lg:col-span-2">
           <CircuitWinnersTable history={history} />
         </div>
-
-        <!-- Right Column: Context & Records -->
-        <div class="space-y-6">
-          <CircuitTelemetryCard meta={meta} />
-
-          <!-- Live Weather Forecast Widget -->
-          {isUpcomingCircuit && (
-            <WeatherForecast lat={lat} lng={lng} cityName={circuit.city} forecast={forecast} />
-          )}
-
-          <!-- Fastest Lap -->
-          <div class="border border-white/[0.06] bg-black p-5">
-            <h2 class="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mb-4">Fastest Lap Record</h2>
-            {fastestLap ? (
-              <div>
-                <span class="text-3xl font-bold font-mono tracking-tight text-white mb-1 block">
-                  {formatLapTime(fastestLap.timeMs)}
-                </span>
-                <div class="flex items-center justify-between mt-3">
-                  <div>
-                    <span class="block text-sm font-medium">{fastestLap.driver.fullName}</span>
-                    <span class="block font-mono text-[9px] text-muted-foreground mt-0.5">{fastestLap.driver.team.name}</span>
-                  </div>
-                  <span class="font-mono text-[10px] text-white/40 border border-white/10 px-2 py-1">{fastestLap.year}</span>
-                </div>
-              </div>
-            ) : (
-              <span class="text-sm text-muted-foreground">No data available</span>
-            )}
-          </div>
-
-          <!-- Safety Car Stats -->
-          <div class="border border-white/[0.06] bg-black p-5">
-            <h2 class="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mb-4">
-              <AlertTriangle size={11} className="text-yellow-500/70" /> Safety Car Stats
-            </h2>
-            <div class="grid grid-cols-2 gap-4">
-              <div class="bg-white/[0.01] p-3 border border-white/[0.03]">
-                <span class="block font-mono text-[8px] text-muted-foreground tracking-widest uppercase mb-1">Avg SC Laps</span>
-                <span class="text-lg font-semibold text-white">{safetyCarStats.avgScLaps.toFixed(1)} <span class="text-[10px] text-muted-foreground font-normal">laps</span></span>
-              </div>
-              <div class="bg-white/[0.01] p-3 border border-white/[0.03]">
-                <span class="block font-mono text-[8px] text-muted-foreground tracking-widest uppercase mb-1">Safety Car Rate</span>
-                <span class="text-lg font-semibold text-white">{Math.round(safetyCarStats.scRaceRate * 100)}% <span class="text-[10px] text-muted-foreground font-normal">races</span></span>
-              </div>
-            </div>
-            <p class="mt-3 text-[10px] text-muted-foreground leading-relaxed">
-              Derived from historical safety car lap counters. A higher rate indicates a chaotic race environment with frequent yellow flags.
-            </p>
-          </div>
-
-          <!-- Weather Split -->
-          <div class="border border-white/[0.06] bg-black p-5">
-            <h2 class="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mb-4">Historical Weather</h2>
-            {totalWeather > 0 ? (
-              <>
-                <div class="h-2 w-full flex rounded-full overflow-hidden mb-3">
-                  {dryPct > 0 && <div class="bg-yellow-500/80 bar-fill" style={`width: ${dryPct}%`} />}
-                  {mixedPct > 0 && <div class="bg-blue-400/80 bar-fill" style={`width: ${mixedPct}%`} />}
-                  {wetPct > 0 && <div class="bg-blue-600/80 bar-fill" style={`width: ${wetPct}%`} />}
-                </div>
-                <div class="flex justify-between font-mono text-[9px] tracking-widest uppercase text-muted-foreground">
-                  <span class={dryPct > 0 ? "text-yellow-500/80" : "hidden"}>Dry {dryPct}%</span>
-                  <span class={mixedPct > 0 ? "text-blue-400/80" : "hidden"}>Mixed {mixedPct}%</span>
-                  <span class={wetPct > 0 ? "text-blue-600/80" : "hidden"}>Wet {wetPct}%</span>
-                </div>
-              </>
-            ) : (
-              <span class="text-sm text-muted-foreground">No data available</span>
-            )}
-          </div>
-
-          <DominanceCard dominance={dominance} />
-
-        </div>
+        <CircuitWinningFacts
+          history={history}
+          poleToWinRate={qualifyingImpact.poleToWinRate}
+          avgWinnerGridPos={qualifyingImpact.avgWinnerGridPos}
+          fastestLap={fastestLap}
+        />
       </div>
+    ) : tab === 'dominance' ? (
+      <DominanceCard dominance={dominance} />
+    ) : (
+      telemetry
+        ? <CircuitTelemetryProfile telemetry={telemetry} />
+        : <EmptyState message="No qualifying telemetry here yet. Car data starts in 2018." />
     )}
   </div>
 </BaseLayout>
-
-<script>
-  // Belt-and-braces for images already cached broken before the inline onerror wired up.
-  document.addEventListener('astro:page-load', () => {
-    const img = document.getElementById('circuit-img') as HTMLImageElement | null;
-    if (img) {
-      if (img.complete && img.naturalWidth === 0) {
-        img.style.display = 'none';
-        const fallback = document.getElementById('circuit-svg-fallback');
-        if (fallback) fallback.classList.remove('hidden');
-      } else {
-        img.addEventListener('error', () => {
-          img.style.display = 'none';
-          const fallback = document.getElementById('circuit-svg-fallback');
-          if (fallback) fallback.classList.remove('hidden');
-        });
-      }
-    }
-  });
-</script>

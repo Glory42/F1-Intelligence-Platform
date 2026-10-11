@@ -10,7 +10,7 @@ import type {
   PredictionHistoryItem, IntelStandingRow, ModelInfo, SeasonAccuracy,
 } from '../../common/types';
 import { resolveSeason } from '../../common/standings';
-import { aggregateAccuracyBySeason } from '../../common/accuracy';
+import { aggregateAccuracyBySeason } from './accuracy.helpers';
 import {
   buildHistoryItems,
   buildProbPosMaps,
@@ -19,7 +19,7 @@ import {
   type HistoryPredictionRow,
   type HistoryProbRow,
   type HistoryWinnerRow,
-} from '../../common/prediction-history';
+} from './prediction-history.helpers';
 import { aggregateSeasonFeatures, buildIntelStandingRows } from './intel-standings.helpers';
 import { buildGpPredictionResponse } from './predictions.helpers';
 
@@ -39,7 +39,7 @@ export class PredictionsService {
     return buildGpPredictionResponse(db, raceId);
   }
 
-  // `year` omitted returns every season — used by findAccuracyBySeason() to aggregate across all years.
+  // `year` omitted returns every season: used by findAccuracyBySeason() to aggregate across all years.
   async findHistory(db: Db, year?: number): Promise<PredictionHistoryItem[]> {
     const yearFilter = year !== undefined ? eq(seasons.year, year) : undefined;
     const [gpRows, sprintRows] = await Promise.all([

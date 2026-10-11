@@ -1,0 +1,72 @@
+---
+import { ArrowUpRight } from 'lucide-react';
+import type { PredictionAccent } from '@/features/predictions/types';
+
+export interface RaceTab {
+  id: string;
+  label: string;
+}
+
+export interface RaceTabLink {
+  href: string;
+  label: string;
+}
+
+interface Props {
+  tabs: RaceTab[];
+  /** Heavier analysis lives on its own route so the race page never loads it eagerly. */
+  links?: RaceTabLink[];
+  defaultTab: string;
+  accent: PredictionAccent;
+  /** Prefixes tab/panel ids so two tab sets never collide (e.g. "sprint-"). */
+  namespace?: string;
+}
+
+const { tabs, defaultTab, accent, namespace = '', links = [] } = Astro.props;
+const activeStyle = `border-color:${accent.hex};color:hsl(var(--foreground))`;
+---
+
+<div
+  class="race-tabs scrollbar-none relative mb-6 flex gap-6 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_rgba(255,255,255,0.06)]"
+  role="tablist"
+  data-namespace={namespace}
+  data-active-style={activeStyle}
+>
+  {tabs.map((t) => (
+    <button
+      type="button"
+      data-tab={t.id}
+      id={`${namespace}tab-${t.id}`}
+      role="tab"
+      aria-selected={t.id === defaultTab ? 'true' : 'false'}
+      aria-controls={`${namespace}panel-${t.id}`}
+      tabindex={t.id === defaultTab ? 0 : -1}
+      class="race-tab-btn whitespace-nowrap border-b-2 border-transparent py-2.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors duration-150"
+      style={t.id === defaultTab ? activeStyle : undefined}
+    >
+      {t.label}
+    </button>
+  ))}
+  {links.map((l) => (
+    <a
+      href={l.href}
+      class="inline-flex items-center gap-1 whitespace-nowrap border-b-2 border-transparent py-2.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors duration-150"
+    >
+      {l.label}<ArrowUpRight size={12} />
+    </a>
+  ))}
+  <span
+    data-tab-indicator
+    aria-hidden="true"
+    class="pointer-events-none absolute bottom-0 left-0 h-0.5 w-0 opacity-0 transition-[transform,width] duration-300 ease-out motion-reduce:transition-none"
+    style={`background:${accent.hex}`}
+  />
+</div>
+
+<script>
+  import { initRaceTabs } from '@/features/races/raceTabs';
+
+  document.addEventListener('astro:page-load', () => {
+    document.querySelectorAll<HTMLElement>('.race-tabs').forEach(initRaceTabs);
+  });
+</script>

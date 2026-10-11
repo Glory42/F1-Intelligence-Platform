@@ -11,6 +11,8 @@
     "test": "bun test --timeout 30000",
     "test:unit": "bun test tests/unit",
     "test:integration": "bun test tests/integration --timeout 30000",
+    "test:db:up": "docker compose -f ../../docker-compose.test.yml up -d --wait && NODE_ENV=test DATABASE_URL=postgres://f1:f1@localhost:4445/f1_test bun --env-file=.env.test run src/db/migrate.ts",
+    "test:db:down": "docker compose -f ../../docker-compose.test.yml down",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:migrate": "bun run src/db/migrate.ts",

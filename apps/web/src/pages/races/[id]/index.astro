@@ -3,28 +3,28 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import { RaceResultsTable } from '@/features/races/components/RaceResultsTable';
 import { QualifyingGrid } from '@/features/races/components/QualifyingGrid';
 import LapChart from '@/features/races/components/LapChart.astro';
-import RaceControlTimeline from '@/features/races/components/RaceControlTimeline.astro';
-import OvertakesList from '@/features/races/components/OvertakesList.astro';
-import TeamRadioList from '@/features/races/components/TeamRadioList.astro';
 import RaceHeroInfo from '@/features/races/components/RaceHeroInfo.astro';
 import RacePredictionPanel from '@/features/races/components/RacePredictionPanel.astro';
+import SessionSwitcher from '@/features/races/components/SessionSwitcher.astro';
+import RaceTabs from '@/features/races/components/RaceTabs.astro';
+import RaceTabPanel from '@/features/races/components/RaceTabPanel.astro';
+import RaceEventPanels from '@/features/races/components/RaceEventPanels.astro';
+import CircuitStatsGrid from '@/features/races/components/CircuitStatsGrid.astro';
 import { api } from '@/lib/api';
-import { formatDate, formatMs, unwrapSettled } from '@/lib/utils';
-import type { PredictionResponse, CircuitHistoryItem, RaceControlMessage, RaceOvertake, TeamRadioClip, Driver } from '@/types';
-import { RotateCcw, Gauge, Zap, Flag, CornerDownRight, Wind } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { formatDate } from '@/lib/utils';
+import { gridDrops } from '@/features/races/gridPenalties';
+import { NO_RACE_EVENTS, loadRaceEvents, raceEventTabs } from '@/features/races/loadRaceEvents';
+import { circuitYearItems, conditionsOf, driverMapOf, fastestLapOf, predictedPodium, winnerOf } from '@/features/races/raceView';
+import type { PredictionResponse, CircuitHistoryItem, RaceDetailResponse } from '@/types';
 import { GP_ACCENT } from '@/features/predictions/types';
+
+// OpenF1 notes F1 releases far fewer radio clips from 2026 on, so an empty list there is expected.
+const RADIO_SPARSE_FROM_YEAR = 2026;
 
 const { id } = Astro.params;
 
-let raceData = null;
-let prediction: PredictionResponse | null = null;
-let circuitHistory: CircuitHistoryItem[] = [];
-let raceControlMessages: RaceControlMessage[] = [];
-let overtakes: RaceOvertake[] = [];
-let teamRadio: TeamRadioClip[] = [];
+let raceData: RaceDetailResponse | null = null;
 let error = null;
-
 try {
   raceData = await api.getRaceById(Number(id));
 } catch (e) {
@@ -32,78 +32,42 @@ try {
 }
 
 const race = raceData?.race;
-
+let prediction: PredictionResponse | null = null;
+let circuitHistory: CircuitHistoryItem[] = [];
+let events = NO_RACE_EVENTS;
 if (race) {
-  const [predResult, histResult, raceControlResult, overtakesResult, teamRadioResult] = await Promise.allSettled([
+  const [predResult, circuitResult, eventsResult] = await Promise.allSettled([
     api.getPredictionByRace(race.id),
     api.getCircuitDetails(race.circuit.circuitKey),
-    api.getRaceControlMessages(race.id),
-    api.getOvertakes(race.id),
-    api.getTeamRadio(race.id),
+    loadRaceEvents(race.id, 'race'),
   ]);
-  prediction = unwrapSettled(predResult, null);
-  if (histResult.status === 'fulfilled') circuitHistory = histResult.value.history;
-  raceControlMessages = unwrapSettled(raceControlResult, []);
-  overtakes = unwrapSettled(overtakesResult, []);
-  teamRadio = unwrapSettled(teamRadioResult, []);
+  if (predResult.status === 'fulfilled') prediction = predResult.value;
+  if (circuitResult.status === 'fulfilled') circuitHistory = circuitResult.value.history;
+  if (eventsResult.status === 'fulfilled') events = eventsResult.value;
 }
 
+const results = raceData?.results ?? [];
+const qualifying = raceData?.qualifying ?? [];
+const laps = raceData?.laps ?? [];
 const isCompleted = race?.status === 'completed';
 const isQualiDone = race?.status === 'qualifying_done';
 const isSprintish = race?.status === 'sprint_done' || race?.status === 'sprint_qualifying_done';
-
-const hasResults = (raceData?.results?.length ?? 0) > 0;
-const hasQualifying = (raceData?.qualifying?.length ?? 0) > 0;
-const hasLaps = (raceData?.laps?.length ?? 0) > 0;
-const driverMap = new Map<number, Driver>((raceData?.results ?? []).map((r) => [r.driverId, r.driver]));
-
-// A new Race Event tab is one entry here, not a new hasX + tabs.push pair.
-const raceEventTabs = [
-  { id: 'incidents', label: 'Incidents', hasData: raceControlMessages.length > 0 },
-  { id: 'overtakes', label: 'Overtakes', hasData: overtakes.length > 0 },
-  { id: 'team-radio', label: 'Team Radio', hasData: teamRadio.length > 0 },
-];
-
-type Tab = { id: string; label: string };
-const tabs: Tab[] = [];
-if (isCompleted && hasResults) tabs.push({ id: 'results', label: 'Results' });
-if (hasQualifying) tabs.push({ id: 'qualifying', label: 'Qualifying' });
-if (isCompleted && hasLaps) tabs.push({ id: 'laps', label: 'Lap Chart' });
-if (isCompleted) raceEventTabs.filter((t) => t.hasData).forEach((t) => tabs.push({ id: t.id, label: t.label }));
-tabs.push({ id: 'circuit', label: 'Circuit' });
-
-const circuitYearItems = [...circuitHistory]
-  .sort((a, b) => b.year - a.year)
-  .map((h) => ({ year: h.year, href: `/races/${h.raceId}` }));
-
-const defaultTab = tabs[0]?.id ?? 'circuit';
 const raceYear = race ? new Date(race.raceDate).getFullYear() : new Date().getFullYear();
 
-const podium = (prediction?.drivers ?? [])
-  .sort((a, b) => (a.predictedPosition ?? 99) - (b.predictedPosition ?? 99))
-  .slice(0, 5);
+const eventTabs = isCompleted ? raceEventTabs(events, raceYear >= RADIO_SPARSE_FROM_YEAR) : [];
+const tabs = [
+  ...(isCompleted && results.length > 0 ? [{ id: 'results', label: 'Results' }] : []),
+  ...(qualifying.length > 0 ? [{ id: 'qualifying', label: 'Qualifying' }] : []),
+  ...(isCompleted && laps.length > 0 ? [{ id: 'laps', label: 'Lap Chart' }] : []),
+  ...eventTabs,
+  { id: 'circuit', label: 'Circuit' },
+];
+const defaultTab = tabs[0].id;
 
-const actualWinner = hasResults ? raceData!.results.find((r) => r.finishPosition === 1) : null;
-const flResult = hasResults ? raceData!.results.find((r) => r.fastestLap) : null;
-const flLapMs = flResult && raceData?.laps
-  ? raceData.laps.find((l) => l.driverId === flResult.driver.id)?.fastestLapMs ?? null
-  : null;
-const predCorrect = prediction && actualWinner
-  ? prediction.predictedWinner.id === actualWinner.driver.id
-  : null;
-
-const raceDistanceKm = race
-  ? (race.circuit.lapCount * Number(race.circuit.trackLengthKm)).toFixed(1)
-  : null;
-
-const conditions: { label: string; val: string | number }[] = [];
-if (race) {
-  if (race.safetyCarLaps != null) conditions.push({ label: 'SC Laps', val: race.safetyCarLaps });
-  if (race.vscLaps != null) conditions.push({ label: 'VSC', val: race.vscLaps });
-  if (race.airTempAvg) conditions.push({ label: 'Air', val: `${Math.round(Number(race.airTempAvg))}°C` });
-  if (race.trackTempAvg) conditions.push({ label: 'Track', val: `${Math.round(Number(race.trackTempAvg))}°C` });
-  if (race.humidityAvg) conditions.push({ label: 'Humidity', val: `${Math.round(Number(race.humidityAvg))}%` });
-}
+const drops = gridDrops(results, qualifying);
+const podium = predictedPodium(prediction?.drivers ?? []);
+const actualWinner = winnerOf(results);
+const predCorrect = prediction && actualWinner ? prediction.predictedWinner.id === actualWinner.driver.id : null;
 
 const statusToneClass = isCompleted
   ? 'border-[rgba(168,85,247,0.3)] text-[rgba(168,85,247,0.7)]'
@@ -112,23 +76,17 @@ const statusToneClass = isCompleted
   : isSprintish
   ? 'border-orange-500/30 text-orange-400/70'
   : 'border-white/[0.08] text-muted-foreground';
-
-const circuitStats: Array<{ Icon: LucideIcon; label: string; val: string | number }> = race ? [
-  { Icon: RotateCcw, label: 'Laps', val: race.circuit.lapCount },
-  { Icon: Gauge, label: 'Length', val: `${race.circuit.trackLengthKm} km` },
-  { Icon: Flag, label: 'Race Dist', val: `${raceDistanceKm} km` },
-  { Icon: CornerDownRight, label: 'Corners', val: race.circuit.numberOfCorners ?? '—' },
-  { Icon: Wind, label: 'DRS Zones', val: race.circuit.drsZones ?? '—' },
-  { Icon: Zap, label: 'Overtake Rate', val: race.circuit.overtakeRate ? `${Math.round(Number(race.circuit.overtakeRate) * 100)}%` : '—' },
-] : [];
 ---
 
 <BaseLayout title={race?.name ?? 'Race'}>
-  <div class="mt-7 space-y-8">
+  <div class="space-y-8">
 
-    <a href="/races" class="inline-block font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground hover:text-foreground transition-colors duration-150">
-      ← all races
-    </a>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <a href="/races" class="inline-block font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground hover:text-foreground transition-colors duration-150">
+        ← all races
+      </a>
+      {race?.hasSprint && <SessionSwitcher raceId={race.id} current="gp" />}
+    </div>
 
     {error ? (
       <div class="border border-destructive/40 bg-destructive/10 p-8 text-center">
@@ -150,11 +108,11 @@ const circuitStats: Array<{ Icon: LucideIcon; label: string; val: string | numbe
               lapsLabel={`${race.circuit.lapCount} laps`}
               lengthKm={race.circuit.trackLengthKm}
               weather={race.weather}
-              conditions={conditions}
-              fastestLap={flResult ? { code: flResult.driver.code, timeStr: flLapMs ? formatMs(flLapMs) : null } : null}
+              conditions={conditionsOf(race)}
+              fastestLap={fastestLapOf(results, laps)}
               accent={GP_ACCENT}
               countdown={!isCompleted ? { id: 'race-countdown', date: race.raceDateUtc || race.raceDate, borderClass: 'border-white/[0.08]', digitClass: 'countdown-d' } : null}
-              yearItems={circuitYearItems}
+              yearItems={circuitYearItems(circuitHistory, 'race')}
               currentYear={raceYear}
             />
 
@@ -177,109 +135,60 @@ const circuitStats: Array<{ Icon: LucideIcon; label: string; val: string | numbe
         </div>
 
         {/* ── TABS ── */}
-        {tabs.length > 0 && (
-          <div>
-            <div class="flex items-center gap-1.5 mb-6" role="tablist">
-              {tabs.map((t) => (
-                <button
-                  type="button"
-                  data-tab={t.id}
-                  id={`tab-${t.id}`}
-                  role="tab"
-                  aria-selected={t.id === defaultTab ? 'true' : 'false'}
-                  aria-controls={`panel-${t.id}`}
-                  tabindex={t.id === defaultTab ? 0 : -1}
-                  class={`tab-btn font-mono text-[9px] tracking-[0.12em] uppercase px-3 py-1.5 border transition-colors duration-150 ${
-                    t.id === defaultTab
-                      ? 'border-[rgba(168,85,247,0.5)] text-[#a855f7] bg-[rgba(168,85,247,0.08)]'
-                      : 'border-white/[0.08] text-muted-foreground hover:text-foreground hover:border-white/[0.15]'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
+        <div>
+          <RaceTabs tabs={tabs} defaultTab={defaultTab} accent={GP_ACCENT} links={isCompleted ? [
+            { href: `/races/${race.id}/race-story`, label: 'Race story' },
+            { href: `/races/${race.id}/telemetry`, label: 'Telemetry' },
+          ] : []} />
 
-            {hasResults && (
-              <div id="panel-results" role="tabpanel" aria-labelledby="tab-results" class={`tab-panel ${defaultTab !== 'results' ? 'hidden' : ''}`}>
-                <div class="border border-white/[0.06] overflow-hidden">
-                  <RaceResultsTable results={raceData.results} year={raceYear} laps={raceData.laps} />
-                </div>
+          {isCompleted && results.length > 0 && (
+            <RaceTabPanel id="results" defaultTab={defaultTab}>
+              <div class="border border-white/[0.06] overflow-hidden">
+                <RaceResultsTable results={results} year={raceYear} laps={laps} />
               </div>
-            )}
+              {drops.length > 0 && (
+                <ul aria-label="Grid drops" class="mt-3 border border-white/[0.06] divide-y divide-white/[0.06] font-mono text-[11px]">
+                  {drops.map((d) => (
+                    <li class="px-4 py-2 text-muted-foreground">
+                      {d.pitLane ? `${d.code} qualified P${d.qualified}, started from the pit lane` : `${d.code} qualified P${d.qualified}, started P${d.started} (−${d.places})`}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </RaceTabPanel>
+          )}
 
-            {hasQualifying && (
-              <div id="panel-qualifying" role="tabpanel" aria-labelledby="tab-qualifying" class={`tab-panel ${defaultTab !== 'qualifying' ? 'hidden' : ''}`}>
-                <div class="border border-white/[0.06] overflow-hidden">
-                  <QualifyingGrid qualifying={raceData.qualifying} year={raceYear} />
-                </div>
+          {qualifying.length > 0 && (
+            <RaceTabPanel id="qualifying" defaultTab={defaultTab}>
+              <div class="border border-white/[0.06] overflow-hidden">
+                <QualifyingGrid qualifying={qualifying} year={raceYear} />
               </div>
-            )}
+            </RaceTabPanel>
+          )}
 
-            {hasLaps && (
-              <div id="panel-laps" role="tabpanel" aria-labelledby="tab-laps" class={`tab-panel ${defaultTab !== 'laps' ? 'hidden' : ''}`}>
-                <div class="border border-white/[0.06] overflow-hidden">
-                  <LapChart laps={raceData.laps} />
-                </div>
+          {isCompleted && laps.length > 0 && (
+            <RaceTabPanel id="laps" defaultTab={defaultTab}>
+              <div class="border border-white/[0.06] overflow-hidden">
+                <LapChart laps={laps} />
               </div>
-            )}
+            </RaceTabPanel>
+          )}
 
-            {raceControlMessages.length > 0 && (
-              <div id="panel-incidents" role="tabpanel" aria-labelledby="tab-incidents" class={`tab-panel ${defaultTab !== 'incidents' ? 'hidden' : ''}`}>
-                <div class="border border-white/[0.06] overflow-hidden">
-                  <RaceControlTimeline messages={raceControlMessages} />
-                </div>
-              </div>
-            )}
+          <RaceEventPanels events={events} tabs={eventTabs} defaultTab={defaultTab} driverMap={driverMapOf(results)} year={raceYear} />
 
-            {overtakes.length > 0 && (
-              <div id="panel-overtakes" role="tabpanel" aria-labelledby="tab-overtakes" class={`tab-panel ${defaultTab !== 'overtakes' ? 'hidden' : ''}`}>
-                <div class="border border-white/[0.06] overflow-hidden">
-                  <OvertakesList overtakes={overtakes} driverMap={driverMap} />
-                </div>
-              </div>
-            )}
-
-            {teamRadio.length > 0 && (
-              <div id="panel-team-radio" role="tabpanel" aria-labelledby="tab-team-radio" class={`tab-panel ${defaultTab !== 'team-radio' ? 'hidden' : ''}`}>
-                <div class="border border-white/[0.06] overflow-hidden">
-                  <TeamRadioList clips={teamRadio} driverMap={driverMap} />
-                </div>
-              </div>
-            )}
-
-            <div id="panel-circuit" role="tabpanel" aria-labelledby="tab-circuit" class={`tab-panel ${defaultTab !== 'circuit' ? 'hidden' : ''}`}>
-              <div class="grid grid-cols-2 sm:grid-cols-3 gap-px bg-white/[0.06]">
-                {circuitStats.map(({ Icon, label, val }) => (
-                  <div class="bg-black p-5">
-                    <div class="flex items-center gap-1 font-mono text-[8px] text-muted-foreground tracking-widest uppercase mb-2">
-                      <Icon size={10} />{label}
-                    </div>
-                    <div class="font-bold text-xl">{val}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+          <RaceTabPanel id="circuit" defaultTab={defaultTab}>
+            <CircuitStatsGrid circuit={race.circuit} session="race" />
+          </RaceTabPanel>
+        </div>
       </>
     ) : null}
   </div>
 </BaseLayout>
 
 <script>
-  import { initRaceCountdown, initRaceTabs } from '@/features/races/raceTabs';
+  import { initRaceCountdown } from '@/features/races/raceTabs';
 
   document.addEventListener('astro:page-load', () => {
     initRaceCountdown('race-countdown', 'raceDate', 'countdown-d');
-    initRaceTabs({
-      btnClass: 'tab-btn',
-      panelClass: 'tab-panel',
-      panelIdPrefix: 'panel-',
-      activeBorder: 'rgba(168,85,247,0.5)',
-      activeColor: '#a855f7',
-      activeBg: 'rgba(168,85,247,0.08)',
-      strippedClasses: ['border-[rgba(168,85,247,0.5)]', 'text-[#a855f7]', 'bg-[rgba(168,85,247,0.08)]'],
-    });
   });
 </script>

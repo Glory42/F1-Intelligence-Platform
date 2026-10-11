@@ -1,0 +1,25 @@
+---
+interface Props {
+  title: string;
+  id: string;
+  links?: Array<{ href: string; label: string }>;
+}
+
+const { title, id, links = [] } = Astro.props;
+---
+
+<section aria-labelledby={id} class="flex flex-col border border-white/[0.06] p-6">
+  <h2 id={id} class="mb-4 font-mono text-[9px] lowercase tracking-[0.25em]" style="color: rgba(168,85,247,0.55)">
+    <span aria-hidden="true">./</span>{title}
+  </h2>
+  <div class="flex-1">
+    <slot />
+  </div>
+  {links.length > 0 && (
+    <div class="mt-5 flex gap-5 border-t border-white/[0.06] pt-4">
+      {links.map((l) => (
+        <a href={l.href} class="text-[13px] text-muted-foreground hover:text-[#a855f7] transition-colors duration-150">{l.label} →</a>
+      ))}
+    </div>
+  )}
+</section>
