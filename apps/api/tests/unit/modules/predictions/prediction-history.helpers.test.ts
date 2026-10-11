@@ -5,8 +5,8 @@ import {
   buildWinnerMap,
   mergeHistoryByDateDesc,
   type HistoryPredictionRow,
-} from '../../../src/common/prediction-history';
-import type { drivers, teams, races, circuits } from '../../../src/db/schema';
+} from '../../../../src/modules/predictions/prediction-history.helpers';
+import type { drivers, teams, races, circuits } from '../../../../src/db/schema';
 
 const team: typeof teams.$inferSelect = {
   id: 1, seasonId: 2025, teamKey: 'red_bull', name: 'Red Bull Racing', nationality: 'Austrian',

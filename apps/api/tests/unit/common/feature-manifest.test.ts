@@ -3,8 +3,8 @@ import {
   GP_FEATURE_MANIFEST,
   SPRINT_FEATURE_MANIFEST,
   mapFeatureRow,
-} from '../../../src/common/featureManifest';
-import type { FeatureManifestEntry } from '../../../src/common/featureManifest';
+} from '../../../src/common/feature-manifest';
+import type { FeatureManifestEntry } from '../../../src/common/feature-manifest';
 
 type Row = Record<string, unknown>;
 

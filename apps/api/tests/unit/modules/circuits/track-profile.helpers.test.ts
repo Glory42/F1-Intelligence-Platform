@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { thinTrace, trackProfile } from '../../../src/common/trackProfile';
+import { thinTrace, trackProfile } from '../../../../src/modules/circuits/track-profile.helpers';
 
 // Builds a 10 m-grid lap from segments, the way ingest_qualifying_telemetry stores it.
 function lap(segments: Array<{ m: number; speed: number; throttle: number; brake?: number }>) {

@@ -2,7 +2,7 @@ import type { Context } from 'hono';
 import type { Bindings } from '../../common/types';
 import { createDb } from '../../config/database';
 import { RacesService } from './races.service';
-import { cacheControlForStatus, cacheControlForYear, cacheIfData } from '../../common/cache';
+import { cacheControlForStatus } from '../../common/cache';
 
 const service = new RacesService();
 
@@ -17,27 +17,6 @@ export const RacesController = {
     // Only a status=completed filter guarantees every row in the list is immutable —
     // an unfiltered or non-completed filter can include a race that's still in progress.
     c.header('Cache-Control', cacheControlForStatus(status ?? ''));
-    return c.json({ data, error: null });
-  },
-
-  getAllCircuits: async (c: Context<{ Bindings: Bindings }>) => {
-    const data = await service.findAllCircuits(createDb(c.env.DATABASE_URL));
-    return c.json({ data, error: null });
-  },
-
-  getCircuitDetails: async (c: Context<{ Bindings: Bindings }>) => {
-    const circuitKey = c.req.param('circuitKey') ?? '';
-    const data = await service.findCircuitDetails(createDb(c.env.DATABASE_URL), circuitKey);
-    if (!data) {
-      return c.json({ data: null, error: { code: 'NOT_FOUND', message: `Circuit ${circuitKey} not found` } }, 404);
-    }
-    return c.json({ data, error: null });
-  },
-
-  getCircuitTelemetry: async (c: Context<{ Bindings: Bindings }>) => {
-    const circuitKey = c.req.param('circuitKey') ?? '';
-    const data = await service.findCircuitTelemetry(createDb(c.env.DATABASE_URL), circuitKey);
-    c.header('Cache-Control', cacheIfData(cacheControlForYear(data?.year ?? new Date().getFullYear()), data != null));
     return c.json({ data, error: null });
   },
 

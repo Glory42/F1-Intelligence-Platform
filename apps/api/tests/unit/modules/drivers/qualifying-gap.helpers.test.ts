@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { median, qualifyingGapMs } from '../../../src/common/qualifyingGap';
+import { median, qualifyingGapMs } from '../../../../src/modules/drivers/qualifying-gap.helpers';
 
 const lap = (q1: number | null, q2: number | null = null, q3: number | null = null) => ({ q1TimeMs: q1, q2TimeMs: q2, q3TimeMs: q3 });
 

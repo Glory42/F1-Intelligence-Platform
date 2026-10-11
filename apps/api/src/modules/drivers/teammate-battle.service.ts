@@ -3,8 +3,8 @@ import type { Db } from '../../config/database';
 import { drivers, qualifyingResults, raceResults, races, teams } from '../../db/schema';
 import type { HeadToHead, TeammateBattle, TeammateOuting, TeammateRace } from '../../common/types';
 import { toDriver } from '../../common/mappers';
-import { isClassifiedFinish } from '../../common/classification';
-import { median, qualifyingGapMs, type QualifyingTimes } from '../../common/qualifyingGap';
+import { isClassifiedFinish } from './classification.helpers';
+import { median, qualifyingGapMs, type QualifyingTimes } from './qualifying-gap.helpers';
 
 interface Outing extends TeammateOuting {
   roundNumber: number;

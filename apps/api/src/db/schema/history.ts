@@ -5,7 +5,7 @@ import { pgTable, serial, integer, varchar, numeric, date, timestamp, uniqueInde
 export const historyDrivers = pgTable('history_drivers', {
   id: serial('id').primaryKey(),
   f1dbId: varchar('f1db_id', { length: 100 }).notNull(),
-  // normalize_person_name(name) — the join key to core drivers (see f1dbMatch.ts).
+  // normalize_person_name(name) — the join key to core drivers (see modules/history/f1db-match.helpers.ts).
   matchKey: varchar('match_key', { length: 120 }).notNull(),
   name: varchar('name', { length: 120 }).notNull(),
   abbreviation: varchar('abbreviation', { length: 3 }),

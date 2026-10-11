@@ -69,12 +69,11 @@ pytest, config in `pyproject.toml` (`pythonpath = ["."]`, `testpaths = ["tests"]
 
 ## API unit (`apps/api/tests/unit/`)
 
-`bun test`, no DB, no network. Mirrors `src/` by domain — mostly the shared `src/common/` transform
-layer (`mappers`, `openf1-mappers`, `standings`, `prediction-response`, `prediction-history`,
-`accuracy`, `cache`, `classification`, `driverIdentity`, `f1dbMatch`, `featureManifest`,
-`qualifyingGap`, `trackOutline`, `trackProfile`) plus module-local pure helpers
-(`modules/history/history.helpers`, `modules/predictions/intel-standings.helpers`,
-`modules/races/circuit-era.helpers`, `modules/races/circuit-stats.helpers`, `modules/quality`). Fixtures are plain objects typed as
+`bun test`, no DB, no network. Mirrors `src/` by domain: the shared `src/common/` layer (`mappers`,
+`standings`, `prediction-response`, `cache`, `driver-identity`, `feature-manifest`) and each module's
+pure `*.helpers.ts` (`circuits/` track outline, track profile, circuit era/stats; `drivers/`
+classification, qualifying gap; `history/` helpers, F1DB match; `predictions/` accuracy, prediction
+history, intel standings; `race-events/openf1.mappers`; `quality`). Fixtures are plain objects typed as
 `typeof <table>.$inferSelect`; see
 `prediction-response.test.ts` for the pattern.
 

@@ -1,4 +1,4 @@
-import type { AccuracyBucket, PredictionHistoryItem, SeasonAccuracy } from './types';
+import type { AccuracyBucket, PredictionHistoryItem, SeasonAccuracy } from '../../common/types';
 
 function toBucket(items: PredictionHistoryItem[]): AccuracyBucket {
   const decided = items.filter((i) => i.correct !== null);

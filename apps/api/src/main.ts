@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { sql } from 'drizzle-orm';
 import { createDb } from './config/database';
+import circuitsModule from './modules/circuits/circuits.module';
 import racesModule from './modules/races/races.module';
 import raceEventsModule from './modules/race-events/race-events.module';
 import strategyModule from './modules/strategy/strategy.module';
@@ -17,7 +18,7 @@ import sprintModule from './modules/sprint/sprint.module';
 import searchModule from './modules/search/search';
 import qualityModule from './modules/quality/quality';
 import type { Bindings } from './common/types';
-import { edgeCache } from './common/edgeCache';
+import { edgeCache } from './common/edge-cache';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -56,6 +57,7 @@ app.get('/api/health', async (c) => {
   }
 });
 
+app.route('/api/races', circuitsModule);
 app.route('/api/races', racesModule);
 app.route('/api/races', raceEventsModule);
 app.route('/api/races', strategyModule);

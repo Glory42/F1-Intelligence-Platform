@@ -2,7 +2,7 @@ import { and, eq, asc } from 'drizzle-orm';
 import type { Db } from '../../config/database';
 import { races, raceControlMessages, raceOvertakes, teamRadioClips } from '../../db/schema';
 import type { RaceControlMessage, RaceOvertake, TeamRadioClip, RaceSession } from '../../common/types';
-import { toRaceControlMessage, toRaceOvertake, toTeamRadioClip } from '../../common/openf1-mappers';
+import { toRaceControlMessage, toRaceOvertake, toTeamRadioClip } from './openf1.mappers';
 
 export class RaceEventsService {
   async raceExists(db: Db, raceId: number): Promise<boolean> {

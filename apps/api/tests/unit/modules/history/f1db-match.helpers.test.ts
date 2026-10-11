@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { f1dbConstructorId, normalizePersonName } from '../../../src/common/f1dbMatch';
+import { f1dbConstructorId, normalizePersonName } from '../../../../src/modules/history/f1db-match.helpers';
 
 describe('normalizePersonName', () => {
   it('produces the same key as data-engine for core and F1DB spellings', () => {

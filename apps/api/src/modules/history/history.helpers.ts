@@ -1,5 +1,5 @@
 import type { ConstructorLineage, DriverRecordStat, LineageMember, RecordChase, RecordEntry } from '../../common/types';
-import { f1dbConstructorId, normalizePersonName } from '../../common/f1dbMatch';
+import { f1dbConstructorId, normalizePersonName } from './f1db-match.helpers';
 
 export type CoreTeamRef = { id: number; teamKey: string };
 export type CoreLink = { id: number; active: boolean };

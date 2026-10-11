@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { isSamePerson } from '../../../src/common/driverIdentity';
+import { isSamePerson } from '../../../src/common/driver-identity';
 
 const row = (code: string, firstName: string, lastName: string) => ({ code, firstName, lastName });
 

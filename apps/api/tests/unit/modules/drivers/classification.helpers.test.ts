@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { isClassifiedFinish } from '../../../src/common/classification';
+import { isClassifiedFinish } from '../../../../src/modules/drivers/classification.helpers';
 
 // Mirrors compute_season_stats.py's DNF rule (docs/adr/0002): anything else is a non-finish.
 describe('isClassifiedFinish', () => {

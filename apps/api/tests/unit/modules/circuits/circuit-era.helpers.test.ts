@@ -4,8 +4,8 @@ import {
   driverKeyFor,
   aggregateEraWins,
   buildDominanceByEra,
-} from '../../../../src/modules/races/circuit-era.helpers';
-import type { WinnerRow } from '../../../../src/modules/races/circuit-stats.helpers';
+} from '../../../../src/modules/circuits/circuit-era.helpers';
+import type { WinnerRow } from '../../../../src/modules/circuits/circuit-stats.helpers';
 import type { races, drivers, teams } from '../../../../src/db/schema';
 
 type RaceRow = typeof races.$inferSelect;

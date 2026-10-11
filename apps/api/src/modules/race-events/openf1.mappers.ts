@@ -1,5 +1,5 @@
-import type { raceControlMessages, raceOvertakes, teamRadioClips } from '../db/schema';
-import type { RaceControlMessage, RaceOvertake, TeamRadioClip } from './types';
+import type { raceControlMessages, raceOvertakes, teamRadioClips } from '../../db/schema';
+import type { RaceControlMessage, RaceOvertake, TeamRadioClip } from '../../common/types';
 
 export function toRaceControlMessage(m: typeof raceControlMessages.$inferSelect): RaceControlMessage {
   return {

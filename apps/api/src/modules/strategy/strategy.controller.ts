@@ -4,7 +4,7 @@ import { INVALID_SESSION_ERROR, parseRaceSession } from '../../common/session';
 import { createDb } from '../../config/database';
 import { cacheControlForStatus, cacheIfData } from '../../common/cache';
 import { StrategyService } from './strategy.service';
-import { findRaceStatus } from '../../common/raceStatus';
+import { findRaceStatus } from '../../common/race-status';
 
 const service = new StrategyService();
 

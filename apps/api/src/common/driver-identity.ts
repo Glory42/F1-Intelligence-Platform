@@ -6,7 +6,7 @@ export interface DriverName {
   lastName: string;
 }
 
-// Unlike f1dbMatch's normalizePersonName this keeps "Jr.", so Piquet Sr. and Jr. stay two people.
+// Unlike f1db-match.helpers' normalizePersonName this keeps "Jr.", so Piquet Sr. and Jr. stay two people.
 export function personKey(d: Pick<DriverName, 'firstName' | 'lastName'>): string {
   const ascii = `${d.firstName} ${d.lastName}`.normalize('NFKD').replace(/[̀-ͯ]/g, '');
   return ascii.toLowerCase().replace(/\s+/g, ' ').trim();

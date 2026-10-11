@@ -4,7 +4,7 @@ import { createDb } from '../../config/database';
 import { PredictionsService } from './predictions.service';
 import { FridayPaceService } from './friday-pace.service';
 import { TitleOddsService } from './title-odds.service';
-import { findRaceStatus } from '../../common/raceStatus';
+import { findRaceStatus } from '../../common/race-status';
 import { CACHE_ACTIVE, cacheControlForStatus, cacheControlForYear, cacheIfData } from '../../common/cache';
 
 const service = new PredictionsService();

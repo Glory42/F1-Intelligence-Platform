@@ -168,7 +168,7 @@ Returns historical race results at a specific circuit across all years. Each ite
 Track character from one real lap: the circuit's latest pole lap (falling back to that race's fastest
 stored qualifying lap when the pole sitter's telemetry is missing — `isPoleLap` says which). Returns
 `{ raceId, year, raceName, driver, lapTimeMs, isPoleLap, profile, trace }` or `null` before 2023 data
-exists. `profile` (`common/trackProfile.ts`): full-throttle share (≥98%), longest flat-out run, top
+exists. `profile` (`modules/circuits/track-profile.helpers.ts`): full-throttle share (≥98%), longest flat-out run, top
 speed, braking zones, and corners — every lift or brake, classed by apex speed (low < 130, medium
 < 210 km/h). `trace` is speed/throttle/brake thinned to every 50 m.
 
@@ -210,7 +210,7 @@ Returns a single driver with their season stats for the given year.
 ### `GET /api/drivers/:id/career`
 
 Returns a driver's stats across all seasons they have data in. `drivers` rows are season-scoped and
-FastF1's names vary by season, so seasons are linked by person (`common/driverIdentity.ts`): the same
+FastF1's names vary by season, so seasons are linked by person (`common/driver-identity.ts`): the same
 name ignoring accents and case, or the same code with one name extending the other ("Andrea Kimi
 Antonelli" / "Kimi Antonelli"). "Jr." still counts, so a father and son stay separate. `/api/search`
 uses the same rule to list each person once, under their latest season.

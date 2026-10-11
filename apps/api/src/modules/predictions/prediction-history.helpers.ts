@@ -1,6 +1,6 @@
-import type { drivers, teams, races, circuits } from '../db/schema';
-import type { PredictionHistoryItem, Driver } from './types';
-import { toDriver, toCircuit } from './mappers';
+import type { drivers, teams, races, circuits } from '../../db/schema';
+import type { PredictionHistoryItem, Driver } from '../../common/types';
+import { toDriver, toCircuit } from '../../common/mappers';
 
 type DriverRow = typeof drivers.$inferSelect;
 type TeamRow = typeof teams.$inferSelect;

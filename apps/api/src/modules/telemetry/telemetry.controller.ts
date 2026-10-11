@@ -2,7 +2,7 @@ import type { Context } from 'hono';
 import type { Bindings } from '../../common/types';
 import { createDb } from '../../config/database';
 import { cacheControlForStatus, cacheIfData } from '../../common/cache';
-import { findRaceStatus } from '../../common/raceStatus';
+import { findRaceStatus } from '../../common/race-status';
 import { TelemetryService } from './telemetry.service';
 
 const service = new TelemetryService();

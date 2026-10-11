@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { toRaceControlMessage, toRaceOvertake, toTeamRadioClip } from '../../../src/common/openf1-mappers';
-import type { raceControlMessages, raceOvertakes, teamRadioClips } from '../../../src/db/schema';
+import { toRaceControlMessage, toRaceOvertake, toTeamRadioClip } from '../../../../src/modules/race-events/openf1.mappers';
+import type { raceControlMessages, raceOvertakes, teamRadioClips } from '../../../../src/db/schema';
 
 describe('toRaceControlMessage', () => {
   const row: typeof raceControlMessages.$inferSelect = {

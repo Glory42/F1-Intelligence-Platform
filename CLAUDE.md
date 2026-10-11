@@ -168,26 +168,29 @@ sprint weekend:
 ### Module structure (NestJS-style)
 ```
 apps/api/src/
-├── common/types.ts                    # Bindings + all response types
+├── common/                            # only what several modules share
+│   ├── types/                         # response types, one file per domain behind an index.ts barrel
+│   ├── mappers.ts, standings.ts, prediction-response.ts, feature-manifest.ts, driver-identity.ts
+│   └── cache.ts, edge-cache.ts, race-status.ts, session.ts, constants.ts
 ├── config/database.ts                 # createDb() — Neon HTTP driver
 ├── db/schema/                         # Drizzle table definitions
-├── modules/
-│   ├── races/{controller,service,module}.ts
-│   ├── drivers/{controller,service,module}.ts
-│   ├── teams/{controller,service,module}.ts
-│   ├── predictions/{controller,service,module}.ts
-│   ├── sprint/{controller,service,module}.ts
-│   ├── seasons/seasons.ts             # single file — one route, too small for the 3-file split
-│   ├── search/search.ts               # single file, same reason
-│   └── quality/quality.ts             # single file, dev-only reporting route
+├── modules/<domain>/
+│   ├── <domain>.{controller,service,module}.ts
+│   ├── <topic>.service.ts             # a second query service when one domain has several (racecraft, title-odds)
+│   └── <topic>.helpers.ts             # pure logic used only by this module (unit-tested)
+│   # races, circuits, race-events, strategy, race-story, telemetry, drivers, teams,
+│   # predictions, sprint, history — plus seasons/, search/, quality/ as single files
 └── main.ts                            # Entry point, route registration
 ```
 
 - **service** — DB queries (Drizzle, no Hono context)
 - **controller** — parses Hono context, calls service, returns JSON
 - **module** — Hono sub-router that wires controller handlers to routes
+- **helpers** — pure functions; code moves to `common/` only once a second module needs it
 - A module with one route and a handful of query lines (`seasons`, `search`, `quality`) skips
   the split — one file holding the router + query is more readable than three near-empty ones.
+- File names are kebab-case. Sub-resources keep their public URL even when they get their own
+  module: `circuits` and the race sub-resources mount under `/api/races` (circuits before races' `/:id`).
 
 ### Environment Variables
 | Variable | Where set |

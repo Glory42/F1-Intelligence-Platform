@@ -172,7 +172,7 @@ rather than raising the limit. (`apps/api` has its own parallel budget — see t
 ## Types
 
 `src/types/index.ts` holds **all** frontend types in one file. It is a hand-maintained mirror of the
-API's response shapes (`apps/api/src/common/types.ts`) — the two are separate files and can drift, so
+API's response shapes (`apps/api/src/common/types/`) — the two are separate files and can drift, so
 when an endpoint's response changes, update both. Same applies to `lib/predictionMath.ts`, whose
 `GP_WEIGHTS` / `SPRINT_WEIGHTS` are hand-copied from the Python model.
 

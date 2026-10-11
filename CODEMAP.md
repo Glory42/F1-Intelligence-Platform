@@ -40,28 +40,20 @@ Must use `@neondatabase/serverless` (HTTP driver) — no TCP in Workers.
 apps/api/
 ├── src/
 │   ├── main.ts                    # Entry point — logger, CORS, edgeCache() on /api/*, /api/health, mounts every module
-│   ├── common/types.ts            # Bindings + all response types
-│   ├── common/constants.ts        # SPRINT_FORMATS — single source of truth shared by all services
-│   ├── common/mappers.ts          # toDriver(), toTeam(), toRace(), toCircuit(), toRaceResult(), toQualifyingResult(), toSprintResult() — canonical row→DTO mappers used by all services
-│   ├── common/openf1-mappers.ts   # toRaceControlMessage(), toRaceOvertake(), toTeamRadioClip() — split out from mappers.ts once the OpenF1-sourced DTOs pushed it over the 150-line budget
-│   ├── common/standings.ts        # resolveSeason(), buildStandings(), buildCareerStats(), sortByChampionshipStanding() — shared standings/career-stats pipeline for drivers, teams, predictions; drivers/teams pass a StatsAdapter (entityId/statsEntityId/toStats/emptyStats) instead of loose lambdas
-│   ├── common/prediction-response.ts  # buildPredictionResponse(db, config) — shared GP/sprint prediction pipeline (winner lookup, feature mapping, response assembly); used by predictions.service.ts + sprint.service.ts
-│   ├── common/prediction-history.ts   # buildHistoryItems(), buildWinnerMap(), buildProbPosMaps(), mergeHistoryByDateDesc() — pure GP/sprint prediction-history assembly for predictions.service.findHistory()
-│   ├── common/cache.ts             # cacheControlForStatus(), cacheControlForYear(), cacheIfData() — Cache-Control rules for completed vs in-progress data
-│   ├── common/edgeCache.ts         # edgeCache() middleware — serves repeat GETs from the Workers Cache API (custom domain only); skips errors/non-public responses
-│   ├── common/raceStatus.ts        # findRaceStatus(db, raceId) — the status lookup race sub-resources use for 404 + cache lifetime
-│   ├── common/session.ts           # parseRaceSession() + INVALID_SESSION_ERROR — validates `?session=race|sprint`
-│   ├── common/classification.ts    # isClassifiedFinish() — DSQ/DNS count as non-finishes (ADR 0002, mirrors compute_season_stats.py)
-│   ├── common/driverIdentity.ts    # personKey(), isSamePerson() — links one person's season-scoped driver rows (career, search)
-│   ├── common/f1dbMatch.ts         # normalizePersonName() (mirrors data-engine's f1db.normalize_person_name), f1dbConstructorId(teamKey) — core ↔ F1DB join keys
-│   ├── common/trackProfile.ts      # trackProfile(), thinTrace() — track character from one real qualifying lap
-│   ├── common/trackOutline.ts      # buildOutlinePath() — pole-lap x/y telemetry → closed SVG path for the circuit outline
-│   ├── common/qualifyingGap.ts     # qualifyingGapMs() (deepest shared Q session), median() — teammate battle quali gap
-│   ├── common/accuracy.ts          # aggregateAccuracyBySeason() — groups PredictionHistoryItem[] into per-season gp/sprint/overall accuracy buckets
-│   ├── common/featureManifest.ts   # GP_FEATURE_MANIFEST/SPRINT_FEATURE_MANIFEST (key, column, label, nullable) +
-│   │                               #   mapFeatureRow() — weight-less local manifest (apps/api never computes with
-│   │                               #   weights); derives toFeatures()/toSprintFeatures() and intel-standings.helpers.ts's
-│   │                               #   aggregation columns from one place instead of three
+│   ├── common/                    # Only what several modules share — module-only logic lives in that module's *.helpers.ts
+│   │   ├── types/                 # Response types per domain (api, seasons, circuits, drivers, teams, races, race-events,
+│   │   │                          #   strategy, race-story, telemetry, predictions, sprint, history, quality) + index.ts barrel
+│   │   ├── constants.ts           # SPRINT_FORMATS — single source of truth shared by all services
+│   │   ├── mappers.ts             # toDriver(), toTeam(), toRace(), toCircuit(), toRaceResult(), toQualifyingResult(), toSprintResult() — canonical row→DTO mappers used by all services
+│   │   ├── standings.ts           # resolveSeason(), buildStandings(), buildCareerStats(), sortByChampionshipStanding() — shared standings/career-stats pipeline for drivers, teams, predictions; drivers/teams pass a StatsAdapter
+│   │   ├── prediction-response.ts # buildPredictionResponse(db, config) — shared GP/sprint prediction pipeline; used by predictions + sprint
+│   │   ├── feature-manifest.ts    # GP_FEATURE_MANIFEST/SPRINT_FEATURE_MANIFEST (key, column, label, nullable) + mapFeatureRow() —
+│   │   │                          #   weight-less manifest behind toFeatures()/toSprintFeatures() and intel-standings aggregation
+│   │   ├── driver-identity.ts     # personKey(), isSamePerson() — links one person's season-scoped driver rows (career, search)
+│   │   ├── cache.ts               # cacheControlForStatus(), cacheControlForYear(), cacheIfData() — Cache-Control rules for completed vs in-progress data
+│   │   ├── edge-cache.ts          # edgeCache() middleware — serves repeat GETs from the Workers Cache API (custom domain only); skips errors/non-public responses
+│   │   ├── race-status.ts         # findRaceStatus(db, raceId) — the status lookup race sub-resources use for 404 + cache lifetime
+│   │   └── session.ts             # parseRaceSession() + INVALID_SESSION_ERROR — validates `?session=race|sprint`
 │   ├── config/database.ts         # createDb() — Drizzle over Neon HTTP driver
 │   ├── config/localNeonProxy.ts   # configureLocalNeonProxy() — points the Neon driver at docker-compose.test.yml's proxy (tests/migrate only, never the Worker)
 │   ├── db/
@@ -100,13 +92,20 @@ apps/api/
 │   │   └── seed.ts                # Seeds static circuit data (track category, image paths) + seasons
 │   └── modules/                   # Feature modules (service / controller / module)
 │       ├── races/
-│       │   ├── races.service.ts   # DB queries — race list, detail, circuits, circuit details, circuit telemetry (pole lap)
-│       │   ├── circuit-era.helpers.ts     # Pure era bucketing for findCircuitDetails — Era/EraMap/ERAS, aggregateEraWins(), buildDominanceByEra(), normalizeTeamKey()
-│       │   ├── circuit-stats.helpers.ts   # Pure per-response stat computations — buildCircuitHistory(), computeQualifyingImpactStats/WeatherStats/SafetyCarStats(), pickFastestLap(); owns WinnerRow/FastestLapRow
-│       │   ├── circuit-headshot-backfill.ts # backfillDriverHeadshots() — the one DB-reading enrichment (swaps latest driver profiles into per-era win entries in place; no writes)
+│       │   ├── races.service.ts   # DB queries — race list, race detail (results, qualifying, lap summaries)
 │       │   ├── races.controller.ts# Parses context, calls service, returns JSON
-│       │   └── races.module.ts    # GET /, /circuits, /circuit/:circuitKey, /circuit/:circuitKey/telemetry, /:id
+│       │   └── races.module.ts    # GET /, /:id
+│       ├── circuits/              # Mounted at /api/races ahead of races' /:id (URLs predate the module)
+│       │   ├── circuits.service.ts        # Circuit list, circuit details (history, eras, stats, outline), circuit telemetry (pole lap)
+│       │   ├── circuit-era.helpers.ts     # Pure era bucketing — Era/EraMap/ERAS, aggregateEraWins(), buildDominanceByEra(), normalizeTeamKey()
+│       │   ├── circuit-stats.helpers.ts   # Pure per-response stats — buildCircuitHistory(), computeQualifyingImpactStats/WeatherStats/SafetyCarStats(), pickFastestLap()
+│       │   ├── circuit-headshots.helpers.ts # backfillDriverHeadshots() — the one DB-reading enrichment (latest driver profiles into per-era win entries; no writes)
+│       │   ├── track-outline.helpers.ts   # buildOutlinePath() — pole-lap x/y telemetry → closed SVG path for the circuit outline
+│       │   ├── track-profile.helpers.ts   # trackProfile(), thinTrace() — track character from one real qualifying lap
+│       │   ├── circuits.controller.ts
+│       │   └── circuits.module.ts         # GET /circuits, /circuit/:circuitKey, /circuit/:circuitKey/telemetry
 │       ├── race-events/           # OpenF1-sourced race data, separate from races/ to keep its controller under budget
+│       │   ├── openf1.mappers.ts         # toRaceControlMessage(), toRaceOvertake(), toTeamRadioClip()
 │       │   ├── race-events.service.ts    # getRaceControlMessages(), getOvertakes(), getTeamRadio(), raceExists() — per session_type
 │       │   ├── race-events.controller.ts # raceSubResource(getter) factory — one 404/session/cache/json shape, three getters bound to it
 │       │   └── race-events.module.ts     # GET /:id/race-control, /:id/overtakes, /:id/team-radio (mounted at /api/races)
@@ -127,6 +126,8 @@ apps/api/
 │       │   ├── drivers.service.ts # Driver list, standings, detail, career stats
 │       │   ├── racecraft.service.ts       # findRacecraft() — GP overtakes made/suffered/net per driver for a season (2023+)
 │       │   ├── teammate-battle.service.ts # findBattle() — quali/race/points head-to-head + race-by-race list vs the team-mate
+│       │   ├── qualifying-gap.helpers.ts  # qualifyingGapMs() (deepest shared Q session), median() — teammate quali gap
+│       │   ├── classification.helpers.ts  # isClassifiedFinish() — DSQ/DNS count as non-finishes (ADR 0002, mirrors compute_season_stats.py)
 │       │   ├── drivers.controller.ts
 │       │   └── drivers.module.ts  # GET /standings, /racecraft, /, /:id/career, /:id/history (HistoryController), /:id/teammate-battle, /:id
 │       ├── teams/
@@ -136,6 +137,8 @@ apps/api/
 │       ├── predictions/
 │       │   ├── predictions.service.ts # Upcoming (date-guarded), by race, history (incl. sprint), accuracy-by-season, standings, model-info
 │       │   ├── predictions.helpers.ts # toFeatures() (GP feature row→DTO) + buildGpPredictionResponse() — the GP-specific query builders over common/prediction-response
+│       │   ├── accuracy.helpers.ts    # aggregateAccuracyBySeason() — per-season gp/sprint/overall accuracy buckets
+│       │   ├── prediction-history.helpers.ts # buildHistoryItems(), buildWinnerMap(), buildProbPosMaps(), mergeHistoryByDateDesc()
 │       │   ├── intel-standings.helpers.ts # aggregateSeasonFeatures() (table-driven per-feature averaging) + buildIntelStandingRows() (rank + min-max normalise + sprint totals) for findIntelStandings()
 │       │   ├── friday-pace.service.ts # findFridayPace() — each driver's best practice long run + gap to fastest (Long Run Pace input)
 │       │   ├── title-odds.service.ts  # findTitleOdds() — latest round's driver/team title odds + per-round history for charting
@@ -147,6 +150,7 @@ apps/api/
 │       │   └── sprint.module.ts   # GET /upcoming, /race/:raceId, /race/:raceId/detail
 │       ├── history/               # F1DB all-time history (mounted at /api/history; driver/team history routes live on those modules)
 │       │   ├── history.service.ts     # findRecords(), findMilestones(), findLineages(), findDriverHistory(), findTeamHistory(), findOnThisDay()
+│       │   ├── f1db-match.helpers.ts  # normalizePersonName() (mirrors data-engine's f1db.normalize_person_name), f1dbConstructorId(teamKey) — core ↔ F1DB join keys
 │       │   ├── history.helpers.ts     # Pure — buildCoreLinks() (F1DB → core page ids, active flag), nearestMonthDay() (wraps New Year), buildChases() (best active driver per record), groupLineages()
 │       │   ├── history.controller.ts  # Also serves /api/drivers/:id/history + /api/teams/:id/history; validates date=MM-DD
 │       │   └── history.module.ts      # GET /records, /milestones, /lineages, /on-this-day
@@ -166,29 +170,17 @@ apps/api/
 ├── tests/
 │   ├── unit/                      # bun test — mirrors src/, one *.test.ts per file
 │   │   ├── modules/
-│   │   │   ├── history/history.helpers.test.ts  # buildCoreLinks (latest season, renamed constructors), nearestMonthDay (nearest day, New Year wrap, ties), buildChases, groupLineages
-│   │   │   ├── quality/quality.test.ts          # castSeverity() (severity casting)
-│   │   │   ├── races/             # circuit-era.helpers + circuit-stats.helpers tests (era win aggregation, per-response stat computations)
-│   │   │   └── predictions/       # intel-standings.helpers test (feature averaging + standings normalise)
-│   │   └── common/
-│   │       ├── mappers.test.ts
-│   │       ├── openf1-mappers.test.ts # toRaceControlMessage/toRaceOvertake/toTeamRadioClip
-│   │       ├── standings.test.ts
-│   │       ├── prediction-response.test.ts
-│   │       ├── prediction-history.test.ts
-│   │       ├── featureManifest.test.ts
-│   │       ├── cache.test.ts
-│   │       ├── accuracy.test.ts
-│   │       ├── classification.test.ts  # classified finishes vs DNF/DSQ/DNS
-│   │       ├── driverIdentity.test.ts  # accents/case, middle names, fathers and sons kept apart
-│   │       ├── f1dbMatch.test.ts       # normalizePersonName parity with data-engine, f1dbConstructorId renames
-│   │       ├── qualifyingGap.test.ts   # deepest shared session, Q2 fallback, median
-│   │       ├── trackOutline.test.ts    # square viewBox, y flip, aspect ratio
-│   │       └── trackProfile.test.ts    # full throttle, braking zones, corner classes, thinTrace
+│   │   │   ├── circuits/          # circuit-era + circuit-stats helpers, track-outline (viewBox, y flip), track-profile (throttle, braking, corners, thinTrace)
+│   │   │   ├── drivers/           # classification (finishes vs DNF/DSQ/DNS), qualifying-gap (deepest shared session, median)
+│   │   │   ├── history/           # history.helpers (buildCoreLinks, nearestMonthDay, buildChases, groupLineages), f1db-match (parity with data-engine)
+│   │   │   ├── predictions/       # accuracy, prediction-history, intel-standings helpers
+│   │   │   ├── race-events/       # openf1.mappers (race control, overtakes, team radio)
+│   │   │   └── quality/quality.test.ts # castSeverity()
+│   │   └── common/                # mappers, standings, prediction-response, feature-manifest, cache, driver-identity
 │   ├── integration/                # bun test — real Hono `app.request()` against a LOCAL Postgres (docker-compose.test.yml behind
 │   │   │                           #   a Neon HTTP proxy; `bun run test:db:up`, config in .env.test) — never Neon
 │   │   ├── races/races.test.ts     # list/filter/detail/circuit-history joins
-│   │   ├── races/circuit-outline.test.ts # circuit outline from the latest stored pole lap; none without telemetry
+│   │   ├── circuits/circuit-outline.test.ts # circuit outline from the latest stored pole lap; none without telemetry
 │   │   ├── circuits/circuit-telemetry.test.ts # pole lap preferred over a faster non-pole lap; null without telemetry
 │   │   ├── race-events/race-events.test.ts # race-control message + overtakes + team-radio lists, ordering, 404
 │   │   ├── race-events/race-events-sessions.test.ts # ?session=sprint returns only sprint rows
@@ -720,7 +712,7 @@ data-engine/
 │       ├── upsert.py              # upsert(conn, table, rows, conflict_cols, exclude_update=[])
 │       ├── driver_map.py          # build_driver_code_map(), build_driver_number_map(conn, season_id) — shared driver code/number→id lookups for ingest jobs
 │       ├── driver_registry.py     # session_entries(), register_session_drivers() — adds a session's missing drivers/teams before results are mapped
-│       ├── f1db.py                # normalize_person_name() (join key with apps/api f1dbMatch.ts), career_milestones(), driver_row(),
+│       ├── f1db.py                # normalize_person_name() (join key with apps/api history/f1db-match.helpers.ts), career_milestones(), driver_row(),
 │       │                          # constructor_row(), constructor_seasons() — F1DB release → history_* rows
 │       ├── f1db_results.py        # match_f1db_driver(), race_row(), qualifying_row() — F1DB record → our rows
 │       ├── f1db_backfill.py       # plan_season() — pure diff of one season vs F1DB (codes, new drivers, merges, rows)

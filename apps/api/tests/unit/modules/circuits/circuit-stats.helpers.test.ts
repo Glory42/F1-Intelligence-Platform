@@ -7,8 +7,8 @@ import {
   pickFastestLap,
   type WinnerRow,
   type FastestLapRow,
-} from '../../../../src/modules/races/circuit-stats.helpers';
-import type { DriverWinEntry } from '../../../../src/modules/races/circuit-era.helpers';
+} from '../../../../src/modules/circuits/circuit-stats.helpers';
+import type { DriverWinEntry } from '../../../../src/modules/circuits/circuit-era.helpers';
 import type { races, drivers, teams } from '../../../../src/db/schema';
 
 type RaceRow = typeof races.$inferSelect;

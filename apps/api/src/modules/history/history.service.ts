@@ -9,7 +9,7 @@ import type {
   ConstructorLineage, DriverHistory, HistoryMilestones, HistoryRecords, MilestoneEntry, OnThisDay, RecordEntry,
   TeamHistory,
 } from '../../common/types';
-import { f1dbConstructorId, normalizePersonName } from '../../common/f1dbMatch';
+import { f1dbConstructorId, normalizePersonName } from './f1db-match.helpers';
 import { toDriver } from '../../common/mappers';
 import { buildChases, buildCoreLinks, groupLineages, nearestMonthDay, type CoreLink, type CoreLinks } from './history.helpers';
 

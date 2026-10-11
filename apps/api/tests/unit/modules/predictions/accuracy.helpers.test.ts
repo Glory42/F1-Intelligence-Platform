@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { aggregateAccuracyBySeason } from '../../../src/common/accuracy';
-import type { PredictionHistoryItem } from '../../../src/common/types';
+import { aggregateAccuracyBySeason } from '../../../../src/modules/predictions/accuracy.helpers';
+import type { PredictionHistoryItem } from '../../../../src/common/types';
 
 function item(overrides: Partial<PredictionHistoryItem>): PredictionHistoryItem {
   return {

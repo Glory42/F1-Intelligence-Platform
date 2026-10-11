@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { buildOutlinePath } from '../../../src/common/trackOutline';
+import { buildOutlinePath } from '../../../../src/modules/circuits/track-outline.helpers';
 
 describe('buildOutlinePath', () => {
   it('scales the lap into a square viewBox and flips y, since telemetry y points up but SVG y points down', () => {
