@@ -71,7 +71,8 @@ def _patch_race_session_helpers(monkeypatch, **overrides):
         "get_sc_vsc_laps": lambda session: {"safety_car_laps": 0, "vsc_laps": 0},
         "session_to_race_results": lambda session: _RESULT_ROWS,
         "session_to_lap_times": lambda session: _LAP_ROWS,
-        "build_driver_code_map": lambda conn, season_id: dict(_DRIVER_MAP),
+        "session_entries": lambda session: ["entry"],
+        "register_session_drivers": lambda conn, season_id, entries: dict(_DRIVER_MAP),
     }
     defaults.update(overrides)
     for name, fn in defaults.items():
@@ -179,32 +180,34 @@ class TestRunIngestJob:
         assert conn.commits == 0
         assert conn.closed is True
 
-    def test_raises_when_no_results_rows_survive_driver_map_lookup(self, monkeypatch):
-        _patch_race_session_helpers(monkeypatch, build_driver_code_map=lambda conn, season_id: {})
+    def test_registers_the_sessions_drivers_before_mapping_results(self, monkeypatch):
+        registered = []
+        _patch_race_session_helpers(
+            monkeypatch,
+            register_session_drivers=lambda conn, season_id, entries: registered.append((season_id, entries)) or dict(_DRIVER_MAP),
+        )
+        monkeypatch.setattr(ingest_runner, "upsert", lambda *a, **k: None)
+        monkeypatch.setattr(ingest_runner, "get_conn", lambda: FakeConnection([]))
+
+        run_ingest_job(2026, 5, self._config())
+
+        assert registered == [(10, ["entry"])]
+
+    def test_a_result_for_a_driver_still_unknown_fails_instead_of_being_dropped(self, monkeypatch):
+        _patch_race_session_helpers(monkeypatch, register_session_drivers=lambda conn, season_id, entries: {"VER": 1})
         upsert_calls = []
         monkeypatch.setattr(ingest_runner, "upsert", lambda *a, **k: upsert_calls.append((a, k)))
-        conn = FakeConnection([])
-        monkeypatch.setattr(ingest_runner, "get_conn", lambda: conn)
+        monkeypatch.setattr(ingest_runner, "get_conn", lambda: FakeConnection([]))
 
-        with pytest.raises(RuntimeError, match="No results for race 1"):
+        with pytest.raises(RuntimeError, match="unknown driver HAM"):
             run_ingest_job(2026, 5, self._config())
 
         assert upsert_calls == []
 
-    def test_headshot_backfill_only_for_rows_with_headshot_url_and_known_driver(self, monkeypatch):
+    def test_headshot_backfill_only_for_rows_with_headshot_url(self, monkeypatch):
         result_rows = [
             {**_RESULT_ROWS[0], "headshot_url": "https://example.com/ver.jpg"},
             {**_RESULT_ROWS[1], "headshot_url": None},
-            {
-                "driver_code": "XXX",
-                "finish_position": 3,
-                "grid_position": 3,
-                "points": 0.0,
-                "status": "Finished",
-                "total_race_time_ms": 5410000,
-                "fastest_lap": False,
-                "headshot_url": "https://example.com/xxx.jpg",
-            },
         ]
         _patch_race_session_helpers(monkeypatch, session_to_race_results=lambda session: result_rows)
         monkeypatch.setattr(ingest_runner, "upsert", lambda *a, **k: None)
@@ -268,7 +271,8 @@ def _patch_quali_session_helpers(monkeypatch, **overrides):
     defaults = {
         "get_session": lambda year, round_num, session_type, messages=False: object(),
         "session_to_quali_results": lambda session: _QUALI_ROWS,
-        "build_driver_code_map": lambda conn, season_id: dict(_DRIVER_MAP),
+        "session_entries": lambda session: ["entry"],
+        "register_session_drivers": lambda conn, season_id, entries: dict(_DRIVER_MAP),
     }
     defaults.update(overrides)
     for name, fn in defaults.items():
@@ -368,6 +372,19 @@ class TestRunQualifyingIngestJob:
 
         with pytest.raises(ValueError, match="bad format"):
             run_qualifying_ingest_job(2026, 5, config)
+
+    def test_registers_the_sessions_drivers_before_building_rows(self, monkeypatch):
+        registered = []
+        _patch_quali_session_helpers(
+            monkeypatch,
+            register_session_drivers=lambda conn, season_id, entries: registered.append((season_id, entries)) or dict(_DRIVER_MAP),
+        )
+        monkeypatch.setattr(ingest_runner, "upsert", lambda *a, **k: None)
+        monkeypatch.setattr(ingest_runner, "get_conn", lambda: FakeConnection([None]))
+
+        run_qualifying_ingest_job(2026, 5, self._config())
+
+        assert registered == [(10, ["entry"])]
 
     def test_raises_when_no_rows_survive_driver_map_lookup(self, monkeypatch):
         _patch_quali_session_helpers(monkeypatch)

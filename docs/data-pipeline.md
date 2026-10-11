@@ -15,7 +15,7 @@ All jobs live in `data-engine/src/jobs/`. They are invoked via `src/main.py --jo
 | Job | Purpose |
 |-----|---------|
 | `sync_schedule` | Populates the `races` table for a season from FastF1 (includes sprint dates, event_format). Races are matched by event name first, so when FastF1 renumbers the calendar (an event added or dropped mid-season) each race keeps its row and only its `round_number` moves |
-| `sync_season` | Populates `teams` and `drivers` for a season from FastF1 |
+| `sync_season` | Populates `teams` and `drivers` for a season from FastF1 (one round's lineup). Race, sprint, qualifying and sprint-qualifying ingests also register every driver and team their session lists (`utils/driver_registry.py`), so mid-season replacements are added as they appear; a result for a driver that still can't be matched fails the job instead of being dropped |
 | `ingest_qualifying` | Ingests Q1/Q2/Q3 qualifying session data and sector times — 2018+ |
 | `ingest_qualifying_legacy` | Ingests qualifying from Ergast — pre-2018 |
 | `ingest_fp2` | Ingests practice long-run stints into `fp2_long_run_times` — FP2 primary, **FP1 fallback on sprint weekends** (recorded in `session_type`) |
