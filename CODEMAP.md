@@ -55,6 +55,7 @@ apps/api/
 │   ├── common/prediction-response.ts  # buildPredictionResponse(db, config) — shared GP/sprint prediction pipeline (winner lookup, feature mapping, response assembly); used by predictions.service.ts + sprint.service.ts
 │   ├── common/prediction-history.ts   # buildHistoryItems(), buildWinnerMap(), buildProbPosMaps(), mergeHistoryByDateDesc() — pure GP/sprint prediction-history assembly for predictions.service.findHistory()
 │   ├── common/cache.ts             # cacheControlForStatus(), cacheControlForYear() — Cache-Control header rules for completed vs in-progress races
+│   ├── common/driverIdentity.ts    # personKey(), isSamePerson() — links one person's season-scoped driver rows (career, search)
 │   ├── common/accuracy.ts          # aggregateAccuracyBySeason() — groups PredictionHistoryItem[] into per-season gp/sprint/overall accuracy buckets
 │   ├── common/featureManifest.ts   # GP_FEATURE_MANIFEST/SPRINT_FEATURE_MANIFEST (key, column, label, nullable) +
 │   │                               #   mapFeatureRow() — weight-less local manifest (apps/api never computes with
@@ -146,6 +147,7 @@ apps/api/
 │   │   ├── races/races.test.ts     # list/filter/detail/circuit-history joins
 │   │   ├── race-events/race-events.test.ts # race-control message + overtakes + team-radio lists, ordering, 404
 │   │   ├── drivers/drivers.test.ts # list/filter/standings/detail
+│   │   ├── drivers/career.test.ts  # career + search link a person's seasons across name variants
 │   │   ├── teams/teams.test.ts     # list/standings/detail
 │   │   ├── seasons/seasons.test.ts # race-count aggregation
 │   │   ├── search/search.test.ts   # cross-season dedup
