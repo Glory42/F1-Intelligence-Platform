@@ -3,7 +3,7 @@ export default {
   darkMode: ['class'],
   content: ['./src/**/*.{astro,html,js,jsx,ts,tsx}'],
   theme: {
-    // override ALL border-radius — sharp corners like portfolio
+    // override ALL border-radius: sharp corners like portfolio
     borderRadius: {
       none:    '0px',
       sm:      '0px',
@@ -63,7 +63,7 @@ export default {
         telemetry:        'telemetry 4s linear infinite alternate',
       },
       // Apple "Fluid Interfaces" curves, opt-in via `ease-spring`/`ease-spring-bounce` for
-      // entrances/exits — Tailwind's DEFAULT stays neutral for plain hover/color transitions.
+      // entrances/exits: Tailwind's DEFAULT stays neutral for plain hover/color transitions.
       transitionTimingFunction: {
         spring: 'cubic-bezier(0.32, 0.72, 0, 1)',
         'spring-bounce': 'cubic-bezier(0.34, 1.56, 0.64, 1)',

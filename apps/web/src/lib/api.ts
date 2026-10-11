@@ -97,6 +97,6 @@ export const api = {
   getTeamById: (id: number, year: number) => get<TeamDetailResponse>(`/api/teams/${id}?year=${year}`),
   getTeamCareer: (id: number) => get<TeamYearStats[]>(`/api/teams/${id}/career`),
 
-  // Quality (dev-only — see lib/api dev guard)
+  // Quality (dev-only: see lib/api dev guard)
   getQuality: (year: number) => get<QualityReport>(`/api/quality?year=${year}`),
 };

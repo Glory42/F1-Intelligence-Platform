@@ -37,7 +37,7 @@ function score(mine: Map<number, Outing>, theirs: Map<number, Outing>) {
       if (a.qualiPosition < b.qualiPosition) qualifying.driver += 1;
       else qualifying.teammate += 1;
     }
-    // Only races both finished — a retirement says little about who was quicker.
+    // Only races both finished: a retirement says little about who was quicker.
     if (isClassifiedFinish(a.status) && isClassifiedFinish(b.status) && a.finishPosition != null && b.finishPosition != null) {
       if (a.finishPosition < b.finishPosition) race.driver += 1;
       else race.teammate += 1;

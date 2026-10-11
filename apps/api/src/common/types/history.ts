@@ -53,5 +53,5 @@ export type TeamHistory = {
 
 export type OnThisDayRace = { raceId: number; year: number; name: string; winner: Driver | null };
 
-// date is the month-day actually shown — the nearest one with races when requested has none.
+// date is the month-day actually shown: the nearest one with races when requested has none.
 export type OnThisDay = { requested: string; date: string; races: OnThisDayRace[] };

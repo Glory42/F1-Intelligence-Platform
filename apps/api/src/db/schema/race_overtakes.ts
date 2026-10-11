@@ -9,7 +9,7 @@ export const raceOvertakes = pgTable('race_overtakes', {
   overtakingDriverId: integer('overtaking_driver_id').notNull().references(() => drivers.id),
   overtakenDriverId: integer('overtaken_driver_id').notNull().references(() => drivers.id),
   position: integer('position').notNull(),
-  // 'race' | 'sprint' — both sessions of a sprint weekend share one race_id.
+  // 'race' | 'sprint': both sessions of a sprint weekend share one race_id.
   sessionType: varchar('session_type', { length: 10 }).notNull().default('race'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [

@@ -62,8 +62,8 @@ const subtitle = [
                     <span class:list={['relative flex-1 truncate', r.code && 'hidden text-muted-foreground sm:block']}>{r.name}</span>
                     {r.code && <span class="flex-1 sm:hidden" />}
                     <span class="relative w-12 text-right font-mono font-bold tabular-nums">{Math.round(r.points)}</span>
-                    <span class="relative w-12 text-right font-mono tabular-nums text-muted-foreground">{i === 0 ? '—' : `−${Math.round(t.rows[0].points - r.points)}`}</span>
-                    {showOdds && <span class="relative w-12 text-right font-mono tabular-nums text-[#a855f7]">{r.odds != null ? formatTitleOdds(r.odds) : '—'}</span>}
+                    <span class="relative w-12 text-right font-mono tabular-nums text-muted-foreground">{i === 0 ? '-' : `−${Math.round(t.rows[0].points - r.points)}`}</span>
+                    {showOdds && <span class="relative w-12 text-right font-mono tabular-nums text-[#a855f7]">{r.odds != null ? formatTitleOdds(r.odds) : '-'}</span>}
                   </a>
                 </li>
               ))}

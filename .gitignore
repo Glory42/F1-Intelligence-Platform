@@ -19,7 +19,7 @@ dist/
 .env
 .env.*
 !.env.example
-# Local docker-only test credentials (docker-compose.test.yml) — no secrets.
+# Local docker-only test credentials (docker-compose.test.yml): no secrets.
 !apps/api/.env.test
 
 # Python

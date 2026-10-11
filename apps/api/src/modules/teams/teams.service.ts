@@ -21,7 +21,7 @@ const emptyTeamStats = {
   dnfCount: 0, reliabilityScore: null, sprintTotalPoints: '0',
 };
 
-// Standings pass raw `teams` rows; career passes `{ teams, seasons }` entries — so the
+// Standings pass raw `teams` rows; career passes `{ teams, seasons }` entries: so the
 // two share the stats half and differ only in how they reach the team id.
 const teamStatsPart = {
   statsEntityId: (s: typeof teamSeasonStats.$inferSelect) => s.teamId,
@@ -106,7 +106,7 @@ export class TeamsService {
     );
   }
 
-  // `teams` rows are season-scoped, so teamId alone already pins the season — no `year` param needed.
+  // `teams` rows are season-scoped, so teamId alone already pins the season: no `year` param needed.
   async findById(db: Db, teamId: number): Promise<TeamDetailResponse | null> {
     const teamRows = await db
       .select()

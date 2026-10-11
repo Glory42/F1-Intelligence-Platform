@@ -7,18 +7,18 @@ interface Props {
 }
 
 export function DriverStatsGrid({ stats }: Props) {
-  const winRate = stats.winRate ? `${(Number(stats.winRate) * 100).toFixed(1)}%` : '—';
+  const winRate = stats.winRate ? `${(Number(stats.winRate) * 100).toFixed(1)}%` : '-';
   const avgGain = stats.avgPositionGain
     ? (Number(stats.avgPositionGain) > 0 ? '+' : '') + Number(stats.avgPositionGain).toFixed(1)
-    : '—';
+    : '-';
   const dnfDisplay = `${stats.dnfCount}${stats.dnfRate ? ` (${(Number(stats.dnfRate) * 100).toFixed(0)}%)` : ''}`;
-  const topSpeed = stats.topSpeedAvg ? `${Math.round(Number(stats.topSpeedAvg))} km/h` : '—';
+  const topSpeed = stats.topSpeedAvg ? `${Math.round(Number(stats.topSpeedAvg))} km/h` : '-';
   const tmDelta = stats.teammateQualiDelta
     ? (Number(stats.teammateQualiDelta) >= 0 ? '+' : '') + (Number(stats.teammateQualiDelta) * 100).toFixed(2) + '%'
-    : '—';
+    : '-';
 
   const cells: [string, string | number][] = [
-    ['Championship', stats.championshipPosition ? `P${stats.championshipPosition}` : '—'],
+    ['Championship', stats.championshipPosition ? `P${stats.championshipPosition}` : '-'],
     ['Points', Math.round(championshipPoints(stats))],
     ['Wins', stats.wins],
     ['Podiums', stats.podiums],
@@ -29,7 +29,7 @@ export function DriverStatsGrid({ stats }: Props) {
     ['DNFs', dnfDisplay],
     ['Top Speed', topSpeed],
     ['vs Teammate', tmDelta],
-    ['Avg Finish', stats.avgFinishPosition ? `P${Math.round(Number(stats.avgFinishPosition))}` : '—'],
+    ['Avg Finish', stats.avgFinishPosition ? `P${Math.round(Number(stats.avgFinishPosition))}` : '-'],
   ];
 
   return (

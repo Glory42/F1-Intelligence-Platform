@@ -52,7 +52,7 @@ class IngestJobConfig:
     resolve_race: Callable[[Any, int, int], RaceContext]
     mark_status: Callable[[Any, RaceContext, str, dict[str, float | None], dict[str, int]], None]
     # Runs after mark_status, for side effects on OTHER tables (e.g. ingest_race's
-    # circuits.sc_probability recompute) — a visible, named step, not a buried one.
+    # circuits.sc_probability recompute): a visible, named step, not a buried one.
     cross_table_hook: Callable[[Any, RaceContext], None] | None = None
 
 
@@ -107,7 +107,7 @@ def run_ingest_job(year: int, round_num: int, config: IngestJobConfig) -> None:
     session = get_session(year, round_num, config.session_type)
     if not validate_session_data(session, config.session_type):
         raise RuntimeError(
-            f"{config.session_label} results not fully available or complete yet — retry later"
+            f"{config.session_label} results not fully available or complete yet: retry later"
         )
     entries = session_entries(session)
     weather = get_weather(session)
@@ -144,7 +144,7 @@ def run_ingest_job(year: int, round_num: int, config: IngestJobConfig) -> None:
             driver_id = driver_map.get(rr["driver_code"])
             if not driver_id:
                 raise RuntimeError(
-                    f"{config.session_label} result for unknown driver {rr['driver_code']} — not registered from the session"
+                    f"{config.session_label} result for unknown driver {rr['driver_code']}: not registered from the session"
                 )
             results_to_upsert.append({
                 "race_id": race_ctx.race_id,
@@ -225,7 +225,7 @@ class QualifyingJobConfig:
     allowed_event_formats: frozenset[str]
     format_error: str  # .format(round_num=, event_format=)
     date_guard_error: str  # .format(year=, round_num=, day=)
-    no_results_error: str  # .format(year=, round_num=, race_id=) — superset kwargs; each job's
+    no_results_error: str  # .format(year=, round_num=, race_id=): superset kwargs; each job's
     # template only uses the ones it needs
     session_type_for: Callable[[str], str]
     resolve_race: Callable[[Any, int, int], QualifyingContext]
@@ -253,7 +253,7 @@ def run_qualifying_ingest_job(year: int, round_num: int, config: QualifyingJobCo
             )
 
         session_type = config.session_type_for(ctx.event_format)
-        print(f"  event_format={ctx.event_format} — ingesting {session_type} session")
+        print(f"  event_format={ctx.event_format}: ingesting {session_type} session")
 
     finally:
         conn.close()
@@ -289,7 +289,7 @@ def run_qualifying_ingest_job(year: int, round_num: int, config: QualifyingJobCo
 
 # OpenF1's free tier only serves data once a session is >30min past its end. We don't track
 # exact race end time, so this buffers from the (known) start time by a typical race
-# duration + margin — conservative in the direction of waiting longer, never running early
+# duration + margin: conservative in the direction of waiting longer, never running early
 # enough to hit OpenF1's paid live window.
 OPENF1_LIVE_WINDOW_BUFFER = timedelta(hours=3)
 
@@ -307,14 +307,14 @@ class OpenF1JobConfig:
     fetch: Callable[[int], list[dict[str, Any]]]
     # (raw OpenF1 rows, race_id, driver_number->driver_id map) -> (rows to upsert, skipped count).
     # driver_map is always built and passed, even to configs that don't need it (e.g.
-    # race_control) — one extra cheap query isn't worth a conditional in the runner.
+    # race_control): one extra cheap query isn't worth a conditional in the runner.
     to_rows: Callable[[list[dict[str, Any]], int, dict[int, int]], tuple[list[dict[str, Any]], int]]
 
 
 def run_openf1_job(year: int, round_num: int, config: OpenF1JobConfig, *, session_name: str = "Race") -> None:
     """session_name selects which session's data to pull: "Race" (the Sunday GP, default) or
     "Sprint" (the Saturday sprint race on a sprint weekend). Both are gated on the *weekend's*
-    completion (status == 'completed') and OpenF1 live-window buffer off race_date_utc — by the
+    completion (status == 'completed') and OpenF1 live-window buffer off race_date_utc: by the
     time the GP is done and past the buffer, Saturday's sprint session is well outside its own
     live window too, so one gate covers both rather than needing a second timestamp column."""
     print(f"[{config.job_name}] year={year} round={round_num} session={session_name}")
@@ -354,18 +354,18 @@ def run_openf1_job(year: int, round_num: int, config: OpenF1JobConfig, *, sessio
 
         tier = read_storage_tier(conn)
         if not tier.allows_optional:
-            print(f"  [SKIP] Neon storage tier is {tier.value} — OpenF1 enrichment is not written")
+            print(f"  [SKIP] Neon storage tier is {tier.value}: OpenF1 enrichment is not written")
             return
         driver_map = build_driver_number_map(conn, race_row["season_id"])
     finally:
         conn.close()
 
-    # No connection held across OpenF1's paced HTTP calls — it would keep Neon compute awake.
+    # No connection held across OpenF1's paced HTTP calls: it would keep Neon compute awake.
     session_key = cached_session_key or get_session_key(year, session_date, session_name=session_name)
     raw = config.fetch(session_key)
     rows, skipped = config.to_rows(raw, race_id, driver_map)
     rows = [{**row, "session_type": _SESSION_TYPES[session_name]} for row in rows]
-    skip_note = f" ({skipped} skipped — unknown driver number)" if skipped else ""
+    skip_note = f" ({skipped} skipped: unknown driver number)" if skipped else ""
 
     conn = get_conn()
     try:

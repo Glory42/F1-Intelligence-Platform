@@ -8,6 +8,6 @@ def run(race_id: int) -> None:
         feature_table="driver_sprint_features",
         prediction_table="sprint_predictions",
         model_version="sprint-v2",
-        not_found_error=f"No sprint feature rows for race {race_id} — run compute_sprint_features first",
+        not_found_error=f"No sprint feature rows for race {race_id}: run compute_sprint_features first",
         winner_label="Sprint predicted winner",
     )

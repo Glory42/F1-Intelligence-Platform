@@ -11,13 +11,13 @@ order: 1
 ```
 F1-prediction/
 ├── apps/
-│   ├── web/       Astro SSR frontend — Cloudflare Pages
-│   └── api/       Hono REST API — Cloudflare Workers
-└── data-engine/   Python ETL batch jobs — Render
+│   ├── web/       Astro SSR frontend: Cloudflare Pages
+│   └── api/       Hono REST API: Cloudflare Workers
+└── data-engine/   Python ETL batch jobs: Render
 ```
 
 The schema source of truth lives in `apps/api/src/db/schema/`. Generated SQL migration files live in
-`apps/api/drizzle/migrations/` — both are owned by `apps/api/`, not a separate top-level package.
+`apps/api/drizzle/migrations/`: both are owned by `apps/api/`, not a separate top-level package.
 
 ---
 
@@ -29,25 +29,25 @@ The schema source of truth lives in `apps/api/src/db/schema/`. Generated SQL mig
 └────────────────────┬────────────────────────────┘
                      │ HTTPS
 ┌────────────────────▼────────────────────────────┐
-│  apps/web/  (Astro SSR — Cloudflare Pages)      │
+│  apps/web/  (Astro SSR: Cloudflare Pages)      │
 │  Renders HTML server-side, fetches from API     │
 │  in Astro frontmatter (never client-side JS)    │
 └────────────────────┬────────────────────────────┘
                      │ HTTP (PUBLIC_API_URL)
 ┌────────────────────▼────────────────────────────┐
-│  apps/api/  (Hono — Cloudflare Workers)         │
+│  apps/api/  (Hono: Cloudflare Workers)         │
 │  Read-only REST API, Drizzle ORM queries        │
 │  Uses @neondatabase/serverless (HTTP driver)    │
 └────────────────────┬────────────────────────────┘
                      │ Neon HTTP
 ┌────────────────────▼────────────────────────────┐
 │  Neon PostgreSQL                                │
-│  Shared DB — written by data-engine,            │
+│  Shared DB: written by data-engine,            │
 │  read by api                                    │
 └────────────────────▲────────────────────────────┘
                      │ psycopg2 TCP
 ┌────────────────────┴────────────────────────────┐
-│  data-engine/  (Python — Render Web Service)    │
+│  data-engine/  (Python: Render Web Service)    │
 │  Fetches F1 data via FastF1, computes           │
 │  features and predictions, writes to DB         │
 └─────────────────────────────────────────────────┘
@@ -59,7 +59,7 @@ The schema source of truth lives in `apps/api/src/db/schema/`. Generated SQL mig
 
 **Cloudflare Workers have no TCP.** The `apps/api/` layer must use `@neondatabase/serverless` (HTTP driver). Never use `pg` or `postgres` packages there.
 
-**Python writes directly to Neon.** The API is read-only. There are no write endpoints — the ETL engine connects directly via psycopg2.
+**Python writes directly to Neon.** The API is read-only. There are no write endpoints: the ETL engine connects directly via psycopg2.
 
 **All data fetching in Astro frontmatter.** No client-side data fetching, no React/Vue islands for data. The `---` blocks handle everything server-side.
 

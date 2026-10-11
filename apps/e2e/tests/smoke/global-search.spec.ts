@@ -6,7 +6,7 @@ test('opens via keyboard shortcut, shows fixture results, and closes on Escape',
   const searchInput = page.getByPlaceholder(/search drivers, teams, and circuits/i);
   await expect(searchInput).not.toBeVisible();
 
-  // GlobalSearch is a `client:idle` island — on a cold dev server it can take a
+  // GlobalSearch is a `client:idle` island: on a cold dev server it can take a
   // few seconds to hydrate, so retry the shortcut until the palette responds.
   await expect(async () => {
     await page.keyboard.press('Control+k');

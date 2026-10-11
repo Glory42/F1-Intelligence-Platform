@@ -26,7 +26,7 @@ export default defineConfig({
     },
     {
       // @astrojs/cloudflare doesn't support `astro preview`, so tests run via `astro dev`
-      // instead — still the real page frontmatter/runtime, just via Vite's dev server.
+      // instead: still the real page frontmatter/runtime, just via Vite's dev server.
       command: `bun run dev --port ${WEB_PORT}`,
       cwd: '../web',
       url: `http://localhost:${WEB_PORT}/`,

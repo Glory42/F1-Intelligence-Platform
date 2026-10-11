@@ -1,4 +1,4 @@
-"""Covers plan_season: one season's diff between our drivers/results and F1DB — code fixes, new
+"""Covers plan_season: one season's diff between our drivers/results and F1DB, code fixes, new
 drivers (including stand-ins sharing a car number), and results rebuilt from F1DB."""
 from src.utils.f1db_backfill import SeasonInput, plan_season
 
@@ -79,7 +79,7 @@ def test_a_result_filed_under_the_wrong_driver_is_deleted():
         ],
         race_results=[{"race_id": 500, "driver_id": 12, "finish_position": 1, "grid_position": 1, "points": 10.0,
                        "status": "Finished", "total_race_time_ms": None, "fastest_lap": False}],
-        # Senna raced this season (round 2), just not in round 1 — the code collapse credited him anyway.
+        # Senna raced this season (round 2), just not in round 1: the code collapse credited him anyway.
         f1db_race_results=[_race_rec("felipe-massa", 1), _race_rec("luca-badoer", None), _race_rec("ayrton-senna", 3, round_=2)],
     ))
 

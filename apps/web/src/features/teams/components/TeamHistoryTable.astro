@@ -66,22 +66,22 @@ const lead = c
           ]}
         >
           <div role="cell" class:list={['font-mono font-bold', r.year === year ? 'text-[#a855f7]' : 'text-muted-foreground']}>{r.year}</div>
-          <div role="cell" class="truncate font-semibold">{r.chassis ?? '—'}</div>
-          <div role="cell" class="hidden truncate font-mono text-[11px] text-muted-foreground lg:block">{r.engine ?? '—'}</div>
-          <div role="cell" class="text-right font-bold tabular-nums">{s ? Math.round(championshipPoints(s)) : '—'}</div>
-          <div role="cell" class="text-right font-mono text-muted-foreground">{s?.championshipPosition ? `P${s.championshipPosition}` : '—'}</div>
-          <div role="cell" class="hidden text-right font-mono text-muted-foreground sm:block">{s?.wins ?? '—'}</div>
-          <div role="cell" class="hidden text-right font-mono text-muted-foreground sm:block">{s?.podiums ?? '—'}</div>
-          <div role="cell" class="hidden text-right font-mono text-muted-foreground md:block">{s?.racesCompleted ?? '—'}</div>
-          <div role="cell" class="hidden text-right font-mono text-muted-foreground md:block">{s?.dnfCount ?? '—'}</div>
-          <div role="cell" class="hidden text-right font-mono text-muted-foreground lg:block">{s?.avgFinishPosition ? `P${Math.round(Number(s.avgFinishPosition))}` : '—'}</div>
+          <div role="cell" class="truncate font-semibold">{r.chassis ?? '-'}</div>
+          <div role="cell" class="hidden truncate font-mono text-[11px] text-muted-foreground lg:block">{r.engine ?? '-'}</div>
+          <div role="cell" class="text-right font-bold tabular-nums">{s ? Math.round(championshipPoints(s)) : '-'}</div>
+          <div role="cell" class="text-right font-mono text-muted-foreground">{s?.championshipPosition ? `P${s.championshipPosition}` : '-'}</div>
+          <div role="cell" class="hidden text-right font-mono text-muted-foreground sm:block">{s?.wins ?? '-'}</div>
+          <div role="cell" class="hidden text-right font-mono text-muted-foreground sm:block">{s?.podiums ?? '-'}</div>
+          <div role="cell" class="hidden text-right font-mono text-muted-foreground md:block">{s?.racesCompleted ?? '-'}</div>
+          <div role="cell" class="hidden text-right font-mono text-muted-foreground md:block">{s?.dnfCount ?? '-'}</div>
+          <div role="cell" class="hidden text-right font-mono text-muted-foreground lg:block">{s?.avgFinishPosition ? `P${Math.round(Number(s.avgFinishPosition))}` : '-'}</div>
           <div role="cell" class="hidden items-center justify-end gap-1.5 lg:flex">
             {s?.carPerformanceScore ? (
               <>
                 <div class="h-1 w-10 bg-white/[0.06]"><div class="h-full bg-[#a855f7]" style={`width:${Math.round(Number(s.carPerformanceScore) * 100)}%`} /></div>
                 <span class="font-mono text-[10px] text-muted-foreground">{Math.round(Number(s.carPerformanceScore) * 100)}</span>
               </>
-            ) : <span class="font-mono text-[10px] text-muted-foreground">—</span>}
+            ) : <span class="font-mono text-[10px] text-muted-foreground">-</span>}
           </div>
         </Tag>
       );

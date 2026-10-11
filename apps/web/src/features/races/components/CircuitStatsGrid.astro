@@ -17,9 +17,9 @@ const stats = [
   { Icon: RotateCcw, label: session === 'race' ? 'Laps' : 'Sprint Laps', val: session === 'race' ? laps : `~${laps}` },
   { Icon: Gauge, label: 'Length', val: `${circuit.trackLengthKm} km` },
   { Icon: Flag, label: session === 'race' ? 'Race Dist' : 'Sprint Dist', val: `${distanceKm} km` },
-  { Icon: CornerDownRight, label: 'Corners', val: circuit.numberOfCorners ?? '—' },
-  { Icon: Wind, label: 'DRS Zones', val: circuit.drsZones ?? '—' },
-  { Icon: Zap, label: 'Overtake Rate', val: circuit.overtakeRate ? `${Math.round(Number(circuit.overtakeRate) * 100)}%` : '—' },
+  { Icon: CornerDownRight, label: 'Corners', val: circuit.numberOfCorners ?? '-' },
+  { Icon: Wind, label: 'DRS Zones', val: circuit.drsZones ?? '-' },
+  { Icon: Zap, label: 'Overtake Rate', val: circuit.overtakeRate ? `${Math.round(Number(circuit.overtakeRate) * 100)}%` : '-' },
 ];
 ---
 

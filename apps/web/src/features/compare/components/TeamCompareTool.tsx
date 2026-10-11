@@ -52,7 +52,7 @@ const careerStatConfig: StatRowConfig<CareerTotals>[] = [
   {
     label: 'Best Championship Finish',
     value: (c) => c.bestFin || 10,
-    format: (v) => (v === 10 ? '—' : `P${v}`),
+    format: (v) => (v === 10 ? '-' : `P${v}`),
     lowerBetter: true,
   },
   { label: 'Total Points', value: (c) => c.points, format: (v) => v.toFixed(1) },

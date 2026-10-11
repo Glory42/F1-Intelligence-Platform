@@ -21,7 +21,7 @@ export const getTestDatabaseUrl = (): string => {
   return databaseUrl;
 };
 
-// Neon hostnames never contain "test", so string-matching isn't meaningful here — the real
+// Neon hostnames never contain "test", so string-matching isn't meaningful here: the real
 // safety boundary is that TEST_DATABASE_URL must differ from DATABASE_URL.
 const assertResetAllowed = (testDatabaseUrl: string): void => {
   const allowManualOverride = process.env.TEST_DB_ALLOW_RESET === '1';
@@ -37,7 +37,7 @@ const assertResetAllowed = (testDatabaseUrl: string): void => {
 };
 
 // Neon Free's 100 CU-hours are shared by every branch, and the TDD loop runs these tests
-// constantly — so only docker-compose.test.yml is allowed unless explicitly overridden.
+// constantly: so only docker-compose.test.yml is allowed unless explicitly overridden.
 const assertNotNeon = (testDatabaseUrl: string): void => {
   if (process.env.TEST_DB_ALLOW_NEON === '1') return;
   if (new URL(testDatabaseUrl).hostname.endsWith('neon.tech')) {
@@ -75,7 +75,7 @@ const ALL_TABLES = [
 ];
 
 export const truncateAll = async (db: Db): Promise<void> => {
-  // CASCADE handles FK ordering for us — one statement covering every table.
+  // CASCADE handles FK ordering for us: one statement covering every table.
   const tableList = sql.join(ALL_TABLES.map((t) => sql`${t}`), sql.raw(', '));
   await db.execute(sql`TRUNCATE TABLE ${tableList} RESTART IDENTITY CASCADE`);
 };

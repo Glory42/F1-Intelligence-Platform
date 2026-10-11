@@ -1,4 +1,4 @@
-// Mirrors data-engine's f1db.normalize_person_name — the join key between core drivers and
+// Mirrors data-engine's f1db.normalize_person_name: the join key between core drivers and
 // history_drivers.match_key. Change both together.
 export function normalizePersonName(name: string): string {
   const ascii = name.normalize('NFKD').replace(/[̀-ͯ]/g, '');

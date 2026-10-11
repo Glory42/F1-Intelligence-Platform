@@ -5,7 +5,7 @@ import numpy as np
 
 def sample_finishing_orders(win_probs: np.ndarray, n: int, rng: np.random.Generator) -> np.ndarray:
     """Plackett–Luce draws via the Gumbel-max trick: sorting log(p) + Gumbel noise yields a
-    full finishing order whose winner follows p — one vectorised argsort, cheap at Render's 0.1 CPU.
+    full finishing order whose winner follows p: one vectorised argsort, cheap at Render's 0.1 CPU.
     Returns (n, drivers) indices, best finisher first."""
     with np.errstate(divide="ignore"):
         log_p = np.log(win_probs)
@@ -47,7 +47,7 @@ def simulate_season_totals(current_points: np.ndarray, races: list[RemainingRace
 def summarize_totals(totals: np.ndarray) -> TitleOdds:
     best = totals.max(axis=1, keepdims=True)
     is_champion = totals == best
-    # A points tie is settled on countback, which isn't simulated — split the title between them.
+    # A points tie is settled on countback, which isn't simulated: split the title between them.
     title_share = is_champion / is_champion.sum(axis=1, keepdims=True)
     return TitleOdds(
         title_probability=title_share.mean(axis=0),
@@ -61,7 +61,7 @@ def simulate_title_odds(current_points: np.ndarray, races: list[RemainingRace], 
     return summarize_totals(simulate_season_totals(current_points, races, n, seed))
 
 FORM_WINDOW = 5
-# A driver absent from recent predictions (e.g. a mid-season replacement) keeps a token chance —
+# A driver absent from recent predictions (e.g. a mid-season replacement) keeps a token chance:
 # zero would make the Gumbel sampler place them last in every simulated race.
 _MIN_WIN_PROB = 0.001
 

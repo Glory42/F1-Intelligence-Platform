@@ -1,5 +1,5 @@
 """Plans one season's repair from F1DB (CC-BY-4.0): the code fixes, missing drivers/teams and
-the race/qualifying rows to rebuild. Pure — scripts/backfill_results_from_f1db.py does the I/O."""
+the race/qualifying rows to rebuild. Pure: scripts/backfill_results_from_f1db.py does the I/O."""
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -90,7 +90,7 @@ def _rebuild(plan_rows: list[dict[str, Any]], existing: list[dict[str, Any]], re
         old = current.get(ref)
         if old is None or any(_same(old.get(f)) != _same(row[f]) for f in fields):
             changed += 1
-    # A driver F1DB couldn't place keeps their rows — absence from F1DB proves nothing about them.
+    # A driver F1DB couldn't place keeps their rows: absence from F1DB proves nothing about them.
     deletes = [(race_id, driver_id) for driver_id in current if driver_id not in wanted and driver_id not in keep]
     return changed, deletes
 

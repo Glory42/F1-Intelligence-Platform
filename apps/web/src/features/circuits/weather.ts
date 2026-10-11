@@ -6,7 +6,7 @@ export interface ForecastDay {
   weatherCode: number;
 }
 
-// Only surfaces the upcoming Fri/Sat/Sun (FP, quali, race) — skips any other days
+// Only surfaces the upcoming Fri/Sat/Sun (FP, quali, race): skips any other days
 export async function getWeatherForecast(lat: number, lng: number): Promise<ForecastDay[]> {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weathercode&timezone=auto&forecast_days=16`;
   const res = await fetch(url);

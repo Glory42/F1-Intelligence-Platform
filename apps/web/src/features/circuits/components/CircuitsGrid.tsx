@@ -178,13 +178,13 @@ export function CircuitsGrid({ initialCircuits }: Props) {
                       <div className="flex items-center gap-1 font-mono text-[7px] text-muted-foreground tracking-widest uppercase mb-0.5">
                         <CornerDownRight size={8} /> Corners
                       </div>
-                      <div className="font-mono text-xs font-semibold">{circuit.numberOfCorners ?? '—'}</div>
+                      <div className="font-mono text-xs font-semibold">{circuit.numberOfCorners ?? '-'}</div>
                     </div>
                     <div>
                       <div className="flex items-center gap-1 font-mono text-[7px] text-muted-foreground tracking-widest uppercase mb-0.5">
                         <Wind size={8} /> DRS Zones
                       </div>
-                      <div className="font-mono text-xs font-semibold">{circuit.drsZones ?? '—'}</div>
+                      <div className="font-mono text-xs font-semibold">{circuit.drsZones ?? '-'}</div>
                     </div>
                   </div>
 

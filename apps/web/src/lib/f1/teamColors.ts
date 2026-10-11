@@ -1,5 +1,5 @@
 const TEAM_COLORS: Record<string, string> = {
-  // Current teams — keys match DB team_key (full name lowercased + underscores)
+  // Current teams: keys match DB team_key (full name lowercased + underscores)
   red_bull_racing: '#3671C6',
   mercedes:        '#27F4D2',
   ferrari:         '#E8002D',
@@ -14,10 +14,10 @@ const TEAM_COLORS: Record<string, string> = {
   audi:            '#BB0021',
   cadillac:        '#003DA5',
 
-  // Red Bull — short key used in pre-2018 DB rows
+  // Red Bull: short key used in pre-2018 DB rows
   red_bull:          '#3671C6',
 
-  // Historical — full name variants
+  // Historical: full name variants
   renault:           '#FFD800',
   lotus_f1:          '#FFB800',
   lotus:             '#FFB800',

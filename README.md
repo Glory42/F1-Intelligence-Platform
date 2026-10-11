@@ -39,7 +39,7 @@ bun run install:all
 bun run dev         # runs api + web dev servers concurrently
 ```
 
-### API (Hono — Cloudflare Workers)
+### API (Hono: Cloudflare Workers)
 ```bash
 cd apps/api
 bun install

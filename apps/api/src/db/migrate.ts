@@ -114,7 +114,7 @@ async function migrate() {
         await db.execute(sql.raw(stmt));
       } catch (err) {
         if (isIgnorableMigrationError(err)) {
-          // Schema object already exists in this database environment — safe to proceed
+          // Schema object already exists in this database environment: safe to proceed
           continue;
         }
         throw err;

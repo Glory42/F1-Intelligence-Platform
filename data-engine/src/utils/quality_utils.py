@@ -10,7 +10,7 @@ def health_from_issues(issues: list[dict[str, Any]]) -> float:
     return max(0.0, 100.0 - min(penalty, 100.0))
 
 
-# Single source of truth for "is this check fixable" and "what heals it" — a check is
+# Single source of truth for "is this check fixable" and "what heals it": a check is
 # fixable exactly when it has a repair path here. data_quality_audit.add() derives its
 # `fixable` flag from is_fixable() instead of hand-typing it per call site, so the two
 # facts can't drift apart the way they previously did (race_results/points_present and
@@ -37,6 +37,6 @@ def is_fixable(table_name: str, check_name: str) -> bool:
 
 
 def resolve_issue_actions(issue: dict[str, Any]) -> list[str]:
-    """Ordered job names to resolve one issue — ingest first, then downstream recompute.
+    """Ordered job names to resolve one issue: ingest first, then downstream recompute.
     Returns [] when the issue has no repair path."""
     return list(ISSUE_REPAIR_STEPS.get((issue.get("table_name"), issue.get("check_name")), []))

@@ -26,7 +26,7 @@ ingest_year() {
   python -m src.main --job compute_season_stats --year "$year" 2>&1 | tail -3
 }
 
-# 2025 — skip round 1 (already done)
+# 2025: skip round 1 (already done)
 echo "[$(date)] === Ingesting 2025 races (2–24) ==="
 for round in $(seq 2 24); do
   echo -n "  Round $round ... "

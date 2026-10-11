@@ -4,7 +4,7 @@ import { races } from './races';
 import { drivers } from './drivers';
 
 // Each driver's fastest Q / SQ lap from OpenF1 (2023+), resampled every 10 m into int arrays.
-// One JSONB row per driver (~10 KB after TOAST) — always read whole, never queried per sample.
+// One JSONB row per driver (~10 KB after TOAST): always read whole, never queried per sample.
 export const qualifyingLapTelemetry = pgTable('qualifying_lap_telemetry', {
   id: serial('id').primaryKey(),
   raceId: integer('race_id').notNull().references(() => races.id),

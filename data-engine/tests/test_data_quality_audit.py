@@ -1,4 +1,4 @@
-"""Covers data_quality_audit._audit_race — the per-race gate/threshold branching
+"""Covers data_quality_audit._audit_race: the per-race gate/threshold branching
 that decides which quality issues fire. Driven by FakeConnection: _audit_race calls
 _query/_scalar once per DB round-trip, so each scenario scripts result sets in the
 exact order the triggered blocks query them.

@@ -44,7 +44,7 @@ describe('HYDRATE', () => {
     // the stale mount-time detail fetch for the old defaults must not still be armed
     expect(state.detailFetch).toBeNull();
 
-    // fetchItemsForYear(2024) resolves with [5, 6] — without the fix this would default
+    // fetchItemsForYear(2024) resolves with [5, 6]: without the fix this would default
     // aId/bId to items[0]/items[1] instead of applying the URL's a=6&b=5
     state = compareReducer(state, { type: 'ITEMS_LOADED', requestId: 2, items: yearItems }, config);
 

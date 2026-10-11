@@ -30,7 +30,7 @@ class TestBuildLapTraces:
         assert traces["C"].intervals_ms == [1_500, 5_200, 8_600, 11_100]
 
     def test_a_lapped_car_has_no_gap_and_counts_laps_down(self):
-        # D finishes its 3rd lap at 375 s — after leader B already completed lap 4 at 370 s.
+        # D finishes its 3rd lap at 375 s: after leader B already completed lap 4 at 370 s.
         race = WORKED_RACE + [
             _lap("D", 1, 4, 120_000), _lap("D", 2, 4, 245_000), _lap("D", 3, 4, 375_000),
         ]

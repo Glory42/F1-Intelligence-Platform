@@ -5,7 +5,7 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: python -m src.server
     envVars:
-      # numpy/pandas/psycopg2-binary have no wheels for Render's 3.14 default —
+      # numpy/pandas/psycopg2-binary have no wheels for Render's 3.14 default:
       # unpinned, the build compiles them from source and OOMs the free tier.
       - key: PYTHON_VERSION
         value: "3.12.8"

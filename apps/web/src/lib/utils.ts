@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatMs(ms: number | null | undefined): string {
-  if (ms == null) return '—';
+  if (ms == null) return '-';
   const total = ms / 1000;
   const mins = Math.floor(total / 60);
   const secs = (total % 60).toFixed(3).padStart(6, '0');
@@ -30,7 +30,7 @@ export function unwrapSettled<T>(result: PromiseSettledResult<T>, fallback: T): 
 }
 
 export function formatStopSeconds(ms: number | null | undefined): string {
-  return ms == null ? '—' : `${(ms / 1000).toFixed(2)} s`;
+  return ms == null ? '-' : `${(ms / 1000).toFixed(2)} s`;
 }
 
 export function formatAgeFromDays(days: number): string {

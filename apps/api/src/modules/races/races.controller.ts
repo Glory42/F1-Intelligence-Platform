@@ -14,7 +14,7 @@ export const RacesController = {
       return c.json({ data: null, error: { code: 'INVALID_YEAR', message: 'year must be a number' } }, 400);
     }
     const data = await service.findAll(createDb(c.env.DATABASE_URL), year, status);
-    // Only a status=completed filter guarantees every row in the list is immutable —
+    // Only a status=completed filter guarantees every row in the list is immutable:
     // an unfiltered or non-completed filter can include a race that's still in progress.
     c.header('Cache-Control', cacheControlForStatus(status ?? ''));
     return c.json({ data, error: null });

@@ -1,5 +1,5 @@
 """Downloads an F1DB release (CC-BY-4.0) and verifies its SHA-256 against the release's own
-checksum file. Shared by the import, audit and backfill scripts. Local only — never on Render."""
+checksum file. Shared by the import, audit and backfill scripts. Local only: never on Render."""
 import hashlib
 import zipfile
 from pathlib import Path
@@ -39,7 +39,7 @@ def fetch_release(version: str, workdir: Path) -> Path:
     archive = workdir / ASSET
     _download(f"{RELEASES}/download/{version}/{ASSET}", archive)
     if hashlib.sha256(archive.read_bytes()).hexdigest() != _expected_sha256(version):
-        raise SystemExit(f"Checksum mismatch for {ASSET} {version} — refusing to use it")
+        raise SystemExit(f"Checksum mismatch for {ASSET} {version}: refusing to use it")
     extracted = workdir / "release"
     with zipfile.ZipFile(archive) as zf:
         zf.extractall(extracted)

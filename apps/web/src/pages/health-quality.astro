@@ -5,7 +5,7 @@ import type { QualityReport, SeasonSummary } from '@/types';
 import YearSelect from '@/components/page/YearSelect.astro';
 import { ShieldCheck, Wrench, TriangleAlert, CircleAlert, Info } from 'lucide-react';
 
-// Dev-only dashboard — a production request short-circuits to a real 404 before
+// Dev-only dashboard: a production request short-circuits to a real 404 before
 // any data is fetched, since SSR would otherwise run this on every request.
 if (!import.meta.env.DEV) {
   return new Response('Not found', { status: 404 });

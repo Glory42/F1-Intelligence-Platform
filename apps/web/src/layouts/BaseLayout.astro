@@ -17,7 +17,7 @@ const {
   description = 'F1 race prediction and analytics platform',
   image = '/preview/Preview-landingPage.png',
 } = Astro.props;
-const fullTitle = `${title} — ${SITE_NAME}`;
+const fullTitle = `${title} | ${SITE_NAME}`;
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 const ogImageURL = new URL(image, Astro.site);
 const sidebarCollapsed = isSidebarCollapsed(Astro.cookies.get(SIDEBAR_COOKIE)?.value);

@@ -1,12 +1,12 @@
-# API — Hono on Cloudflare Workers
+# API: Hono on Cloudflare Workers
 
 Read-only REST API for the F1 prediction platform. NestJS-style module structure (service / controller / module).
 
 ## Stack
 
-- **Runtime**: Cloudflare Workers (V8 isolate — no TCP)
+- **Runtime**: Cloudflare Workers (V8 isolate, no TCP)
 - **Framework**: Hono
-- **ORM**: Drizzle ORM with `@neondatabase/serverless` (HTTP driver — mandatory)
+- **ORM**: Drizzle ORM with `@neondatabase/serverless` (HTTP driver, mandatory)
 - **DB**: Neon PostgreSQL
 
 ## Local Dev
@@ -28,7 +28,7 @@ bun run dev      # wrangler dev on :8787
 bunx tsc --noEmit
 ```
 
-Pre-existing errors in `drizzle.config.ts` and `src/db/seed.ts` (missing node types) are expected — ignore them. Only fail on new errors in `src/modules/` or `src/common/`.
+Pre-existing errors in `drizzle.config.ts` and `src/db/seed.ts` (missing node types) are expected: ignore them. Only fail on new errors in `src/modules/` or `src/common/`.
 
 ## Seed Database
 
@@ -86,4 +86,4 @@ src/modules/<name>/
 
 ## Deploy
 
-Push to GitHub — Cloudflare Workers deploys automatically. Never run `wrangler deploy` directly.
+Push to GitHub: Cloudflare Workers deploys automatically. Never run `wrangler deploy` directly.

@@ -68,8 +68,8 @@ def run(year: int, round_num: int) -> None:
                 "Cannot run ingest_qualifying for event_format='{event_format}' "
                 "(round {round_num}). Only standard qualifying formats are supported."
             ),
-            date_guard_error="Qualifying for {year} R{round_num} is on {day} — not yet. Skipping.",
-            no_results_error="No qualifying results found for {year} R{round_num} — session may not have data yet",
+            date_guard_error="Qualifying for {year} R{round_num} is on {day}: not yet. Skipping.",
+            no_results_error="No qualifying results found for {year} R{round_num}: session may not have data yet",
             session_type_for=_session_type_for,
             resolve_race=_resolve_race,
             rows_from_quali=_rows_from_quali,

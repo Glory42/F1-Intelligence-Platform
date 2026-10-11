@@ -20,10 +20,10 @@ def _resolve_race(conn: Any, year: int, round_num: int) -> RaceContext:
     event_format = race_row["event_format"] or ""
     if event_format not in SPRINT_FORMATS:
         raise ValueError(
-            f"Round {round_num} has event_format='{event_format}' — not a sprint weekend. "
+            f"Round {round_num} has event_format='{event_format}': not a sprint weekend. "
             "Cannot run ingest_sprint."
         )
-    print(f"  event_format={event_format} — ingesting Session3 (sprint race)")
+    print(f"  event_format={event_format}: ingesting Session3 (sprint race)")
 
     return RaceContext(race_id=race_row["id"], season_id=race_row["season_id"])
 
@@ -84,7 +84,7 @@ def run(year: int, round_num: int) -> None:
             time_field="total_sprint_time_ms",
             results_row_label="sprint result",
             laps_row_label="sprint lap",
-            no_results_error="No sprint results for race {race_id} — all driver codes unknown",
+            no_results_error="No sprint results for race {race_id}: all driver codes unknown",
             resolve_race=_resolve_race,
             mark_status=_mark_status,
         ),

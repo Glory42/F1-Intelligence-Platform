@@ -51,7 +51,7 @@ const isSQDone = race.status === 'sprint_qualifying_done';
   <div class="flex items-center gap-1 font-mono text-[9px] text-muted-foreground tracking-widest">
     <CalendarDays size={10} />{formatDate(date)}
   </div>
-  {/* Action links — relative z-10 to sit above the stretched overlay */}
+  {/* Action links: relative z-10 to sit above the stretched overlay */}
   {((isQualiDone && !isSprint) || ((isSQDone || isSprintDone || isQualiDone) && isSprint)) && (
     <div class="relative z-10 mt-4 pt-3 border-t border-white/[0.06]">
       {isQualiDone && !isSprint && (

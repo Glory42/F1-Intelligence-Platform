@@ -1,5 +1,5 @@
 """Backfills FP2 long-run data for all completed races (2018+).
-Failures are logged and skipped — FP2 data availability varies."""
+Failures are logged and skipped: FP2 data availability varies."""
 import sys
 import time
 import psycopg2
@@ -41,7 +41,7 @@ def main():
         try:
             ingest_fp2(race["year"], race["round_number"])
             elapsed = time.time() - t0
-            print(f"  [{i}/{total}] {race['year']} R{race['round_number']} {race['name']} — {elapsed:.1f}s")
+            print(f"  [{i}/{total}] {race['year']} R{race['round_number']} {race['name']}: {elapsed:.1f}s")
         except Exception as exc:
             elapsed = time.time() - t0
             print(f"  [{i}/{total}] {race['year']} R{race['round_number']} SKIP ({elapsed:.1f}s): {exc}",

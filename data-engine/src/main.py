@@ -97,7 +97,7 @@ def auto_detect_sprint(year: int | None) -> tuple[int, int]:
 
 
 def auto_detect_completed_race(year: int | None, conn) -> tuple[int, int]:
-    """Finds the most recent 'completed' race — for post-race-only jobs (e.g.
+    """Finds the most recent 'completed' race: for post-race-only jobs (e.g.
     ingest_race_control) that must run after ingest_race, unlike auto_detect_race which
     explicitly excludes completed races."""
     from src.db.client import get_conn

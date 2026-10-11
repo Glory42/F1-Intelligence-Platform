@@ -30,7 +30,7 @@ export const PREDICTION_COPY: Record<PredictionPageKind, PredictionCopy> = {
     weightsHeading: './model weights',
     sliderMax: 30,
     whatIfBlurb:
-      'Drag the weights to see how the predicted order shifts. Recomputed live in your browser — the model itself is unchanged.',
+      'Drag the weights to see how the predicted order shifts. Recomputed live in your browser: the model itself is unchanged.',
   },
   sprint: {
     pageTitle: (raceName) => `Sprint Prediction · ${raceName}`,
@@ -42,9 +42,9 @@ export const PREDICTION_COPY: Record<PredictionPageKind, PredictionCopy> = {
     actualWinnerLabel: 'sprint winner',
     gridColLabel: 'Grid',
     weightsHeading: './sprint weights',
-    weightsNote: 'Grid position weighted higher — no pit stop strategy in ~17 lap sprint.',
+    weightsNote: 'Grid position weighted higher, since a ~17 lap sprint has no pit stop strategy.',
     sliderMax: 35,
     whatIfBlurb:
-      'Drag the weights to see how the predicted sprint order shifts. Recomputed live in your browser — the model itself is unchanged.',
+      'Drag the weights to see how the predicted sprint order shifts. Recomputed live in your browser: the model itself is unchanged.',
   },
 };

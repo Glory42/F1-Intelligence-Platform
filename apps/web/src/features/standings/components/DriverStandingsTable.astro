@@ -50,7 +50,7 @@ const COLUMNS = [
         class={`${COLUMNS} items-start sm:items-center px-5 py-3.5 hover:bg-white/[0.02] transition-colors duration-150 group ${i !== 0 ? 'border-t border-white/[0.04]' : ''}`}
         style={`border-left: 3px solid ${getTeamColor(s.driver.team.teamKey)};`}
       >
-        <!-- Position — pt-1 aligns with name text -->
+        <!-- Position: pt-1 aligns with name text -->
         <div class={`font-mono text-sm font-bold pt-1 sm:pt-0 ${isTopPos(s.stats.championshipPosition, i) ? 'text-[#a855f7]' : 'text-muted-foreground'}`}>
           {champPos(s.stats.championshipPosition, i) === 1 ? <Trophy size={14} /> : String(champPos(s.stats.championshipPosition, i)).padStart(2, '0')}
         </div>
@@ -70,9 +70,9 @@ const COLUMNS = [
           )}
           <div class="min-w-0">
             <div class="font-semibold text-sm leading-none group-hover:text-[#a855f7] transition-colors duration-150 truncate">{s.driver.fullName}</div>
-            <!-- Team — own line, mobile only -->
+            <!-- Team: own line, mobile only -->
             <div class="font-mono text-[8px] text-muted-foreground mt-1 md:hidden">{s.driver.team.name}</div>
-            <!-- Stats — mobile only -->
+            <!-- Stats: mobile only -->
             <div class="flex items-center gap-2 mt-0.5 sm:hidden font-mono text-[8px] text-muted-foreground/60">
               <span>{s.stats.wins}W</span>
               <span class="text-white/20">·</span>

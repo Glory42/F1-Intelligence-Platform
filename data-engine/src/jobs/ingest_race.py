@@ -60,7 +60,7 @@ def _mark_status(
 
 
 def _recompute_circuit_sc_probability(conn: Any, race_ctx: RaceContext) -> None:
-    """Refresh circuits.sc_probability for this race's circuit from all completed races —
+    """Refresh circuits.sc_probability for this race's circuit from all completed races:
     a cross-table side effect of a race finishing, distinct from this race's own status write."""
     circuit_id = race_ctx.circuit_id
 
@@ -97,7 +97,7 @@ def run(year: int, round_num: int) -> None:
             time_field="total_race_time_ms",
             results_row_label="race result",
             laps_row_label="lap time",
-            no_results_error="No results inserted for race {race_id} — all driver codes unknown",
+            no_results_error="No results inserted for race {race_id}: all driver codes unknown",
             resolve_race=_resolve_race,
             mark_status=_mark_status,
             cross_table_hook=_recompute_circuit_sc_probability,

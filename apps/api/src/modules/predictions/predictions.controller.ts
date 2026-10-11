@@ -70,7 +70,7 @@ export const PredictionsController = {
   getAccuracy: async (c: Context<{ Bindings: Bindings }>) => {
     const data = await service.findAccuracyBySeason(createDb(c.env.DATABASE_URL));
     // Response spans every season, and the most recent one is almost always still in
-    // progress — cache short rather than trying to reason about which years are final.
+    // progress: cache short rather than trying to reason about which years are final.
     c.header('Cache-Control', CACHE_ACTIVE);
     return c.json({ data, error: null });
   },

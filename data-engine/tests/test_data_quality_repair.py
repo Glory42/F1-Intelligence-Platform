@@ -1,4 +1,4 @@
-"""Covers data_quality_repair.run — picking the audit run to act on, grouping fixable
+"""Covers data_quality_repair.run: picking the audit run to act on, grouping fixable
 issues by race, de-duplicating repair steps across issues, and the per-group
 resolve/rollback bookkeeping. The ingest/recompute jobs and get_conn are mocked;
 FakeConnection scripts the SELECTs run() makes in order:

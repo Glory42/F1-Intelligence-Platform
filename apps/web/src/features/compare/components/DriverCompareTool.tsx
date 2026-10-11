@@ -85,7 +85,7 @@ export function DriverCompareTool({ allSeasons, initialDrivers, allDrivers }: Pr
 
   const driverSubtitle = (d: Driver) => (
     <div className="flex items-center gap-1.5 font-mono text-[9px] text-muted-foreground tracking-wider uppercase mt-1">
-      <span className="text-[#a855f7] font-bold">#{d.driverNumber || '—'}</span>
+      <span className="text-[#a855f7] font-bold">#{d.driverNumber || '-'}</span>
       <span>•</span>
       <span>{d.team?.name || 'No Team'}</span>
     </div>

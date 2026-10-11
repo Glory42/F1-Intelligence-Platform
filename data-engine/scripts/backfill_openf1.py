@@ -37,7 +37,7 @@ def storage_allows_backfill() -> bool:
     finally:
         conn.close()
     if not tier.allows_backfill:
-        print(f"[STOP] Neon storage tier is {tier.value} — backfills are paused to protect the 1 GB Free limit")
+        print(f"[STOP] Neon storage tier is {tier.value}: backfills are paused to protect the 1 GB Free limit")
     return tier.allows_backfill
 
 

@@ -101,7 +101,7 @@ beforeEach(() => {
   vi.mocked(api.getSprintDetail).mockReset();
 });
 
-describe('buildPredictionPageData — gp', () => {
+describe('buildPredictionPageData: gp', () => {
   test('happy path assembles the full view model', async () => {
     vi.mocked(api.getPredictionByRace).mockResolvedValue(gpPrediction());
     vi.mocked(api.getRaceById).mockResolvedValue(gpDetail());
@@ -178,7 +178,7 @@ describe('buildPredictionPageData — gp', () => {
   });
 });
 
-describe('buildPredictionPageData — sprint', () => {
+describe('buildPredictionPageData: sprint', () => {
   test('happy path uses the sprint behaviour axis (date field, radar count)', async () => {
     vi.mocked(api.getSprintByRaceId).mockResolvedValue(sprintPrediction());
     vi.mocked(api.getSprintDetail).mockResolvedValue(sprintDetail());

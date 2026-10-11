@@ -21,7 +21,7 @@ const COLUMNS = 'grid-cols-[40px_1fr_140px] md:grid-cols-[40px_1fr_220px_120px]'
 {odds.teams.length > 0 && (
   <section>
     <TabIntro
-      lead={`After round ${odds.afterRound} — 10,000 simulated finishes of the remaining races, using the model's win probabilities.`}
+      lead={`After round ${odds.afterRound}: 10,000 simulated finishes of the remaining races, using the model's win probabilities.`}
       terms={[
         { term: 'Title odds', meaning: 'share of simulations won' },
         { term: 'Likely final', meaning: '10th–90th percentile points' },

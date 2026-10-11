@@ -56,7 +56,7 @@ const facts = race
         {session && (
           <div>
             <p class="text-[12px] text-muted-foreground">{session.label} in</p>
-            <p id="home-countdown" data-target={session.date} class="mt-1 font-mono text-3xl font-bold tabular-nums">—</p>
+            <p id="home-countdown" data-target={session.date} class="mt-1 font-mono text-3xl font-bold tabular-nums">-</p>
           </div>
         )}
         {schedule.length > 0 && (
@@ -97,7 +97,7 @@ const facts = race
       </div>
     </div>
   ) : (
-    <p class="text-[13px] text-muted-foreground">The season is over — next year's calendar soon.</p>
+    <p class="text-[13px] text-muted-foreground">The season is over. Next year's calendar is coming soon.</p>
   )}
 </HomeBlock>
 

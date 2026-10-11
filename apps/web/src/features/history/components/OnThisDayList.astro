@@ -42,7 +42,7 @@ const next = shiftMonthDay(requested, 1);
     <>
       {isFallback && (
         <p class="font-mono text-[9px] tracking-wider uppercase text-muted-foreground">
-          No Grand Prix on {requestedLabel} — showing the nearest date, <span class="text-white">{shownLabel}</span>.
+          No Grand Prix on {requestedLabel}: showing the nearest date, <span class="text-white">{shownLabel}</span>.
         </p>
       )}
       <ol aria-label={`On this day, ${shownLabel}`} class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

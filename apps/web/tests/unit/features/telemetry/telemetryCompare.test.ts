@@ -6,7 +6,7 @@ const A = { timeMs: [0, 1_000, 2_500, 3_400] };
 const B = { timeMs: [0, 1_200, 2_400, 3_500] };
 
 describe('lapDelta', () => {
-  it('is A minus B at each distance point — negative while A is ahead', () => {
+  it('is A minus B at each distance point: negative while A is ahead', () => {
     expect(lapDelta(A, B)).toEqual([0, -200, 100, -100]);
   });
 });

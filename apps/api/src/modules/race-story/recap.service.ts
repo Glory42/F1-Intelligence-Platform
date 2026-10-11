@@ -8,7 +8,7 @@ import { toDriver } from '../../common/mappers';
 const leaderDrivers = alias(drivers, 'leader_drivers');
 const leaderTeams = alias(teams, 'leader_teams');
 
-// One cheap call for the home hub's "last race" card — no traces, no laps.
+// One cheap call for the home hub's "last race" card: no traces, no laps.
 export class RecapService {
   async findRecap(db: Db, raceId: number): Promise<RaceRecap> {
     const [winnerRows, predictionRows, stopRows, battleRows] = await Promise.all([

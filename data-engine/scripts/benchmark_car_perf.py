@@ -182,7 +182,7 @@ def main():
     print(f"Benchmarking {len(race_ids)} completed races across years {years}\n")
 
     # OLD recompute: new season-stats code, old avg-finish car_performance formula,
-    # no circuit blend — isolates exactly the metric change vs the NEW pass below.
+    # no circuit blend: isolates exactly the metric change vs the NEW pass below.
     for year in years:
         compute_season_stats.run(year)
     set_old_car_performance(conn, years)

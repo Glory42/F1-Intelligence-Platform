@@ -125,7 +125,7 @@ export class DriversService {
     );
   }
 
-  // `drivers` rows are season-scoped, so driverId alone already pins the season — no `year` param needed.
+  // `drivers` rows are season-scoped, so driverId alone already pins the season: no `year` param needed.
   async findById(db: Db, driverId: number): Promise<DriverDetailResponse | null> {
     const driverRows = await db
       .select()

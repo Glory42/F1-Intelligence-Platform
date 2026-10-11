@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
       - run: bun install
-      # Local Postgres + Neon HTTP proxy (docker-compose.test.yml) — CI never spends Neon Free CU-hours.
+      # Local Postgres + Neon HTTP proxy (docker-compose.test.yml): CI never spends Neon Free CU-hours.
       - run: bun run test:db:up
       - run: bun run test
       - run: bun run typecheck

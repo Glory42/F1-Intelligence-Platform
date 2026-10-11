@@ -132,13 +132,13 @@ const compareRows: HeadToHeadRow[] = d1 && d2 ? [
               </div>
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-px bg-white/[0.06]">
                 {[
-                  ['Championship', data.seasonStats.championshipPosition ? `P${data.seasonStats.championshipPosition}` : '—'],
+                  ['Championship', data.seasonStats.championshipPosition ? `P${data.seasonStats.championshipPosition}` : '-'],
                   ['Points', Math.round(championshipPoints(data.seasonStats))],
                   ['Wins', data.seasonStats.wins],
                   ['Podiums', data.seasonStats.podiums],
                   ['Races', data.seasonStats.racesCompleted],
-                  ['Avg Finish', data.seasonStats.avgFinishPosition ? `P${Math.round(Number(data.seasonStats.avgFinishPosition))}` : '—'],
-                  ['Car Perf', data.seasonStats.carPerformanceScore ? `${Math.round(Number(data.seasonStats.carPerformanceScore)*100)}/100` : '—'],
+                  ['Avg Finish', data.seasonStats.avgFinishPosition ? `P${Math.round(Number(data.seasonStats.avgFinishPosition))}` : '-'],
+                  ['Car Perf', data.seasonStats.carPerformanceScore ? `${Math.round(Number(data.seasonStats.carPerformanceScore)*100)}/100` : '-'],
                   ['DNFs', data.seasonStats.dnfCount],
                 ].map(([label, val]) => (
                   <div class="bg-black p-4">

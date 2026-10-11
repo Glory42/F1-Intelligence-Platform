@@ -49,7 +49,7 @@ test('on this day steps between dates and falls back to the nearest day with a r
   await expect(page).toHaveURL(/date=09-09/);
 
   await page.goto('/history?tab=on-this-day&date=12-25');
-  await expect(page.getByText(/No Grand Prix on 25 December — showing the nearest date/)).toBeVisible();
+  await expect(page.getByText(/No Grand Prix on 25 December: showing the nearest date/)).toBeVisible();
   await expect(page.getByRole('list', { name: 'On this day, 13 December' })).toBeVisible();
 });
 

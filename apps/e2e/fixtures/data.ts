@@ -17,7 +17,7 @@ export const circuit: Circuit = {
   numberOfCorners: 11, drsZones: 2, scProbability: '0.300', imageUrl: null,
 };
 
-// Raced before but not on the current calendar — splits "this season" from "all circuits".
+// Raced before but not on the current calendar: splits "this season" from "all circuits".
 export const pastCircuit: Circuit = {
   ...circuit, id: 6, circuitKey: 'hockenheimring', name: 'Hockenheimring', country: 'Germany', city: 'Hockenheim',
 };
@@ -195,7 +195,7 @@ export const teamCareer: TeamYearStats[] = [
   { year: 2026, teamId: 1, stats: teamSeasonStats },
 ];
 
-// Red Bull's 2026 stops: median 2.45 s, best 2.04 s — matching its pit crew ranking row.
+// Red Bull's 2026 stops: median 2.45 s, best 2.04 s, matching its pit crew ranking row.
 export const teamPitStops: TeamPitStop[] = [
   { raceId: 30, roundNumber: 19, raceName: 'Italian Grand Prix', driver, lapNumber: 18, stationaryMs: 2450 },
   { raceId: 30, roundNumber: 19, raceName: 'Italian Grand Prix', driver, lapNumber: 36, stationaryMs: 2040 },
@@ -350,7 +350,7 @@ export const race2026DetailResponse: RaceDetailResponse = {
   laps: [],
 };
 
-// 2026 with five grands prix left: VER 350 vs LEC 210 — a 140-point gap LEC can no longer close.
+// 2026 with five grands prix left: VER 350 vs LEC 210, a 140-point gap LEC can no longer close.
 export const races2026: Race[] = [
   { ...race, id: 30, roundNumber: 19, status: 'completed' },
   ...[20, 21, 22, 23, 24].map((round) => ({ ...race, id: 10 + round, roundNumber: round, status: 'scheduled' as const })),

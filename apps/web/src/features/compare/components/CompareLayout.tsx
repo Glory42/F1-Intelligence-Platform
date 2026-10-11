@@ -60,10 +60,10 @@ export function CompareLayout({ a, b, years, year, setYear, isCareer, setIsCaree
             <div className="flex items-center justify-between gap-4 font-mono text-[9px] tracking-wider uppercase text-white/80">
               <span className="flex items-center gap-2 min-w-0">
                 <CompareSlotBadge slot="A" color={a.color} />
-                <span className="truncate">{a.name ?? '—'}</span>
+                <span className="truncate">{a.name ?? '-'}</span>
               </span>
               <span className="flex items-center gap-2 min-w-0 justify-end">
-                <span className="truncate">{b.name ?? '—'}</span>
+                <span className="truncate">{b.name ?? '-'}</span>
                 <CompareSlotBadge slot="B" color={b.color} />
               </span>
             </div>

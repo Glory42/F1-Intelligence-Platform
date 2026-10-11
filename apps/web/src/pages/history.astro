@@ -76,13 +76,13 @@ const onThisDayHref = (monthDay: string) => `/history?tab=on-this-day&date=${mon
         <section aria-label="Headline records" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <RecordTile
             label="Most championships"
-            value={String(records.drivers.championships[0]?.value ?? '—')}
+            value={String(records.drivers.championships[0]?.value ?? '-')}
             holders={recordHolders(records.drivers.championships).map(holder)}
             accent={RANK_COLORS[0]}
           />
-          <RecordTile label="Most race wins" value={String(records.drivers.wins[0]?.value ?? '—')} holders={records.drivers.wins.slice(0, 1).map(holder)} />
-          <RecordTile label="Most pole positions" value={String(records.drivers.poles[0]?.value ?? '—')} holders={records.drivers.poles.slice(0, 1).map(holder)} />
-          <RecordTile label="Most race starts" value={String(records.drivers.starts[0]?.value ?? '—')} holders={records.drivers.starts.slice(0, 1).map(holder)} />
+          <RecordTile label="Most race wins" value={String(records.drivers.wins[0]?.value ?? '-')} holders={records.drivers.wins.slice(0, 1).map(holder)} />
+          <RecordTile label="Most pole positions" value={String(records.drivers.poles[0]?.value ?? '-')} holders={records.drivers.poles.slice(0, 1).map(holder)} />
+          <RecordTile label="Most race starts" value={String(records.drivers.starts[0]?.value ?? '-')} holders={records.drivers.starts.slice(0, 1).map(holder)} />
         </section>
 
         <p class="-mt-6 flex items-center justify-end gap-1.5 font-mono text-[8px] tracking-[0.15em] uppercase text-muted-foreground">

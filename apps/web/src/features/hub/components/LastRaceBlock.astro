@@ -20,7 +20,7 @@ const verdict = race ? modelVerdict(history, race.id) : null;
 const verdictFacts: HomeFact[] = verdict
   ? [
       { label: "Model's pick", value: `${verdict.pick.code} · ${Math.round(verdict.probability * 100)}%` },
-      { label: 'Winner ranked', value: verdict.winnerRank != null ? `#${verdict.winnerRank}` : '—' },
+      { label: 'Winner ranked', value: verdict.winnerRank != null ? `#${verdict.winnerRank}` : '-' },
       { label: 'Season calls', value: `${verdict.seasonCorrect} / ${verdict.seasonDecided}` },
     ]
   : [];

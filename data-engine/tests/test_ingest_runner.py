@@ -729,7 +729,7 @@ class TestRunOpenF1Job:
         self._patch_openf1(monkeypatch)
 
         def _no_lookup(*args, **kwargs):
-            raise AssertionError("session key was cached — /sessions must not be queried")
+            raise AssertionError("session key was cached: /sessions must not be queried")
 
         monkeypatch.setattr(ingest_runner, "get_session_key", _no_lookup)
         monkeypatch.setattr(ingest_runner, "upsert", lambda *a, **k: None)

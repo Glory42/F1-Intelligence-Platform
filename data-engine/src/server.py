@@ -59,7 +59,7 @@ def log_update(msg):
 
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_HEAD(self):
-        # Unauthenticated on purpose — UptimeRobot only needs a 200 liveness signal.
+        # Unauthenticated on purpose: UptimeRobot only needs a 200 liveness signal.
         self.send_response(200)
         self.send_header("Content-type", "text/html")
         self.end_headers()
@@ -154,7 +154,7 @@ def start_server():
 def start_worker():
     log_update(
         "[worker] Background worker started. Polls ~every 20 min during a race weekend, "
-        "~every 6 h otherwise — outside a race weekend it never opens a DB connection."
+        "~every 6 h otherwise: outside a race weekend it never opens a DB connection."
     )
     memo = auto_runner.WorkerMemo()
     while True:
@@ -180,7 +180,7 @@ def start_worker():
                 result.window, datetime.now(timezone.utc), schedule_available=result.schedule_available
             )
         else:
-            sleep_seconds = auto_runner.ACTIVE_POLL_SECONDS  # cycle raised — fail-safe, retry soon
+            sleep_seconds = auto_runner.ACTIVE_POLL_SECONDS  # cycle raised: fail-safe, retry soon
         log_update(f"[worker] Checks finished. Sleeping for {sleep_seconds // 60} minutes...")
         time.sleep(sleep_seconds)
 

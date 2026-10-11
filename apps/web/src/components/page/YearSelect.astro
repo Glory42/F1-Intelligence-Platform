@@ -11,7 +11,7 @@ const uid = `ys-${Math.random().toString(36).slice(2, 7)}`;
 ---
 
 <div class="relative" id={uid}>
-  <!-- Trigger button — matches active pill style -->
+  <!-- Trigger button: matches active pill style -->
   <button
     type="button"
     id={`${uid}-btn`}
@@ -21,7 +21,7 @@ const uid = `ys-${Math.random().toString(36).slice(2, 7)}`;
     <span id={`${uid}-arrow`} class="text-[8px] transition-transform duration-150">▾</span>
   </button>
 
-  <!-- Dropdown panel — 6 rows visible, rest scrollable -->
+  <!-- Dropdown panel: 6 rows visible, rest scrollable -->
   <div
     id={`${uid}-panel`}
     class="absolute right-0 top-full mt-1 z-50 hidden border border-[rgba(168,85,247,0.25)] bg-[#080808] min-w-[80px]"

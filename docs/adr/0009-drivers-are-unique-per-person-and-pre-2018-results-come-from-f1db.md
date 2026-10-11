@@ -7,7 +7,7 @@ stand-in (Badoer in Massa's #3) couldn't exist next to the regular driver and an
 him (Senna's 1994 row became Mansell's); a driver who changed number got two rows; and FastF1's NaN
 codes became "NAN", collapsing most 1991–2004 drivers into one.
 
-We now key `drivers` on (season, first name, last name) — the person — with the car number a plain
+We now key `drivers` on (season, first name, last name), the person, with the car number a plain
 index, and ingest registers every driver its session lists before mapping results, failing on any
 it still can't place. History before FastF1 (1980–2017) is rebuilt from F1DB, which we already
 import and credit, rather than re-fetching ~700 races from the rate-limited Ergast mirror;
@@ -16,6 +16,6 @@ import and credit, rather than re-fetching ~700 races from the rate-limited Erga
 ## Consequences
 
 F1DB is the source of truth for pre-2018 results and codes (its abbreviations repeat within some
-seasons — Bernard and Berger are both BER in 1990 — so codes are labels, not keys). A driver who
+seasons: Bernard and Berger are both BER in 1990, so codes are labels, not keys). A driver who
 changed teams mid-season still has one row and one team per season. `scripts/audit_results_vs_f1db.py`
 re-checks every race against F1DB after any backfill.

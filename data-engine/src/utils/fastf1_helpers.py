@@ -78,7 +78,7 @@ def session_to_race_results(session: Session) -> list[dict[str, Any]]:
         else:
             headshot_map[code] = None
 
-    # Derive fastest lap from lap times — FastF1 results don't have a FastestLap column
+    # Derive fastest lap from lap times: FastF1 results don't have a FastestLap column
     fastest_lap_driver: str | None = None
     try:
         laps = session.laps
@@ -253,7 +253,7 @@ def validate_session_data(session: Session, session_type: str) -> bool:
 
 
 def session_to_lap_records(session) -> list[dict]:
-    """Every lap with a position and end time — deliberately NOT pick_accurate(): the race story
+    """Every lap with a position and end time: deliberately NOT pick_accurate(): the race story
     needs in/out laps too, or every pit stop would leave a hole in the gap chart."""
     records = []
     for _, lap in session.laps.iterrows():

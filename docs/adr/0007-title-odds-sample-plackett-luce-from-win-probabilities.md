@@ -1,7 +1,7 @@
 # Title odds sample finishing orders from the model's win probabilities
 
-The model only produces a win probability per driver per race — there is no stored
-finishing-position distribution — but championship odds need whole finishing orders. Rather than
+The model only produces a win probability per driver per race: there is no stored
+finishing-position distribution: but championship odds need whole finishing orders. Rather than
 build a second model, `compute_title_odds` samples orders with Plackett–Luce (pick the winner by
 `p`, remove them, renormalise, repeat), implemented as the Gumbel-max trick so 10,000 seasons run as
 one vectorised `argsort` per race on Render's 0.1 CPU. Plackett–Luce is the natural extension of the

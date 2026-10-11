@@ -43,7 +43,7 @@ export interface NavUtility {
 
 export function buildNavUtilities(isDev: boolean): NavUtility[] {
   const utilities: NavUtility[] = [{ href: '/docs', label: 'docs', icon: BookOpen }];
-  // The data-quality dashboard reads dev-only reporting tables — never ship its link.
+  // The data-quality dashboard reads dev-only reporting tables: never ship its link.
   if (isDev) utilities.push({ href: '/health-quality', label: 'data quality', icon: ShieldCheck });
   return utilities;
 }

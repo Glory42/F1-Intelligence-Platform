@@ -54,7 +54,7 @@ try {
     ) : tab === 'title-odds' ? (
       titleOdds && titleOdds.teams.length > 0
         ? <ConstructorTitleOdds odds={titleOdds} year={year} />
-        : <EmptyState message={`No title odds for ${year} yet — they start after the first race.`} />
+        : <EmptyState message={`No title odds for ${year} yet. They start after the first race.`} />
     ) : (
       pitCrewRankings.length > 0
         ? <PitCrewRankingTable rankings={pitCrewRankings} year={year} />

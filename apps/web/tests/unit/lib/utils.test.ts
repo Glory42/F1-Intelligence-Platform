@@ -25,7 +25,7 @@ describe('formatStopSeconds', () => {
   });
 
   test('shows a dash when the duration is unknown', () => {
-    expect(formatStopSeconds(null)).toBe('—');
+    expect(formatStopSeconds(null)).toBe('-');
   });
 });
 

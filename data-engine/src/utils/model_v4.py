@@ -35,7 +35,7 @@ def brier_score(probabilities: dict, winner) -> float:
 
 def rescore_with_overtake_rate(rows: list[dict], overtake_rate: float, sc_probability: float) -> dict:
     """Re-prices stored GP feature rows under a different overtake rate. Only the two circuit-adjusted
-    features depend on it, so each raw score shifts by weight × (new − old) — exact, no recompute."""
+    features depend on it, so each raw score shifts by weight × (new − old): exact, no recompute."""
     weights = GP_WEIGHTS
     raws = []
     for r in rows:

@@ -4,7 +4,7 @@ import src.utils.prediction_runner as prediction_runner
 from src.utils.prediction_runner import run_prediction_job
 from tests.support.fake_db import FakeConnection
 
-# rank_by_probability itself is covered by test_prediction_ranking.py — this file
+# rank_by_probability itself is covered by test_prediction_ranking.py: this file
 # covers run_prediction_job, the DB-touching orchestration around it.
 
 

@@ -1,4 +1,4 @@
-// `drivers` rows are season-scoped, so one person has a row per season — and the name FastF1 gave
+// `drivers` rows are season-scoped, so one person has a row per season: and the name FastF1 gave
 // that season can differ (accents in the Ergast era, "Andrea Kimi Antonelli" in 2025 only).
 export interface DriverName {
   code: string;

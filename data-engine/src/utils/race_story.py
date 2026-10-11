@@ -12,7 +12,7 @@ class LapTrace:
 
 
 def build_lap_traces(laps: list[dict]) -> dict[str, LapTrace]:
-    """laps: one record per driver lap — driver, lap, position, time_ms (session time at lap end)."""
+    """laps: one record per driver lap, driver, lap, position, time_ms (session time at lap end)."""
     time_at: dict[tuple[int, int], int] = {(lap["lap"], lap["position"]): lap["time_ms"] for lap in laps}
     leader_lap_ends = sorted(t for (_, position), t in time_at.items() if position == 1)
 

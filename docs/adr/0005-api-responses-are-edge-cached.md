@@ -1,6 +1,6 @@
 # API responses are served from the Workers edge cache
 
-A `Cache-Control` header on a Worker's own response does not make Cloudflare cache it — only the
+A `Cache-Control` header on a Worker's own response does not make Cloudflare cache it: only the
 Workers Cache API does. Without it every page view queried Neon, spending Free-tier compute and
 egress. `edgeCache()` (`apps/api/src/common/edge-cache.ts`) stores 200 responses that carry a public
 `Cache-Control` (set per route via `src/common/cache.ts`) and replays them on later requests, with

@@ -1,4 +1,4 @@
-"""Backfills race-story tables (lap traces, battles, weather) for completed races — FastF1 only,
+"""Backfills race-story tables (lap traces, battles, weather) for completed races: FastF1 only,
 so 2018+. Writes nothing else. Run locally, never on Render (FastF1 loads need RAM and bandwidth).
 Usage: python scripts/backfill_race_story.py 2018 2025"""
 import argparse
@@ -41,7 +41,7 @@ def backfill_session(race: dict, fastf1_session: str, tag: str) -> None:
     conn = get_conn()
     try:
         if not read_storage_tier(conn).allows_backfill:
-            raise SystemExit("[STOP] Neon storage past the backfill threshold — see storage_guard")
+            raise SystemExit("[STOP] Neon storage past the backfill threshold: see storage_guard")
         write_session_story(conn, race["id"], tag, traces, battles, weather, build_driver_code_map(conn, race["season_id"]))
         conn.commit()
     finally:

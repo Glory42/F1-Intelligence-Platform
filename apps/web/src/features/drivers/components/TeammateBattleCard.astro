@@ -43,7 +43,7 @@ const rows: HeadToHeadRow[] = [
 
 const gap = battle.medianQualiGapMs;
 const gapLabel = gap == null || !mate
-  ? '—'
+  ? '-'
   : gap === 0 ? 'Level' : `${gap < 0 ? driver.code : mate.code} ${(Math.abs(gap) / 1000).toFixed(3)}s faster`;
 const pointsGap = Math.round(battle.points.driver - battle.points.teammate);
 
@@ -104,11 +104,11 @@ const COLUMNS = 'grid-cols-[32px_minmax(0,1fr)_84px_84px] sm:grid-cols-[40px_min
               <DataRow columns={COLUMNS} first={i === 0} class="py-2.5">
                 <div role="cell" class="font-mono text-[11px] text-muted-foreground">{r.roundNumber}</div>
                 <div role="cell" class="truncate pr-3 text-[13px]"><a href={`/races/${r.raceId}`} class="hover:text-[#a855f7] transition-colors duration-150">{r.raceName}</a></div>
-                {cell(r.driver.qualiPosition != null ? position(r.driver.qualiPosition) : '—', r.teammate.qualiPosition != null ? position(r.teammate.qualiPosition) : '—', quali)}
+                {cell(r.driver.qualiPosition != null ? position(r.driver.qualiPosition) : '-', r.teammate.qualiPosition != null ? position(r.teammate.qualiPosition) : '-', quali)}
                 {cell(finishLabel(r.driver), finishLabel(r.teammate), finish)}
                 {cell(String(Math.round(r.driver.points)), String(Math.round(r.teammate.points)), points, 'hidden sm:block')}
                 <div role="cell" class={`hidden sm:block text-right font-mono text-[12px] tabular-nums ${r.qualiGapMs != null && r.qualiGapMs < 0 ? 'text-[#a855f7]' : 'text-muted-foreground'}`}>
-                  {r.qualiGapMs == null ? '—' : `${r.qualiGapMs > 0 ? '+' : r.qualiGapMs < 0 ? '−' : ''}${(Math.abs(r.qualiGapMs) / 1000).toFixed(3)}`}
+                  {r.qualiGapMs == null ? '-' : `${r.qualiGapMs > 0 ? '+' : r.qualiGapMs < 0 ? '−' : ''}${(Math.abs(r.qualiGapMs) / 1000).toFixed(3)}`}
                 </div>
               </DataRow>
             );

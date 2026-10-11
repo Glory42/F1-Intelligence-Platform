@@ -18,7 +18,7 @@ def _get_pool() -> psycopg2.pool.SimpleConnectionPool:
 
 class _PooledConnection:
     """conn.close() returns the connection to the pool instead of tearing down the
-    TCP/TLS session — every job already calls close() in a finally block."""
+    TCP/TLS session: every job already calls close() in a finally block."""
 
     def __init__(self, pool: psycopg2.pool.SimpleConnectionPool, conn: Any) -> None:
         self._pool = pool

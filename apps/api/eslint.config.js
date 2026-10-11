@@ -1,6 +1,6 @@
 import tseslint from 'typescript-eslint';
 
-// max-lines counts real code — blank lines and comments don't count toward the limit.
+// max-lines counts real code: blank lines and comments don't count toward the limit.
 const maxLines = (max) => ['error', { max, skipBlankLines: true, skipComments: true }];
 
 export default [
@@ -26,7 +26,7 @@ export default [
     rules: { 'max-lines': maxLines(200) },
   },
 
-  // shared transformation helpers — mappers, standings, aggregation
+  // shared transformation helpers: mappers, standings, aggregation
   {
     files: ['src/common/**/*.ts'],
     rules: { 'max-lines': maxLines(150) },

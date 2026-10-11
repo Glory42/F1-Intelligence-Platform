@@ -3,7 +3,7 @@ import type { Db } from '../../config/database';
 import { drivers, teams, seasons } from '../../db/schema';
 import { ERAS, driverKeyFor, type EraMap, type DriverWinEntry } from './circuit-era.helpers';
 
-// Historical rows often lack headshots — read-only enrichment from each driver's
+// Historical rows often lack headshots: read-only enrichment from each driver's
 // latest season profile, swapped into the per-era win entries in place.
 export async function backfillDriverHeadshots(
   db: Db,

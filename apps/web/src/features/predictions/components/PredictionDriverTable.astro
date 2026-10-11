@@ -51,7 +51,7 @@ const cols = hasResults
       const isActualWinner = actualWinnerId === d.driver.id;
       const isPredWinner = predictedWinnerId === d.driver.id;
       const actualResult = results?.find((r) => r.driver.id === d.driver.id);
-      const actualPosText = actualResult?.finishPosition ? `P${actualResult.finishPosition}` : (actualResult?.status ?? '—');
+      const actualPosText = actualResult?.finishPosition ? `P${actualResult.finishPosition}` : (actualResult?.status ?? '-');
       const gridPos = Math.round((1 - Number(d.features.startingPosition ?? 0)) * 19) + 1;
       const carPct = Math.round(Number(d.features.carPerformance ?? 0) * 100);
       return (

@@ -46,7 +46,7 @@ class TestGetSessionKey:
             get_session_key(2024, "2024-09-01")
 
     def test_pre_coverage_year_raises_clean_error(self, monkeypatch):
-        # OpenF1 has no data before 2023 — confirmed live to return 404 (not 200 + []) for
+        # OpenF1 has no data before 2023: confirmed live to return 404 (not 200 + []) for
         # any query matching zero rows, on every endpoint, not just this pre-coverage case.
         monkeypatch.setattr(
             openf1_client.requests, "get",
@@ -58,7 +58,7 @@ class TestGetSessionKey:
 
     def test_accepts_a_full_datetime_for_a_timestamptz_column_like_sprint_date(self, monkeypatch):
         # races.sprint_date is a TIMESTAMPTZ, so psycopg2 hands back a datetime (not a
-        # bare date like races.race_date) — must reduce to a date before comparing.
+        # bare date like races.race_date): must reduce to a date before comparing.
         sessions = [{"session_key": 9591, "date_start": "2024-08-31T15:00:00+00:00"}]
         monkeypatch.setattr(openf1_client.requests, "get", lambda *a, **k: _FakeResponse(sessions))
 
@@ -126,7 +126,7 @@ class TestFetchTeamRadio:
         assert fetch_team_radio(9636) == clips
 
     def test_returns_empty_list_on_404(self, monkeypatch):
-        # The real bug this guards against: a session with zero radio clips (common — F1
+        # The real bug this guards against: a session with zero radio clips (common, F1
         # doesn't release radio for every session) 404s instead of returning 200 + [].
         monkeypatch.setattr(
             openf1_client.requests, "get",

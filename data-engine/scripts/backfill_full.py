@@ -81,14 +81,14 @@ def process_year(year: int) -> None:
     print(f"  BACKFILL  {year}")
     print(f"{'='*52}")
 
-    # 1 ── Sync schedule (idempotent — safe to re-run)
+    # 1 ── Sync schedule (idempotent: safe to re-run)
     print(f"\n[{year}] sync_schedule ...")
     from src.jobs.sync_schedule import run as sync_schedule
     if not _run(f"sync_schedule {year}", sync_schedule, year):
-        print(f"  FATAL: sync_schedule failed for {year} — skipping year")
+        print(f"  FATAL: sync_schedule failed for {year}, skipping year")
         return
 
-    # 2 ── Sync season (drivers + teams) — try round 1 first, fall back to 2
+    # 2 ── Sync season (drivers + teams): try round 1 first, fall back to 2
     print(f"[{year}] sync_season ...")
     from src.jobs.sync_season import run as sync_season
     if not _run(f"sync_season {year} r1", sync_season, year, 1):
@@ -100,7 +100,7 @@ def process_year(year: int) -> None:
     conn.close()
 
     if not rounds:
-        print(f"  No rounds found for {year} — skipping")
+        print(f"  No rounds found for {year}: skipping")
         return
 
     print(f"[{year}] ingesting {len(rounds)} rounds ...")
@@ -188,7 +188,7 @@ def main() -> None:
         try:
             process_year(year)
         except Exception as e:
-            print(f"\n  ERROR in year {year}: {e} — continuing to next year")
+            print(f"\n  ERROR in year {year}: {e}, continuing to next year")
 
     print(f"\n{'='*52}")
     print("  FULL BACKFILL COMPLETE")

@@ -11,6 +11,6 @@ from a GET form (`?a=&b=`), so it needs no client-side fetch.
 
 ## Consequences
 
-Distance is approximate (speed integration, not GPS), good to a few metres per corner — fine for
+Distance is approximate (speed integration, not GPS), good to a few metres per corner: fine for
 speed traces and mini-sectors, not for racing-line analysis. Only fastest laps exist; race-lap
 telemetry would need a different storage budget.

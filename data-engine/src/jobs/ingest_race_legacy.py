@@ -1,6 +1,6 @@
 """
 Legacy race ingest for pre-2018 seasons.
-Uses Ergast data via FastF1 — no lap timing data, results only.
+Uses Ergast data via FastF1: no lap timing data, results only.
 """
 import fastf1
 import pandas as pd
@@ -13,7 +13,7 @@ from src.utils.driver_map import build_driver_code_map
 
 def _get_session(year: int, round_num: int) -> Any:
     session = fastf1.get_session(year, round_num, "R")
-    # Skip laps — pre-2018 has no timing data, loading saves time.
+    # Skip laps: pre-2018 has no timing data, loading saves time.
     # Disable weather to avoid 403/404 on Formula 1's live timing server for older years.
     session.load(laps=False, telemetry=False, weather=False, messages=False)
     return session
@@ -45,7 +45,7 @@ def run(year: int, round_num: int) -> None:
         if session.results is None or session.results.empty:
             raise RuntimeError("Race results not available")
 
-        # Weather — best effort
+        # Weather: best effort
         weather = "dry"
         try:
             w = session.weather_data
@@ -96,7 +96,7 @@ def run(year: int, round_num: int) -> None:
             })
 
         if not results_to_upsert:
-            raise RuntimeError(f"No results inserted for race {race_id} — all drivers unknown; sync_season may not have run")
+            raise RuntimeError(f"No results inserted for race {race_id}: all drivers unknown; sync_season may not have run")
 
         upsert(conn, "race_results", results_to_upsert, ["race_id", "driver_id"])
         print(f"  Upserted {len(results_to_upsert)} race result rows")

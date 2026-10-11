@@ -39,7 +39,7 @@ export class PredictionsService {
     return buildGpPredictionResponse(db, raceId);
   }
 
-  // `year` omitted returns every season — used by findAccuracyBySeason() to aggregate across all years.
+  // `year` omitted returns every season: used by findAccuracyBySeason() to aggregate across all years.
   async findHistory(db: Db, year?: number): Promise<PredictionHistoryItem[]> {
     const yearFilter = year !== undefined ? eq(seasons.year, year) : undefined;
     const [gpRows, sprintRows] = await Promise.all([

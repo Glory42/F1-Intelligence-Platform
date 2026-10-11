@@ -52,7 +52,7 @@ def _spend_request() -> None:
 
 
 def _get(path: str, params: dict[str, Any], operator_filters: str = "") -> Any:
-    """OpenF1 returns 404 {"detail": "No results found."} — not 200 + [] — for any query
+    """OpenF1 returns 404 {"detail": "No results found."} (not 200 + []) for any query
     that matches zero rows, on every endpoint we use. Treat that as an empty list rather
     than an error; every caller here expects a list back regardless."""
     for attempt in range(_MAX_ATTEMPTS):
@@ -77,7 +77,7 @@ def _get(path: str, params: dict[str, Any], operator_filters: str = "") -> Any:
 def get_session_key(year: int, session_date: Any, session_name: str = "Race") -> int:
     """OpenF1's circuit naming doesn't line up 1:1 with our circuit_key values, so matching
     the session by closest start date is the reliable join key instead. session_name is
-    "Race" for the Sunday GP or "Sprint" for the Saturday sprint session — both are covered
+    "Race" for the Sunday GP or "Sprint" for the Saturday sprint session: both are covered
     by OpenF1 (2023+ only)."""
     sessions = _get("sessions", {"year": year, "session_name": session_name})
     if not sessions:
@@ -121,7 +121,7 @@ def fetch_pit_stops(session_key: int) -> list[dict]:
 
 def _time_window(start: datetime, end: datetime) -> str:
     """OpenF1 range filters are `date>=X` / `date<=Y` (operator, no `=` separator), which requests'
-    params would encode as `date>==X` — so they're appended to the path pre-encoded."""
+    params would encode as `date>==X`: so they're appended to the path pre-encoded."""
     return f"?date%3E%3D{quote(start.isoformat(), safe=':')}&date%3C%3D{quote(end.isoformat(), safe=':')}"
 
 

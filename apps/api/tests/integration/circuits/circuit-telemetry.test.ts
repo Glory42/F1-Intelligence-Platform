@@ -35,7 +35,7 @@ describe('circuit telemetry (integration)', () => {
     const newRace = await createRace(db, newer.id, circuit.id, { raceDate: '2098-05-01', name: 'New GP' });
 
     await createLapTelemetry(db, oldRace.id, oldDriver.id, { lapTimeMs: 70_000 });
-    // SLO set a faster Q2 lap, but POL took pole — the pole lap is the one to profile.
+    // SLO set a faster Q2 lap, but POL took pole: the pole lap is the one to profile.
     await createLapTelemetry(db, newRace.id, slower.id, { lapTimeMs: 79_500 });
     await createQualifyingResult(db, newRace.id, pole.id, { gridPosition: 1 });
     await createQualifyingResult(db, newRace.id, slower.id, { gridPosition: 2 });

@@ -1,7 +1,7 @@
 import type { driverPredictionFeatures, driverSprintFeatures } from '../db/schema';
 import type { FeatureScores, SprintFeatureScores } from './types';
 
-// apps/api never computes with weights, so no weight field here — just the key/column/label
+// apps/api never computes with weights, so no weight field here: just the key/column/label
 // mapping. `column: keyof TRow` makes a stale column reference a compile error.
 export interface FeatureManifestEntry<TRow, TKey extends string = string> {
   key: TKey;

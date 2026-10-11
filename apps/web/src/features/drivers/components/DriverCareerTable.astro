@@ -41,13 +41,13 @@ const thisYear = new Date().getFullYear();
             <Trophy size={11} color="#a855f7" className="shrink-0" />
           )}
         </div>
-        <div class="font-bold text-sm text-right">{y.stats ? Math.round(championshipPoints(y.stats)) : '—'}</div>
+        <div class="font-bold text-sm text-right">{y.stats ? Math.round(championshipPoints(y.stats)) : '-'}</div>
         <div class="font-mono text-sm text-right text-muted-foreground">
-          {y.stats?.championshipPosition ? `P${y.stats.championshipPosition}` : '—'}
+          {y.stats?.championshipPosition ? `P${y.stats.championshipPosition}` : '-'}
         </div>
-        <div class="font-mono text-sm text-right text-muted-foreground hidden sm:block">{y.stats?.wins ?? '—'}</div>
-        <div class="font-mono text-sm text-right text-muted-foreground hidden sm:block">{y.stats?.podiums ?? '—'}</div>
-        <div class="font-mono text-sm text-right text-muted-foreground hidden md:block">{y.stats?.poles ?? '—'}</div>
+        <div class="font-mono text-sm text-right text-muted-foreground hidden sm:block">{y.stats?.wins ?? '-'}</div>
+        <div class="font-mono text-sm text-right text-muted-foreground hidden sm:block">{y.stats?.podiums ?? '-'}</div>
+        <div class="font-mono text-sm text-right text-muted-foreground hidden md:block">{y.stats?.poles ?? '-'}</div>
       </a>
     ))}
   </div>
