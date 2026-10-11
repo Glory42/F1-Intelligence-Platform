@@ -56,8 +56,11 @@ class _SpyScheduleProvider:
         return self._schedule
 
 
-def _active_race_row(race_id=1, round_number=1, year=2026, status="scheduled", event_format="sprint"):
-    return {"id": race_id, "round_number": round_number, "year": year, "status": status, "event_format": event_format}
+def _active_race_row(race_id=1, round_number=1, year=2026, status="scheduled", event_format="sprint", name=None):
+    row = {"id": race_id, "round_number": round_number, "year": year, "status": status, "event_format": event_format}
+    if name is not None:
+        row["name"] = name
+    return row
 
 
 class _FlakyOnceScheduleProvider:
@@ -784,3 +787,28 @@ class TestTitleOddsSteps:
         outcome = auto_runner._run_action_steps(action, auto_runner.RaceRunContext(race_id=1, year=2026, round_number=5))
 
         assert outcome.ok is True
+
+class TestRunCycleCalendarDrift:
+    def test_resyncs_the_schedule_instead_of_ingesting_when_the_round_is_now_a_different_race(self, monkeypatch):
+        # The DB still has Singapore at round 16, but FastF1 has since put Bahrain there.
+        race = _utc(2026, 10, 4, 7, 0)
+        now = race + timedelta(hours=6)
+        schedule = _schedule_with_race(16, race).assign(EventName="Bahrain Grand Prix")
+        synced = []
+        monkeypatch.setattr(auto_runner.sync_schedule, "run", lambda year, schedule=None: synced.append((year, schedule)))
+        monkeypatch.setattr(
+            auto_runner.ingest_sprint_qualifying, "run",
+            lambda y, r: pytest.fail("must not ingest another event's session"),
+        )
+        conn = FakeConnection([None, _active_race_row(race_id=286, round_number=16, name="Singapore Grand Prix")])
+
+        auto_runner.run_cycle(
+            log_func=lambda *_: None,
+            now_utc=now,
+            schedule_provider=lambda: schedule,
+            conn_factory=lambda: conn,
+        )
+
+        assert len(synced) == 1
+        assert synced[0][0] == 2026
+        assert synced[0][1] is schedule

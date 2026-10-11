@@ -99,8 +99,34 @@ def _to_utc_iso(ts) -> str | None:
         return None
 
 
-def run(year: int) -> None:
+def plan_round_moves(existing: list[dict], incoming: list[dict]) -> dict[int, int]:
+    """Race id -> new round for every stored race FastF1 has renumbered, matched by event name,
+    so a race keeps its row (and its results) when another event is added or dropped before it."""
+    new_round = {r["name"]: r["round_number"] for r in incoming}
+    return {
+        race["id"]: new_round[race["name"]]
+        for race in existing
+        if race["name"] in new_round and new_round[race["name"]] != race["round_number"]
+    }
+
+
+def _apply_round_moves(conn, moves: dict[int, int]) -> None:
+    if not moves:
+        return
+    with conn.cursor() as cur:
+        # Park the moving rows on negative rounds first so (season, round) stays unique mid-update.
+        cur.execute("UPDATE races SET round_number = -round_number WHERE id = ANY(%s)", (list(moves),))
+        for race_id, round_number in moves.items():
+            cur.execute("UPDATE races SET round_number = %s WHERE id = %s", (round_number, race_id))
+
+
+def run(year: int, schedule: pd.DataFrame | None = None) -> None:
     print(f"[sync_schedule] year={year}")
+
+    if schedule is None:
+        # Bypass FastF1's 12h HTTP cache: a stale calendar is exactly what this job exists to fix.
+        with fastf1.Cache.disabled():
+            schedule = fastf1.get_event_schedule(year, include_testing=False)
 
     conn = get_conn()
     try:
@@ -115,7 +141,9 @@ def run(year: int) -> None:
             cur.execute("SELECT id, circuit_key FROM circuits")
             circuit_map: dict[str, int] = {r["circuit_key"]: r["id"] for r in cur.fetchall()}
 
-        schedule = fastf1.get_event_schedule(year, include_testing=False)
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, round_number, name FROM races WHERE season_id = %s", (season_id,))
+            existing_races = cur.fetchall()
 
         rows_to_upsert = []
         for _, event in schedule.iterrows():
@@ -168,6 +196,10 @@ def run(year: int) -> None:
             })
 
         if rows_to_upsert:
+            moves = plan_round_moves(existing_races, rows_to_upsert)
+            for race_id, round_number in moves.items():
+                print(f"  Race {race_id} moves to round {round_number}")
+            _apply_round_moves(conn, moves)
             # Exclude 'status' from UPDATE so re-running never resets completed races back to scheduled
             upsert(conn, "races", rows_to_upsert, ["season_id", "round_number"], exclude_update=["status"])
             sprint_count = sum(1 for r in rows_to_upsert if r["sprint_date"])

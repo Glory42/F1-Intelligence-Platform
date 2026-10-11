@@ -55,6 +55,7 @@ apps/api/
 │   ├── common/prediction-response.ts  # buildPredictionResponse(db, config) — shared GP/sprint prediction pipeline (winner lookup, feature mapping, response assembly); used by predictions.service.ts + sprint.service.ts
 │   ├── common/prediction-history.ts   # buildHistoryItems(), buildWinnerMap(), buildProbPosMaps(), mergeHistoryByDateDesc() — pure GP/sprint prediction-history assembly for predictions.service.findHistory()
 │   ├── common/cache.ts             # cacheControlForStatus(), cacheControlForYear() — Cache-Control header rules for completed vs in-progress races
+│   ├── common/driverIdentity.ts    # personKey(), isSamePerson() — links one person's season-scoped driver rows (career, search)
 │   ├── common/accuracy.ts          # aggregateAccuracyBySeason() — groups PredictionHistoryItem[] into per-season gp/sprint/overall accuracy buckets
 │   ├── common/featureManifest.ts   # GP_FEATURE_MANIFEST/SPRINT_FEATURE_MANIFEST (key, column, label, nullable) +
 │   │                               #   mapFeatureRow() — weight-less local manifest (apps/api never computes with
@@ -146,6 +147,7 @@ apps/api/
 │   │   ├── races/races.test.ts     # list/filter/detail/circuit-history joins
 │   │   ├── race-events/race-events.test.ts # race-control message + overtakes + team-radio lists, ordering, 404
 │   │   ├── drivers/drivers.test.ts # list/filter/standings/detail
+│   │   ├── drivers/career.test.ts  # career + search link a person's seasons across name variants
 │   │   ├── teams/teams.test.ts     # list/standings/detail
 │   │   ├── seasons/seasons.test.ts # race-count aggregation
 │   │   ├── search/search.test.ts   # cross-season dedup
@@ -506,7 +508,7 @@ data-engine/
 │   │   ├── client.py              # get_conn() — psycopg2 RealDictCursor connection
 │   │   └── __init__.py
 │   ├── jobs/
-│   │   ├── sync_schedule.py            # Populate races table — includes sprint_date, event_format
+│   │   ├── sync_schedule.py            # Populate races table — includes sprint_date, event_format; renumber-safe (matches by event name)
 │   │   ├── sync_season.py              # Populate teams + drivers from FastF1 session data
 │   │   ├── ingest_qualifying.py        # Q1/Q2/Q3 + sector times — 2018+; date guard rejects future rounds
 │   │   ├── ingest_qualifying_legacy.py # Qualifying from Ergast — pre-2018
@@ -535,6 +537,9 @@ data-engine/
 │       ├── math_utils.py          # normalize_minmax(), softmax(), bayesian_win_rate(), clamp(), weighted_sum()
 │       ├── upsert.py              # upsert(conn, table, rows, conflict_cols, exclude_update=[])
 │       ├── driver_map.py          # build_driver_code_map(), build_driver_number_map(conn, season_id) — shared driver code/number→id lookups for ingest jobs
+│       ├── driver_registry.py     # session_entries(), register_session_drivers() — adds a session's missing drivers/teams before results are mapped
+│       ├── f1db_results.py        # match_f1db_driver(), race_row(), qualifying_row() — F1DB record → our rows
+│       ├── f1db_backfill.py       # plan_season() — pure diff of one season vs F1DB (codes, new drivers, merges, rows)
 │       ├── openf1_client.py       # get_session_key(), fetch_race_control(), fetch_overtakes(), fetch_team_radio() over one shared _get(path, params) — thin OpenF1 REST client (free/historical tier only)
 │       ├── prediction_runner.py   # run_prediction_job(...) — shared softmax/rank/upsert logic for GP + sprint predictions
 │       ├── ingest_runner.py       # Three seams: run_ingest_job(...) — shared headshot/results/lap-time/status logic for
@@ -558,6 +563,10 @@ data-engine/
 │   ├── backfill_openf1.py         # Backfill any OpenF1 job (race control, overtakes, radio, stints, pit stops) for a year range — 2023+, local only, stops at the storage guard
 │   ├── backfill_all_predictions.py # Recompute GP + sprint predictions for all races (weighted-v3 / sprint-v2)
 │   ├── backfill_historical.sh     # Shell loop over sync_schedule/ingest/compute for a year range
+│   ├── f1db_release.py            # Download + SHA-256-verify + extract an F1DB release (shared by the scripts below)
+│   ├── import_f1db.py             # Import F1DB all-time history tables
+│   ├── audit_results_vs_f1db.py   # Read-only: every race's results vs F1DB; --modern-plan lists 2018+ races to re-ingest
+│   ├── backfill_results_from_f1db.py # Rebuild 1980–2017 results/drivers from F1DB (ADR 0009) — dry run unless --apply
 │   └── populate_all.sh            # One-time population run for 2021–2025
 ├── tests/                          # pytest — pure functions directly; DB-touching functions via a fake-db double
 │   ├── conftest.py                 # Placeholder DATABASE_URL so importing job modules doesn't need a real .env
@@ -584,8 +593,11 @@ data-engine/
 │   ├── test_data_quality_audit.py  # _audit_race gate/threshold branching per race status — via fake_db
 │   ├── test_data_quality_repair.py # run() audit-run selection, per-race issue grouping + step dedup, resolve/rollback — mocked jobs
 │   ├── test_main_auto_detect.py    # auto_detect_race/sprint_qualifying/sprint — row→(year,round), exit(1), query filters
-│   ├── test_sync_schedule.py       # _to_utc_iso + run() circuit-key resolution (Madrid/Spielberg year overrides), status-preserving upsert
-│   ├── test_sync_season.py         # run() team-key normalise, driver-code fallbacks, team_id remap — mocked FastF1 session
+│   ├── test_sync_schedule.py       # _to_utc_iso + run() circuit-key resolution (Madrid/Spielberg year overrides), status-preserving upsert, round renumbering
+│   ├── test_sync_season.py         # run() hands the round's drivers to the registry, refreshing known ones
+│   ├── test_driver_registry.py     # session entries (code fallbacks incl. NaN, team keys) + registering missing drivers/teams
+│   ├── test_f1db_results.py        # F1DB driver matching (accents, surname, aliases) + race/qualifying row building
+│   ├── test_f1db_backfill.py       # plan_season — stand-ins sharing a number, NAN codes, merges, wrong-driver deletes
 │   └── test_compute_sprint_features.py # _compute_short_run_pace SQ-time source, main-quali fallback, min-max inversion
 ├── render.yaml                    # Render cron job definitions
 ├── requirements.txt               # Python dependencies
@@ -599,7 +611,7 @@ data-engine/
 | Job | Input | Purpose |
 |-----|-------|---------|
 | `sync_schedule` | `--year` | Populates `races` table with sprint dates and event_format |
-| `sync_season` | `--year [--round]` | Populates `teams` and `drivers`; must run before any ingest |
+| `sync_season` | `--year [--round]` | Populates `teams` and `drivers` from one round; ingests register later arrivals themselves |
 | `ingest_qualifying` | `--year --round` | Q1/Q2/Q3 times, sector times, grid positions — 2018+ |
 | `ingest_qualifying_legacy` | `--year --round` | Grid positions and Q times via Ergast — pre-2018 |
 | `ingest_race` | `--year --round` | Race results + per-lap timing + conditions — 2018+ |

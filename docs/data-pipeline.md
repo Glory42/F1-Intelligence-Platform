@@ -14,8 +14,8 @@ All jobs live in `data-engine/src/jobs/`. They are invoked via `src/main.py --jo
 
 | Job | Purpose |
 |-----|---------|
-| `sync_schedule` | Populates the `races` table for a season from FastF1 (includes sprint dates, event_format) |
-| `sync_season` | Populates `teams` and `drivers` for a season from FastF1 |
+| `sync_schedule` | Populates the `races` table for a season from FastF1 (includes sprint dates, event_format). Races are matched by event name first, so when FastF1 renumbers the calendar (an event added or dropped mid-season) each race keeps its row and only its `round_number` moves |
+| `sync_season` | Populates `teams` and `drivers` for a season from FastF1 (one round's lineup). Race, sprint, qualifying and sprint-qualifying ingests also register every driver and team their session lists (`utils/driver_registry.py`), so mid-season replacements are added as they appear; a result for a driver that still can't be matched fails the job instead of being dropped |
 | `ingest_qualifying` | Ingests Q1/Q2/Q3 qualifying session data and sector times — 2018+ |
 | `ingest_qualifying_legacy` | Ingests qualifying from Ergast — pre-2018 |
 | `ingest_fp2` | Ingests practice long-run stints into `fp2_long_run_times` — FP2 primary, **FP1 fallback on sprint weekends** (recorded in `session_type`) |
@@ -183,7 +183,7 @@ A persistent web service runs continuously:
 
 ### How `auto_runner.py` works:
 1. Queries the database for the most recent active race (where `status != 'completed'`).
-2. Fetches the official F1 schedule via FastF1 to get exact UTC session times.
+2. Fetches the official F1 schedule via FastF1 to get exact UTC session times. If the race stored at that round has a different name from FastF1's event there (the calendar changed since the last sync), it re-runs `sync_schedule` with that schedule and stops the cycle instead of ingesting another event's sessions — every job loads FastF1 sessions by round number.
 3. Checks if a session ended recently:
    - Sprint Qualifying + 1.5 hours
    - Sprint Race + 1.5 hours
@@ -251,7 +251,22 @@ python -m src.main --job ingest_race_legacy       --year 2015 --round 5
 
 ## Historical Backfill
 
-Two backfill scripts in `data-engine/scripts/`:
+### Results audit and F1DB rebuild (`scripts/audit_results_vs_f1db.py`, `scripts/backfill_results_from_f1db.py`)
+
+Both download a checksum-verified F1DB release (`scripts/f1db_release.py`). The audit is read-only: it compares
+every completed race's race / qualifying / sprint results with F1DB and lists the drivers we're missing;
+`--modern-plan` prints the 2018+ races to re-ingest from FastF1. The rebuild covers 1980–2017 only (ADR 0009): it
+fixes driver codes, adds missing drivers and teams, merges a person's duplicate rows, upserts every result,
+deletes results filed under the wrong driver and marks rebuilt races `completed`. Dry run unless `--apply`;
+it refuses a season with unmatched drivers or mismatched race dates, and checks `storage_guard` first.
+
+```bash
+python scripts/audit_results_vs_f1db.py [--modern-plan]
+python scripts/backfill_results_from_f1db.py --from 1980 --to 2017 [--apply]
+python -m src.main --job compute_season_stats --year 1992   # after a rebuild
+```
+
+Other backfill scripts in `data-engine/scripts/`:
 
 ### Full backfill (`scripts/backfill_full.py`)
 

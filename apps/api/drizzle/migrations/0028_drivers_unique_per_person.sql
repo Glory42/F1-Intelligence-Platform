@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "drivers_season_person_idx" ON "drivers" USING btree ("season_id","first_name","last_name");

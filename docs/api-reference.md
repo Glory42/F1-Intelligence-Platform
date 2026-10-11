@@ -197,7 +197,11 @@ Returns a single driver with their season stats for the given year.
 
 ### `GET /api/drivers/:id/career`
 
-Returns a driver's stats across all seasons they have data in.
+Returns a driver's stats across all seasons they have data in. `drivers` rows are season-scoped and
+FastF1's names vary by season, so seasons are linked by person (`common/driverIdentity.ts`): the same
+name ignoring accents and case, or the same code with one name extending the other ("Andrea Kimi
+Antonelli" / "Kimi Antonelli"). "Jr." still counts, so a father and son stay separate. `/api/search`
+uses the same rule to list each person once, under their latest season.
 
 ---
 

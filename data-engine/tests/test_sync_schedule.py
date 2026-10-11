@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 from src.jobs import sync_schedule
-from src.jobs.sync_schedule import _to_utc_iso, run
+from src.jobs.sync_schedule import _to_utc_iso, plan_round_moves, run
 from tests.support.fake_db import FakeConnection
 
 _CIRCUITS = [
@@ -18,6 +18,8 @@ _CIRCUITS = [
     {"id": 13, "circuit_key": "red_bull_ring"},
     {"id": 14, "circuit_key": "a1_ring"},
     {"id": 15, "circuit_key": "interlagos"},
+    {"id": 16, "circuit_key": "bahrain"},
+    {"id": 17, "circuit_key": "singapore"},
 ]
 
 
@@ -41,8 +43,8 @@ def _event(round_number, name, location, *, fmt="conventional",
     }
 
 
-def _run(events, *, year=2025, season_row={"id": 1}):
-    conn = FakeConnection([season_row, list(_CIRCUITS)])
+def _run(events, *, year=2025, season_row={"id": 1}, existing=None):
+    conn = FakeConnection([season_row, list(_CIRCUITS), list(existing or [])])
     schedule = pd.DataFrame(events)
     with patch.object(sync_schedule.fastf1, "get_event_schedule", return_value=schedule), \
          patch.object(sync_schedule, "get_conn", return_value=conn), \
@@ -131,3 +133,43 @@ class TestRun:
     def test_nothing_to_upsert_never_calls_upsert(self):
         _, mock_upsert = _run([_event(1, "Fake GP", "Atlantis")])
         mock_upsert.assert_not_called()
+
+
+def _existing(race_id, round_number, name):
+    return {"id": race_id, "round_number": round_number, "name": name}
+
+
+class TestPlanRoundMoves:
+    def test_a_race_keeps_its_row_when_an_earlier_round_is_added(self):
+        existing = [_existing(286, 16, "Singapore Grand Prix"), _existing(287, 17, "United States Grand Prix")]
+        incoming = [
+            {"round_number": 16, "name": "Bahrain Grand Prix"},
+            {"round_number": 17, "name": "Singapore Grand Prix"},
+            {"round_number": 18, "name": "United States Grand Prix"},
+        ]
+
+        assert plan_round_moves(existing, incoming) == {286: 17, 287: 18}
+
+    def test_an_unchanged_calendar_moves_nothing(self):
+        existing = [_existing(1, 1, "Australian Grand Prix")]
+
+        assert plan_round_moves(existing, [{"round_number": 1, "name": "Australian Grand Prix"}]) == {}
+
+    def test_a_race_dropped_from_the_schedule_is_left_alone(self):
+        existing = [_existing(5, 5, "Saudi Arabian Grand Prix"), _existing(6, 6, "Miami Grand Prix")]
+
+        assert plan_round_moves(existing, [{"round_number": 5, "name": "Miami Grand Prix"}]) == {6: 5}
+
+
+class TestRunRenumbering:
+    def test_renumbered_races_move_to_their_new_rounds_before_the_upsert(self):
+        existing = [_existing(286, 16, "Singapore Grand Prix")]
+        conn, mock_upsert = _run(
+            [_event(16, "Bahrain Grand Prix", "Sakhir"), _event(17, "Singapore Grand Prix", "Marina Bay")],
+            year=2026, existing=existing,
+        )
+
+        executed = [params for cur in conn.cursors for _, params in cur.executed]
+        assert (17, 286) in executed
+        rows = mock_upsert.call_args.args[2]
+        assert [(r["round_number"], r["name"]) for r in rows] == [(16, "Bahrain Grand Prix"), (17, "Singapore Grand Prix")]
