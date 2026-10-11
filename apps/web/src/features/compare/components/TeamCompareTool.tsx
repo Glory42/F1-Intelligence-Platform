@@ -4,14 +4,12 @@ import type { Team, TeamDetailResponse, TeamSeasonStats, TeamYearStats, SeasonSu
 import { getTeamColor } from '@/lib/teamColors';
 import { getTeamLogo } from '@/lib/teamLogos';
 import { aggregateCareerStats, DEFAULT_COMPARE_YEAR, type CareerTotals } from '../compareStats';
-import { Zap } from 'lucide-react';
 import { useCompareController } from '../useCompareController';
 import { SearchSelect } from '@/components/ui/search-select';
 import { ComparisonRow, type StatRowConfig } from './ComparisonRow';
-import { CompareModeToggle } from './CompareModeToggle';
-import { CompareYearSelect } from './CompareYearSelect';
 import { CompareStatus } from './CompareStatus';
 import { CompareEntityCard } from './CompareEntityCard';
+import { CompareLayout } from './CompareLayout';
 
 interface Props {
   allSeasons: SeasonSummary[];
@@ -106,122 +104,103 @@ export function TeamCompareTool({ allSeasons, initialTeams, allTeams }: Props) {
   const teamInputLabel = (t: Team) => t.name;
   const teamOption = (t: Team) => t.name;
 
+  const stats = comparison?.mode === 'season' ? (
+    <>
+      {seasonStatConfig.map((row) => (
+        <ComparisonRow
+          key={row.label}
+          label={row.label}
+          valA={row.value(comparison.a.seasonStats)}
+          valB={row.value(comparison.b.seasonStats)}
+          format={row.format}
+          lowerBetter={row.lowerBetter}
+          colorA={colorA} colorB={colorB}
+        />
+      ))}
+    </>
+  ) : comparison?.mode === 'career' && careerA && careerB ? (
+    <>
+      {careerStatConfig.map((row) => (
+        <ComparisonRow
+          key={row.label}
+          label={row.label}
+          valA={row.value(careerA)}
+          valB={row.value(careerB)}
+          format={row.format}
+          lowerBetter={row.lowerBetter}
+          colorA={colorA} colorB={colorB}
+        />
+      ))}
+    </>
+  ) : (
+    <CompareStatus loading={false} error={null} entityLabel="teams" />
+  );
+
   return (
-    <div className="space-y-6">
-      {/* Controls */}
-      <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between border-b border-white/[0.06] pb-5">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 max-w-3xl">
-          <div className="flex-1 min-w-[200px]">
-            <SearchSelect<Team>
-              items={teams}
-              selectedId={teamAId}
-              onSelect={setTeamAId}
-              placeholder="Search Constructor A..."
-              getInputLabel={teamInputLabel}
-              renderOption={teamOption}
-              matches={teamMatches}
-              noResultsLabel="No constructors found"
-            />
-          </div>
-
-          <div className="flex justify-center shrink-0">
-            <span className="font-mono text-[9px] tracking-widest text-muted-foreground uppercase px-2 align-middle self-center">vs</span>
-          </div>
-
-          <div className="flex-1 min-w-[200px]">
-            <SearchSelect<Team>
-              items={teams}
-              selectedId={teamBId}
-              onSelect={setTeamBId}
-              placeholder="Search Constructor B..."
-              getInputLabel={teamInputLabel}
-              renderOption={teamOption}
-              matches={teamMatches}
-              noResultsLabel="No constructors found"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 justify-end">
-          {!isCareer && <CompareYearSelect years={years} year={year} setYear={setYear} />}
-
-          <CompareModeToggle isCareer={isCareer} setIsCareer={setIsCareer} />
-        </div>
-      </div>
-
-      {loading || error ? (
-        <CompareStatus loading={loading} error={error} entityLabel="teams" />
-      ) : (
-        <div key="content" className="fade-swap space-y-8">
-          {/* Team Profile Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {teamA && (
-              <CompareEntityCard
-                entityType="team"
-                href={`/teams/${teamA.id}${isCareer ? '' : `?year=${year}`}`}
-                imageUrl={logoA}
-                imageAlt={teamA.name}
-                borderColor={colorA}
-                name={teamA.name}
-                subtitle={teamSubtitle}
-              />
-            )}
-
-            {teamB && (
-              <CompareEntityCard
-                entityType="team"
-                href={`/teams/${teamB.id}${isCareer ? '' : `?year=${year}`}`}
-                imageUrl={logoB}
-                imageAlt={teamB.name}
-                borderColor={colorB}
-                name={teamB.name}
-                subtitle={teamSubtitle}
-              />
-            )}
-          </div>
-
-          {/* Stats metrics */}
-          <div className="border border-white/[0.06] bg-black p-6 space-y-6">
-            <div className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">
-              <Zap size={11} /> head-to-head comparison
-            </div>
-
-            <div className="space-y-4">
-              {comparison?.mode === 'season' ? (
-                <>
-                  {seasonStatConfig.map((row) => (
-                    <ComparisonRow
-                      key={row.label}
-                      label={row.label}
-                      valA={row.value(comparison.a.seasonStats)}
-                      valB={row.value(comparison.b.seasonStats)}
-                      format={row.format}
-                      lowerBetter={row.lowerBetter}
-                      colorA={colorA} colorB={colorB}
-                    />
-                  ))}
-                </>
-              ) : comparison?.mode === 'career' && careerA && careerB ? (
-                <>
-                  {careerStatConfig.map((row) => (
-                    <ComparisonRow
-                      key={row.label}
-                      label={row.label}
-                      valA={row.value(careerA)}
-                      valB={row.value(careerB)}
-                      format={row.format}
-                      lowerBetter={row.lowerBetter}
-                      colorA={colorA} colorB={colorB}
-                    />
-                  ))}
-                </>
-              ) : (
-                <CompareStatus loading={false} error={null} entityLabel="teams" />
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    <CompareLayout
+      a={{
+        select: (
+          <SearchSelect<Team>
+            items={teams}
+            selectedId={teamAId}
+            onSelect={setTeamAId}
+            placeholder="Search Constructor A..."
+            getInputLabel={teamInputLabel}
+            renderOption={teamOption}
+            matches={teamMatches}
+            noResultsLabel="No constructors found"
+          />
+        ),
+        card: teamA && (
+          <CompareEntityCard
+            slot="A"
+            entityType="team"
+            href={`/teams/${teamA.id}${isCareer ? '' : `?year=${year}`}`}
+            imageUrl={logoA}
+            imageAlt={teamA.name}
+            borderColor={colorA}
+            name={teamA.name}
+            subtitle={teamSubtitle}
+          />
+        ),
+        name: teamA?.name ?? null,
+        color: colorA,
+      }}
+      b={{
+        select: (
+          <SearchSelect<Team>
+            items={teams}
+            selectedId={teamBId}
+            onSelect={setTeamBId}
+            placeholder="Search Constructor B..."
+            getInputLabel={teamInputLabel}
+            renderOption={teamOption}
+            matches={teamMatches}
+            noResultsLabel="No constructors found"
+          />
+        ),
+        card: teamB && (
+          <CompareEntityCard
+            slot="B"
+            entityType="team"
+            href={`/teams/${teamB.id}${isCareer ? '' : `?year=${year}`}`}
+            imageUrl={logoB}
+            imageAlt={teamB.name}
+            borderColor={colorB}
+            name={teamB.name}
+            subtitle={teamSubtitle}
+          />
+        ),
+        name: teamB?.name ?? null,
+        color: colorB,
+      }}
+      years={years}
+      year={year}
+      setYear={setYear}
+      isCareer={isCareer}
+      setIsCareer={setIsCareer}
+      status={loading || error ? <CompareStatus loading={loading} error={error} entityLabel="teams" /> : null}
+      stats={stats}
+    />
   );
 }

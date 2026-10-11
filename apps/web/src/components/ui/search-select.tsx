@@ -61,7 +61,7 @@ export function SearchSelect<T extends { id: number }>({
           }}
           onFocus={() => setIsOpen(true)}
           placeholder={placeholder}
-          className="bg-black border border-white/[0.08] text-white text-xs font-mono px-3 py-2 uppercase tracking-wider focus:outline-none focus:border-[#a855f7]/40 w-full pr-8 cursor-text"
+          className="bg-black border border-white/[0.08] text-white h-9 text-xs font-mono px-3 uppercase tracking-wider focus:outline-none focus:border-[#a855f7]/40 w-full pr-8 cursor-text"
         />
         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none text-[8px] font-mono select-none">
           {isOpen ? '▲' : '▼'}
