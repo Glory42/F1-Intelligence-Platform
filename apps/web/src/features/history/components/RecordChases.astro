@@ -1,0 +1,50 @@
+---
+import type { RecordChase, RecordEntry } from '@/types';
+import { f1dbCountryFlag, f1dbCountryName } from '@/lib/f1dbCountries';
+import { CHASE_LABELS, describeChase } from '../historyView';
+import ActiveBadge from './ActiveBadge.astro';
+
+interface Props {
+  chases: RecordChase[];
+}
+
+const { chases } = Astro.props;
+const cards = chases.flatMap((chase) => {
+  const view = describeChase(chase);
+  return view && chase.chaser ? [{ chase, chaser: chase.chaser, view }] : [];
+});
+const driverHref = (e: RecordEntry) => (e.coreId != null ? `/drivers/${e.coreId}` : undefined);
+---
+
+{cards.length > 0 && (
+  <ul aria-label="Chasing the record" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    {cards.map(({ chase, chaser, view }) => (
+      <li class="border border-white/[0.06] bg-black p-4 flex flex-col gap-3">
+        <div class="font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground/70">{CHASE_LABELS[chase.stat].title}</div>
+
+        <div class="space-y-2 text-xs">
+          {[{ entry: chase.record, role: 'Record' }, { entry: chaser, role: 'Chaser' }].map(({ entry, role }) => (
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="sr-only">{role}:</span>
+                <span class="shrink-0" title={f1dbCountryName(entry.nationality)}>{f1dbCountryFlag(entry.nationality)}</span>
+                {driverHref(entry)
+                  ? <a href={driverHref(entry)} class="truncate font-medium hover:text-[#a855f7] transition-colors">{entry.name}</a>
+                  : <span class="truncate font-medium text-white/70">{entry.name}</span>}
+                {entry.active && <ActiveBadge compact />}
+              </div>
+              <span class={`font-mono font-bold tabular-nums ${role === 'Record' ? 'text-[#f5c542]' : 'text-white'}`}>{entry.value}</span>
+            </div>
+          ))}
+        </div>
+
+        <div class="mt-auto space-y-1.5">
+          <div class="h-1 bg-white/[0.04] overflow-hidden" aria-hidden="true">
+            <div class="h-full bar-fill bg-[#a855f7]" style={`width: ${view.progress * 100}%`} />
+          </div>
+          <div class="font-mono text-[8px] tracking-wider uppercase text-muted-foreground">{view.summary}</div>
+        </div>
+      </li>
+    ))}
+  </ul>
+)}

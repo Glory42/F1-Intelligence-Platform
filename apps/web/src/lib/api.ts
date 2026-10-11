@@ -6,8 +6,8 @@ import type {
   SprintPredictionResponse, SprintDetailResponse, ModelInfo, SeasonAccuracy,
   QualityReport, RaceSession, StrategyResponse, PitCrewRanking, FridayPaceRow,
   TitleOddsResponse, TeammateBattle, RacecraftRow, RaceStoryResponse, TelemetryResponse, QualifyingSession,
-  HistoryRecords, DriverHistory, TeamHistory, RaceRecap, OnThisDayRace,
-} from '@/types';
+  HistoryRecords, HistoryMilestones, ConstructorLineage, DriverHistory, TeamHistory, RaceRecap, OnThisDay,
+ TeamPitStop, CircuitTelemetry } from '@/types';
 
 const API_URL = import.meta.env.PUBLIC_API_URL ?? 'http://localhost:8787';
 
@@ -56,18 +56,23 @@ export const api = {
   getStrategy: (raceId: number, session: RaceSession = 'race') =>
     get<StrategyResponse>(`/api/races/${raceId}/strategy${sessionQuery(session)}`),
   getPitCrewRankings: (year: number) => get<PitCrewRanking[]>(`/api/teams/pit-stops?year=${year}`),
+  getTeamPitStops: (teamId: number, year: number) => get<TeamPitStop[]>(`/api/teams/${teamId}/pit-stops?year=${year}`),
   getFridayPace: (raceId: number) => get<FridayPaceRow[]>(`/api/predictions/race/${raceId}/friday-pace`),
   getTitleOdds: (year: number) => get<TitleOddsResponse>(`/api/predictions/title-odds?year=${year}`),
   getTeammateBattle: (driverId: number, year: number) =>
     get<TeammateBattle>(`/api/drivers/${driverId}/teammate-battle?year=${year}`),
   getRacecraft: (year: number) => get<RacecraftRow[]>(`/api/drivers/racecraft?year=${year}`),
-  getHistoryRecords: () => get<HistoryRecords>('/api/history/records'),
-  getOnThisDay: (monthDay: string) => get<OnThisDayRace[]>(`/api/history/on-this-day?date=${monthDay}`),
+  // v= sidesteps edge-cached responses from before each history shape changed; bump it with the shape.
+  getHistoryRecords: () => get<HistoryRecords>('/api/history/records?v=3'),
+  getHistoryMilestones: () => get<HistoryMilestones>('/api/history/milestones?v=2'),
+  getConstructorLineages: () => get<ConstructorLineage[]>('/api/history/lineages?v=2'),
+  getOnThisDay: (monthDay: string) => get<OnThisDay>(`/api/history/on-this-day?date=${monthDay}&v=2`),
   getRaceRecap: (raceId: number) => get<RaceRecap>(`/api/races/${raceId}/recap`),
   getDriverHistory: (driverId: number) => get<DriverHistory>(`/api/drivers/${driverId}/history`),
   getTeamHistory: (teamId: number) => get<TeamHistory>(`/api/teams/${teamId}/history`),
   getCircuitDetails: (circuitKey: string) => get<CircuitDetailResponse>(`/api/races/circuit/${circuitKey}`),
   getCircuits: () => get<Circuit[]>('/api/races/circuits'),
+  getCircuitTelemetry: (circuitKey: string) => get<CircuitTelemetry | null>(`/api/races/circuit/${circuitKey}/telemetry`),
 
   // Drivers
   getDrivers: (year: number) => get<Driver[]>(`/api/drivers?year=${year}`),

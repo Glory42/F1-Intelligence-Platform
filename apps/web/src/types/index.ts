@@ -215,6 +215,7 @@ export type PitStop = { lapNumber: number; pitLaneMs: number | null; stationaryM
 export type DriverStrategy = { driver: Driver; finishPosition: number | null; stints: TyreStint[]; pitStops: PitStop[] };
 export type StrategyResponse = { source: 'openf1' | 'derived' | 'none'; drivers: DriverStrategy[] };
 export type PitCrewRanking = { team: Team; stops: number; medianStationaryMs: number; fastestStationaryMs: number };
+export type TeamPitStop = { raceId: number; roundNumber: number; raceName: string; driver: Driver; lapNumber: number; stationaryMs: number };
 export type FridayPaceRow = {
   driver: Driver;
   compound: string;
@@ -232,12 +233,23 @@ export type TitleOddsResponse = {
   history: Array<{ afterRound: number; driverId: number; titleProbability: number }>;
 };
 export type HeadToHead = { driver: number; teammate: number };
+export type TeammateOuting = {
+  qualiPosition: number | null; finishPosition: number | null; status: string | null; points: number;
+};
+export type TeammateRace = {
+  raceId: number; roundNumber: number; raceName: string;
+  /** Negative = the driver out-qualified the team-mate. */
+  qualiGapMs: number | null;
+  driver: TeammateOuting; teammate: TeammateOuting;
+};
 export type TeammateBattle = {
   teammate: Driver | null;
   sharedRaces: number;
   qualifying: HeadToHead;
   race: HeadToHead;
   points: HeadToHead;
+  medianQualiGapMs: number | null;
+  races: TeammateRace[];
 };
 export type RacecraftRow = { driver: Driver; made: number; suffered: number; net: number };
 
@@ -253,6 +265,14 @@ export type RaceBattle = { chaser: Driver; leader: Driver; lapStart: number; lap
 export type SessionWeather = { minuteOffsets: number[]; airTempC: number[]; trackTempC: number[]; rainfall: boolean[] };
 export type RaceStoryResponse = { drivers: DriverLapTrace[]; battles: RaceBattle[]; weather: SessionWeather | null };
 
+export type TrackProfile = {
+  fullThrottlePct: number; longestFullThrottleM: number; topSpeedKph: number; brakingZones: number;
+  corners: { low: number; medium: number; high: number };
+};
+export type CircuitTelemetry = {
+  raceId: number; year: number; raceName: string; driver: Driver; lapTimeMs: number; isPoleLap: boolean; profile: TrackProfile;
+  trace: { distanceM: number[]; speed: number[]; throttle: number[]; brake: number[] };
+};
 export type LapTelemetrySamples = {
   distanceM: number[];
   timeMs: number[];
@@ -270,12 +290,43 @@ export type TelemetryResponse = {
   laps: Array<{ driver: Driver; lapNumber: number; lapTimeMs: number; samples: LapTelemetrySamples }>;
 };
 
-export type RecordEntry = { f1dbId: string; name: string; value: number };
-export type HistoryRecords = {
-  drivers: Record<'wins' | 'championships' | 'poles' | 'podiums' | 'starts', RecordEntry[]>;
-  constructors: Record<'wins' | 'championships' | 'poles', RecordEntry[]>;
-  youngestWinners: Array<{ f1dbId: string; name: string; ageDays: number; raceName: string }>;
+// nationality is an F1DB country id (e.g. 'united-kingdom'); coreId links to the driver/team page
+// (core data starts in 1980) and active means still on the current grid.
+export type RecordEntry = {
+  f1dbId: string; name: string; value: number; nationality: string | null; coreId: number | null; active: boolean;
 };
+
+export type DriverRecordStat = 'wins' | 'championships' | 'poles' | 'podiums' | 'starts';
+
+export type RecordChase = { stat: DriverRecordStat; record: RecordEntry; chaser: RecordEntry | null };
+
+export type HistoryRecords = {
+  drivers: Record<DriverRecordStat, RecordEntry[]>;
+  constructors: Record<'wins' | 'championships' | 'poles', RecordEntry[]>;
+  // value is a 0–1 ratio over race starts; only drivers with rateMinStarts or more qualify.
+  rates: Record<'winRate' | 'poleRate' | 'podiumRate', RecordEntry[]>;
+  rateMinStarts: number;
+  chases: RecordChase[];
+};
+
+export type MilestoneKey =
+  | 'youngestWinner' | 'youngestPole' | 'youngestPodium' | 'youngestStarter' | 'oldestFirstWin' | 'longestWaitForWin';
+
+export type MilestoneEntry = {
+  f1dbId: string; name: string; nationality: string | null; coreId: number | null; active: boolean; days: number; raceName: string;
+};
+
+export type HistoryMilestones = Record<MilestoneKey, MilestoneEntry[]>;
+
+export type LineageMember = {
+  f1dbId: string; name: string; yearFrom: number; yearTo: number | null; raceWins: number; championships: number;
+  coreId: number | null;
+};
+
+export type ConstructorLineage = {
+  f1dbId: string; name: string; coreTeam: { id: number; teamKey: string } | null; active: boolean; members: LineageMember[];
+};
+
 export type DriverHistory = {
   f1dbId: string; name: string; dateOfBirth: string | null; nationality: string | null;
   championships: number; raceStarts: number; raceWins: number; podiums: number; polePositions: number;
@@ -297,3 +348,5 @@ export type RaceRecap = {
   topBattle: RaceBattle | null;
 };
 export type OnThisDayRace = { raceId: number; year: number; name: string; winner: Driver | null };
+// date is the month-day actually shown — the nearest one with races when requested has none.
+export type OnThisDay = { requested: string; date: string; races: OnThisDayRace[] };

@@ -1,14 +1,14 @@
 import {
-  predictionResponse, raceDetailResponse, raceControlMessages, raceOvertakes, teamRadioClips, predictionHistory, intelStandings,
-  seasons, modelInfo, circuit, pastCircuit, circuitDetailResponse,
+  predictionResponse, raceDetailResponse, raceControlMessages, raceOvertakes, teamRadioClips, predictionHistory, predictionHistory2026, intelStandings,
+  seasons, modelInfo, circuit, pastCircuit, circuitDetailResponse, circuitTelemetry,
   driverCareer, driverBCareer, driverDetailResponse, driverBDetailResponse,
-  teamCareer, teamDetailResponse, driverStandingsResponse, driversListResponse,
+  teamCareer, teamPitStops, teamDetailResponse, driverStandingsResponse, driversListResponse,
   globalSearchResponse,
   teamsListResponse, teamBDetailResponse, teamBCareer,
   sprintPredictionResponse, sprintDetailResponse, sprintWeekendRaceDetailResponse,
   sprintRaceControlMessages, raceStrategyResponse, fridayPaceRows, pitCrewRankings, teamStandingsResponse, race2026DetailResponse,
   races2026, titleOddsResponse, racecraftRows, teammateBattle, raceStoryResponse, telemetryResponse,
-  historyRecords, driverHistory, teamHistory, lastRaceRecap, onThisDayRaces,
+  historyRecords, historyMilestones, constructorLineages, driverHistory, teamHistory, lastRaceRecap, lastRaceDetailResponse, onThisDay,
 } from './data';
 
 const PORT = Number(process.env.FIXTURE_API_PORT ?? 4310);
@@ -37,11 +37,15 @@ Bun.serve({
 
     if (url.pathname === '/api/predictions/model-info') return ok(modelInfo);
     if (url.pathname === '/api/predictions/upcoming') return ok(predictionResponse);
-    if (url.pathname === '/api/predictions/history') return ok(predictionHistory);
+    if (url.pathname === '/api/predictions/history') {
+      return ok(url.searchParams.get('year') === '2026' ? predictionHistory2026 : predictionHistory);
+    }
     if (url.pathname === '/api/predictions/standings') return ok(intelStandings);
     if (url.pathname === '/api/seasons') return ok(seasons);
     if (url.pathname === '/api/history/records') return ok(historyRecords);
-    if (url.pathname === '/api/history/on-this-day') return ok(onThisDayRaces);
+    if (url.pathname === '/api/history/milestones') return ok(historyMilestones);
+    if (url.pathname === '/api/history/lineages') return ok(constructorLineages);
+    if (url.pathname === '/api/history/on-this-day') return ok(onThisDay(url.searchParams.get('date') ?? ''));
     if (url.pathname === '/api/drivers/10/history') return ok(driverHistory);
     if (url.pathname === '/api/teams/1/history') return ok(teamHistory);
     if (url.pathname === '/api/predictions/title-odds') return ok(titleOddsResponse);
@@ -54,6 +58,7 @@ Bun.serve({
     if (url.pathname === '/api/races/2') return ok(sprintWeekendRaceDetailResponse);
     if (url.pathname === '/api/races/3') return ok(race2026DetailResponse);
     if (url.pathname === '/api/races/30/recap') return ok(lastRaceRecap);
+    if (url.pathname === '/api/races/30') return ok(lastRaceDetailResponse);
     if (url.pathname === '/api/races/3/team-radio') return ok([]);
     if (url.pathname === '/api/races/2/race-control' && url.searchParams.get('session') === 'sprint') {
       return ok(sprintRaceControlMessages);
@@ -68,6 +73,7 @@ Bun.serve({
     if (url.pathname === '/api/predictions/race/1/friday-pace') return ok(fridayPaceRows);
     if (url.pathname === '/api/races/circuits') return ok([circuit, pastCircuit]);
     if (url.pathname === '/api/races/circuit/monza') return ok(circuitDetailResponse);
+    if (url.pathname === '/api/races/circuit/monza/telemetry') return ok(circuitTelemetry);
 
     if (url.pathname === '/api/search') return ok(globalSearchResponse);
 
@@ -85,6 +91,7 @@ Bun.serve({
     if (url.pathname === '/api/teams/standings') return ok(teamStandingsResponse);
     if (url.pathname === '/api/teams/1') return ok(teamDetailResponse);
     if (url.pathname === '/api/teams/1/career') return ok(teamCareer);
+    if (url.pathname === '/api/teams/1/pit-stops') return ok(teamPitStops);
     if (url.pathname === '/api/teams/2') return ok(teamBDetailResponse);
     if (url.pathname === '/api/teams/2/career') return ok(teamBCareer);
 

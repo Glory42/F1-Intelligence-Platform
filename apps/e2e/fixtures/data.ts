@@ -8,7 +8,7 @@ import type {
   SprintResult, SprintDetailResponse, RaceControlMessage, RaceOvertake, TeamRadioClip,
   StrategyResponse, FridayPaceRow, PitCrewRanking, TeamStanding, TitleOddsResponse,
   RacecraftRow, TeammateBattle, RaceStoryResponse, TelemetryResponse, LapTelemetrySamples,
-  HistoryRecords, DriverHistory, TeamHistory, RaceRecap, OnThisDayRace,
+  HistoryRecords, HistoryMilestones, ConstructorLineage, DriverHistory, TeamHistory, RaceRecap, OnThisDay, TeamPitStop, CircuitTelemetry,
 } from '../../web/src/types';
 
 export const circuit: Circuit = {
@@ -121,6 +121,15 @@ export const predictionHistory: PredictionHistoryItem[] = [
   },
 ];
 
+// 2026: the model called round 18 but tipped VER for round 19, which LEC won from VER's #2 spot.
+export const predictionHistory2026: PredictionHistoryItem[] = [
+  { ...predictionHistory[0], raceId: 29, roundNumber: 18 },
+  {
+    ...predictionHistory[0], raceId: 30, roundNumber: 19, actualWinner: driverB, correct: false,
+    actualWinnerPredictedPosition: 2,
+  },
+];
+
 export const intelStandings: IntelStandingRow[] = [
   {
     driver, features: featureScores, rawWeightedScore: '0.680000',
@@ -184,6 +193,13 @@ const teamSeasonStats: TeamSeasonStats = {
 
 export const teamCareer: TeamYearStats[] = [
   { year: 2026, teamId: 1, stats: teamSeasonStats },
+];
+
+// Red Bull's 2026 stops: median 2.45 s, best 2.04 s — matching its pit crew ranking row.
+export const teamPitStops: TeamPitStop[] = [
+  { raceId: 30, roundNumber: 19, raceName: 'Italian Grand Prix', driver, lapNumber: 18, stationaryMs: 2450 },
+  { raceId: 30, roundNumber: 19, raceName: 'Italian Grand Prix', driver, lapNumber: 36, stationaryMs: 2040 },
+  { raceId: 31, roundNumber: 20, raceName: 'Italian Grand Prix', driver, lapNumber: 22, stationaryMs: 2600 },
 ];
 
 export const teamDetailResponse: TeamDetailResponse = {
@@ -340,6 +356,20 @@ export const races2026: Race[] = [
   ...[20, 21, 22, 23, 24].map((round) => ({ ...race, id: 10 + round, roundNumber: round, status: 'scheduled' as const })),
 ];
 
+// The last completed 2026 race: LEC beat VER from pole, matching lastRaceRecap.
+export const lastRaceDetailResponse: RaceDetailResponse = {
+  race: races2026[0],
+  results: [
+    { ...raceResults[1], raceId: 30, finishPosition: 1, gridPosition: 1, fastestLap: true },
+    { ...raceResults[0], raceId: 30, finishPosition: 2, gridPosition: 2, fastestLap: false },
+  ],
+  qualifying: [
+    { ...qualifyingResults[1], gridPosition: 1 },
+    { ...qualifyingResults[0], gridPosition: 2 },
+  ],
+  laps: [],
+};
+
 export const titleOddsResponse: TitleOddsResponse = {
   afterRound: 19,
   drivers: [
@@ -369,6 +399,19 @@ export const teammateBattle: TeammateBattle = {
   qualifying: { driver: 14, teammate: 2 },
   race: { driver: 12, teammate: 1 },
   points: { driver: 350, teammate: 48 },
+  medianQualiGapMs: -214,
+  races: [
+    {
+      raceId: 40, roundNumber: 1, raceName: 'Australian Grand Prix', qualiGapMs: -312,
+      driver: { qualiPosition: 1, finishPosition: 1, status: 'Finished', points: 25 },
+      teammate: { qualiPosition: 5, finishPosition: 4, status: 'Finished', points: 12 },
+    },
+    {
+      raceId: 41, roundNumber: 2, raceName: 'Chinese Grand Prix', qualiGapMs: 80,
+      driver: { qualiPosition: 2, finishPosition: null, status: 'Retired', points: 0 },
+      teammate: { qualiPosition: 1, finishPosition: 3, status: 'Finished', points: 15 },
+    },
+  ],
 };
 
 export const raceStoryResponse: RaceStoryResponse = {
@@ -399,6 +442,12 @@ function fixtureLap(segmentMs: (k: number) => number, topSpeed: number): LapTele
   };
 }
 
+export const circuitTelemetry: CircuitTelemetry = {
+  raceId: 1, year: 2025, raceName: 'Italian Grand Prix', driver, lapTimeMs: 78_792, isPoleLap: true,
+  profile: { fullThrottlePct: 81, longestFullThrottleM: 1120, topSpeedKph: 345, brakingZones: 6, corners: { low: 2, medium: 4, high: 3 } },
+  trace: { distanceM: [0, 50, 100, 150], speed: [320, 340, 150, 280], throttle: [100, 100, 0, 100], brake: [0, 0, 100, 0] },
+};
+
 export const telemetryResponse: TelemetryResponse = {
   session: 'Q',
   drivers: [{ driver, lapTimeMs: 26_250 }, { driver: driverB, lapTimeMs: 26_250 }],
@@ -408,22 +457,54 @@ export const telemetryResponse: TelemetryResponse = {
   ],
 };
 
-const leader = (f1dbId: string, name: string, value: number) => ({ f1dbId, name, value });
+const leader = (f1dbId: string, name: string, value: number, nationality: string | null = null, coreId: number | null = null, active = false) => ({
+  f1dbId, name, value, nationality, coreId, active,
+});
+const hamilton = (value: number) => leader('lewis-hamilton', 'Lewis Hamilton', value, 'united-kingdom');
+const verstappen = (value: number) => leader('max-verstappen', 'Max Verstappen', value, 'netherlands', 10, true);
+const schumacher = (value: number) => leader('michael-schumacher', 'Michael Schumacher', value, 'germany', 20);
 export const historyRecords: HistoryRecords = {
   drivers: {
-    wins: [leader('lewis-hamilton', 'Lewis Hamilton', 106), leader('michael-schumacher', 'Michael Schumacher', 91)],
-    championships: [leader('lewis-hamilton', 'Lewis Hamilton', 7), leader('michael-schumacher', 'Michael Schumacher', 7)],
-    poles: [leader('lewis-hamilton', 'Lewis Hamilton', 104)],
-    podiums: [leader('lewis-hamilton', 'Lewis Hamilton', 202)],
-    starts: [leader('fernando-alonso', 'Fernando Alonso', 425)],
+    wins: [hamilton(106), schumacher(91), verstappen(72)],
+    championships: [hamilton(7), schumacher(7), verstappen(4)],
+    poles: [hamilton(104), verstappen(49)],
+    podiums: [hamilton(202), verstappen(135)],
+    starts: [leader('fernando-alonso', 'Fernando Alonso', 425, 'spain'), hamilton(380)],
   },
   constructors: {
-    wins: [leader('ferrari', 'Ferrari', 250)],
-    championships: [leader('ferrari', 'Ferrari', 16)],
-    poles: [leader('ferrari', 'Ferrari', 254)],
+    wins: [leader('ferrari', 'Ferrari', 250, 'italy')],
+    championships: [leader('ferrari', 'Ferrari', 16, 'italy')],
+    poles: [leader('ferrari', 'Ferrari', 254, 'italy')],
   },
-  youngestWinners: [{ f1dbId: 'max-verstappen', name: 'Max Verstappen', ageDays: 6802, raceName: 'Formula 1 Gran Premio de España Pirelli 2016' }],
+  rates: {
+    winRate: [leader('juan-manuel-fangio', 'Juan Manuel Fangio', 0.4706, 'argentina')],
+    poleRate: [leader('juan-manuel-fangio', 'Juan Manuel Fangio', 0.5686, 'argentina')],
+    podiumRate: [leader('juan-manuel-fangio', 'Juan Manuel Fangio', 0.6863, 'argentina')],
+  },
+  rateMinStarts: 50,
+  chases: [{ stat: 'wins', record: hamilton(106), chaser: verstappen(72) }],
 };
+
+const milestone = (f1dbId: string, name: string, days: number, raceName: string, nationality: string, coreId: number | null = null) => ({
+  f1dbId, name, days, raceName, nationality, coreId, active: coreId === 10,
+});
+export const historyMilestones: HistoryMilestones = {
+  youngestWinner: [milestone('max-verstappen', 'Max Verstappen', 6802, 'Formula 1 Gran Premio de España Pirelli 2016', 'netherlands', 10)],
+  youngestPole: [milestone('sebastian-vettel', 'Sebastian Vettel', 7744, 'Gran Premio d\'Italia 2008', 'germany')],
+  youngestPodium: [milestone('max-verstappen', 'Max Verstappen', 6802, 'Formula 1 Gran Premio de España Pirelli 2016', 'netherlands', 10)],
+  youngestStarter: [milestone('max-verstappen', 'Max Verstappen', 6375, '2015 Formula 1 Rolex Australian Grand Prix', 'netherlands', 10)],
+  oldestFirstWin: [milestone('luigi-fagioli', 'Luigi Fagioli', 19379, 'Grand Prix de France 1951', 'italy')],
+  longestWaitForWin: [milestone('sergio-perez', 'Sergio Pérez', 3542, 'Formula 1 Rolex Sakhir Grand Prix 2020', 'mexico')],
+};
+
+export const constructorLineages: ConstructorLineage[] = [{
+  f1dbId: 'red-bull', name: 'Red Bull', coreTeam: { id: 1, teamKey: 'red_bull' }, active: true,
+  members: [
+    { f1dbId: 'stewart', name: 'Stewart', yearFrom: 1997, yearTo: 1999, raceWins: 1, championships: 0, coreId: null },
+    { f1dbId: 'jaguar', name: 'Jaguar', yearFrom: 2000, yearTo: 2004, raceWins: 0, championships: 0, coreId: 5 },
+    { f1dbId: 'red-bull', name: 'Red Bull', yearFrom: 2005, yearTo: null, raceWins: 130, championships: 6, coreId: 1 },
+  ],
+}];
 
 export const driverHistory: DriverHistory = {
   f1dbId: 'max-verstappen', name: 'Max Verstappen', dateOfBirth: '1997-09-30', nationality: 'netherlands',
@@ -448,6 +529,11 @@ export const lastRaceRecap: RaceRecap = {
   topBattle: { chaser: driver, leader: driverB, lapStart: 41, lapEnd: 53, minGapMs: 280 },
 };
 
-export const onThisDayRaces: OnThisDayRace[] = [
-  { raceId: 1, year: 2019, name: 'Italian Grand Prix', winner: driverB },
-];
+// Echoes the requested date so the page can be driven to any day; 12-25 exercises the nearest-date fallback.
+export function onThisDay(requested: string): OnThisDay {
+  return {
+    requested,
+    date: requested === '12-25' ? '12-13' : requested,
+    races: [{ raceId: 1, year: 2019, name: 'Italian Grand Prix', winner: driverB }],
+  };
+}

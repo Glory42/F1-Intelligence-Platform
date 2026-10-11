@@ -1,22 +1,84 @@
 ---
-import type { OnThisDayRace } from '@/types';
+import type { OnThisDay } from '@/types';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { getTeamColor } from '@/lib/teamColors';
+import { getDriverFlagByCode, getNationalityFlag } from '@/lib/countryFlags';
+import { formatMonthDay, shiftMonthDay, yearsAgoLabel } from '../historyView';
+import EmptyState from '@/components/shared/EmptyState.astro';
 
 interface Props {
-  races: OnThisDayRace[];
-  dateLabel: string;
+  result: OnThisDay | null;
+  requested: string;
+  currentYear: number;
+  hrefFor: (monthDay: string) => string;
 }
 
-const { races, dateLabel } = Astro.props;
+const { result, requested, currentYear, hrefFor } = Astro.props;
+const requestedLabel = formatMonthDay(requested);
+const shownDate = result?.date ?? requested;
+const shownLabel = formatMonthDay(shownDate);
+const isFallback = result != null && result.races.length > 0 && result.date !== requested;
+const prev = shiftMonthDay(requested, -1);
+const next = shiftMonthDay(requested, 1);
 ---
 
-<ol aria-label={`On this day, ${dateLabel}`} class="border border-white/[0.06]">
-  {races.map((r, i) => (
-    <li class={i !== 0 ? 'border-t border-white/[0.04]' : ''}>
-      <a href={`/races/${r.raceId}`} class="flex items-center gap-4 px-5 py-3 hover:bg-white/[0.02] transition-colors duration-150 group">
-        <span class="w-12 shrink-0 font-mono text-[13px] font-bold text-muted-foreground">{r.year}</span>
-        <span class="flex-1 truncate text-[13px] group-hover:text-[#a855f7] transition-colors duration-150"><span class="sr-only">{r.year} · </span>{r.name}</span>
-        {r.winner && <span class="shrink-0 text-[13px] text-muted-foreground">{r.winner.fullName}</span>}
-      </a>
-    </li>
-  ))}
-</ol>
+<div class="space-y-5">
+  <nav aria-label="Change date" class="flex items-center justify-between gap-4 border border-white/[0.06] bg-black px-3 py-3">
+    <a href={hrefFor(prev)} class="flex items-center gap-1 font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground hover:text-foreground transition-colors">
+      <ChevronLeft size={12} /> {formatMonthDay(prev)}
+    </a>
+    <div class="text-center">
+      <div class="font-mono text-[8px] tracking-[0.25em] uppercase text-[#a855f7]/70">on this day</div>
+      <div class="text-lg font-bold">{requestedLabel}</div>
+    </div>
+    <a href={hrefFor(next)} class="flex items-center gap-1 font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground hover:text-foreground transition-colors">
+      {formatMonthDay(next)} <ChevronRight size={12} />
+    </a>
+  </nav>
+
+  {!result || result.races.length === 0 ? (
+    <EmptyState message={`No Grand Prix has been held on ${requestedLabel}.`} />
+  ) : (
+    <>
+      {isFallback && (
+        <p class="font-mono text-[9px] tracking-wider uppercase text-muted-foreground">
+          No Grand Prix on {requestedLabel} — showing the nearest date, <span class="text-white">{shownLabel}</span>.
+        </p>
+      )}
+      <ol aria-label={`On this day, ${shownLabel}`} class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {result.races.map((r) => {
+          const color = r.winner ? getTeamColor(r.winner.team.teamKey) : 'rgba(255,255,255,0.1)';
+          const flag = r.winner ? (r.winner.nationality ? getNationalityFlag(r.winner.nationality) : getDriverFlagByCode(r.winner.code)) : null;
+          return (
+            <li>
+              <a
+                href={`/races/${r.raceId}`}
+                class="group relative flex h-full flex-col gap-4 overflow-hidden border border-white/[0.06] bg-black p-5 hover:border-white/[0.12] transition-colors duration-150"
+                style={`border-left: 3px solid ${color}`}
+              >
+                <span class="pointer-events-none absolute -right-2 -bottom-5 select-none font-mono text-7xl font-bold text-white/[0.03]" aria-hidden="true">{r.year}</span>
+                <div class="flex items-baseline justify-between gap-3">
+                  <span class="font-mono text-2xl font-bold tabular-nums">{r.year}</span>
+                  <span class="font-mono text-[8px] tracking-[0.15em] uppercase text-muted-foreground">{yearsAgoLabel(r.year, currentYear)}</span>
+                </div>
+                <div class="text-[15px] font-semibold group-hover:text-[#a855f7] transition-colors duration-150">
+                  <span class="sr-only">{r.year} · </span>{r.name}
+                </div>
+                {r.winner ? (
+                  <div class="mt-auto flex items-center gap-2 text-[13px]">
+                    <span class="font-mono text-[8px] tracking-[0.15em] uppercase text-[#f5c542]">winner</span>
+                    <span>{flag}</span>
+                    <span class="font-medium truncate">{r.winner.fullName}</span>
+                    <span class="font-mono text-[9px] uppercase text-muted-foreground truncate">{r.winner.team.name}</span>
+                  </div>
+                ) : (
+                  <div class="mt-auto font-mono text-[9px] uppercase text-muted-foreground">Winner not recorded</div>
+                )}
+              </a>
+            </li>
+          );
+        })}
+      </ol>
+    </>
+  )}
+</div>

@@ -1,0 +1,85 @@
+---
+import type { ConstructorLineage } from '@/types';
+import { getTeamColor } from '@/lib/teamColors';
+import { formatYearRange, lineageMemberColor, lineageTotals, timelineSpan } from '../historyView';
+import ActiveBadge from './ActiveBadge.astro';
+
+interface Props {
+  lineages: ConstructorLineage[];
+  startYear: number;
+  endYear: number;
+}
+
+const { lineages, startYear, endYear } = Astro.props;
+const decades: number[] = [];
+for (let y = Math.ceil(startYear / 10) * 10; y <= endYear; y += 10) decades.push(y);
+const axisLeft = (year: number) => ((year - startYear) / (endYear - startYear + 1)) * 100;
+// Segments narrower than this can't fit a name; the chain underneath still lists them all.
+const LABEL_MIN_WIDTH = 9;
+---
+
+<div class="border border-white/[0.06] bg-black">
+  <div class="hidden md:grid grid-cols-[220px_1fr] gap-4 px-5 pt-4 pb-2 border-b border-white/[0.04]">
+    <div />
+    <div class="relative h-4" aria-hidden="true">
+      {decades.map((y) => (
+        <span class="absolute -translate-x-1/2 font-mono text-[8px] text-muted-foreground/60" style={`left: ${axisLeft(y)}%`}>{y}</span>
+      ))}
+    </div>
+  </div>
+
+  <ol aria-label="Team family trees" class="divide-y divide-white/[0.04]">
+    {lineages.map((family) => {
+      const totals = lineageTotals(family.members);
+      const color = family.coreTeam ? getTeamColor(family.coreTeam.teamKey) : '#6B7280';
+      return (
+        <li class="grid md:grid-cols-[220px_1fr] gap-x-4 gap-y-3 px-5 py-4">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="h-2.5 w-2.5 shrink-0" style={`background: ${color}`} aria-hidden="true" />
+              {family.coreTeam
+                ? <a href={`/teams/${family.coreTeam.id}`} class="truncate text-sm font-semibold hover:text-[#a855f7] transition-colors">{family.name}</a>
+                : <span class="truncate text-sm font-semibold text-white/70">{family.name}</span>}
+              {family.active && <ActiveBadge />}
+            </div>
+            <div class="mt-1 font-mono text-[8px] tracking-wider uppercase text-muted-foreground">
+              {family.members.length} names · {totals.wins} wins · {totals.titles} titles
+            </div>
+          </div>
+
+          <div class="min-w-0 space-y-2">
+            <div class="relative hidden md:block h-6 bg-white/[0.02]">
+              {decades.map((y) => (
+                <span class="absolute inset-y-0 w-px bg-white/[0.04]" style={`left: ${axisLeft(y)}%`} aria-hidden="true" />
+              ))}
+              {family.members.map((m) => {
+                const span = timelineSpan(m, startYear, endYear);
+                const memberColor = lineageMemberColor(m.f1dbId);
+                return (
+                  <div
+                    class="absolute inset-y-0 flex items-center overflow-hidden border-r border-black px-1.5"
+                    style={`left: ${span.left}%; width: ${span.width}%; background: ${memberColor}33; box-shadow: inset 0 -2px 0 ${memberColor}`}
+                    title={`${m.name} · ${formatYearRange(m)}`}
+                  >
+                    {span.width >= LABEL_MIN_WIDTH && <span class="truncate font-mono text-[8px] uppercase tracking-wider text-white/85">{m.name}</span>}
+                  </div>
+                );
+              })}
+            </div>
+            <ol aria-label={`${family.name} lineage`} class="flex flex-wrap items-center gap-x-1.5 gap-y-1 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+              {family.members.map((m, i) => (
+                <li class="flex items-center gap-1.5">
+                  {i > 0 && <span class="text-white/20" aria-hidden="true">→</span>}
+                  {m.coreId != null
+                    ? <a href={`/teams/${m.coreId}`} class:list={['hover:text-[#a855f7] transition-colors', m.yearTo == null && 'text-white']}>{m.name}</a>
+                    : <span class={m.yearTo == null ? 'text-white' : ''}>{m.name}</span>}
+                  <span class="text-white/30">{formatYearRange(m)}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </li>
+      );
+    })}
+  </ol>
+</div>

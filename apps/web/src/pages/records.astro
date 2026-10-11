@@ -2,7 +2,10 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import PageHeader from '@/components/shared/PageHeader.astro';
 import SectionKicker from '@/components/shared/SectionKicker.astro';
-import RecordTable from '@/features/history/components/RecordTable.astro';
+import Leaderboard, { type LeaderboardEntry } from '@/features/history/components/Leaderboard.astro';
+import RecordTile from '@/features/history/components/RecordTile.astro';
+import RecordChases from '@/features/history/components/RecordChases.astro';
+import LineageTimeline from '@/features/history/components/LineageTimeline.astro';
 import F1dbCredit from '@/features/history/components/F1dbCredit.astro';
 import OnThisDayList from '@/features/history/components/OnThisDayList.astro';
 import PageTabs from '@/components/shared/PageTabs.astro';
@@ -10,62 +13,163 @@ import EmptyState from '@/components/shared/EmptyState.astro';
 import { api } from '@/lib/api';
 import { formatAgeFromDays } from '@/lib/utils';
 import { resolveTab } from '@/lib/pageTabs';
-import type { HistoryRecords, OnThisDayRace } from '@/types';
+import { RANK_COLORS, formatRate, parseMonthDay, recordHolders, todayMonthDay } from '@/features/history/historyView';
+import type { ConstructorLineage, HistoryMilestones, HistoryRecords, MilestoneEntry, OnThisDay, RecordEntry } from '@/types';
 
 const TABS = [
   { id: 'records', label: 'Records' },
+  { id: 'milestones', label: 'Milestones' },
   { id: 'on-this-day', label: 'On this day' },
+  { id: 'lineage', label: 'Lineage' },
 ] as const;
+const TITLES: Record<(typeof TABS)[number]['id'], string> = {
+  'records': 'All-time records',
+  'milestones': 'Milestones',
+  'on-this-day': 'On this day',
+  'lineage': 'Team lineage',
+};
 
 const tab = resolveTab(Astro.url, TABS);
-const today = new Date();
-const monthDay = `${String(today.getUTCMonth() + 1).padStart(2, '0')}-${String(today.getUTCDate()).padStart(2, '0')}`;
-const dateLabel = today.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+const now = new Date();
+const currentYear = now.getUTCFullYear();
+const requestedDay = parseMonthDay(Astro.url.searchParams.get('date')) ?? todayMonthDay(now);
 
 const records: HistoryRecords | null = tab === 'records' ? await api.getHistoryRecords().catch(() => null) : null;
-const onThisDay: OnThisDayRace[] = tab === 'on-this-day' ? await api.getOnThisDay(monthDay).catch(() => []) : [];
-const toEntries = (rows: Array<{ name: string; value: number }>) => rows.map((r) => ({ name: r.name, value: r.value }));
+const milestones: HistoryMilestones | null = tab === 'milestones' ? await api.getHistoryMilestones().catch(() => null) : null;
+const onThisDay: OnThisDay | null = tab === 'on-this-day' ? await api.getOnThisDay(requestedDay).catch(() => null) : null;
+const lineages: ConstructorLineage[] = tab === 'lineage' ? await api.getConstructorLineages().catch(() => []) : [];
+
+const driverHref = (e: { coreId: number | null }) => (e.coreId != null ? `/drivers/${e.coreId}` : undefined);
+const drivers = (rows: RecordEntry[], display?: (v: number) => string): LeaderboardEntry[] =>
+  rows.map((r) => ({
+    name: r.name, value: r.value, display: display?.(r.value), nationality: r.nationality,
+    href: driverHref(r), active: r.active,
+  }));
+const constructors = (rows: RecordEntry[]): LeaderboardEntry[] =>
+  rows.map((r) => ({
+    name: r.name, value: r.value, nationality: r.nationality,
+    href: r.coreId != null ? `/teams/${r.coreId}` : undefined, active: r.active,
+  }));
+const milestoneRows = (rows: MilestoneEntry[]): LeaderboardEntry[] =>
+  rows.map((r) => ({
+    name: r.name, value: r.days, display: formatAgeFromDays(r.days), detail: r.raceName, nationality: r.nationality,
+    href: driverHref(r), active: r.active,
+  }));
+const holder = (e: RecordEntry | MilestoneEntry) => ({
+  name: e.name, nationality: e.nationality, href: driverHref(e), active: e.active,
+});
+
+const lineageStart = Math.floor(Math.min(...lineages.flatMap((l) => l.members.map((m) => m.yearFrom)), currentYear) / 10) * 10;
+const onThisDayHref = (monthDay: string) => `/records?tab=on-this-day&date=${monthDay}`;
 ---
 
-<BaseLayout title={tab === 'records' ? 'All-time records' : 'On this day'}>
+<BaseLayout title={TITLES[tab]}>
   <div class="space-y-6">
     <PageHeader kicker="./history" title="History" subtitle="Every world championship season since 1950" />
 
     <PageTabs tabs={TABS} active={tab} label="History views" />
 
-    {tab === 'on-this-day' ? (
-      onThisDay.length > 0
-        ? <OnThisDayList races={onThisDay} dateLabel={dateLabel} />
-        : <EmptyState message={`No Grand Prix has been held on ${dateLabel}.`} />
-    ) : !records ? (
+    {tab === 'records' && (!records ? (
       <EmptyState message="Historical data hasn't been imported yet." />
     ) : (
-      <>
+      <div class="space-y-10">
+        <section aria-label="Headline records" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <RecordTile
+            label="Most championships"
+            value={String(records.drivers.championships[0]?.value ?? '—')}
+            holders={recordHolders(records.drivers.championships).map(holder)}
+            accent={RANK_COLORS[0]}
+          />
+          <RecordTile label="Most race wins" value={String(records.drivers.wins[0]?.value ?? '—')} holders={records.drivers.wins.slice(0, 1).map(holder)} />
+          <RecordTile label="Most pole positions" value={String(records.drivers.poles[0]?.value ?? '—')} holders={records.drivers.poles.slice(0, 1).map(holder)} />
+          <RecordTile label="Most race starts" value={String(records.drivers.starts[0]?.value ?? '—')} holders={records.drivers.starts.slice(0, 1).map(holder)} />
+        </section>
+
+        <p class="-mt-6 flex items-center justify-end gap-1.5 font-mono text-[8px] tracking-[0.15em] uppercase text-muted-foreground">
+          <span class="h-1.5 w-1.5 rounded-full bg-emerald-300" aria-hidden="true" /> on the current grid
+        </p>
+
+        {records.chases.some((c) => c.chaser) && (
+          <section>
+            <SectionKicker label="./chasing the record" />
+            <RecordChases chases={records.chases} />
+          </section>
+        )}
+
         <section>
           <SectionKicker label="./drivers" />
-          <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <RecordTable title="Most race wins" entries={toEntries(records.drivers.wins)} />
-            <RecordTable title="Most championships" entries={toEntries(records.drivers.championships)} />
-            <RecordTable title="Most pole positions" entries={toEntries(records.drivers.poles)} />
-            <RecordTable title="Most podiums" entries={toEntries(records.drivers.podiums)} />
-            <RecordTable title="Most race starts" entries={toEntries(records.drivers.starts)} />
-            <RecordTable
-              title="Youngest winners"
-              entries={records.youngestWinners.map((w) => ({ name: w.name, value: formatAgeFromDays(w.ageDays), detail: w.raceName }))}
-            />
+          <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Leaderboard title="Most race wins" entries={drivers(records.drivers.wins)} />
+            <Leaderboard title="Most championships" entries={drivers(records.drivers.championships)} />
+            <Leaderboard title="Most pole positions" entries={drivers(records.drivers.poles)} />
+            <Leaderboard title="Most podiums" entries={drivers(records.drivers.podiums)} />
+          </div>
+        </section>
+
+        <section>
+          <SectionKicker label="./longevity & strike rate" />
+          <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Leaderboard title="Most race starts" entries={drivers(records.drivers.starts)} />
+            <Leaderboard title="Best win rate" note={`min ${records.rateMinStarts} starts`} entries={drivers(records.rates.winRate, formatRate)} />
+            <Leaderboard title="Best pole rate" note={`min ${records.rateMinStarts} starts`} entries={drivers(records.rates.poleRate, formatRate)} />
+            <Leaderboard title="Best podium rate" note={`min ${records.rateMinStarts} starts`} entries={drivers(records.rates.podiumRate, formatRate)} />
           </div>
         </section>
 
         <section>
           <SectionKicker label="./constructors" />
-          <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <RecordTable title="Most constructor wins" entries={toEntries(records.constructors.wins)} />
-            <RecordTable title="Most constructors' titles" entries={toEntries(records.constructors.championships)} />
-            <RecordTable title="Most constructor poles" entries={toEntries(records.constructors.poles)} />
+          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Leaderboard title="Most constructor wins" entries={constructors(records.constructors.wins)} />
+            <Leaderboard title="Most constructors' titles" entries={constructors(records.constructors.championships)} />
+            <Leaderboard title="Most constructor poles" entries={constructors(records.constructors.poles)} />
           </div>
         </section>
-      </>
+      </div>
+    ))}
+
+    {tab === 'milestones' && (!milestones ? (
+      <EmptyState message="Historical data hasn't been imported yet." />
+    ) : (
+      <div class="space-y-10">
+        <section aria-label="Headline milestones" class="grid gap-4 sm:grid-cols-3">
+          {([
+            ['Youngest winner', milestones.youngestWinner[0]],
+            ['Youngest polesitter', milestones.youngestPole[0]],
+            ['Oldest first-time winner', milestones.oldestFirstWin[0]],
+          ] as const).map(([label, entry]) => entry && (
+            <RecordTile label={label} value={formatAgeFromDays(entry.days)} holders={[holder(entry)]} detail={entry.raceName} />
+          ))}
+        </section>
+
+        <section>
+          <SectionKicker label="./firsts" />
+          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Leaderboard title="Youngest winners" bars={false} entries={milestoneRows(milestones.youngestWinner)} />
+            <Leaderboard title="Youngest polesitters" bars={false} entries={milestoneRows(milestones.youngestPole)} />
+            <Leaderboard title="Youngest podium finishers" bars={false} entries={milestoneRows(milestones.youngestPodium)} />
+            <Leaderboard title="Youngest starters" bars={false} entries={milestoneRows(milestones.youngestStarter)} />
+            <Leaderboard title="Oldest first-time winners" bars={false} entries={milestoneRows(milestones.oldestFirstWin)} />
+            <Leaderboard title="Longest wait for a first win" note="debut to first win" bars={false} entries={milestoneRows(milestones.longestWaitForWin)} />
+          </div>
+        </section>
+      </div>
+    ))}
+
+    {tab === 'on-this-day' && (
+      <OnThisDayList result={onThisDay} requested={requestedDay} currentYear={currentYear} hrefFor={onThisDayHref} />
     )}
+
+    {tab === 'lineage' && (lineages.length === 0 ? (
+      <EmptyState message="Historical data hasn't been imported yet." />
+    ) : (
+      <section class="space-y-3">
+        <p class="text-[13px] text-muted-foreground">
+          Teams that raced under more than one name, traced from their first entry to today.
+        </p>
+        <LineageTimeline lineages={lineages} startYear={lineageStart} endYear={currentYear} />
+      </section>
+    ))}
+
     <F1dbCredit />
   </div>
 </BaseLayout>
