@@ -25,7 +25,7 @@ Same check for changed `.py` files in `data-engine/src/`. Common leftovers after
 
 ### 3. Unused exported constants and types
 
-Grep for exported constants/types in `apps/api/src/common/types/`, `apps/api/src/common/constants.ts`, and `apps/web/src/types/index.ts`. For each export, check if it has any import anywhere in the project:
+Grep for exported constants/types in `apps/api/src/common/types/`, `apps/api/src/common/constants.ts`, and `apps/web/src/types/`. For each export, check if it has any import anywhere in the project:
 ```bash
 grep -rn "ImportName" apps/api/src apps/web/src --include="*.ts" --include="*.tsx" --include="*.astro"
 ```

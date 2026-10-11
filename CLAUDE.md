@@ -479,7 +479,7 @@ Applying the DB schema is covered under [Drizzle ORM](#drizzle-orm-appsapidrizzl
 ## Code Style
 
 - TypeScript strict mode everywhere in `apps/api/` and `apps/web/`
-- No `any` types — define proper interfaces in `types/index.ts`
+- No `any` types — define proper types in the app's `types/` folder (one file per domain, imported via its barrel)
 - Python: type hints on all function signatures
 - No comments explaining what code does — name things clearly instead
 - Only comment WHY when it's non-obvious (a hidden constraint, a workaround)

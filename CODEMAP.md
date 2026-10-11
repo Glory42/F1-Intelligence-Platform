@@ -504,10 +504,9 @@ apps/web/
 │   │       ├── championshipMath.ts # titleContention() (mathematically out), remainingSessions(), formatTitleOdds(), championshipPoints()
 │   │       └── tyres.ts           # compoundToken() — tyre compound → colour token
 │   ├── middleware.ts              # 301s retired URLs via legacyRedirect()
-│   ├── types/
-│   │   └── index.ts               # All API response types (~75) — core entities (Circuit, Team, Driver, Race, results),
-│   │                              #   predictions/sprint, standings, OpenF1 race events, strategy/pit stops, title odds,
-│   │                              #   teammate battle, racecraft, race story, telemetry, F1DB history, RaceRecap, OnThisDay, quality
+│   ├── types/                     # API response types per domain (mirrors apps/api common/types/): seasons, circuits,
+│   │                              #   drivers, teams, races, race-events, strategy, race-story, telemetry, predictions,
+│   │                              #   sprint, history, quality — imported via the index.ts barrel as '@/types'
 │   ├── styles/
 │   │   └── globals.css            # Tailwind base + CSS custom properties
 │   └── env.d.ts                   # Astro env type declarations

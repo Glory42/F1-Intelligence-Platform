@@ -66,7 +66,7 @@ already passed in as a prop — it does not fetch.
 `src/lib/api.ts` is the single place any `fetch` to the API happens. Every page imports `api` and
 calls a named method — never a raw `fetch`. `get<T>()` unwraps the `{ data, error }` envelope and
 throws on `error` or a non-2xx status, so callers get `T` directly. Response types come from
-`src/types/index.ts`.
+`@/types`.
 
 ## Directory layout
 
@@ -87,7 +87,7 @@ src/
 ├── lib/                app plumbing: api client, utils, site, pageTabs, sidebarState, legacyRedirects
 │   └── f1/             F1 reference data and maths shared by features: teamColors, teamLogos, countryFlags,
 │                       championshipMath, predictionMath, tyres
-├── types/index.ts      all TypeScript types in one file
+├── types/            API response types, one file per domain (mirrors apps/api common/types/), index.ts barrel
 ├── content/config.ts   Astro content collection for docs/ (globs ../../docs, minus adr/)
 └── styles/globals.css  Tailwind base + CSS custom properties
 ```
@@ -174,9 +174,10 @@ rather than raising the limit. (`apps/api` has its own parallel budget — see t
 
 ## Types
 
-`src/types/index.ts` holds **all** frontend types in one file. It is a hand-maintained mirror of the
-API's response shapes (`apps/api/src/common/types/`) — the two are separate files and can drift, so
-when an endpoint's response changes, update both. Same applies to `lib/f1/predictionMath.ts`, whose
+`src/types/` holds the API response types, one file per domain behind an `index.ts` barrel (import
+from `@/types`). It is a hand-maintained mirror of `apps/api/src/common/types/`, file for file — the
+two can drift, so when an endpoint's response changes, update the matching file on both sides.
+Feature-only view models stay in that feature's `types.ts`. Same applies to `lib/f1/predictionMath.ts`, whose
 `GP_WEIGHTS` / `SPRINT_WEIGHTS` are hand-copied from the Python model.
 
 ## Local development
