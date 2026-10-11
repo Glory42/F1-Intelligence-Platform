@@ -1,5 +1,5 @@
 ---
-import SectionKicker from '@/components/shared/SectionKicker.astro';
+import TabIntro from '@/components/shared/TabIntro.astro';
 import DataList from '@/components/shared/DataList.astro';
 import DataRow from '@/components/shared/DataRow.astro';
 import TeamIdentity from '@/components/shared/TeamIdentity.astro';
@@ -11,15 +11,24 @@ import type { PitCrewRanking } from '@/types';
 interface Props {
   rankings: PitCrewRanking[];
   year: number;
+  highlightTeamId?: number;
+  intro?: boolean;
 }
 
-const { rankings, year } = Astro.props;
+const { rankings, year, highlightTeamId, intro = true } = Astro.props;
 const COLUMNS = 'grid-cols-[40px_1fr_80px] sm:grid-cols-[40px_1fr_90px_90px_70px]';
 ---
 
 {rankings.length > 0 && (
   <section id="pit-crews">
-    <SectionKicker label={`./pit-crews · ${year}`} />
+    {intro && <TabIntro
+      lead="Time stationary in the box, from OpenF1 (2024 US GP onwards). Ranked by the median, so one botched stop can't skew it."
+      terms={[
+        { term: 'Median', meaning: 'typical stop' },
+        { term: 'Best', meaning: 'fastest single stop' },
+        { term: 'Stops', meaning: 'stops counted' },
+      ]}
+    />}
     <DataList
       label="Pit crew ranking"
       columns={COLUMNS}
@@ -29,7 +38,7 @@ const COLUMNS = 'grid-cols-[40px_1fr_80px] sm:grid-cols-[40px_1fr_90px_90px_70px
       ]}
     >
       {rankings.map((r, i) => (
-        <DataRow columns={COLUMNS} first={i === 0} accent={getTeamColor(r.team.teamKey)}>
+        <DataRow columns={COLUMNS} first={i === 0} accent={getTeamColor(r.team.teamKey)} class={r.team.id === highlightTeamId ? 'bg-white/[0.04]' : ''}>
           <RankCell rank={i + 1} />
           <TeamIdentity team={r.team} year={year} />
           <div role="cell" class="font-mono text-sm font-bold text-right">{formatStopSeconds(r.medianStationaryMs)}</div>
@@ -38,8 +47,5 @@ const COLUMNS = 'grid-cols-[40px_1fr_80px] sm:grid-cols-[40px_1fr_90px_90px_70px
         </DataRow>
       ))}
     </DataList>
-    <p class="font-mono text-[7px] text-muted-foreground/50 mt-3 leading-relaxed">
-      Median time stationary in the box (OpenF1, from the 2024 US GP) — one botched stop can't skew it.
-    </p>
   </section>
 )}

@@ -1,11 +1,10 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { api } from '@/lib/api';
-import type { TeamYearStats, DriverStanding, PitCrewRanking, TeamHistory } from '@/types';
-import PitCrewCard from '@/features/teams/components/PitCrewCard.astro';
-import LineageTable from '@/features/history/components/LineageTable.astro';
+import type { TeamYearStats, DriverStanding, PitCrewRanking, TeamHistory, TeamPitStop } from '@/types';
+import TeamPitCrew from '@/features/teams/components/TeamPitCrew.astro';
 import HeadToHead, { type HeadToHeadRow } from '@/features/drivers/components/HeadToHead.astro';
-import TeamCareerTable from '@/features/teams/components/TeamCareerTable.astro';
+import TeamHistoryTable from '@/features/teams/components/TeamHistoryTable.astro';
 import { Info } from 'lucide-react';
 import YearSelectLinks from '@/components/shared/YearSelectLinks.astro';
 import PageTabs from '@/components/shared/PageTabs.astro';
@@ -30,6 +29,7 @@ let data = null;
 let career: TeamYearStats[] = [];
 let driverStandings: DriverStanding[] = [];
 let pitCrewRankings: PitCrewRanking[] = [];
+let teamPitStops: TeamPitStop[] = [];
 let teamHistory: TeamHistory | null = null;
 let error = null;
 
@@ -44,10 +44,12 @@ try {
       : (activeYears.includes(new Date().getFullYear()) ? new Date().getFullYear() : Math.max(...activeYears));
     
     year = targetYear;
-    [data, driverStandings, pitCrewRankings, teamHistory] = await Promise.all([
+    const seasonTeamId = career.find((y) => y.year === targetYear)?.teamId ?? Number(id);
+    [data, driverStandings, pitCrewRankings, teamPitStops, teamHistory] = await Promise.all([
       api.getTeamById(Number(id), targetYear),
       tab === 'season' ? api.getDriverStandings(targetYear) : [],
       tab === 'pit-crew' ? api.getPitCrewRankings(targetYear).catch(() => []) : [],
+      tab === 'pit-crew' ? api.getTeamPitStops(seasonTeamId, targetYear).catch(() => []) : [],
       tab === 'history' ? api.getTeamHistory(Number(id)).catch(() => null) : null,
     ]);
   } else {
@@ -200,13 +202,10 @@ const compareRows: HeadToHeadRow[] = d1 && d2 ? [
           </div>
         ) : tab === 'pit-crew' ? (
           pitCrewRankings.some((r) => r.team.id === team.id)
-            ? <PitCrewCard rankings={pitCrewRankings} teamId={team.id} year={year} />
+            ? <TeamPitCrew team={team} rankings={pitCrewRankings} stops={teamPitStops} year={year} />
             : <EmptyState message={`No pit stop data for ${team.name} in ${year}.`} />
         ) : (
-          <div class="space-y-8">
-            {teamHistory && <LineageTable history={teamHistory} color={getTeamColor(team.teamKey)} />}
-            <TeamCareerTable career={careerWithStats} year={year} />
-          </div>
+          <TeamHistoryTable career={careerWithStats} history={teamHistory} year={year} teamName={team.name} />
         )}
 
       </div>

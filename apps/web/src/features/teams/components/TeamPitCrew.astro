@@ -1,0 +1,110 @@
+---
+import StatTiles from '@/components/shared/StatTiles.astro';
+import TabIntro from '@/components/shared/TabIntro.astro';
+import DataList from '@/components/shared/DataList.astro';
+import DataRow from '@/components/shared/DataRow.astro';
+import PitCrewRankingTable from './PitCrewRankingTable.astro';
+import { driverStopSummaries } from '../pitStopSummary';
+import { formatStopSeconds } from '@/lib/utils';
+import { getTeamColor } from '@/lib/teamColors';
+import type { PitCrewRanking, Team, TeamPitStop } from '@/types';
+
+interface Props {
+  team: Team;
+  rankings: PitCrewRanking[];
+  stops: TeamPitStop[];
+  year: number;
+}
+
+const { team, rankings, stops, year } = Astro.props;
+const index = rankings.findIndex((r) => r.team.id === team.id);
+const crew = rankings[index];
+const fastest = rankings[0];
+const gapMs = crew.medianStationaryMs - fastest.medianStationaryMs;
+const color = getTeamColor(team.teamKey);
+const drivers = driverStopSummaries(stops);
+const driverColor = new Map(drivers.map((d, i) => [d.driver.id, i === 0 ? color : 'rgba(255,255,255,0.55)']));
+
+// Every stop, one column per race; anything slower than the cap sits on the top edge as a botched stop.
+const W = 800, H = 220, PAD_L = 40, PAD_R = 12, PAD_T = 12, PAD_B = 28;
+const rounds = [...new Set(stops.map((s) => s.roundNumber))];
+const CAP_S = 5;
+const minS = Math.min(2, ...stops.map((s) => s.stationaryMs / 1000));
+const yFor = (seconds: number) => PAD_T + (1 - (Math.min(seconds, CAP_S) - minS) / (CAP_S - minS)) * (H - PAD_T - PAD_B);
+const xFor = (round: number) => {
+  const i = rounds.indexOf(round);
+  return PAD_L + (rounds.length === 1 ? 0.5 : i / (rounds.length - 1)) * (W - PAD_L - PAD_R);
+};
+const jitter = (i: number) => ((i % 3) - 1) * 4;
+const ticks = [2, 3, 4, 5].filter((t) => t >= minS);
+const COLUMNS = 'grid-cols-[minmax(0,1fr)_64px_80px_80px]';
+---
+
+{crew && (
+  <section aria-label="Pit crew" class="space-y-6">
+    <TabIntro
+      lead={`Time stationary in the box at every timed grand prix stop in ${year} (OpenF1, from the 2024 US GP).`}
+      terms={[
+        { term: 'Median', meaning: 'typical stop — one botched stop can’t skew it' },
+        { term: 'Gap', meaning: 'median behind the fastest crew' },
+      ]}
+    />
+
+    <StatTiles cols="grid-cols-2 sm:grid-cols-5" items={[
+      { label: 'Median stop', value: formatStopSeconds(crew.medianStationaryMs) },
+      { label: 'Best stop', value: formatStopSeconds(crew.fastestStationaryMs) },
+      { label: 'Stops timed', value: crew.stops },
+      { label: 'Crew rank', value: `#${index + 1} of ${rankings.length}` },
+      { label: 'Gap to fastest', value: index === 0 ? 'fastest crew' : `+${(gapMs / 1000).toFixed(2)} s` },
+    ]} />
+
+    {stops.length > 0 && (
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <figure class="border border-white/[0.06] p-4">
+          <figcaption class="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
+            <span class="flex-1">Every stop, by race</span>
+            {drivers.map((d) => (
+              <span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full" style={`background:${driverColor.get(d.driver.id)}`} />{d.driver.code}</span>
+            ))}
+            <span class="flex items-center gap-1.5"><span class="h-px w-4 border-t border-dashed border-[#a855f7]" />median</span>
+          </figcaption>
+          <svg viewBox={`0 0 ${W} ${H}`} class="w-full" role="img" aria-label={`${team.name} stationary time at each pit stop in ${year}`}>
+            {ticks.map((t) => (
+              <g>
+                <line x1={PAD_L} x2={W - PAD_R} y1={yFor(t)} y2={yFor(t)} stroke="rgba(255,255,255,0.06)" />
+                <text x={PAD_L - 8} y={yFor(t) + 3} text-anchor="end" class="fill-muted-foreground font-mono" font-size="10">{t === CAP_S ? `${t}s+` : `${t}s`}</text>
+              </g>
+            ))}
+            <line x1={PAD_L} x2={W - PAD_R} y1={yFor(crew.medianStationaryMs / 1000)} y2={yFor(crew.medianStationaryMs / 1000)} stroke="#a855f7" stroke-dasharray="4 4" />
+            {rounds.map((r) => (
+              <text x={xFor(r)} y={H - 8} text-anchor="middle" class="fill-muted-foreground font-mono" font-size="9">R{r}</text>
+            ))}
+            {stops.map((s, i) => (
+              <circle cx={xFor(s.roundNumber) + jitter(i)} cy={yFor(s.stationaryMs / 1000)} r="4" fill={driverColor.get(s.driver.id)} fill-opacity="0.85">
+                <title>{`${s.driver.code} · ${s.raceName} · lap ${s.lapNumber} · ${formatStopSeconds(s.stationaryMs)}`}</title>
+              </circle>
+            ))}
+          </svg>
+        </figure>
+
+        <DataList label="Stops by driver" columns={COLUMNS} headers={[
+          { label: 'Driver' }, { label: 'Stops', class: 'text-right' }, { label: 'Median', class: 'text-right' }, { label: 'Best', class: 'text-right' },
+        ]}>
+          {drivers.map((d, i) => (
+            <DataRow columns={COLUMNS} first={i === 0} accent={driverColor.get(d.driver.id)}>
+              <div role="cell" class="truncate text-[13px]"><span class="font-mono font-bold">{d.driver.code}</span><span class="ml-2 text-muted-foreground">{d.driver.lastName}</span></div>
+              <div role="cell" class="text-right font-mono text-sm text-muted-foreground">{d.stops}</div>
+              <div role="cell" class="text-right font-mono text-sm font-bold">{formatStopSeconds(d.medianMs)}</div>
+              <div role="cell" class="text-right font-mono text-sm text-muted-foreground">{formatStopSeconds(d.bestMs)}</div>
+            </DataRow>
+          ))}
+        </DataList>
+      </div>
+    )}
+
+    <div>
+      <p class="mb-2 text-[12px] text-muted-foreground">All crews</p>
+      <PitCrewRankingTable rankings={rankings} year={year} highlightTeamId={team.id} intro={false} />
+    </div>
+  </section>
+)}

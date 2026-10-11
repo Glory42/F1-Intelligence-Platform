@@ -1,0 +1,91 @@
+---
+import TabIntro from '@/components/shared/TabIntro.astro';
+import F1dbCredit from '@/features/history/components/F1dbCredit.astro';
+import { mergeTeamHistory } from '../teamHistory';
+import { championshipPoints } from '@/lib/championshipMath';
+import type { TeamHistory, TeamYearStats } from '@/types';
+
+interface Props {
+  career: TeamYearStats[];
+  history: TeamHistory | null;
+  year: number;
+  teamName: string;
+}
+
+const { career, history, year, teamName } = Astro.props;
+const rows = mergeTeamHistory(career, history?.seasons ?? []);
+
+// Columns join by width: stats (sm), reliability (md), power unit + form (lg).
+const COLUMNS = [
+  'grid gap-x-4 grid-cols-[48px_minmax(0,1fr)_56px_44px]',
+  'sm:grid-cols-[52px_minmax(0,1fr)_56px_44px_36px_40px]',
+  'md:grid-cols-[52px_minmax(0,1fr)_56px_44px_36px_40px_48px_44px]',
+  'lg:grid-cols-[52px_minmax(0,1.2fr)_minmax(0,1fr)_56px_44px_36px_40px_48px_44px_56px_88px]',
+].join(' ');
+const c = history?.constructor;
+const lead = c
+  ? `${teamName} across every season: ${c.raceWins} grand prix wins, ${c.podiums} podiums and ${c.championships} constructors' titles all time.`
+  : `${teamName} season by season.`;
+---
+
+<section aria-label="Team history" class="space-y-4">
+  <TabIntro
+    lead={lead}
+    terms={[
+      { term: 'Chassis / power unit', meaning: 'from F1DB, back to the team’s first season' },
+      { term: 'Stats', meaning: 'seasons we hold results for (1980 on)' },
+    ]}
+  />
+
+  <div role="table" aria-label="Season by season" class="border border-white/[0.06]">
+    <div role="row" class={`${COLUMNS} border-b border-white/[0.06] px-5 py-2.5 text-[11px] text-muted-foreground`}>
+      <div role="columnheader">Year</div>
+      <div role="columnheader">Chassis</div>
+      <div role="columnheader" class="hidden lg:block">Power unit</div>
+      <div role="columnheader" class="text-right">Pts</div>
+      <div role="columnheader" class="text-right">Pos</div>
+      <div role="columnheader" class="hidden text-right sm:block">W</div>
+      <div role="columnheader" class="hidden text-right sm:block">Pod</div>
+      <div role="columnheader" class="hidden text-right md:block">Races</div>
+      <div role="columnheader" class="hidden text-right md:block">DNFs</div>
+      <div role="columnheader" class="hidden text-right lg:block">Avg fin</div>
+      <div role="columnheader" class="hidden text-right lg:block">Car perf</div>
+    </div>
+    {rows.map((r, i) => {
+      const s = r.stats;
+      const Tag = r.teamId ? 'a' : 'div';
+      return (
+        <Tag
+          role="row"
+          href={r.teamId ? `/teams/${r.teamId}?year=${r.year}` : undefined}
+          class:list={[
+            COLUMNS, 'items-center px-5 py-2.5 text-sm',
+            i !== 0 && 'border-t border-white/[0.04]',
+            r.teamId && 'hover:bg-white/[0.02] transition-colors duration-150',
+            r.year === year && 'bg-[rgba(168,85,247,0.04)]',
+          ]}
+        >
+          <div role="cell" class:list={['font-mono font-bold', r.year === year ? 'text-[#a855f7]' : 'text-muted-foreground']}>{r.year}</div>
+          <div role="cell" class="truncate font-semibold">{r.chassis ?? '—'}</div>
+          <div role="cell" class="hidden truncate font-mono text-[11px] text-muted-foreground lg:block">{r.engine ?? '—'}</div>
+          <div role="cell" class="text-right font-bold tabular-nums">{s ? Math.round(championshipPoints(s)) : '—'}</div>
+          <div role="cell" class="text-right font-mono text-muted-foreground">{s?.championshipPosition ? `P${s.championshipPosition}` : '—'}</div>
+          <div role="cell" class="hidden text-right font-mono text-muted-foreground sm:block">{s?.wins ?? '—'}</div>
+          <div role="cell" class="hidden text-right font-mono text-muted-foreground sm:block">{s?.podiums ?? '—'}</div>
+          <div role="cell" class="hidden text-right font-mono text-muted-foreground md:block">{s?.racesCompleted ?? '—'}</div>
+          <div role="cell" class="hidden text-right font-mono text-muted-foreground md:block">{s?.dnfCount ?? '—'}</div>
+          <div role="cell" class="hidden text-right font-mono text-muted-foreground lg:block">{s?.avgFinishPosition ? `P${Math.round(Number(s.avgFinishPosition))}` : '—'}</div>
+          <div role="cell" class="hidden items-center justify-end gap-1.5 lg:flex">
+            {s?.carPerformanceScore ? (
+              <>
+                <div class="h-1 w-10 bg-white/[0.06]"><div class="h-full bg-[#a855f7]" style={`width:${Math.round(Number(s.carPerformanceScore) * 100)}%`} /></div>
+                <span class="font-mono text-[10px] text-muted-foreground">{Math.round(Number(s.carPerformanceScore) * 100)}</span>
+              </>
+            ) : <span class="font-mono text-[10px] text-muted-foreground">—</span>}
+          </div>
+        </Tag>
+      );
+    })}
+  </div>
+  {history && <F1dbCredit />}
+</section>

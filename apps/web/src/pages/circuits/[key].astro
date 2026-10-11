@@ -3,10 +3,12 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import { api } from '@/lib/api';
 import { MapPin, Zap, AlertTriangle } from 'lucide-react';
 import { getCountryFlag } from '@/lib/countryFlags';
-import { getCircuitMetadata } from '@/features/circuits/circuitMetadata';
+import { getCircuitCoordinates } from '@/features/circuits/circuitCoordinates';
 import { WeatherForecast } from '@/features/circuits/components/WeatherForecast';
-import CircuitTelemetryCard from '@/features/circuits/components/CircuitTelemetryCard.astro';
+import CircuitTelemetryProfile from '@/features/circuits/components/CircuitTelemetryProfile.astro';
+import EmptyState from '@/components/shared/EmptyState.astro';
 import CircuitWinnersTable from '@/features/circuits/components/CircuitWinnersTable.astro';
+import CircuitWinningFacts from '@/features/circuits/components/CircuitWinningFacts.astro';
 import DominanceCard from '@/features/circuits/components/DominanceCard.astro';
 import { getWeatherForecast, type ForecastDay } from '@/features/circuits/weather';
 import PageTabs from '@/components/shared/PageTabs.astro';
@@ -24,10 +26,12 @@ const { key } = Astro.params;
 if (!key) return Astro.redirect('/races');
 
 const currentYear = new Date().getFullYear();
-const [detailsResult, racesResult] = await Promise.allSettled([
+const [detailsResult, racesResult, telemetryResult] = await Promise.allSettled([
   api.getCircuitDetails(key),
   api.getRaces(currentYear),
+  tab === 'telemetry' ? api.getCircuitTelemetry(key) : Promise.resolve(null),
 ]);
+const telemetry = telemetryResult.status === 'fulfilled' ? telemetryResult.value : null;
 
 const details = detailsResult.status === 'fulfilled' ? detailsResult.value : undefined;
 let error: string | null = null;
@@ -70,8 +74,7 @@ const dryPct = totalWeather ? Math.round((weatherStats.dry / totalWeather) * 100
 const wetPct = totalWeather ? Math.round((weatherStats.wet / totalWeather) * 100) : 0;
 const mixedPct = totalWeather ? Math.round((weatherStats.mixed / totalWeather) * 100) : 0;
 
-const meta = getCircuitMetadata(circuit.circuitKey, Number(circuit.trackLengthKm), circuit.numberOfCorners || 15);
-const { lat, lng } = meta;
+const { lat, lng } = getCircuitCoordinates(circuit.circuitKey);
 
 let forecast: ForecastDay[] | null = null;
 if (tab === 'overview' && isUpcomingCircuit && lat !== 0 && lng !== 0) {
@@ -84,12 +87,6 @@ if (tab === 'overview' && isUpcomingCircuit && lat !== 0 && lng !== 0) {
 
 const imageUrl = circuit.imageUrl || null;
 
-function formatLapTime(ms: number) {
-  const m = Math.floor(ms / 60000);
-  const s = Math.floor((ms % 60000) / 1000);
-  const msRem = ms % 1000;
-  return `${m}:${s.toString().padStart(2, '0')}.${msRem.toString().padStart(3, '0')}`;
-}
 ---
 
 <BaseLayout title={`${circuit.name} - Circuit Details`}>
@@ -192,17 +189,9 @@ function formatLapTime(ms: number) {
                     <span class="font-mono text-[9px] text-muted-foreground uppercase">Overtake Rate</span>
                     <span class="font-mono text-sm font-semibold text-white">{circuit.overtakeRate || '-'}</span>
                   </div>
-                  <div class="flex items-baseline justify-between border-b border-white/[0.04] pb-1.5">
-                    <span class="font-mono text-[9px] text-muted-foreground uppercase">Pole to Win</span>
-                    <span class="font-mono text-sm font-semibold text-white">{Math.round(qualifyingImpact.poleToWinRate * 100)}%</span>
-                  </div>
-                  <div class="flex items-baseline justify-between border-b border-white/[0.04] pb-1.5">
+                  <div class="flex items-baseline justify-between">
                     <span class="font-mono text-[9px] text-muted-foreground uppercase">Seeded SC Prob</span>
                     <span class="font-mono text-sm font-semibold text-white">{circuit.scProbability ? `${(Number(circuit.scProbability) * 100).toFixed(0)}%` : '-'}</span>
-                  </div>
-                  <div class="flex items-baseline justify-between">
-                    <span class="font-mono text-[9px] text-muted-foreground uppercase">Avg Winner Start</span>
-                    <span class="font-mono text-sm font-semibold text-white">Grid P{qualifyingImpact.avgWinnerGridPos.toFixed(1)}</span>
                   </div>
                 </div>
               </div>
@@ -270,33 +259,19 @@ function formatLapTime(ms: number) {
         <div class="lg:col-span-2">
           <CircuitWinnersTable history={history} />
         </div>
-      <!-- Fastest Lap -->
-      <div class="border border-white/[0.06] bg-black p-5">
-        <h2 class="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mb-4">Fastest Lap Record</h2>
-        {fastestLap ? (
-          <div>
-            <span class="text-3xl font-bold font-mono tracking-tight text-white mb-1 block">
-              {formatLapTime(fastestLap.timeMs)}
-            </span>
-            <div class="flex items-center justify-between mt-3">
-              <div>
-                <span class="block text-sm font-medium">{fastestLap.driver.fullName}</span>
-                <span class="block font-mono text-[9px] text-muted-foreground mt-0.5">{fastestLap.driver.team.name}</span>
-              </div>
-              <span class="font-mono text-[10px] text-white/40 border border-white/10 px-2 py-1">{fastestLap.year}</span>
-            </div>
-          </div>
-        ) : (
-          <span class="text-sm text-muted-foreground">No data available</span>
-        )}
-      </div>
+        <CircuitWinningFacts
+          history={history}
+          poleToWinRate={qualifyingImpact.poleToWinRate}
+          avgWinnerGridPos={qualifyingImpact.avgWinnerGridPos}
+          fastestLap={fastestLap}
+        />
       </div>
     ) : tab === 'dominance' ? (
       <DominanceCard dominance={dominance} />
     ) : (
-      <div class="max-w-xl">
-        <CircuitTelemetryCard meta={meta} />
-      </div>
+      telemetry
+        ? <CircuitTelemetryProfile telemetry={telemetry} />
+        : <EmptyState message="No qualifying telemetry here yet — OpenF1 car data starts in 2023." />
     )}
   </div>
 </BaseLayout>

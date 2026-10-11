@@ -1,0 +1,87 @@
+---
+import StatTiles from '@/components/shared/StatTiles.astro';
+import TabIntro from '@/components/shared/TabIntro.astro';
+import { formatMs } from '@/lib/utils';
+import type { CircuitTelemetry } from '@/types';
+
+interface Props {
+  telemetry: CircuitTelemetry;
+}
+
+const { telemetry } = Astro.props;
+const { profile, trace, driver } = telemetry;
+const totalCorners = profile.corners.low + profile.corners.medium + profile.corners.high;
+
+const W = 900, H = 240, PAD_L = 44, PAD_R = 12, PAD_T = 12, PAD_B = 30;
+const lapM = trace.distanceM[trace.distanceM.length - 1] || 1;
+const maxV = Math.ceil(Math.max(...trace.speed) / 50) * 50;
+const x = (m: number) => PAD_L + (m / lapM) * (W - PAD_L - PAD_R);
+const y = (v: number) => PAD_T + (1 - v / maxV) * (H - PAD_T - PAD_B);
+const speedPath = trace.speed.map((v, i) => `${i ? 'L' : 'M'}${x(trace.distanceM[i]).toFixed(1)},${y(v).toFixed(1)}`).join('');
+const step = trace.distanceM[1] - trace.distanceM[0] || 50;
+const braking = trace.brake.flatMap((b, i) => (b > 0 ? [trace.distanceM[i]] : []));
+const speedTicks = [0, 100, 200, 300].filter((v) => v <= maxV);
+const kmTicks = Array.from({ length: Math.floor(lapM / 1000) + 1 }, (_, k) => k * 1000);
+---
+
+<section aria-label="Track telemetry" class="space-y-6">
+  <TabIntro
+    lead={`From ${driver.fullName}'s ${telemetry.isPoleLap ? 'pole lap' : 'fastest recorded qualifying lap'} at the ${telemetry.year} ${telemetry.raceName} (${formatMs(telemetry.lapTimeMs)}), OpenF1 car data.`}
+    terms={[
+      { term: 'Full throttle', meaning: 'share of the lap at 98% throttle or more' },
+      { term: 'Corners', meaning: 'every lift or brake, classed by its slowest point' },
+    ]}
+  />
+
+  <StatTiles items={[
+    { label: 'Full throttle', value: `${profile.fullThrottlePct}%` },
+    { label: 'Longest flat-out', value: `${profile.longestFullThrottleM} m` },
+    { label: 'Top speed', value: `${profile.topSpeedKph} km/h` },
+    { label: 'Braking zones', value: profile.brakingZones },
+  ]} />
+
+  <div class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+    <figure class="border border-white/[0.06] p-4">
+      <figcaption class="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
+        <span class="flex-1">Speed around the lap</span>
+        <span class="flex items-center gap-1.5"><span class="h-px w-4 bg-[#a855f7]" />speed</span>
+        <span class="flex items-center gap-1.5"><span class="h-2 w-2 bg-red-500/60" />braking</span>
+      </figcaption>
+      <svg viewBox={`0 0 ${W} ${H}`} class="w-full" role="img" aria-label={`Speed trace of the fastest ${telemetry.year} qualifying lap`}>
+        {speedTicks.map((v) => (
+          <g>
+            <line x1={PAD_L} x2={W - PAD_R} y1={y(v)} y2={y(v)} stroke="rgba(255,255,255,0.06)" />
+            <text x={PAD_L - 8} y={y(v) + 3} text-anchor="end" class="fill-muted-foreground font-mono" font-size="10">{v}</text>
+          </g>
+        ))}
+        {braking.map((m) => (
+          <rect x={x(m)} y={H - PAD_B - 6} width={Math.max(1, x(m + step) - x(m))} height="6" fill="rgba(239,68,68,0.6)" />
+        ))}
+        <path d={speedPath} fill="none" stroke="#a855f7" stroke-width="1.5" stroke-linejoin="round" />
+        {kmTicks.map((m) => (
+          <text x={x(m)} y={H - 10} text-anchor="middle" class="fill-muted-foreground font-mono" font-size="9">{m / 1000} km</text>
+        ))}
+      </svg>
+    </figure>
+
+    <div>
+      <p class="mb-2 text-[12px] text-muted-foreground">{totalCorners} corners by apex speed</p>
+      <dl class="grid grid-cols-3 gap-px border border-white/[0.06] bg-white/[0.06]">
+        {[
+          { label: 'Low', note: 'under 130 km/h', value: profile.corners.low },
+          { label: 'Medium', note: '130–210 km/h', value: profile.corners.medium },
+          { label: 'High', note: '210 km/h +', value: profile.corners.high },
+        ].map((c) => (
+          <div class="bg-black p-4">
+            <dt class="text-[11px] text-muted-foreground">{c.label}</dt>
+            <dd class="mt-1 font-mono text-xl font-bold tabular-nums">{c.value}</dd>
+            <dd class="mt-1 text-[11px] text-muted-foreground/70">{c.note}</dd>
+          </div>
+        ))}
+      </dl>
+      <p class="mt-3 text-[12px] leading-relaxed text-muted-foreground">
+        Flat-out kinks aren't counted — on this lap they never cost a lift.
+      </p>
+    </div>
+  </div>
+</section>
