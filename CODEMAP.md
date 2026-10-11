@@ -458,12 +458,15 @@ apps/web/
 │   │   ├── circuits/
 │   │   │   ├── components/
 │   │   │   │   ├── CircuitsGrid.tsx      # React component for circuits grid (filters/sorting)
+│   │   │   │   ├── CircuitOverview.astro # Overview tab — track card, key stats, model insights, forecast, safety car, weather split
+│   │   │   │   ├── CircuitTrackCard.astro # Track photo with pole-lap outline fallback (+ broken-image script)
 │   │   │   │   ├── WeatherForecast.tsx   # React weather forecast widget (Open-Meteo API)
 │   │   │   │   ├── CircuitTelemetryProfile.astro # Telemetry tab — pole-lap tiles, speed trace, corners by apex speed
 │   │   │   │   ├── CircuitWinningFacts.astro # Winners tab sidebar — fastest lap record + how races here are won
 │   │   │   │   ├── CircuitWinnersTable.astro   # Recent-winners list for the circuit
 │   │   │   │   └── DominanceCard.astro         # Era-filtered constructor/driver dominance + tab script
 │   │   │   ├── circuitCoordinates.ts  # Track lat/lng for the race-week weather forecast
+│   │   │   ├── circuitView.ts         # isRaceWeekCircuit() (forecast only for the next race's track), weatherSplit()
 │   │   │   ├── winnerFacts.ts         # winnerFacts() — races, different winners, longest streak at a circuit
 │   │   │   └── weather.ts             # Open-Meteo forecast fetch + ForecastDay type
 │   │   ├── compare/
