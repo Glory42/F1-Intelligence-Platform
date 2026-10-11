@@ -13,6 +13,7 @@ from src.utils.schedule_window import race_weekend_window, RaceWeekendWindow
 
 # Import jobs
 from src.jobs import (
+    sync_schedule,
     ingest_sprint_qualifying,
     compute_sprint_features,
     compute_sprint_predictions,
@@ -396,7 +397,7 @@ def run_cycle(
             # Find the most recent active race
             cur.execute(
                 """
-                SELECT r.id, r.round_number, s.year, r.status, r.event_format
+                SELECT r.id, r.round_number, s.year, r.status, r.event_format, r.name
                 FROM races r
                 JOIN seasons s ON r.season_id = s.id
                 WHERE r.status != 'completed' AND s.year >= EXTRACT(YEAR FROM CURRENT_DATE)
@@ -434,6 +435,17 @@ def run_cycle(
             event = schedule[schedule["RoundNumber"] == ctx.round_number].iloc[0]
         except Exception as e:
             log_func(f"[auto_runner] Failed to fetch schedule from FastF1: {e}")
+            return CycleResult(window=window, schedule_available=schedule_available)
+
+        # Jobs load FastF1 sessions by round number, so a calendar change (an event added or
+        # dropped earlier in the season) would make them ingest a different event's sessions.
+        stored_name, schedule_name = race_row.get("name"), event.get("EventName")
+        if stored_name and schedule_name and stored_name != schedule_name:
+            log_func(
+                f"[auto_runner] Round {ctx.round_number} is {schedule_name} in FastF1 but {stored_name} "
+                f"in the database — re-syncing the {ctx.year} calendar."
+            )
+            sync_schedule.run(ctx.year, schedule=schedule)
             return CycleResult(window=window, schedule_available=schedule_available)
 
         try:
