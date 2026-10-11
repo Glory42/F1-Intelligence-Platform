@@ -1,9 +1,10 @@
-import { eq, and, desc, inArray } from 'drizzle-orm';
+import { eq, and, desc, inArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../../config/database';
 import { drivers, teams, seasons, driverSeasonStats, raceResults, races } from '../../db/schema';
 import type { Driver, DriverDetailResponse, DriverStanding, DriverYearStats } from '../../common/types';
 import { toDriver } from '../../common/mappers';
 import { resolveSeason, buildStandings, buildCareerStats, type StatsAdapter } from '../../common/standings';
+import { isSamePerson } from '../../common/driverIdentity';
 
 function toDriverStats(s: typeof driverSeasonStats.$inferSelect) {
   return {
@@ -88,20 +89,17 @@ export class DriversService {
     const driverRow = await db.select().from(drivers).where(eq(drivers.id, driverId)).limit(1);
     if (!driverRow[0]) return [];
 
-    const { firstName, lastName } = driverRow[0];
+    const self = driverRow[0];
 
-    const allEntries = await db
+    // Candidates share the code or surname; isSamePerson then decides, since FastF1's names vary by season.
+    const candidates = await db
       .select()
       .from(drivers)
       .innerJoin(seasons, eq(drivers.seasonId, seasons.id))
       .innerJoin(teams, eq(drivers.teamId, teams.id))
-      .where(
-        and(
-          eq(drivers.firstName, firstName),
-          eq(drivers.lastName, lastName)
-        )
-      )
+      .where(or(eq(drivers.code, self.code), sql`lower(${drivers.lastName}) = lower(${self.lastName})`))
       .orderBy(desc(seasons.year));
+    const allEntries = candidates.filter((e) => isSamePerson(self, e.drivers));
 
     if (!allEntries.length) return [];
 

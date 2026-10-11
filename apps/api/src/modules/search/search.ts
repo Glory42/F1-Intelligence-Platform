@@ -1,12 +1,30 @@
 import { Hono } from 'hono';
-import { desc, eq, sql } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import type { Bindings, Driver } from '../../common/types';
 import { createDb, type Db } from '../../config/database';
 import { drivers, teams, circuits, seasons } from '../../db/schema';
 import { toDriver, toTeam, toCircuit } from '../../common/mappers';
+import { isSamePerson, personKey } from '../../common/driverIdentity';
+
+type DriverRow = typeof drivers.$inferSelect;
+
+// Rows arrive newest season first, so the first row kept for a person is their latest season.
+function latestRowPerPerson<T extends { driver: DriverRow }>(rows: T[]): T[] {
+  const kept: T[] = [];
+  const keys = new Set<string>();
+  const byCode = new Map<string, DriverRow[]>();
+  for (const row of rows) {
+    const key = personKey(row.driver);
+    const sameCode = byCode.get(row.driver.code) ?? [];
+    if (keys.has(key) || sameCode.some((d) => isSamePerson(d, row.driver))) continue;
+    kept.push(row);
+    keys.add(key);
+    byCode.set(row.driver.code, [...sameCode, row.driver]);
+  }
+  return kept;
+}
 
 async function getGlobalSearchData(db: Db) {
-  const fullNameExpr = sql`${drivers.firstName} || ' ' || ${drivers.lastName}`;
 
   const [teamRows, driverRows, allCircuits] = await Promise.all([
     db
@@ -15,15 +33,15 @@ async function getGlobalSearchData(db: Db) {
       .innerJoin(seasons, eq(teams.seasonId, seasons.id))
       .orderBy(teams.teamKey, desc(seasons.year)),
     db
-      .selectDistinctOn([fullNameExpr], { driver: drivers, team: teams })
+      .select({ driver: drivers, team: teams })
       .from(drivers)
       .innerJoin(seasons, eq(drivers.seasonId, seasons.id))
       .innerJoin(teams, eq(drivers.teamId, teams.id))
-      .orderBy(fullNameExpr, desc(seasons.year)),
+      .orderBy(desc(seasons.year)),
     db.select().from(circuits),
   ]);
 
-  const mappedDrivers: Driver[] = driverRows.map(({ driver: d, team: t }) => toDriver(d, t));
+  const mappedDrivers: Driver[] = latestRowPerPerson(driverRows).map(({ driver: d, team: t }) => toDriver(d, t));
 
   return {
     drivers: mappedDrivers,
