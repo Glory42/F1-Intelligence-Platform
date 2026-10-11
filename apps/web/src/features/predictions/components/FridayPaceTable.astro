@@ -18,7 +18,7 @@ interface Props {
 
 const { rows, accent, year } = Astro.props;
 const COLUMNS = 'grid-cols-[40px_1fr_90px_70px] md:grid-cols-[40px_1fr_110px_100px_80px_60px]';
-const formatDelta = (ms: number) => (ms === 0 ? '—' : `+${(ms / 1000).toFixed(3)}`);
+const formatDelta = (ms: number) => (ms === 0 ? '-' : `+${(ms / 1000).toFixed(3)}`);
 ---
 
 <section>
@@ -36,15 +36,15 @@ const formatDelta = (ms: number) => (ms === 0 ? '—' : `+${(ms / 1000).toFixed(
         <RankCell rank={i + 1} />
         <DriverIdentity driver={r.driver} year={year} />
         <div role="cell" class="hidden md:flex items-center gap-1.5 font-mono text-[9px] tracking-widest uppercase text-muted-foreground">
-          <span class="w-2 h-2 rounded-full" style={`background:hsl(var(--${compoundToken(r.compound)}))`} />{r.compound}
+          <span class="w-2 h-2 rounded-full" style={`background:hsl(var(--${compoundToken(r.compound, year)}))`} />{r.compound}
         </div>
         <div role="cell" class="font-mono text-sm font-bold text-right">{formatMs(r.medianLapMs)}</div>
         <div role="cell" class="font-mono text-sm text-right text-muted-foreground">{formatDelta(r.deltaToFastestMs)}</div>
-        <div role="cell" class="font-mono text-sm text-right text-muted-foreground hidden md:block">{r.stintLength ?? '—'}{r.sessionType !== 'FP2' && <span class="text-[8px]"> {r.sessionType}</span>}</div>
+        <div role="cell" class="font-mono text-sm text-right text-muted-foreground hidden md:block">{r.stintLength ?? '-'}{r.sessionType !== 'FP2' && <span class="text-[8px]"> {r.sessionType}</span>}</div>
       </DataRow>
     ))}
   </DataList>
   <p class="font-mono text-[7px] text-muted-foreground/50 mt-3 leading-relaxed">
-    Median lap of each driver's quickest practice long run — the raw input behind the Long Run Pace feature.
+    Median lap of each driver's quickest practice long run: the raw input behind the Long Run Pace feature.
   </p>
 </section>

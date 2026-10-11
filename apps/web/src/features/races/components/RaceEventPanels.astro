@@ -26,7 +26,7 @@ const { strategy, raceControlMessages, overtakes, teamRadio } = events;
   <RaceTabPanel id="strategy" defaultTab={defaultTab} namespace={namespace}>
     <div class="space-y-4">
       <div class="border border-white/[0.06] p-5">
-        <StintChart drivers={strategy.drivers} approximate={strategy.source === 'derived'} />
+        <StintChart drivers={strategy.drivers} approximate={strategy.source === 'derived'} year={year} />
       </div>
       <div class="border border-white/[0.06] overflow-hidden">
         <PitStopTable drivers={strategy.drivers} year={year} />
@@ -58,7 +58,7 @@ const { strategy, raceControlMessages, overtakes, teamRadio } = events;
         <TeamRadioList clips={teamRadio} driverMap={driverMap} />
       ) : (
         <p class="px-4 py-6 text-sm text-muted-foreground">
-          F1 has published far fewer team radio clips since 2026 — none were released for this race.
+          F1 has published far fewer team radio clips since 2026: none were released for this race.
         </p>
       )}
     </div>

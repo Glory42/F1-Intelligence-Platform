@@ -6,9 +6,10 @@ import type { DriverStrategy } from '@/types';
 interface Props {
   drivers: DriverStrategy[];
   approximate: boolean;
+  year: number;
 }
 
-const { drivers, approximate } = Astro.props;
+const { drivers, approximate, year } = Astro.props;
 
 const ROW_H = 16;
 const ROW_GAP = 6;
@@ -34,7 +35,7 @@ const stintLabel = (code: string, compound: string | null, used: boolean, lapSta
   <ul class="flex flex-wrap gap-4 mb-4 font-mono text-[8px] tracking-widest uppercase text-muted-foreground" aria-label="Compounds">
     {compoundsUsed.map((c) => (
       <li class="flex items-center gap-1.5">
-        <span class="inline-block w-2.5 h-2.5" style={`background:hsl(var(--${compoundToken(c)}))`} />{c}
+        <span class="inline-block w-2.5 h-2.5" style={`background:hsl(var(--${compoundToken(c, year)}))`} />{c}
       </li>
     ))}
     {anyUsedSets && (
@@ -67,7 +68,7 @@ const stintLabel = (code: string, compound: string | null, used: boolean, lapSta
           return (
             <g role="img" aria-label={stintLabel(d.driver.code, s.compound, used, s.lapStart!, s.lapEnd!)}>
               <title>{stintLabel(d.driver.code, s.compound, used, s.lapStart!, s.lapEnd!)}</title>
-              <rect x={barX} y={rowY(i)} width={barW} height={ROW_H} fill={`hsl(var(--${compoundToken(s.compound)}))`} />
+              <rect x={barX} y={rowY(i)} width={barW} height={ROW_H} fill={`hsl(var(--${compoundToken(s.compound, year)}))`} />
               {used && <rect x={barX} y={rowY(i)} width={barW} height={ROW_H} fill="url(#used-set)" />}
             </g>
           );
@@ -77,7 +78,7 @@ const stintLabel = (code: string, compound: string | null, used: boolean, lapSta
   </svg>
   {approximate && (
     <p class="mt-3 font-mono text-[7px] text-muted-foreground/50 leading-relaxed">
-      Approximate — rebuilt from timed laps; pit in/out laps and tyre age aren't recorded for this race.
+      Approximate: rebuilt from timed laps; pit in/out laps and tyre age aren't recorded for this race.
     </p>
   )}
 </div>

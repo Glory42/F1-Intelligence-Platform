@@ -76,7 +76,7 @@ const forecast: ForecastDay[] | null = showForecast && lat !== 0 && lng !== 0
     ) : (
       telemetry
         ? <CircuitTelemetryProfile telemetry={telemetry} />
-        : <EmptyState message="No qualifying telemetry here yet — OpenF1 car data starts in 2023." />
+        : <EmptyState message="No qualifying telemetry here yet. Car data starts in 2018." />
     )}
   </div>
 </BaseLayout>
