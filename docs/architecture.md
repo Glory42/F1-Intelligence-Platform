@@ -112,6 +112,10 @@ Sunday
 
 ## Screenshots
 
+**Home**
+
+![Home page](../preview/Preview-homePage.png)
+
 **Races calendar**
 
 ![Races page](../preview/Preview-racesPage.png)
@@ -119,6 +123,30 @@ Sunday
 **Race detail**
 
 ![Race detail page](../preview/Preview-races[id]Page.png)
+
+**Race story: gap to leader and positions, lap by lap**
+
+![Race story page](../preview/Preview-raceStoryPage.png)
+
+**Qualifying telemetry: two fastest laps compared**
+
+![Telemetry page](../preview/Preview-telemetryPage.png)
+
+**Driver standings**
+
+![Drivers page](../preview/Preview-driversPage.png)
+
+**Driver detail**
+
+![Driver detail page](../preview/Preview-drivers[id]Page.png)
+
+**Constructors: pit crew rankings**
+
+![Teams page](../preview/Preview-teamsPage.png)
+
+**Constructor detail**
+
+![Team detail page](../preview/Preview-teams[id]Page.png)
 
 **Circuits directory**
 
@@ -135,6 +163,10 @@ Sunday
 **Team comparison tool**
 
 ![Team comparison page](../preview/Preview-teamComparisonPage.png)
+
+**All-time history (F1DB)**
+
+![History page](../preview/Preview-historyPage.png)
 
 ---
 

@@ -280,13 +280,18 @@ All queries use Drizzle joins. Never fetch a list then loop-query for each item.
 | Route | Layout | Data source |
 |-------|--------|------------|
 | `/` | BaseLayout | Season progress strip + three fixed blocks: next race (schedule, circuit, model top 3), last race (podium + Recap), championship top 5 with title odds |
-| `/prediction` | BaseLayout | `GET /api/predictions/upcoming` |
-| `/races/[id]` | BaseLayout | `GET /api/races/:id` (+ strategy, race events) |
+| `/prediction` | BaseLayout | `GET /api/predictions/upcoming` (+ sprint, model standings); `?tab=scorecard` fetches `predictions/history` + `accuracy` |
+| `/prediction/[id]` · `/prediction/sprint/[id]` | BaseLayout | `GET /api/predictions/race/:id` (+ friday pace) · `GET /api/sprint/race/:id` |
+| `/races` | BaseLayout | `GET /api/races?year=N` |
+| `/races/[id]` · `/races/[id]/sprint` | BaseLayout | `GET /api/races/:id` (+ strategy, race events per tab) · `GET /api/sprint/race/:id/detail` |
 | `/races/[id]/race-story` | BaseLayout | `GET /api/races/:id/race-story` (`?session=sprint` for the sprint) |
 | `/races/[id]/telemetry` | BaseLayout | `GET /api/races/:id/telemetry`: drivers picked with a plain GET form, so no client fetch |
+| `/circuits` · `/circuits/[key]` | BaseLayout | `GET /api/races/circuits` · `GET /api/races/circuit/:key` (+ `/telemetry` tab) |
+| `/drivers` · `/teams` | BaseLayout | standings; `?tab=title-fight`/`title-odds` fetch title odds, `racecraft`/`pit-crews` their own route |
+| `/drivers/[id]` | BaseLayout | `GET /api/drivers/:id` (+ teammate battle, career, model tabs) |
+| `/teams/[id]` | BaseLayout | `GET /api/teams/:id` (+ pit crew, history tabs) |
+| `/compare/drivers` · `/compare/teams` | BaseLayout | season lists in frontmatter; the compare island fetches the pair client-side (§3 exception) |
 | `/history` | BaseLayout | `GET /api/history/records`; `?tab=milestones`/`on-this-day` (`&date=MM-DD`)/`lineage` each fetch their own route |
-| `/drivers/[id]` | BaseLayout | `GET /api/drivers/:id` |
-| `/teams/[id]` | BaseLayout | `GET /api/teams/:id` |
 
 ### Navigation and page tabs
 - Collapsible sidebar (`components/layout/Sidebar.astro`) with two groups: Season (home, calendar, drivers,
