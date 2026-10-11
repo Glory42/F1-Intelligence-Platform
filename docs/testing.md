@@ -106,7 +106,7 @@ suite never touches Neon.
 - **Covered**: `races` (incl. circuit outline + circuit telemetry), `race-events`, `race-story`,
   `strategy`, `telemetry`, `drivers` (incl. career, racecraft, teammate battle), `teams` (incl. pit
   stops), `seasons`, `search`, `predictions` (incl. Friday pace, title odds), `sprint`, `history`,
-  the home hub's on-this-day query, and the `edgeCache` middleware. Not yet: `quality`.
+  the home hub's on-this-day query, and the `edgeCache` middleware (`common/edge-cache.ts`). Not yet: `quality`.
 
 ## Web unit (`apps/web/tests/unit/`)
 
@@ -114,7 +114,8 @@ Vitest, config in `vitest.config.ts` (include `tests/unit/**/*.test.{ts,tsx}`, `
 
 - **Default environment is `node`** — pure logic runs there: `lib/f1/predictionMath.ts` (all exports),
   `lib/f1/teamColors` / `lib/f1/teamLogos` / `features/history/f1dbCountries`, `features/compare/compareStats.ts`,
-  `features/history/historyView.ts`, the hub/circuits/drivers/teams feature helpers,
+  `features/history/historyView.ts`, `features/races/{raceView,calendar,loadRaceEvents}` (race page and
+  calendar view logic), `components/data/{chartScale,labelLayout}`, the hub/circuits/drivers/teams feature helpers,
   `features/predictions/{buildPredictionPageData,predictionCopy}` (API mocked with `vi.mock`, not MSW).
 - **jsdom is opt-in per file** via a `// @vitest-environment jsdom` docblock on line 1 — used for
   hook/component tests (`useCompareController`, `useGlobalSearch`, `GlobalSearch`) with Testing
