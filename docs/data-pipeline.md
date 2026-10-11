@@ -14,7 +14,7 @@ All jobs live in `data-engine/src/jobs/`. They are invoked via `src/main.py --jo
 
 | Job | Purpose |
 |-----|---------|
-| `sync_schedule` | Populates the `races` table for a season from FastF1 (includes sprint dates, event_format) |
+| `sync_schedule` | Populates the `races` table for a season from FastF1 (includes sprint dates, event_format). Races are matched by event name first, so when FastF1 renumbers the calendar (an event added or dropped mid-season) each race keeps its row and only its `round_number` moves |
 | `sync_season` | Populates `teams` and `drivers` for a season from FastF1 |
 | `ingest_qualifying` | Ingests Q1/Q2/Q3 qualifying session data and sector times — 2018+ |
 | `ingest_qualifying_legacy` | Ingests qualifying from Ergast — pre-2018 |
@@ -138,7 +138,7 @@ A persistent web service runs continuously:
 
 ### How `auto_runner.py` works:
 1. Queries the database for the most recent active race (where `status != 'completed'`).
-2. Fetches the official F1 schedule via FastF1 to get exact UTC session times.
+2. Fetches the official F1 schedule via FastF1 to get exact UTC session times. If the race stored at that round has a different name from FastF1's event there (the calendar changed since the last sync), it re-runs `sync_schedule` with that schedule and stops the cycle instead of ingesting another event's sessions — every job loads FastF1 sessions by round number.
 3. Checks if a session ended recently:
    - Sprint Qualifying + 1.5 hours
    - Sprint Race + 1.5 hours
