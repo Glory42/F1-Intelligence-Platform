@@ -125,7 +125,7 @@ class TestRunScheduleGate:
         assert spy.calls == 1
 
     def test_fetches_the_schedule_only_once_per_cycle(self):
-        # The gate fetch and the session-time lookup must reuse the same schedule —
+        # The gate fetch and the session-time lookup must reuse the same schedule:
         # not each trigger their own fastf1.get_event_schedule() call.
         race = _utc(2026, 3, 8, 4, 0)
         now = race - timedelta(hours=6)
@@ -145,7 +145,7 @@ class TestRunScheduleGate:
 
     def test_resyncs_schedule_available_and_window_after_a_successful_retry(self):
         # The gate fetch fails, but the in-cycle retry (once we know which round to look up)
-        # succeeds — the CycleResult must reflect that recovery, not the earlier failure.
+        # succeeds: the CycleResult must reflect that recovery, not the earlier failure.
         race = _utc(2026, 3, 8, 4, 0)
         now = race - timedelta(hours=6)  # inside the window once the schedule is available
         provider = _FlakyOnceScheduleProvider(_schedule_with_race(1, race))
@@ -166,7 +166,7 @@ class TestRunScheduleGate:
         calls = []
         monkeypatch.setattr(
             auto_runner, "_retry_missing_race_events",
-            lambda log_func, conn, round_number, year: calls.append((round_number, year))
+            lambda log_func, conn, round_number, year, memo=None: calls.append((round_number, year))
         )
         race = _utc(2026, 3, 8, 4, 0)
         now = race - timedelta(hours=6)
@@ -292,9 +292,12 @@ class TestDecideNextAction:
             "ingest_team_radio_sprint",
             "ingest_stints_sprint",
             "ingest_pit_stops_sprint",
-            "ingest_qualifying_telemetry",
-            "ingest_sprint_qualifying_telemetry",
         ]
+
+    def test_telemetry_runs_as_soon_as_its_qualifying_session_is_ingested(self):
+        last = {kind: auto_runner._ACTION_JOBS[kind][-1].name for kind in auto_runner.ActionKind}
+        assert last[auto_runner.ActionKind.MAIN_QUALIFYING] == "ingest_qualifying_telemetry"
+        assert last[auto_runner.ActionKind.SPRINT_QUALIFYING] == "ingest_sprint_qualifying_telemetry"
 
 
 class TestRunOpenF1Step:
@@ -346,140 +349,95 @@ class TestRunOpenF1Step:
 
 
 class TestRetryMissingRaceEvents:
-    def _row(self, **overrides):
-        row = {"id": 1, "status": "completed", "sprint_date": None, "has_race_control": False, "telemetry_complete": True}
-        row.update(overrides)
-        return row
+    # A completed weekend with every table covered: tests flip only the flags they care about.
+    _COVERED = {
+        "has_race_control": True, "has_overtakes": True, "has_stints": True, "has_pit_stops": True,
+        "has_story": True, "telemetry_complete": True, "stats_current": True, "odds_current": True,
+        "has_sprint_race_control": True, "has_sprint_overtakes": True, "has_sprint_stints": True,
+        "has_sprint_pit_stops": True, "has_sprint_story": True, "sq_telemetry_complete": True,
+    }
 
-    def _patch_openf1_jobs(self, monkeypatch):
+    def _row(self, **overrides):
+        return {"id": 1, "status": "completed", "sprint_date": None, **self._COVERED, **overrides}
+
+    def _patch_jobs(self, monkeypatch, fail=()):
         calls = []
-        for job in (
-            auto_runner.ingest_race_control, auto_runner.ingest_overtakes, auto_runner.ingest_team_radio,
-            auto_runner.ingest_stints, auto_runner.ingest_pit_stops,
-        ):
-            name = job.__name__.rsplit(".", 1)[-1]
-            monkeypatch.setattr(
-                job, "run",
-                lambda y, r, session_name="Race", _name=name: calls.append((_name, session_name))
-            )
+
+        def job(name, kw):
+            def run(y, r, **kwargs):
+                label = (name, kwargs.get(kw, "Race" if kw == "session_name" else "Q"))
+                calls.append(label)
+                if name in fail:
+                    raise RuntimeError("boom")
+            return run
+
+        for module in (auto_runner.ingest_race_control, auto_runner.ingest_overtakes, auto_runner.ingest_team_radio,
+                       auto_runner.ingest_stints, auto_runner.ingest_pit_stops, auto_runner.ingest_race_story):
+            name = module.__name__.rsplit(".", 1)[-1]
+            monkeypatch.setattr(module, "run", job(name, "session_name"))
+        monkeypatch.setattr(auto_runner.ingest_qualifying_telemetry, "run", job("telemetry", "session_type"))
+        monkeypatch.setattr(auto_runner.compute_season_stats, "run", lambda y: calls.append(("season_stats", y)))
+        monkeypatch.setattr(auto_runner.compute_title_odds, "run", lambda y: calls.append(("title_odds", y)))
         return calls
 
+    def _retry(self, row, memo=None):
+        return auto_runner._retry_missing_race_events(lambda *_: None, FakeConnection([row]), 5, 2026, memo)
+
     def test_noop_when_race_not_found(self, monkeypatch):
-        calls = self._patch_openf1_jobs(monkeypatch)
-        conn = FakeConnection([None])
-
-        auto_runner._retry_missing_race_events(lambda *_: None, conn, round_number=5, year=2026)
-
+        calls = self._patch_jobs(monkeypatch)
+        assert self._retry(None) is True
         assert calls == []
 
-    def test_noop_when_race_not_completed(self, monkeypatch):
-        calls = self._patch_openf1_jobs(monkeypatch)
-        conn = FakeConnection([self._row(status="qualifying_done")])
-
-        auto_runner._retry_missing_race_events(lambda *_: None, conn, round_number=5, year=2026)
-
+    def test_noop_when_everything_is_covered(self, monkeypatch):
+        calls = self._patch_jobs(monkeypatch)
+        assert self._retry(self._row()) is True
         assert calls == []
 
-    def test_noop_when_race_control_already_present(self, monkeypatch):
-        calls = self._patch_openf1_jobs(monkeypatch)
-        conn = FakeConnection([self._row(has_race_control=True)])
+    def test_race_events_wait_for_the_race_but_qualifying_telemetry_does_not(self, monkeypatch):
+        calls = self._patch_jobs(monkeypatch)
+        self._retry(self._row(status="qualifying_done", has_race_control=False, telemetry_complete=False))
+        assert calls == [("telemetry", "Q")]
 
-        auto_runner._retry_missing_race_events(lambda *_: None, conn, round_number=5, year=2026)
+    def test_reruns_only_the_job_whose_table_is_empty(self, monkeypatch):
+        calls = self._patch_jobs(monkeypatch)
+        self._retry(self._row(has_pit_stops=False))
+        assert calls == [("ingest_pit_stops", "Race")]
 
-        assert calls == []
+    def test_checks_the_sprint_session_on_a_sprint_weekend(self, monkeypatch):
+        calls = self._patch_jobs(monkeypatch)
+        sprint = datetime(2026, 3, 7, 15, 0, tzinfo=timezone.utc)
+        self._retry(self._row(sprint_date=sprint, has_sprint_stints=False, sq_telemetry_complete=False))
+        assert calls == [("telemetry", "SQ"), ("ingest_stints", "Sprint")]
 
-    def test_retries_race_session_jobs_when_completed_and_missing(self, monkeypatch):
-        calls = self._patch_openf1_jobs(monkeypatch)
-        conn = FakeConnection([self._row()])
+    def test_recomputes_stale_standings_and_missing_title_odds(self, monkeypatch):
+        calls = self._patch_jobs(monkeypatch)
+        self._retry(self._row(stats_current=False, odds_current=False, has_story=False))
+        assert calls == [("ingest_race_story", "Race"), ("season_stats", 2026), ("title_odds", 2026)]
 
-        auto_runner._retry_missing_race_events(lambda *_: None, conn, round_number=5, year=2026)
+    def test_a_job_that_finished_cleanly_is_settled_even_if_its_table_stays_empty(self, monkeypatch):
+        calls = self._patch_jobs(monkeypatch)
+        memo = auto_runner.WorkerMemo()
+        row = self._row(has_overtakes=False)
 
-        assert calls == [
-            ("ingest_race_control", "Race"),
-            ("ingest_overtakes", "Race"),
-            ("ingest_team_radio", "Race"),
-            ("ingest_stints", "Race"),
-            ("ingest_pit_stops", "Race"),
-        ]
+        assert self._retry(row, memo) is True
+        assert self._retry(row, memo) is True
+        assert calls == [("ingest_overtakes", "Race")]
 
-    def test_also_retries_sprint_session_jobs_when_sprint_date_present(self, monkeypatch):
-        calls = self._patch_openf1_jobs(monkeypatch)
-        conn = FakeConnection([self._row(sprint_date=datetime(2026, 3, 7, 15, 0, tzinfo=timezone.utc))])
+    def test_a_failed_job_stays_pending_and_does_not_stop_the_others(self, monkeypatch):
+        calls = self._patch_jobs(monkeypatch, fail={"ingest_race_control"})
+        memo = auto_runner.WorkerMemo()
+        row = self._row(has_race_control=False, has_overtakes=False)
 
-        auto_runner._retry_missing_race_events(lambda *_: None, conn, round_number=5, year=2026)
+        assert self._retry(row, memo) is False
+        assert self._retry(row, memo) is False
+        assert calls == [("ingest_race_control", "Race"), ("ingest_overtakes", "Race"), ("ingest_race_control", "Race")]
 
-        assert calls == [
-            ("ingest_race_control", "Race"),
-            ("ingest_overtakes", "Race"),
-            ("ingest_team_radio", "Race"),
-            ("ingest_stints", "Race"),
-            ("ingest_pit_stops", "Race"),
-            ("ingest_race_control", "Sprint"),
-            ("ingest_overtakes", "Sprint"),
-            ("ingest_team_radio", "Sprint"),
-            ("ingest_stints", "Sprint"),
-            ("ingest_pit_stops", "Sprint"),
-        ]
-
-    def test_retries_only_the_sprint_session_when_just_its_race_control_is_missing(self, monkeypatch):
-        calls = self._patch_openf1_jobs(monkeypatch)
-        conn = FakeConnection([self._row(
-            sprint_date=datetime(2026, 3, 7, 15, 0, tzinfo=timezone.utc),
-            has_race_control=True,
-            has_sprint_race_control=False,
-        )])
-
-        settled = auto_runner._retry_missing_race_events(lambda *_: None, conn, round_number=5, year=2026)
-
-        assert calls == [
-            ("ingest_race_control", "Sprint"),
-            ("ingest_overtakes", "Sprint"),
-            ("ingest_team_radio", "Sprint"),
-            ("ingest_stints", "Sprint"),
-            ("ingest_pit_stops", "Sprint"),
-        ]
-        assert settled is False
-
-    def test_resumes_qualifying_telemetry_until_every_qualifier_is_stored(self, monkeypatch):
-        calls = self._patch_openf1_jobs(monkeypatch)
-        telemetry_calls = []
-        monkeypatch.setattr(
-            auto_runner.ingest_qualifying_telemetry, "run",
-            lambda y, r, session_type="Q": telemetry_calls.append(session_type),
-        )
-        conn = FakeConnection([self._row(has_race_control=True, telemetry_complete=False)])
-
-        settled = auto_runner._retry_missing_race_events(lambda *_: None, conn, round_number=5, year=2026)
-
-        assert calls == []
-        assert telemetry_calls == ["Q", "SQ"]
-        assert settled is False
-
-    def test_a_failure_in_one_job_does_not_stop_the_others(self, monkeypatch):
-        calls = []
-        monkeypatch.setattr(
-            auto_runner.ingest_race_control, "run",
-            lambda y, r, session_name="Race": (_ for _ in ()).throw(RuntimeError("boom"))
-        )
-        monkeypatch.setattr(
-            auto_runner.ingest_overtakes, "run",
-            lambda y, r, session_name="Race": calls.append(("ingest_overtakes", session_name))
-        )
-        for job in (auto_runner.ingest_team_radio, auto_runner.ingest_stints, auto_runner.ingest_pit_stops):
-            name = job.__name__.rsplit(".", 1)[-1]
-            monkeypatch.setattr(
-                job, "run", lambda y, r, session_name="Race", _name=name: calls.append((_name, session_name))
-            )
-        conn = FakeConnection([self._row()])
-
-        # Must not raise — each job goes through the same non-fatal _run_openf1_step wrapper.
-        auto_runner._retry_missing_race_events(lambda *_: None, conn, round_number=5, year=2026)
-
-        assert calls == [
-            ("ingest_overtakes", "Race"), ("ingest_team_radio", "Race"),
-            ("ingest_stints", "Race"), ("ingest_pit_stops", "Race"),
-        ]
-
+    def test_telemetry_that_ran_out_of_budget_stays_pending(self, monkeypatch):
+        self._patch_jobs(monkeypatch)
+        monkeypatch.setattr(auto_runner.ingest_qualifying_telemetry, "run", lambda y, r, session_type="Q": False)
+        memo = auto_runner.WorkerMemo()
+        assert self._retry(self._row(telemetry_complete=False), memo) is False
+        assert memo.settled == set()
 
 class TestRunActionSteps:
     def test_all_steps_succeed_returns_ok_and_last_committed_status(self, monkeypatch):
@@ -514,7 +472,7 @@ class TestRunActionSteps:
         monkeypatch.setattr(
             auto_runner.compute_sprint_predictions,
             "run",
-            lambda rid: pytest.fail("should not run — the sequence must stop at the failing step"),
+            lambda rid: pytest.fail("should not run, the sequence must stop at the failing step"),
         )
 
         action = auto_runner.Action(
@@ -565,7 +523,7 @@ class TestRevertRaceStatus:
 
     def test_opens_its_own_connection_rather_than_reusing_one(self):
         # Regression guard: revert must not reuse a connection that's been idle for the
-        # whole (potentially long) job sequence — it should ask conn_factory for a fresh one.
+        # whole (potentially long) job sequence: it should ask conn_factory for a fresh one.
         conn = FakeConnection([None])
         factory_calls = []
 
@@ -594,7 +552,7 @@ class TestRunCycleSequenceRetry:
         monkeypatch.setattr(
             auto_runner.compute_sprint_predictions,
             "run",
-            lambda rid: pytest.fail("should not run — compute_sprint_features already failed"),
+            lambda rid: pytest.fail("should not run, compute_sprint_features already failed"),
         )
 
         # First row answers the missing-race-events recheck (no race found -> no-op), second

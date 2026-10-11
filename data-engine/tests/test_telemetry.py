@@ -16,6 +16,14 @@ class TestFastestLaps:
         assert (best[NORRIS].lap_number, best[NORRIS].lap_ms) == (11, 79_327)
         assert (best[PIASTRI].lap_number, best[PIASTRI].lap_ms) == (15, 79_436)
 
+    def test_skips_a_timed_lap_that_has_no_start_date(self):
+        laps = [
+            {"driver_number": 1, "lap_number": 3, "lap_duration": 70.0, "is_pit_out_lap": False, "date_start": None},
+            {"driver_number": 1, "lap_number": 4, "lap_duration": 71.0, "is_pit_out_lap": False,
+             "date_start": "2023-10-07T18:00:00+00:00"},
+        ]
+        assert fastest_laps(laps)[1].lap_number == 4
+
 
 T0 = datetime(2024, 8, 31, 15, 0, tzinfo=timezone.utc)
 

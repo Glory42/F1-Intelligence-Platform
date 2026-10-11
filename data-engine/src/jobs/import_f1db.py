@@ -13,7 +13,8 @@ def _load(release_dir: Path, name: str) -> list[dict]:
 
 def run(release_dir: str, version: str) -> None:
     """Imports an extracted F1DB *json-splitted* release (bios, career totals, milestones, lineage).
-    Local-only: parsing the release needs more RAM than Render Free has. Skips already-imported versions."""
+    Never on Render: parsing the release needs more RAM than Render Free has (see f1db-import.yml).
+    Skips already-imported versions."""
     root = Path(release_dir)
     print(f"[import_f1db] version={version} dir={root}")
 
@@ -40,7 +41,7 @@ def run(release_dir: str, version: str) -> None:
                 print(f"  [SKIP] F1DB {version} already imported")
                 return
         if not read_storage_tier(conn).allows_backfill:
-            print("  [SKIP] Neon storage past the backfill threshold — see storage_guard")
+            print("  [SKIP] Neon storage past the backfill threshold: see storage_guard")
             return
         upsert(conn, "history_drivers", drivers, ["f1db_id"])
         upsert(conn, "history_constructors", constructors, ["f1db_id"])

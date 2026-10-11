@@ -1,0 +1,31 @@
+name: f1db-import
+
+# F1DB publishes a release after every grand prix. Importing it needs more RAM than Render Free
+# has, so it runs here instead: one short Neon connection a week, a no-op when nothing is new.
+on:
+  schedule:
+    - cron: "0 6 * * 3"
+  workflow_dispatch:
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: data-engine
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - name: Skip without a DATABASE_URL secret
+        id: secret
+        run: echo "present=$([ -n "$DATABASE_URL" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v5
+        if: steps.secret.outputs.present == 'true'
+      - uses: actions/setup-python@v6
+        if: steps.secret.outputs.present == 'true'
+        with:
+          python-version: "3.12"
+      - if: steps.secret.outputs.present == 'true'
+        run: pip install -r requirements.txt
+      - if: steps.secret.outputs.present == 'true'
+        run: python scripts/import_f1db.py

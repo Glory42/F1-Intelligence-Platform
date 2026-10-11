@@ -1,5 +1,5 @@
 import numpy as np
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 
 
@@ -14,7 +14,8 @@ def fastest_laps(laps: list[dict]) -> dict[int, LapWindow]:
     """OpenF1 /laps → each driver's quickest timed lap; out-laps and untimed laps are skipped."""
     best: dict[int, LapWindow] = {}
     for lap in laps:
-        if not lap.get("lap_duration") or lap.get("is_pit_out_lap"):
+        # OpenF1 occasionally sends a timed lap without its start date; it can't be windowed.
+        if not lap.get("lap_duration") or lap.get("is_pit_out_lap") or not lap.get("date_start"):
             continue
         window = LapWindow(
             lap_number=lap["lap_number"],
@@ -48,7 +49,7 @@ def build_lap_telemetry(
 ) -> LapTelemetry:
     """OpenF1 car_data has no distance channel: integrate speed over time (trapezoid), scale the
     total to the circuit length to cancel drift, then resample everything onto a fixed distance
-    grid so two drivers' laps line up point for point. Ints only — compact JSONB in Neon."""
+    grid so two drivers' laps line up point for point. Ints only: compact JSONB in Neon."""
     # Pad with the lap's true start (t=0) and end (t=lap time), carrying the nearest sample's values:
     # car_data starts ~0.1 s after the line and stops short of it, which would otherwise skew deltas.
     lap_s = window.lap_ms / 1000
@@ -79,3 +80,13 @@ def build_lap_telemetry(
         x=[int(round(v)) for v in np.interp(grid, distance, x_at_car)],
         y=[int(round(v)) for v in np.interp(grid, distance, y_at_car)],
     )
+
+
+def _camel(name: str) -> str:
+    head, *rest = name.split("_")
+    return head + "".join(part.title() for part in rest)
+
+
+def telemetry_samples(telemetry: LapTelemetry) -> dict[str, list[int]]:
+    """The JSONB shape stored in qualifying_lap_telemetry.samples (camelCase keys, as the API reads)."""
+    return {_camel(k): v for k, v in asdict(telemetry).items()}

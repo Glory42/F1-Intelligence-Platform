@@ -1,5 +1,6 @@
 """Downloads an F1DB release (CC-BY-4.0), verifies its SHA-256 against the release's own checksum
-file, extracts it into a fresh temp dir and imports it. Local only — never on Render.
+file, extracts it into a fresh temp dir and imports it. Runs weekly from .github/workflows/f1db-import.yml
+or locally; never on Render (512 MB RAM).
 Usage: python scripts/import_f1db.py [--version v2026.16.1]   (default: latest release)"""
 import argparse
 import sys
