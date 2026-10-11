@@ -1,5 +1,5 @@
 ---
-import SectionKicker from '@/components/shared/SectionKicker.astro';
+import TabIntro from '@/components/shared/TabIntro.astro';
 import DataList from '@/components/shared/DataList.astro';
 import DataRow from '@/components/shared/DataRow.astro';
 import TeamIdentity from '@/components/shared/TeamIdentity.astro';
@@ -20,7 +20,13 @@ const COLUMNS = 'grid-cols-[40px_1fr_140px] md:grid-cols-[40px_1fr_220px_120px]'
 
 {odds.teams.length > 0 && (
   <section>
-    <SectionKicker label={`./title-odds · after r${odds.afterRound}`} />
+    <TabIntro
+      lead={`After round ${odds.afterRound} — 10,000 simulated finishes of the remaining races, using the model's win probabilities.`}
+      terms={[
+        { term: 'Title odds', meaning: 'share of simulations won' },
+        { term: 'Likely final', meaning: '10th–90th percentile points' },
+      ]}
+    />
     <DataList
       label="Constructors' title odds"
       columns={COLUMNS}

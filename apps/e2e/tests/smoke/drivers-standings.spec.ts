@@ -29,3 +29,10 @@ test('switching to the racecraft tab keeps the chosen season', async ({ page }) 
   const table = page.getByRole('table', { name: 'Racecraft' });
   await expect(table.getByRole('row', { name: /LEC.*41.*22.*\+19/ })).toBeVisible();
 });
+
+test('the page tab row never scrolls vertically', async ({ page }) => {
+  await page.goto('/drivers?year=2026');
+
+  const overflowY = await views(page).evaluate((el) => el.scrollHeight - el.clientHeight);
+  expect(overflowY).toBe(0);
+});

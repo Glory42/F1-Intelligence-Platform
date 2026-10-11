@@ -1,6 +1,6 @@
 ---
-import SectionKicker from '@/components/shared/SectionKicker.astro';
 import DataList from '@/components/shared/DataList.astro';
+import TabIntro from '@/components/shared/TabIntro.astro';
 import DataRow from '@/components/shared/DataRow.astro';
 import DriverIdentity from '@/components/shared/DriverIdentity.astro';
 import RankCell from '@/components/shared/RankCell.astro';
@@ -19,7 +19,14 @@ const signed = (n: number) => (n > 0 ? `+${n}` : String(n));
 
 {rows.length > 0 && (
   <section>
-    <SectionKicker label={`./racecraft · ${year}`} />
+    <TabIntro
+      lead="Grand prix overtakes recorded by OpenF1, 2023 onwards. The feed can miss some passes."
+      terms={[
+        { term: 'Made', meaning: 'passes made' },
+        { term: 'Lost', meaning: 'times passed' },
+        { term: 'Net', meaning: 'made minus lost' },
+      ]}
+    />
     <DataList
       label="Racecraft"
       columns={COLUMNS}
@@ -38,8 +45,5 @@ const signed = (n: number) => (n > 0 ? `+${n}` : String(n));
         </DataRow>
       ))}
     </DataList>
-    <p class="font-mono text-[7px] text-muted-foreground/50 mt-3 leading-relaxed">
-      Grand prix position changes recorded by OpenF1 (2023+) — passes made vs lost. OpenF1 notes this feed can be incomplete.
-    </p>
   </section>
 )}

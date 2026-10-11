@@ -1,7 +1,7 @@
 ---
 import LineChart, { type LineSeries } from '@/components/charts/LineChart.astro';
-import SectionKicker from '@/components/shared/SectionKicker.astro';
 import DataList from '@/components/shared/DataList.astro';
+import TabIntro from '@/components/shared/TabIntro.astro';
 import DataRow from '@/components/shared/DataRow.astro';
 import DriverIdentity from '@/components/shared/DriverIdentity.astro';
 import RankCell from '@/components/shared/RankCell.astro';
@@ -40,7 +40,15 @@ const series: LineSeries[] = odds.drivers.slice(0, CHART_DRIVERS).map((d) => ({
 ---
 
 <section aria-label="Title fight">
-  <SectionKicker label={`./title-fight · after r${odds.afterRound}`} />
+  <TabIntro
+    lead={`After round ${odds.afterRound} — 10,000 simulated finishes of the remaining races, using the model's win probabilities.`}
+    terms={[
+      { term: 'Champ pts', meaning: 'points so far, grand prix + sprint' },
+      { term: 'Title odds', meaning: 'share of simulations won' },
+      { term: 'Likely final', meaning: '10th–90th percentile points' },
+      { term: 'Eliminated', meaning: "can't catch the leader any more" },
+    ]}
+  />
   <div class={`grid gap-4 items-start ${showChart ? 'lg:grid-cols-[1fr_420px]' : ''}`}>
     <DataList
       label="Title odds"
@@ -76,7 +84,4 @@ const series: LineSeries[] = odds.drivers.slice(0, CHART_DRIVERS).map((d) => ({
       </div>
     )}
   </div>
-  <p class="font-mono text-[7px] text-muted-foreground/50 mt-3 leading-relaxed">
-    Champ pts = championship points so far (grand prix + sprint). Title odds = share of 10,000 simulated finishes of the remaining races, using the model's win probabilities. Eliminated = can no longer reach the leader even by winning every remaining race.
-  </p>
 </section>

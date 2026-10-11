@@ -14,10 +14,18 @@ const { standings, year } = Astro.props;
 
 function isTopPos(pos: number | null, i: number) { return (pos ?? i + 1) < 4; }
 function champPos(pos: number | null, i: number) { return pos ?? i + 1; }
+
+// The constructor column is capped at 2 shares so the stats spread out instead of bunching on the right.
+const COLUMNS = [
+  'grid gap-x-4 grid-cols-[32px_minmax(0,1fr)_56px]',
+  'sm:grid-cols-[40px_minmax(0,2fr)_repeat(3,minmax(48px,1fr))]',
+  'md:grid-cols-[40px_minmax(0,2fr)_repeat(4,minmax(48px,1fr))]',
+  'lg:grid-cols-[40px_minmax(0,2fr)_repeat(4,minmax(48px,1fr))_minmax(120px,1.4fr)]',
+].join(' ');
 ---
 
 <div class="border border-white/[0.06]">
-  <div class="grid grid-cols-[40px_1fr_60px] sm:grid-cols-[40px_1fr_60px_60px_60px] md:grid-cols-[40px_1fr_60px_60px_60px_80px] lg:grid-cols-[40px_1fr_80px_60px_60px_80px_100px] gap-0 px-5 py-2.5 border-b border-white/[0.06]">
+  <div class={`${COLUMNS} px-5 py-2.5 border-b border-white/[0.06]`}>
     <div class="text-[11px] text-muted-foreground">Pos</div>
     <div class="text-[11px] text-muted-foreground">Constructor</div>
     <div class="text-[11px] text-muted-foreground text-right">Pts</div>
@@ -30,7 +38,7 @@ function champPos(pos: number | null, i: number) { return pos ?? i + 1; }
   {standings.map((s, i) => (
       <a
         href={`/teams/${s.team.id}?year=${year}`}
-        class={`grid grid-cols-[40px_1fr_60px] sm:grid-cols-[40px_1fr_60px_60px_60px] md:grid-cols-[40px_1fr_60px_60px_60px_80px] lg:grid-cols-[40px_1fr_80px_60px_60px_80px_100px] gap-0 items-center px-5 py-4 hover:bg-white/[0.02] transition-colors duration-150 group relative ${i !== 0 ? 'border-t border-white/[0.04]' : ''}`}
+        class={`${COLUMNS} items-center px-5 py-4 hover:bg-white/[0.02] transition-colors duration-150 group relative ${i !== 0 ? 'border-t border-white/[0.04]' : ''}`}
         style={`border-left: 3px solid ${getTeamColor(s.team.teamKey)};`}
       >
         <div class={`font-mono text-sm font-bold ${isTopPos(s.stats.championshipPosition, i) ? 'text-[#a855f7]' : 'text-muted-foreground'}`}>
@@ -38,14 +46,14 @@ function champPos(pos: number | null, i: number) { return pos ?? i + 1; }
         </div>
         <div class="flex items-center gap-3 min-w-0">
           {(() => { const logo = getTeamLogo(s.team.teamKey); return logo ? (
-            <img src={logo} alt={s.team.name} class="h-7 w-14 object-contain shrink-0" loading="lazy" />
+            <img src={logo} alt={s.team.name} class="h-5 w-8 sm:h-7 sm:w-14 object-contain shrink-0" loading="lazy" />
           ) : null; })()}
           <div class="min-w-0">
           <div class="font-semibold text-sm group-hover:text-[#a855f7] transition-colors duration-150 truncate">{s.team.name}</div>
           {s.team.nationality && (
             <div class="font-mono text-[8px] text-muted-foreground tracking-wider mt-0.5">{s.team.nationality}</div>
           )}
-          <div class="flex items-center gap-2 mt-1 sm:hidden font-mono text-[8px] text-muted-foreground">
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 sm:hidden whitespace-nowrap font-mono text-[9px] text-muted-foreground">
             <span>{s.stats.wins}W</span>
             <span class="text-white/20">·</span>
             <span>{s.stats.podiums} Pod</span>

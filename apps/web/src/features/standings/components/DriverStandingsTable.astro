@@ -19,14 +19,23 @@ function isTopPos(pos: number | null, i: number) {
 function champPos(pos: number | null, i: number) {
   return pos ?? i + 1;
 }
+
+// Columns appear by priority as width allows: stats (sm), team (md), pole/races (lg), nationality (xl).
+const COLUMNS = [
+  'grid gap-x-4 grid-cols-[32px_minmax(0,1fr)_56px]',
+  'sm:grid-cols-[40px_minmax(0,1fr)_56px_40px_40px]',
+  'md:grid-cols-[40px_minmax(0,1.6fr)_minmax(0,1fr)_56px_40px_40px]',
+  'lg:grid-cols-[40px_minmax(0,1.6fr)_minmax(0,1fr)_56px_40px_40px_40px_48px]',
+  'xl:grid-cols-[40px_minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.2fr)_56px_40px_40px_40px_48px]',
+].join(' ');
 ---
 
 <div class="border border-white/[0.06]">
   <!-- Table header -->
-  <div class="grid grid-cols-[40px_1fr_60px] sm:grid-cols-[40px_1fr_280px_60px_60px_60px] md:grid-cols-[40px_360px_280px_1fr_60px_60px_60px] lg:grid-cols-[40px_360px_280px_1fr_60px_60px_60px_60px_80px] gap-0 px-5 py-2.5 border-b border-white/[0.06]" style="border-left: 3px solid transparent;">
+  <div class={`${COLUMNS} px-5 py-2.5 border-b border-white/[0.06]`} style="border-left: 3px solid transparent;">
     <div class="text-[11px] text-muted-foreground">Pos</div>
     <div class="text-[11px] text-muted-foreground">Driver</div>
-    <div class="text-[11px] text-muted-foreground hidden sm:block pr-4">Nationality</div>
+    <div class="text-[11px] text-muted-foreground hidden xl:block">Nationality</div>
     <div class="text-[11px] text-muted-foreground hidden md:block">Team</div>
     <div class="text-[11px] text-muted-foreground text-right">Pts</div>
     <div class="text-[11px] text-muted-foreground text-right hidden sm:block">W</div>
@@ -38,7 +47,7 @@ function champPos(pos: number | null, i: number) {
   {standings.map((s, i) => (
       <a
         href={`/drivers/${s.driver.id}?year=${year}`}
-        class={`grid grid-cols-[40px_1fr_60px] sm:grid-cols-[40px_1fr_280px_60px_60px_60px] md:grid-cols-[40px_360px_280px_1fr_60px_60px_60px] lg:grid-cols-[40px_360px_280px_1fr_60px_60px_60px_60px_80px] gap-0 items-start sm:items-center px-5 py-3.5 hover:bg-white/[0.02] transition-colors duration-150 group ${i !== 0 ? 'border-t border-white/[0.04]' : ''}`}
+        class={`${COLUMNS} items-start sm:items-center px-5 py-3.5 hover:bg-white/[0.02] transition-colors duration-150 group ${i !== 0 ? 'border-t border-white/[0.04]' : ''}`}
         style={`border-left: 3px solid ${getTeamColor(s.driver.team.teamKey)};`}
       >
         <!-- Position — pt-1 aligns with name text -->
@@ -74,9 +83,9 @@ function champPos(pos: number | null, i: number) {
           </div>
         </div>
         <!-- Nationality (sm+) -->
-        <div class="hidden sm:flex items-center gap-1.5 min-w-0 pr-4">
+        <div class="hidden xl:flex items-center gap-1.5 min-w-0">
           <span class="text-sm select-none">{s.driver.nationality ? getNationalityFlag(s.driver.nationality) : getDriverFlagByCode(s.driver.code)}</span>
-          <span class="font-mono text-[9px] text-muted-foreground uppercase">{s.driver.nationality || getDriverNationalityCode(s.driver.code)}</span>
+          <span class="font-mono text-[9px] text-muted-foreground uppercase truncate">{s.driver.nationality || getDriverNationalityCode(s.driver.code)}</span>
         </div>
         <!-- Team (md+) -->
         <div class="hidden md:flex items-center gap-2 min-w-0">

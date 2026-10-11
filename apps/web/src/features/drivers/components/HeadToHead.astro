@@ -57,7 +57,9 @@ const { left, right, color, rows, year } = Astro.props;
   <!-- Stat rows -->
   {rows.map((row, i) => {
     const total = row.v1 + row.v2;
-    const pct1 = total === 0 ? 50 : Math.round((row.v1 / total) * 100);
+    // A lower-is-better stat gives the bigger bar to the smaller value, so the longer bar always wins.
+    const share1 = row.lowerBetter ? row.v2 : row.v1;
+    const pct1 = total === 0 ? 50 : Math.round((share1 / total) * 100);
     const pct2 = 100 - pct1;
     const d1Wins = row.lowerBetter ? row.v1 < row.v2 : row.v1 > row.v2;
     const d2Wins = row.lowerBetter ? row.v2 < row.v1 : row.v2 > row.v1;
