@@ -163,6 +163,15 @@ x/y at the circuit, or null before any 2023+ telemetry exists.
 
 Returns historical race results at a specific circuit across all years. Each item includes `hasSprint: boolean`.
 
+### `GET /api/races/circuit/:circuitKey/telemetry`
+
+Track character from one real lap: the circuit's latest pole lap (falling back to that race's fastest
+stored qualifying lap when the pole sitter's telemetry is missing — `isPoleLap` says which). Returns
+`{ raceId, year, raceName, driver, lapTimeMs, isPoleLap, profile, trace }` or `null` before 2023 data
+exists. `profile` (`common/trackProfile.ts`): full-throttle share (≥98%), longest flat-out run, top
+speed, braking zones, and corners — every lift or brake, classed by apex speed (low < 130, medium
+< 210 km/h). `trace` is speed/throttle/brake thinned to every 50 m.
+
 ---
 
 ## Drivers
@@ -189,7 +198,10 @@ Head-to-head against the team-mate with the most shared races that season (`:id`
 season-scoped driver id): `{ teammate, sharedRaces, qualifying, race, points }`, each a
 `{ driver, teammate }` count. `qualifying` compares classified qualifying position; `race` only
 counts races both drivers finished (`Finished`/`Lapped`/`+N Lap(s)`, ADR 0002); `points` are GP
-points. `year` only drives the cache header.
+points. `races` lists every shared race in round order — `{ raceId, roundNumber, raceName, qualiGapMs,
+driver, teammate }`, each side `{ qualiPosition, finishPosition, status, points }`. `qualiGapMs` compares
+lap times in the deepest session both reached (Q3, else Q2, else Q1); negative means the driver was
+faster. `medianQualiGapMs` is the median of those gaps. `year` only drives the cache header.
 
 ### `GET /api/drivers/:id?year=N`
 
@@ -220,6 +232,12 @@ Returns constructor championship standings for the year, ordered by points.
 Pit crews ranked by **median** stationary time (one botched stop can't skew it): `[{ team, stops,
 medianStationaryMs, fastestStationaryMs }]`. Stops without a stationary time (pre-2024 US GP) are
 ignored. Long-cached for past seasons (`cacheControlForYear`).
+
+### `GET /api/teams/:id/pit-stops?year=N`
+
+Every timed grand prix stop by one team's drivers (`:id` is season-scoped, so `year` only picks the
+cache lifetime): `[{ raceId, roundNumber, raceName, driver, lapNumber, stationaryMs }]` in round
+and lap order. Sprint stops and stops without a stationary time are left out.
 
 ### `GET /api/teams/:id?year=N`
 
@@ -385,11 +403,18 @@ Returns the "Intelligence Standings" — driver rankings by average prediction s
 
 ### `GET /api/sprint/upcoming`
 
-Returns the sprint prediction for the next upcoming sprint weekend. Same envelope as the grand prix upcoming prediction but uses sprint model features and `modelVersion: "sprint-v1"`.
+Returns the sprint prediction for the next upcoming sprint weekend. Same envelope as the grand prix upcoming prediction but uses sprint model features and `modelVersion: "sprint-v2"`.
 
 ### `GET /api/sprint/race/:raceId`
 
-Returns the sprint prediction for a specific race ID. Includes sprint results if the sprint has been completed, and sprint lap summaries.
+The sprint prediction for that race weekend — same envelope as `/api/sprint/upcoming`. 404 when the
+weekend has no sprint prediction.
+
+### `GET /api/sprint/race/:raceId/detail`
+
+Everything the sprint page needs: `{ race, prediction, results, laps }` — `prediction` is null
+before sprint qualifying, `results`/`laps` are empty until the sprint has run. 404 for a
+conventional (non-sprint) weekend.
 
 ```json
 {
@@ -397,7 +422,7 @@ Returns the sprint prediction for a specific race ID. Includes sprint results if
     "race": { "id": 205, "name": "Chinese Grand Prix", "hasSprint": true, "sprintDate": "2026-03-15", ... },
     "prediction": {
       "predictedWinner": { "code": "ANT", ... },
-      "modelVersion": "sprint-v1",
+      "modelVersion": "sprint-v2",
       "drivers": [
         {
           "predictedPosition": 1,
@@ -490,13 +515,35 @@ All-time data imported from [F1DB](https://github.com/f1db/f1db) (CC-BY-4.0). Ca
 
 ### `GET /api/history/records`
 
-Top-10 leaders `{ f1dbId, name, value }` for drivers (`wins`, `championships`, `poles`, `podiums`,
-`starts`) and constructors (`wins`, `championships`, `poles`), plus the five `youngestWinners`
-(`ageDays` = first win date − date of birth, `raceName`).
+Top-10 leaders `{ f1dbId, name, value, nationality, coreId, active }` for drivers (`wins`, `championships`,
+`poles`, `podiums`, `starts`) and constructors (`wins`, `championships`, `poles`). `nationality` is
+an F1DB country id. `coreId` is the core driver/team id for the page link (null before 1980, when core
+data starts): a driver's latest season, and for a constructor its current core key or else its
+longest-running one. `active` is true only for the latest season's grid.
+Ties sort by wins, then name. Also:
+- `rates` — top-10 `winRate`/`poleRate`/`podiumRate` (`value` is a 0–1 ratio), only drivers with
+  at least `rateMinStarts` (50) starts.
+- `chases` — per driver stat, the `record` holder and the best active `chaser` who doesn't hold it
+  (null when no active driver has scored).
+
+### `GET /api/history/milestones`
+
+Five drivers each for `youngestWinner`, `youngestPole`, `youngestPodium`, `youngestStarter`,
+`oldestFirstWin` and `longestWaitForWin` (debut to first win): `{ f1dbId, name, nationality,
+coreId, active, days, raceName }`.
+
+### `GET /api/history/lineages`
+
+Constructors that raced under more than one name (F1DB chronology), one family per team keyed by
+its latest name: `{ f1dbId, name, coreTeam: { id, teamKey } | null, active, members: [{ f1dbId, name,
+yearFrom, yearTo, raceWins, championships, coreId }] }`. Member totals are per constructor, so a name that
+recurs (Renault, Sauber) repeats them. Active families first.
 
 ### `GET /api/history/on-this-day?date=MM-DD`
 
-Up to 10 completed races (core DB, 1980+) held on that calendar day, newest first, with the winner.
+`{ requested, date, races }` — up to 10 completed races (core DB, 1980+) held on that calendar
+day, newest first, with the winner. When the day has none, `date` is the nearest day that does.
+400 for a day that doesn't exist.
 
 ### `GET /api/drivers/:id/history`
 

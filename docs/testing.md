@@ -70,10 +70,11 @@ pytest, config in `pyproject.toml` (`pythonpath = ["."]`, `testpaths = ["tests"]
 ## API unit (`apps/api/tests/unit/`)
 
 `bun test`, no DB, no network. Mirrors `src/` by domain — mostly the shared `src/common/` transform
-layer (`mappers`, `collections`, `standings`, `prediction-response`, `prediction-history`,
-`accuracy`, `cache`, `featureManifest`) plus module-local pure helpers
-(`modules/predictions/intel-standings.helpers`, `modules/races/circuit-era.helpers`,
-`modules/races/circuit-stats.helpers`, `modules/quality`). Fixtures are plain objects typed as
+layer (`mappers`, `openf1-mappers`, `standings`, `prediction-response`, `prediction-history`,
+`accuracy`, `cache`, `classification`, `driverIdentity`, `f1dbMatch`, `featureManifest`,
+`qualifyingGap`, `trackOutline`, `trackProfile`) plus module-local pure helpers
+(`modules/history/history.helpers`, `modules/predictions/intel-standings.helpers`,
+`modules/races/circuit-era.helpers`, `modules/races/circuit-stats.helpers`, `modules/quality`). Fixtures are plain objects typed as
 `typeof <table>.$inferSelect`; see
 `prediction-response.test.ts` for the pattern.
 
@@ -103,15 +104,18 @@ suite never touches Neon.
 - **Lifecycle** — each test file calls `truncateAll(db)` in `beforeAll` and `afterAll`, seeds its
   own fixtures (typically under a sentinel year like `2097`/`2099`), and asserts on the JSON
   response. `truncateAll` is a single `TRUNCATE … RESTART IDENTITY CASCADE` over every table.
-- **Covered**: `races`, `drivers`, `teams`, `seasons`, `search`, `predictions`, `sprint`. Not yet:
-  `quality`.
+- **Covered**: `races` (incl. circuit outline + circuit telemetry), `race-events`, `race-story`,
+  `strategy`, `telemetry`, `drivers` (incl. career, racecraft, teammate battle), `teams` (incl. pit
+  stops), `seasons`, `search`, `predictions` (incl. Friday pace, title odds), `sprint`, `history`,
+  the home hub's on-this-day query, and the `edgeCache` middleware. Not yet: `quality`.
 
 ## Web unit (`apps/web/tests/unit/`)
 
 Vitest, config in `vitest.config.ts` (include `tests/unit/**/*.test.{ts,tsx}`, `@` alias, setup file).
 
 - **Default environment is `node`** — pure logic runs there: `lib/predictionMath.ts` (all exports),
-  `lib/teamColors` / `lib/teamLogos`, `features/compare/compareStats.ts`,
+  `lib/teamColors` / `lib/teamLogos` / `lib/f1dbCountries`, `features/compare/compareStats.ts`,
+  `features/history/historyView.ts`, the hub/circuits/drivers/teams feature helpers,
   `features/predictions/{buildPredictionPageData,predictionCopy}` (API mocked with `vi.mock`, not MSW).
 - **jsdom is opt-in per file** via a `// @vitest-environment jsdom` docblock on line 1 — used for
   hook/component tests (`useCompareController`, `useGlobalSearch`, `GlobalSearch`) with Testing
@@ -137,9 +141,14 @@ Playwright, its own `package.json` and `playwright.config.ts` (see
 - The fixture server sends CORS headers because `GlobalSearch` / `DriverCompareTool` /
   `TeamCompareTool` fetch client-side — a genuine cross-origin browser request. Every other route is
   only ever hit server-side.
-- Smoke specs cover `/prediction`, `/races/[id]`, `/races/[id]/sprint`, `/drivers/[id]`,
-  `/teams/[id]`, `/drivers/compare`, `/teams/compare`, `/prediction/sprint/[id]`, and the global
-  search palette — each asserts key content renders and no "failed to load" appears.
+- Smoke specs (`tests/smoke/`) cover the home hub, `/prediction`, `/prediction/sprint/[id]`,
+  `/races/[id]` (+ sprint, race story, telemetry), `/circuits` + `/circuits/[key]`, `/drivers` +
+  `/drivers/[id]`, `/teams` + `/teams/[id]`, both compare pages, `/records` (all four History tabs),
+  the sidebar, branding, and the global search palette — each asserts key content renders against
+  the fixtures.
+- `reuseExistingServer` is on outside CI, so a developer's own `astro dev` on `:4321` would be
+  silently reused — against real data. Set `E2E_WEB_PORT` / `E2E_API_PORT` (e.g. `4329` / `4319`)
+  to run against fresh fixture-backed servers while your dev servers are up.
 
 ## CI (`.github/workflows/test.yml`)
 

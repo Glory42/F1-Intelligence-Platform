@@ -18,8 +18,8 @@ recommended; brand `F1 Intelligence Platform`.
 | 2 Analysis | ✅ | Title odds (ADR 0007), contention maths, teammate battles, racecraft (API aggregate, no new columns). No lap-1 split — OpenF1 overtakes carry no lap number. |
 | 3 Race story | ✅ | Lap traces, battles, weather from FastF1 full laps; grid drops from existing data (no `/starting_grid` needed). All FastF1 runners now load with no DB connection held. |
 | 4 Telemetry | ✅ | Resumable OpenF1 ingest (ADR 0008); server-rendered comparison; circuit outline derived in the API from the latest pole lap (no new column). |
-| 5 History | ✅ | Scoped F1DB import (~700 KB): bios, totals, milestones, chassis/engine lineage. Local-only import script (not in the worker — Render RAM). "On this day" uses core 1980+ races. |
-| 6 Home hub | ✅ | Last-race recap, championship card, on this day, next-session countdown. |
+| 5 History | ✅ | Scoped F1DB import (~700 KB): bios, totals, milestones, chassis/engine lineage. Local-only import script (not in the worker — Render RAM). "On this day" uses core 1980+ races. Later: History page split into Records (headline tiles, record chases, strike rates, min 50 starts) / Milestones / On this day (date stepping, nearest-day fallback) / Lineage (F1DB chronology as a team family timeline) — `history/milestones` + `history/lineages`, no new tables. |
+| 6 Home hub | ✅ | Last-race recap, championship card, on this day, next-session countdown. Later: season progress strip, next race with schedule + model top 3, last-race podium, championship top 5 with title odds. |
 | 7 Model v4 | ⛔ rejected | Measured overtake rate backtested over 208 races: no gain (`docs/prediction-model.md`). SC/VSC split and wet pace not built — deferred until a candidate shows promise. |
 | N4 skip-unchanged upserts | ✅ | `IS DISTINCT FROM` guard in `utils/upsert.py`, verified against local Postgres. |
 

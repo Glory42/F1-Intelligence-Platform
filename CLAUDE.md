@@ -37,14 +37,17 @@ it's Python, and its jobs run once and exit rather than being a long-running dev
   (`docker-compose.test.yml` behind a Neon HTTP proxy; `bun run test:db:up`, config in the committed
   `apps/api/.env.test`). Never against Neon — the test setup refuses `*.neon.tech` hosts. Seeds its own
   fixtures per file via `tests/support/factories/` and truncates after (`tests/support/db/test-db.ts`).
-  Covers `races`, `drivers`, `teams`, `seasons`, `search`; `predictions`/`sprint`/`quality` are not yet covered.
+  Covers every module except `quality` (dev-only) — `races`, race events/story/strategy/telemetry, `drivers`, `teams`,
+  `seasons`, `search`, `predictions`, `sprint`, `history` — plus the `edgeCache` middleware.
 - `apps/web/tests/unit/` — Vitest. Pure logic (`compareStats.ts`, `lib/` lookups) runs under the default `node`
   environment. Hook/component tests (`useCompareController`, `useGlobalSearch`, `GlobalSearch`) opt into `jsdom`
   per-file via a `// @vitest-environment jsdom` docblock, use Testing Library, and mock `src/lib/api.ts`'s
   endpoints with MSW (`tests/support/msw/`). `.astro` component rendering is still not covered.
 - `apps/e2e/tests/smoke/` — Playwright, drives a real browser against `astro dev` with a fixture API server
-  (`apps/e2e/fixtures/`) standing in for `apps/api`. Covers `/prediction`, `/races/[id]`, `/drivers/[id]`,
-  `/teams/[id]`, `/drivers/compare`, and the global search command palette. The fixture server sends CORS
+  (`apps/e2e/fixtures/`) standing in for `apps/api`. Covers the hub, races, circuits, drivers, teams,
+  compare, predictions and History pages and the global search palette. Playwright reuses an already-running
+  `astro dev` on :4321 (your real-data dev server) — set `E2E_WEB_PORT`/`E2E_API_PORT` to run against fixtures
+  while dev servers are up. The fixture server sends CORS
   headers because `GlobalSearch`/`DriverCompareTool`/`TeamCompareTool` fetch client-side (see the data-fetching
   exception below) — that's a real cross-origin browser request, unlike every other route which is only ever
   hit server-side from Astro frontmatter.
@@ -205,6 +208,7 @@ GET /api/health
 GET /api/races?year=N&status=S
 GET /api/races/circuits
 GET /api/races/circuit/:circuitKey
+GET /api/races/circuit/:circuitKey/telemetry
 GET /api/races/:id
 GET /api/races/:id/race-control?session=race|sprint
 GET /api/races/:id/overtakes?session=race|sprint
@@ -224,11 +228,13 @@ GET /api/drivers/:id?year=N
 GET /api/teams?year=N
 GET /api/teams/standings?year=N
 GET /api/teams/pit-stops?year=N
+GET /api/teams/:id/pit-stops?year=N
 GET /api/teams/:id/history
 GET /api/teams/:id/career
 GET /api/teams/:id?year=N
 
 GET /api/predictions/model-info
+GET /api/predictions/accuracy
 GET /api/predictions/upcoming
 GET /api/predictions/history?year=N
 GET /api/predictions/standings?year=N
@@ -243,10 +249,14 @@ GET /api/sprint/race/:race_id/detail
 GET /api/seasons
 
 GET /api/history/records
+GET /api/history/milestones
+GET /api/history/lineages
 GET /api/history/on-this-day?date=MM-DD
 GET /api/races/:id/recap
 
 GET /api/search
+
+GET /api/quality?year=N            # dev-only data-quality report
 ```
 
 No authentication. No write endpoints (ETL writes directly to DB).
@@ -266,12 +276,12 @@ All queries use Drizzle joins. Never fetch a list then loop-query for each item.
 ### Pages
 | Route | Layout | Data source |
 |-------|--------|------------|
-| `/` | BaseLayout | Three fixed blocks: next race (+ model favourite), last race Recap, championship top 3 |
+| `/` | BaseLayout | Season progress strip + three fixed blocks: next race (schedule, circuit, model top 3), last race (podium + Recap), championship top 5 with title odds |
 | `/prediction` | BaseLayout | `GET /api/predictions/upcoming` |
 | `/races/[id]` | BaseLayout | `GET /api/races/:id` (+ strategy, race events) |
 | `/races/[id]/race-story` | BaseLayout | `GET /api/races/:id/race-story` (`?session=sprint` for the sprint) |
 | `/races/[id]/telemetry` | BaseLayout | `GET /api/races/:id/telemetry` — drivers picked with a plain GET form, so no client fetch |
-| `/records` | BaseLayout | `GET /api/history/records` |
+| `/records` | BaseLayout | `GET /api/history/records`; `?tab=milestones`/`on-this-day` (`&date=MM-DD`)/`lineage` each fetch their own route |
 | `/drivers/[id]` | BaseLayout | `GET /api/drivers/:id` |
 | `/teams/[id]` | BaseLayout | `GET /api/teams/:id` |
 
@@ -288,7 +298,8 @@ All queries use Drizzle joins. Never fetch a list then loop-query for each item.
 - Tailwind for all styling
 - `.astro` components for display; `.tsx` for interactive Shadcn islands
 - `client:load`/`client:idle` only when interactivity is strictly needed — currently: `GlobalSearch`,
-  `DriverCompareTool`, `TeamCompareTool` (see the client-fetch exception under Critical Constraints §3)
+  `DriverCompareTool`, `TeamCompareTool` (see the client-fetch exception under Critical Constraints §3), and
+  `CircuitsGrid` (filters/sorts a list passed as a prop — no fetch)
 
 ---
 

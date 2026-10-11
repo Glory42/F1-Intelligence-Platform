@@ -103,22 +103,32 @@ second unrelated feature needs it.
 - **One question per page** — each page leads with one main view; everything else is a `?tab=` link tab
   (`PageTabs.astro`, `resolveTab`/`tabHref` in `lib/pageTabs.ts`). The default tab keeps the plain URL, other
   params (e.g. `year`) are preserved, and the frontmatter fetches only what the open tab needs. A tab can
-  point at its own route instead (`href` — Compare's Drivers/Teams).
+  point at its own route instead (`href` — Compare's Drivers/Teams). `TabIntro.astro` opens a tab with a one-line
+  lead-in and optional term definitions (racecraft, title odds, pit crews, teammate battle, …).
+- **Compare layout** — `CompareLayout.tsx`: head-to-head stats on the left, a sticky panel on the right with
+  the two pickers, season/career controls and both entity cards (A/B badges match the stat columns, so
+  team-mates with the same colour stay tellable apart). Stacks panel-first below `lg`.
 - **Season picker** — `YearSelect` in `PageHeader`'s `aside` slot, `?year=` in the URL, default current season.
 - **Retired URLs** — `/prediction/recap[/year]` 301s to the Predictions Scorecard tab (`src/middleware.ts`).
 
 ## Routes
 
-| Route | Data source |
+| Route | Data source (per `?tab=` where the page has tabs) |
 |---|---|
-| `/` | `races?year=` + `predictions/upcoming` + `races/:id/recap` + `drivers/standings` + `teams/standings` |
+| `/` | `races?year=` + `predictions/upcoming` + `races/:id` + `races/:id/recap` + `predictions/history?year=` + `drivers/standings` + `teams/standings` + `predictions/title-odds` — season progress strip, next race, last race, championship top 5 |
 | `/prediction` | Upcoming tab: `predictions/upcoming` + `sprint/upcoming` + `predictions/standings` · Scorecard tab: `predictions/history?year=` + `predictions/accuracy` |
 | `/prediction/[id]` | `predictions/race/:id` |
 | `/prediction/sprint/[id]` | `sprint/race/:id` |
-| `/races` · `/races/[id]` · `/races/[id]/sprint` | `races?year=` · `races/:id` · `sprint/race/:id/detail` |
-| `/circuits` · `/circuits/[key]` | `races/circuits` · `races/circuit/:key` |
-| `/drivers` · `/drivers/[id]` · `/drivers/compare` | `drivers/standings?year=` · `drivers/:id?year=` · `drivers?year=` |
-| `/teams` · `/teams/[id]` · `/teams/compare` | `teams/standings?year=` · `teams/:id?year=` · `teams?year=` |
+| `/races` · `/races/[id]` · `/races/[id]/sprint` | `races?year=` · `races/:id` + per tab `strategy` / `race-control` / `overtakes` / `team-radio` / `predictions/race/:id` / `races/circuit/:key` · `sprint/race/:id/detail` |
+| `/races/[id]/race-story` | `races/:id/race-story` (`?session=sprint` for the sprint) |
+| `/races/[id]/telemetry` | `races/:id/telemetry?session=&a=&b=` — drivers picked with a plain GET form |
+| `/circuits` · `/circuits/[key]` | `races/circuits` · `races/circuit/:key` (Overview / Winners / Dominance tabs) + `races/circuit/:key/telemetry` (Telemetry tab) |
+| `/drivers` | Standings / Title fight / Racecraft tabs: `drivers/standings` · `predictions/title-odds` · `drivers/racecraft` |
+| `/drivers/[id]` | Season: `drivers/:id?year=` · Teammate: `drivers/:id/teammate-battle` · Career: `drivers/:id/career` + `drivers/:id/history` · Model: `predictions/history` |
+| `/teams` | Standings / Title odds / Pit crews tabs: `teams/standings` · `predictions/title-odds` · `teams/pit-stops` |
+| `/teams/[id]` | Season: `teams/:id?year=` · Pit crew: `teams/pit-stops` + `teams/:id/pit-stops` · History: `teams/:id/career` + `teams/:id/history` |
+| `/drivers/compare` · `/teams/compare` | `seasons` + `drivers?year=` / `teams?year=` + `search` in frontmatter; the compare island then fetches `:id?year=` / `:id/career` client-side |
+| `/records` (History) | Records: `history/records` · Milestones: `history/milestones` · On this day: `history/on-this-day?date=MM-DD` (`?date=` param, nearest-day fallback) · Lineage: `history/lineages` |
 | `/docs` · `/docs/[slug]` | Astro content collection (`prerender = true`) |
 | `/health-quality` | `quality?year=` — dev-only, 404-guarded outside `import.meta.env.DEV` |
 
