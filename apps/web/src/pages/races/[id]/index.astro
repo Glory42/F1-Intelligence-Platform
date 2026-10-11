@@ -15,7 +15,7 @@ import StintChart from '@/features/races/components/StintChart.astro';
 import { PitStopTable } from '@/features/races/components/PitStopTable';
 import { api } from '@/lib/api';
 import { formatDate, formatMs, unwrapSettled } from '@/lib/utils';
-import { gridDrops } from '@/lib/gridPenalties';
+import { gridDrops } from '@/features/races/gridPenalties';
 import type { PredictionResponse, CircuitHistoryItem, RaceControlMessage, RaceOvertake, TeamRadioClip, Driver, StrategyResponse } from '@/types';
 import { RotateCcw, Gauge, Zap, Flag, CornerDownRight, Wind } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';

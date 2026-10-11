@@ -17,11 +17,11 @@ import {
   FEATURE_META,
   SPRINT_WEIGHTS,
   SPRINT_FEATURE_META,
-} from '../../../src/lib/predictionMath';
+} from '../../../../src/lib/f1/predictionMath';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const featureWeightsFixture = JSON.parse(
-  readFileSync(join(__dirname, '../../../../../docs/feature-weights.json'), 'utf-8'),
+  readFileSync(join(__dirname, '../../../../../../docs/feature-weights.json'), 'utf-8'),
 );
 
 // The shared fixture is snake_case (Python-native); GP_WEIGHTS/SPRINT_WEIGHTS are camelCase.

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { f1dbCountryFlag, f1dbCountryName } from '../../../src/lib/f1dbCountries';
+import { f1dbCountryFlag, f1dbCountryName } from '../../../../src/features/history/f1dbCountries';
 
 describe('f1dbCountryFlag', () => {
   test('builds the flag from the ISO code behind an F1DB country id', () => {

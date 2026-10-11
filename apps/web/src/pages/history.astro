@@ -1,15 +1,15 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
-import PageHeader from '@/components/shared/PageHeader.astro';
-import SectionKicker from '@/components/shared/SectionKicker.astro';
+import PageHeader from '@/components/page/PageHeader.astro';
+import SectionKicker from '@/components/page/SectionKicker.astro';
 import Leaderboard, { type LeaderboardEntry } from '@/features/history/components/Leaderboard.astro';
 import RecordTile from '@/features/history/components/RecordTile.astro';
 import RecordChases from '@/features/history/components/RecordChases.astro';
 import LineageTimeline from '@/features/history/components/LineageTimeline.astro';
 import F1dbCredit from '@/features/history/components/F1dbCredit.astro';
 import OnThisDayList from '@/features/history/components/OnThisDayList.astro';
-import PageTabs from '@/components/shared/PageTabs.astro';
-import EmptyState from '@/components/shared/EmptyState.astro';
+import PageTabs from '@/components/page/PageTabs.astro';
+import EmptyState from '@/components/page/EmptyState.astro';
 import { api } from '@/lib/api';
 import { formatAgeFromDays } from '@/lib/utils';
 import { resolveTab } from '@/lib/pageTabs';

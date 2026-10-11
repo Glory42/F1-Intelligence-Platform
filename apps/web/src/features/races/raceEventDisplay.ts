@@ -1,4 +1,4 @@
-import { getTeamColor } from '@/lib/teamColors';
+import { getTeamColor } from '@/lib/f1/teamColors';
 import type { Driver } from '@/types';
 
 // Mapper output is always a UTC ISO string (e.g. "2024-11-03T15:31:01.000Z") — slicing

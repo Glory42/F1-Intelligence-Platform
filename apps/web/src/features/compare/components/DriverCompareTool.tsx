@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { api } from '@/lib/api';
 import type { Driver, DriverDetailResponse, DriverYearStats, SeasonSummary } from '@/types';
-import { getTeamColor } from '@/lib/teamColors';
-import { getNationalityFlag, getDriverFlagByCode } from '@/lib/countryFlags';
+import { getTeamColor } from '@/lib/f1/teamColors';
+import { getNationalityFlag, getDriverFlagByCode } from '@/lib/f1/countryFlags';
 import { aggregateCareerStats, DEFAULT_COMPARE_YEAR } from '../compareStats';
 import { useCompareController } from '../useCompareController';
 import { SearchSelect } from '@/components/ui/search-select';

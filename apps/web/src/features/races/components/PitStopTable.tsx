@@ -1,5 +1,5 @@
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-import { getTeamColor } from '@/lib/teamColors';
+import { getTeamColor } from '@/lib/f1/teamColors';
 import { formatStopSeconds } from '@/lib/utils';
 import type { DriverStrategy } from '@/types';
 

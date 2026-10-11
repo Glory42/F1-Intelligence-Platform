@@ -1,7 +1,7 @@
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { formatMs } from '@/lib/utils';
 import type { QualifyingResult } from '@/types';
-import { getTeamColor } from '@/lib/teamColors';
+import { getTeamColor } from '@/lib/f1/teamColors';
 
 function fmtSector(ms: number | null): string {
   if (!ms) return '—';

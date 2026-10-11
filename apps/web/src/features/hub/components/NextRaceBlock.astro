@@ -2,8 +2,8 @@
 import HomeBlock from './HomeBlock.astro';
 import HomeFacts from './HomeFacts.astro';
 import type { HomeFact } from '../types';
-import { nextSession, weekendSessions } from '@/lib/nextSession';
-import { getTeamColor } from '@/lib/teamColors';
+import { nextSession, weekendSessions } from '@/features/hub/nextSession';
+import { getTeamColor } from '@/lib/f1/teamColors';
 import type { PredictionResponse, Race } from '@/types';
 
 interface Props {

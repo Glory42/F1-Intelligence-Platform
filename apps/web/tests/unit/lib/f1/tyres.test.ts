@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compoundToken } from '@/lib/tyres';
+import { compoundToken } from '@/lib/f1/tyres';
 
 describe('compoundToken', () => {
   it('maps FastF1 and OpenF1 compound spellings to the same tyre token', () => {

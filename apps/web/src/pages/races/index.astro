@@ -3,7 +3,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import type { Race, SeasonSummary } from '@/types';
-import YearSelect from '@/components/shared/YearSelect.astro';
+import YearSelect from '@/components/page/YearSelect.astro';
 import { MapPin, CalendarDays, ChevronRight, Flag, Zap } from 'lucide-react';
 
 const year   = Number(Astro.url.searchParams.get('year') ?? new Date().getFullYear());

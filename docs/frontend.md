@@ -74,16 +74,19 @@ throws on `error` or a non-2xx status, so callers get `T` directly. Response typ
 src/
 ├── pages/              file-based routes — one .astro per URL, frontmatter fetches + composes
 ├── layouts/            BaseLayout (app chrome)
-├── components/         generic, cross-feature only
+├── components/         generic, cross-feature only — grouped by role
 │   ├── layout/         Sidebar, MobileNav, NavGroups, Footer, nav model
-│   ├── shared/         PageHeader, PageTabs, EmptyState, YearSelect, ConfidenceBadge, …
-│   ├── docs/           OnThisPage TOC
-│   └── ui/             Shadcn primitives (badge, button, card, table, search-select)
-├── features/           domain UI, grouped by area
+│   ├── page/           page chrome: PageHeader, PageTabs, TabIntro, SectionKicker, EmptyState, YearSelect(Links)
+│   ├── data/           data display: DataList/DataRow, StatTiles, RankCell, HeadToHead, LineChart (+ chartScale, labelLayout)
+│   ├── identity/       DriverIdentity, TeamIdentity
+│   └── ui/             Shadcn primitives (table, search-select)
+├── features/           domain UI, grouped by area (one per sidebar section, plus docs and search)
 │   └── <area>/
 │       ├── components/ the area's .astro / .tsx pieces
-│       └── *.ts        pure logic + hooks (compareStats, useCompareController, raceTabs, …)
-├── lib/                truly cross-feature helpers (api, teamColors, teamLogos, predictionMath, utils)
+│       └── *.ts        pure logic + hooks (compareStats, useCompareController, raceTabs, nextSession, …)
+├── lib/                app plumbing: api client, utils, site, pageTabs, sidebarState, legacyRedirects
+│   └── f1/             F1 reference data and maths shared by features: teamColors, teamLogos, countryFlags,
+│                       championshipMath, predictionMath, tyres
 ├── types/index.ts      all TypeScript types in one file
 ├── content/config.ts   Astro content collection for docs/ (globs ../../docs, minus adr/)
 └── styles/globals.css  Tailwind base + CSS custom properties
@@ -150,7 +153,7 @@ Year-scoped pages read `?year=` from `Astro.url.searchParams`, defaulting to the
 ## Styling
 
 Tailwind for everything; the dark theme is fixed (`<html class="dark">`), colour tokens are CSS
-custom properties in `styles/globals.css`. `lib/teamColors.ts` and `lib/teamLogos.ts` map a
+custom properties in `styles/globals.css`. `lib/f1/teamColors.ts` and `lib/f1/teamLogos.ts` map a
 `team_key` to an official hex colour / static logo path under `public/teams/`.
 
 ## File-size budget
@@ -173,7 +176,7 @@ rather than raising the limit. (`apps/api` has its own parallel budget — see t
 
 `src/types/index.ts` holds **all** frontend types in one file. It is a hand-maintained mirror of the
 API's response shapes (`apps/api/src/common/types/`) — the two are separate files and can drift, so
-when an endpoint's response changes, update both. Same applies to `lib/predictionMath.ts`, whose
+when an endpoint's response changes, update both. Same applies to `lib/f1/predictionMath.ts`, whose
 `GP_WEIGHTS` / `SPRINT_WEIGHTS` are hand-copied from the Python model.
 
 ## Local development

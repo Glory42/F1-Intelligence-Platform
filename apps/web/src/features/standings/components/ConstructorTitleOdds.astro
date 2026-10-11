@@ -1,12 +1,12 @@
 ---
-import TabIntro from '@/components/shared/TabIntro.astro';
-import DataList from '@/components/shared/DataList.astro';
-import DataRow from '@/components/shared/DataRow.astro';
-import TeamIdentity from '@/components/shared/TeamIdentity.astro';
-import RankCell from '@/components/shared/RankCell.astro';
-import ShareBar from '@/components/shared/ShareBar.astro';
-import { getTeamColor } from '@/lib/teamColors';
-import { formatTitleOdds } from '@/lib/championshipMath';
+import TabIntro from '@/components/page/TabIntro.astro';
+import DataList from '@/components/data/DataList.astro';
+import DataRow from '@/components/data/DataRow.astro';
+import TeamIdentity from '@/components/identity/TeamIdentity.astro';
+import RankCell from '@/components/data/RankCell.astro';
+import ShareBar from '@/features/standings/components/ShareBar.astro';
+import { getTeamColor } from '@/lib/f1/teamColors';
+import { formatTitleOdds } from '@/lib/f1/championshipMath';
 import type { TitleOddsResponse } from '@/types';
 
 interface Props {

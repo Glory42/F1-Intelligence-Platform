@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { getTeamLogo } from '../../../src/lib/teamLogos';
+import { getTeamLogo } from '../../../../src/lib/f1/teamLogos';
 
 describe('getTeamLogo', () => {
   test('returns the known logo path for a current team key', () => {

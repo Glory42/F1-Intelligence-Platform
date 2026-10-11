@@ -1,8 +1,8 @@
 ---
-import TabIntro from '@/components/shared/TabIntro.astro';
+import TabIntro from '@/components/page/TabIntro.astro';
 import F1dbCredit from '@/features/history/components/F1dbCredit.astro';
 import { mergeTeamHistory } from '../teamHistory';
-import { championshipPoints } from '@/lib/championshipMath';
+import { championshipPoints } from '@/lib/f1/championshipMath';
 import type { TeamHistory, TeamYearStats } from '@/types';
 
 interface Props {

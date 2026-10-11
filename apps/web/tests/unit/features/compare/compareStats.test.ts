@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { aggregateCareerStats } from '../../../src/features/compare/compareStats';
+import { aggregateCareerStats } from '../../../../src/features/compare/compareStats';
 
 type Stats = {
   wins: number;

@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { api } from '@/lib/api';
 import type { Team, TeamDetailResponse, TeamSeasonStats, TeamYearStats, SeasonSummary } from '@/types';
-import { getTeamColor } from '@/lib/teamColors';
-import { getTeamLogo } from '@/lib/teamLogos';
+import { getTeamColor } from '@/lib/f1/teamColors';
+import { getTeamLogo } from '@/lib/f1/teamLogos';
 import { aggregateCareerStats, DEFAULT_COMPARE_YEAR, type CareerTotals } from '../compareStats';
 import { useCompareController } from '../useCompareController';
 import { SearchSelect } from '@/components/ui/search-select';

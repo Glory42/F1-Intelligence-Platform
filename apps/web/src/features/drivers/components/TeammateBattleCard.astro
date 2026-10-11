@@ -1,11 +1,11 @@
 ---
-import HeadToHead, { type HeadToHeadRow } from './HeadToHead.astro';
-import StatTiles from '@/components/shared/StatTiles.astro';
-import TabIntro from '@/components/shared/TabIntro.astro';
-import DataList from '@/components/shared/DataList.astro';
-import DataRow from '@/components/shared/DataRow.astro';
+import HeadToHead, { type HeadToHeadRow } from '../../../components/data/HeadToHead.astro';
+import StatTiles from '@/components/data/StatTiles.astro';
+import TabIntro from '@/components/page/TabIntro.astro';
+import DataList from '@/components/data/DataList.astro';
+import DataRow from '@/components/data/DataRow.astro';
 import { isClassified, teammateTally } from '../teammateTally';
-import { getTeamColor } from '@/lib/teamColors';
+import { getTeamColor } from '@/lib/f1/teamColors';
 import type { Driver, TeammateBattle, TeammateOuting } from '@/types';
 
 interface Props {

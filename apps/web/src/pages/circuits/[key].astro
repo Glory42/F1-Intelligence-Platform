@@ -2,16 +2,16 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { api } from '@/lib/api';
 import { MapPin, Zap, AlertTriangle } from 'lucide-react';
-import { getCountryFlag } from '@/lib/countryFlags';
+import { getCountryFlag } from '@/lib/f1/countryFlags';
 import { getCircuitCoordinates } from '@/features/circuits/circuitCoordinates';
 import { WeatherForecast } from '@/features/circuits/components/WeatherForecast';
 import CircuitTelemetryProfile from '@/features/circuits/components/CircuitTelemetryProfile.astro';
-import EmptyState from '@/components/shared/EmptyState.astro';
+import EmptyState from '@/components/page/EmptyState.astro';
 import CircuitWinnersTable from '@/features/circuits/components/CircuitWinnersTable.astro';
 import CircuitWinningFacts from '@/features/circuits/components/CircuitWinningFacts.astro';
 import DominanceCard from '@/features/circuits/components/DominanceCard.astro';
 import { getWeatherForecast, type ForecastDay } from '@/features/circuits/weather';
-import PageTabs from '@/components/shared/PageTabs.astro';
+import PageTabs from '@/components/page/PageTabs.astro';
 import { resolveTab } from '@/lib/pageTabs';
 
 const TABS = [

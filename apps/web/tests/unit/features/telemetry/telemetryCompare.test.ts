@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lapDelta, miniSectorWinners } from '@/lib/telemetryCompare';
+import { lapDelta, miniSectorWinners } from '@/features/telemetry/telemetryCompare';
 
 // Two hand-built laps on the same 4-point distance grid (cumulative time in ms).
 const A = { timeMs: [0, 1_000, 2_500, 3_400] };

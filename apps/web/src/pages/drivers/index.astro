@@ -2,10 +2,10 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { api } from '@/lib/api';
 import type { DriverStanding, SeasonSummary, Race, TitleOddsResponse, RacecraftRow } from '@/types';
-import PageHeader from '@/components/shared/PageHeader.astro';
-import PageTabs from '@/components/shared/PageTabs.astro';
-import EmptyState from '@/components/shared/EmptyState.astro';
-import YearSelect from '@/components/shared/YearSelect.astro';
+import PageHeader from '@/components/page/PageHeader.astro';
+import PageTabs from '@/components/page/PageTabs.astro';
+import EmptyState from '@/components/page/EmptyState.astro';
+import YearSelect from '@/components/page/YearSelect.astro';
 import DriverStandingsTable from '@/features/standings/components/DriverStandingsTable.astro';
 import TitleFight from '@/features/standings/components/TitleFight.astro';
 import RacecraftTable from '@/features/standings/components/RacecraftTable.astro';

@@ -1,14 +1,14 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
-import PageHeader from '@/components/shared/PageHeader.astro';
-import SectionKicker from '@/components/shared/SectionKicker.astro';
-import LineChart, { type LineSeries } from '@/components/charts/LineChart.astro';
+import PageHeader from '@/components/page/PageHeader.astro';
+import SectionKicker from '@/components/page/SectionKicker.astro';
+import LineChart, { type LineSeries } from '@/components/data/LineChart.astro';
 import BattleList from '@/features/races/components/BattleList.astro';
 import WeatherStrip from '@/features/races/components/WeatherStrip.astro';
 import SessionSwitcher from '@/features/races/components/SessionSwitcher.astro';
 import { GP_ACCENT, SPRINT_ACCENT } from '@/features/predictions/types';
 import { api } from '@/lib/api';
-import { getTeamColor } from '@/lib/teamColors';
+import { getTeamColor } from '@/lib/f1/teamColors';
 import { unwrapSettled } from '@/lib/utils';
 import type { RaceSession } from '@/types';
 

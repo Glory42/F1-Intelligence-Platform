@@ -43,7 +43,7 @@ Also check `math_utils.py` — if a new normalization/scoring formula is added t
 
 ### 5. Frontend: duplicate display-formatting logic
 
-`apps/web/src/lib/teamColors.ts`, `teamLogos.ts`, `countryFlags.ts`, `circuitMetadata.ts` are the canonical lookup tables for team/country/circuit display data. Grep components for inline color hex codes, flag emoji, or circuit stat literals that duplicate what's already in one of these files (a sign a lookup was hand-rolled instead of imported).
+`apps/web/src/lib/f1/teamColors.ts`, `teamLogos.ts`, `countryFlags.ts` are the canonical lookup tables for team/country/circuit display data. Grep components for inline color hex codes, flag emoji, or circuit stat literals that duplicate what's already in one of these files (a sign a lookup was hand-rolled instead of imported).
 
 ### 6. Compare-tool duplication
 

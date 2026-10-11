@@ -1,4 +1,4 @@
-import { championshipPoints } from '@/lib/championshipMath';
+import { championshipPoints } from '@/lib/f1/championshipMath';
 
 export const DEFAULT_COMPARE_YEAR = 2026;
 

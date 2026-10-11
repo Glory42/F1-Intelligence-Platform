@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { linearScale, niceTicks } from '@/lib/chartScale';
+import { linearScale, niceTicks } from '@/components/data/chartScale';
 
 describe('linearScale', () => {
   it('maps a domain value proportionally into the range', () => {

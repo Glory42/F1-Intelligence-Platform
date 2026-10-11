@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rainSpells } from '@/lib/weatherSpells';
+import { rainSpells } from '@/features/races/weatherSpells';
 
 describe('rainSpells', () => {
   it('groups consecutive wet samples into spells by minute', () => {

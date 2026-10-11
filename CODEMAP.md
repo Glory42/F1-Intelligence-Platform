@@ -335,28 +335,25 @@ apps/web/
 │   │   │   ├── SiteLogo.astro     # Brand mark SVG
 │   │   │   ├── navLinks.ts        # buildNavGroups() + buildNavUtilities(isDev) + activeDestination() — nav model
 │   │   │   └── Footer.astro       # Shared footer
-│   │   ├── charts/
-│   │   │   └── LineChart.astro    # Plain SVG multi-series line chart — nice ticks, spread end labels (title fight, race story, weather, telemetry)
-│   │   ├── docs/
-│   │   │   └── OnThisPage.astro   # Sticky right-rail TOC of a doc's h2 sections; scrollspy via IntersectionObserver
-│   │   ├── shared/
+│   │   ├── page/                  # Page chrome
 │   │   │   ├── PageHeader.astro       # Kicker + h1 + subtitle; "aside" slot holds the season picker
 │   │   │   ├── PageTabs.astro         # Server-rendered link tabs (?tab=, or a route href per tab)
-│   │   │   ├── EmptyState.astro       # Bordered "nothing here yet" / error message
 │   │   │   ├── TabIntro.astro         # Tab lead line + term legend (replaces footnote paragraphs under tables)
 │   │   │   ├── SectionKicker.astro    # "./label" section heading with optional link
-│   │   │   ├── DataList.astro / DataRow.astro  # Standings-style row list with table roles (rows/cells) for a11y + tests
-│   │   │   ├── DriverIdentity.astro / TeamIdentity.astro  # Headshot/logo + linked name cell inside a DataRow
-│   │   │   ├── RankCell.astro         # Rank cell — trophy for P1, highlighted top N
-│   │   │   ├── ShareBar.astro         # Percentage bar cell (title odds)
-│   │   │   ├── StatTiles.astro        # Grid of label/value stat tiles
+│   │   │   ├── EmptyState.astro       # Bordered "nothing here yet" / error message
 │   │   │   ├── YearSelect.astro       # Year selector; extraParams prop preserves filter/sort/tab on year change
-│   │   │   ├── YearSelectLinks.astro  # Year selector using anchor links; used by driver/team profile pages
-│   │   │   └── ConfidenceBadge.astro  # LOCK / LIKELY / TOSS-UP badge from the P1−P2 win-probability gap
+│   │   │   └── YearSelectLinks.astro  # Year selector using anchor links; used by driver/team profile pages
+│   │   ├── data/                  # Data display
+│   │   │   ├── DataList.astro / DataRow.astro  # Standings-style row list with table roles (rows/cells) for a11y + tests
+│   │   │   ├── RankCell.astro         # Rank cell — trophy for P1, highlighted top N
+│   │   │   ├── StatTiles.astro        # Grid of label/value stat tiles
+│   │   │   ├── HeadToHead.astro       # Two-side head-to-head bar rows (driver teammate tab, team page)
+│   │   │   ├── LineChart.astro        # Plain SVG multi-series line chart — nice ticks, spread end labels
+│   │   │   ├── chartScale.ts          # linearScale(), niceTicks() — d3-style scales for the plain-SVG charts
+│   │   │   └── labelLayout.ts         # spreadLabels() — nudge end-of-line chart labels apart without reordering
+│   │   ├── identity/
+│   │   │   └── DriverIdentity.astro / TeamIdentity.astro  # Headshot/logo + linked name cell inside a DataRow
 │   │   └── ui/                    # Shadcn/ui primitives + generic widgets
-│   │       ├── badge.tsx
-│   │       ├── button.tsx
-│   │       ├── card.tsx
 │   │       ├── table.tsx
 │   │       └── search-select.tsx  # Generic autocomplete combobox; shared by Driver/TeamCompareTool
 │   ├── features/
@@ -369,6 +366,7 @@ apps/web/
 │   │   │   └── components/
 │   │   │       ├── PredictionPageBody.astro        # Full page body (header→banner→table→radar→Friday pace→WhatIfLab); both
 │   │   │       │                                   #   [id].astro routes reduce to a fetch + <PredictionPageBody data={data} copy={copy} />
+│   │   │       ├── ConfidenceBadge.astro           # LOCK / LIKELY / TOSS-UP badge from the P1−P2 win-probability gap
 │   │   │       ├── PredictionHeader.astro          # Round kicker + title + ConfidenceBadge + circuit/model lines
 │   │   │       ├── PredictionOutcomeBanner.astro   # Predicted → actual winner banner
 │   │   │       ├── ContributionBar.astro           # "why {CODE}" — stacked bar of each feature's weighted-score share
@@ -384,6 +382,8 @@ apps/web/
 │   │   ├── races/
 │   │   │   ├── raceTabs.ts            # initRaceCountdown() + initRaceTabs() — shared by GP + sprint detail scripts
 │   │   │   ├── raceEventDisplay.ts    # timeOf(), dotColor() — shared by the three Race Event list components
+│   │   │   ├── gridPenalties.ts       # gridDrops() — grid drops vs qualifying (pit-lane start = grid 0)
+│   │   │   ├── weatherSpells.ts       # rainSpells() — contiguous rainfall minutes → spells
 │   │   │   └── components/
 │   │   │       ├── LapChart.astro         # Plain SVG lap time chart (no chart library)
 │   │   │       ├── RaceTabs.astro / RaceTabPanel.astro # Client-side tab strip + panels (namespaced ids) + route links for heavy analysis
@@ -400,13 +400,15 @@ apps/web/
 │   │   │       ├── RaceYearSelect.astro   # Year selector for race/sprint detail; variant="orange"|"purple", extraParams prop
 │   │   │       ├── RaceHeroInfo.astro     # Hero left column — status badge, meta, conditions strip, countdown (accent prop)
 │   │   │       └── RacePredictionPanel.astro  # Hero right column — predicted winner + podium (accent prop)
-│   │   ├── telemetry/components/
-│   │   │   └── DominanceMap.astro     # Track map coloured by which of two drivers won each mini-sector
+│   │   ├── telemetry/
+│   │   │   ├── telemetryCompare.ts    # lapDelta(), sectorBounds(), miniSectorWinners() — two resampled laps compared
+│   │   │   ├── trackMap.ts            # projectTrack() — telemetry x/y → SVG points, aspect ratio preserved
+│   │   │   └── components/
+│   │   │       └── DominanceMap.astro # Track map coloured by which of two drivers won each mini-sector
 │   │   ├── drivers/
 │   │   │   └── teammateTally.ts       # Per-driver podiums, retirements, averages, best finish over shared races
 │   │   ├── drivers/components/
 │   │   │   ├── TeammateBattleCard.astro # Teammate tab — quali gap tiles, head-to-head bars, race-by-race list
-│   │   │   ├── HeadToHead.astro       # Two-driver head-to-head bar rows (teammate tab, team page)
 │   │   │   ├── DriverStatsGrid.tsx    # Driver season stats card grid
 │   │   │   ├── RecentResultsTable.tsx # Compact recent results table
 │   │   │   ├── DriverCareerTable.astro # Per-season career rows (Career tab)
@@ -419,12 +421,14 @@ apps/web/
 │   │   │       ├── PitCrewRankingTable.astro # Crews ranked by median stationary time (/teams Pit crews tab + team Pit crew tab)
 │   │   │       └── TeamHistoryTable.astro # History tab — one season-by-season table incl. chassis + power unit
 │   │   ├── standings/components/
+│   │   │   ├── ShareBar.astro         # Percentage bar cell (title odds)
 │   │   │   ├── DriverStandingsTable.astro / TeamStandingsTable.astro  # Standings tabs on /drivers, /teams
 │   │   │   ├── TitleFight.astro       # /drivers Title fight — odds table, mathematically-out flags, odds-over-season chart
 │   │   │   ├── RacecraftTable.astro   # /drivers Racecraft — overtakes made/suffered/net
 │   │   │   └── ConstructorTitleOdds.astro # /teams Title odds — constructors' title probability + likely final points
 │   │   ├── hub/                       # Home
 │   │   │   ├── raceHighlights.ts      # Podium, pole, fastest lap, retirements from a race's results
+│   │   │   ├── nextSession.ts         # nextSession(), weekendSessions() — done/next/upcoming session state for a race weekend
 │   │   │   ├── modelVerdict.ts        # The model's GP call for a race: pick, confidence, winner's rank, season tally
 │   │   │   ├── types.ts               # HomeFact
 │   │   │   └── components/            # Home's three blocks + header strip
@@ -437,6 +441,7 @@ apps/web/
 │   │   ├── history/                   # F1DB all-time history — /history + driver/team career tabs
 │   │   │   ├── historyView.ts         # Pure view helpers — bar widths, record holders, rate/chase summary, month-day
 │   │   │   │                          #   parse/step/format, years-ago label, lineage timeline spans + totals + colours
+│   │   │   ├── f1dbCountries.ts       # F1DB country id ('united-kingdom') → flag emoji / display name
 │   │   │   └── components/
 │   │   │       ├── RecordTile.astro       # Headline record tile — value, holder(s) with flag + active dot
 │   │   │       ├── Leaderboard.astro      # Ranked list w/ bars, flags, active dot; top 5 shown + <details> expander
@@ -475,34 +480,29 @@ apps/web/
 │   │   │   ├── useCompareController.ts # Thin useReducer wiring over compareReducer.ts — URL sync via injectable
 │   │   │   │                          #   locationAdapter, discriminated season/career `comparison` result
 │   │   │   └── compareTabs.ts         # COMPARE_TABS — Drivers/Teams route tabs shared by both compare pages
+│   │   ├── docs/components/
+│   │   │   └── OnThisPage.astro       # Sticky right-rail TOC of a doc's h2 sections; scrollspy via IntersectionObserver
 │   │   └── search/
 │   │       ├── components/
 │   │       │   └── GlobalSearch.tsx   # React global search palette (cmdk) — render only
 │   │       └── useGlobalSearch.ts     # Search-open state hook (keyboard shortcut, sidebar/top-bar search button bridge, fetch-on-open, close animation)
-│   ├── lib/                       # Only truly cross-feature helpers
+│   ├── lib/                       # App plumbing + shared F1 reference data (single-feature logic lives in its feature)
 │   │   ├── api.ts                 # Typed API client — all fetch calls, uses PUBLIC_API_URL
 │   │   ├── site.ts                # SITE_NAME — the brand string
-│   │   ├── teamColors.ts          # team_key → official hex color map (fallback #6B7280)
-│   │   ├── teamLogos.ts           # team_key → /teams/<file> static logo path (null if no logo)
-│   │   ├── countryFlags.ts        # country/nationality/driver code → emoji flag + display name helpers
-│   │   ├── f1dbCountries.ts       # F1DB country id ('united-kingdom') → flag emoji / display name
-│   │   ├── predictionMath.ts      # weightedScore, softmax (SOFTMAX_TEMPERATURE=0.3), radarFeatures(), contributions,
-│   │   │                          #   confidenceTier, brierScore, calibrationBuckets, driverPredictionRecord,
-│   │   │                          #   bestCall/worstMiss/longestStreak, GP_WEIGHTS/SPRINT_WEIGHTS + *_FEATURE_META
-│   │   │                          #   (the canonical TS-side manifest, checked against docs/feature-weights.json)
-│   │   ├── championshipMath.ts    # titleContention() (mathematically out), remainingSessions(), formatTitleOdds(), championshipPoints() (GP + sprint)
-│   │   ├── chartScale.ts          # linearScale(), niceTicks() — d3-style scales for the plain-SVG charts
-│   │   ├── labelLayout.ts         # spreadLabels() — nudge end-of-line chart labels apart without reordering
-│   │   ├── telemetryCompare.ts    # lapDelta(), sectorBounds(), miniSectorWinners() — two resampled laps compared
-│   │   ├── trackMap.ts            # projectTrack() — telemetry x/y → SVG points, aspect ratio preserved
-│   │   ├── tyres.ts               # compoundToken() — tyre compound → colour token
-│   │   ├── weatherSpells.ts       # rainSpells() — contiguous rainfall minutes → spells
-│   │   ├── gridPenalties.ts       # gridDrops() — grid drops vs qualifying (pit-lane start = grid 0)
-│   │   ├── nextSession.ts         # nextSession(), weekendSessions() — done/next/upcoming session state for a race weekend
 │   │   ├── pageTabs.ts            # resolveTab() + tabHref() — ?tab= link tabs that keep other params
 │   │   ├── sidebarState.ts        # Sidebar collapse cookie — isSidebarCollapsed() + sidebarCookie()
 │   │   ├── legacyRedirects.ts     # legacyRedirect(path, search) — retired URLs (prediction recap, /records, /drivers|teams/compare) → their new home
-│   │   └── utils.ts               # cn() (clsx + tailwind-merge), unwrapSettled(), formatMs/Probability/Date/StopSeconds/AgeFromDays
+│   │   ├── utils.ts               # cn() (clsx + tailwind-merge), unwrapSettled(), formatMs/Probability/Date/StopSeconds/AgeFromDays
+│   │   └── f1/                    # F1 reference data + maths used across features
+│   │       ├── teamColors.ts      # team_key → official hex color map (fallback #6B7280)
+│   │       ├── teamLogos.ts       # team_key → /teams/<file> static logo path (null if no logo)
+│   │       ├── countryFlags.ts    # country/nationality/driver code → emoji flag + display name helpers
+│   │       ├── predictionMath.ts  # weightedScore, softmax (SOFTMAX_TEMPERATURE=0.3), radarFeatures(), contributions,
+│   │       │                      #   confidenceTier, brierScore, calibrationBuckets, driverPredictionRecord,
+│   │       │                      #   bestCall/worstMiss/longestStreak, GP_WEIGHTS/SPRINT_WEIGHTS + *_FEATURE_META
+│   │       │                      #   (the canonical TS-side manifest, checked against docs/feature-weights.json)
+│   │       ├── championshipMath.ts # titleContention() (mathematically out), remainingSessions(), formatTitleOdds(), championshipPoints()
+│   │       └── tyres.ts           # compoundToken() — tyre compound → colour token
 │   ├── middleware.ts              # 301s retired URLs via legacyRedirect()
 │   ├── types/
 │   │   └── index.ts               # All API response types (~75) — core entities (Circuit, Team, Driver, Race, results),
@@ -518,25 +518,23 @@ apps/web/
 │   └── teams/                     # Static team logo files (PNG/SVG/JPG) served at /teams/<teamKey>.*
 ├── tests/
 │   ├── unit/
-│   │   ├── compare/
-│   │   │   └── compareStats.test.ts          # aggregateCareerStats() — pure, `node` env
 │   │   ├── features/compare/
+│   │   │   ├── compareStats.test.ts          # aggregateCareerStats() — pure, `node` env
 │   │   │   ├── compareReducer.test.ts        # pure, `node` env — hydrate/year/mode transitions, stale-request
 │   │   │   │                                 #   guarding, explicit 6bf3415 hydration-race regression case
 │   │   │   └── useCompareController.test.ts  # jsdom — URL hydration, career mode, location-adapter seam
-│   │   ├── components/layout/
-│   │   │   └── navLinks.test.ts              # pure — sidebar groups, utilities, active-destination matching
-│   │   ├── lib/                              # pure, `node` env — one *.test.ts per lib file:
-│   │   │   ├── pageTabs / sidebarState / legacyRedirects / teamColors / teamLogos / utils (unwrapSettled)
-│   │   │   ├── predictionMath.test.ts        # all predictionMath exports
-│   │   │   └── championshipMath / chartScale / labelLayout / telemetryCompare / trackMap / tyres /
-│   │   │       weatherSpells / gridPenalties / nextSession / f1dbCountries
+│   │   ├── components/
+│   │   │   ├── layout/navLinks.test.ts       # pure — sidebar groups, utilities, active-destination matching
+│   │   │   └── data/                         # chartScale, labelLayout
+│   │   ├── lib/                              # pure, `node` env — pageTabs / sidebarState / legacyRedirects / utils
+│   │   │   └── f1/                           # predictionMath (all exports), championshipMath, teamColors, teamLogos, tyres
+│   │   ├── features/races/ · features/telemetry/  # gridPenalties, weatherSpells, raceEventDisplay · telemetryCompare, trackMap
 │   │   ├── features/predictions/
 │   │   │   └── buildPredictionPageData.test.ts / predictionCopy.test.ts  # GP + sprint page data, copy table
 │   │   ├── features/history/
-│   │   │   └── historyView.test.ts           # pure, `node` env — bars, holders, rates, chases, month-day, lineage helpers
+│   │   │   └── historyView.test.ts / f1dbCountries.test.ts  # pure, `node` env — bars, holders, rates, chases, month-day, lineage, flags
 │   │   ├── features/hub/
-│   │   │   └── raceHighlights.test.ts / modelVerdict.test.ts  # pure, `node` env
+│   │   │   └── raceHighlights.test.ts / modelVerdict.test.ts / nextSession.test.ts  # pure, `node` env
 │   │   ├── features/drivers/
 │   │   │   └── teammateTally.test.ts         # pure, `node` env
 │   │   ├── features/circuits/
@@ -586,7 +584,7 @@ apps/web/
 | `/teams` | `teams/standings` · `predictions/title-odds` · `teams/pit-stops` | Tabs: Standings · Title odds · Pit crews |
 | `/compare/teams` | `teams?year=N` + `seasons` + `search`; details fetched client-side | Team head-to-head comparison page |
 | `/teams/[id]` | `teams/:id?year=N` + driver standings · `teams/:id/pit-stops` + `teams/pit-stops` · `teams/:id/career` + `teams/:id/history` | Tabs: This season · Pit crew · History |
-| `/records` | `history/records` · `history/milestones` · `history/on-this-day?date=` · `history/lineages` | History — tabs Records · Milestones · On this day · Lineage (F1DB, credited) |
+| `/history` | `history/records` · `history/milestones` · `history/on-this-day?date=` · `history/lineages` | History — tabs Records · Milestones · On this day · Lineage (F1DB, credited) |
 | `/health-quality` | `quality?year=N` + `seasons` | Dev-only data-quality dashboard |
 
 ### Key Library Files
@@ -595,11 +593,11 @@ apps/web/
 |------|---------|
 | `lib/api.ts` | Single typed API client. All pages call functions from here — never raw `fetch`. |
 | `lib/site.ts` | `SITE_NAME` — the brand string used in titles and the header. |
-| `lib/teamColors.ts` | Maps `team_key` strings (e.g. `red_bull`, `ferrari`) to official hex colors. Used for colored badges/dots across standings, driver pages, and result tables. |
-| `lib/teamLogos.ts` | Maps `team_key` to a static logo path under `/teams/`. Returns `null` for historical teams with no logo file. Used on teams index, teams detail, and drivers standings pages. |
-| `lib/f1dbCountries.ts` | `f1dbCountryFlag()` / `f1dbCountryName()` — F1DB kebab-case country ids → flag emoji (via ISO 3166 codes) and display name; used by the history leaderboards, record tiles and chases. |
-| `lib/championshipMath.ts` | Title contention (who is mathematically out given remaining GPs + sprints and the era's points), title-odds formatting, and championship points as GP + sprint totals. |
-| `lib/chartScale.ts` / `lib/labelLayout.ts` | Scale + tick + label-spreading primitives behind the plain-SVG `LineChart` and `StintChart` (no chart library). |
+| `lib/f1/teamColors.ts` | Maps `team_key` strings (e.g. `red_bull`, `ferrari`) to official hex colors. Used for colored badges/dots across standings, driver pages, and result tables. |
+| `lib/f1/teamLogos.ts` | Maps `team_key` to a static logo path under `/teams/`. Returns `null` for historical teams with no logo file. Used on teams index, teams detail, and drivers standings pages. |
+| `features/history/f1dbCountries.ts` | `f1dbCountryFlag()` / `f1dbCountryName()` — F1DB kebab-case country ids → flag emoji (via ISO 3166 codes) and display name; used by the history leaderboards, record tiles and chases. |
+| `lib/f1/championshipMath.ts` | Title contention (who is mathematically out given remaining GPs + sprints and the era's points), title-odds formatting, and championship points as GP + sprint totals. |
+| `components/data/chartScale.ts` / `labelLayout.ts` | Scale + tick + label-spreading primitives behind the plain-SVG `LineChart` and `StintChart` (no chart library). |
 | `lib/pageTabs.ts` | `resolveTab(url, tabs)` picks the open `?tab=` (first tab when absent/unknown); `tabHref()` builds a tab link that keeps `year` etc. and drops `tab` for the default. Pages fetch only the open tab's data. |
 | `lib/sidebarState.ts` | Reads/writes the `sidebar` cookie — a cookie (not localStorage) so `BaseLayout` renders the right width server-side and the layout never jumps. |
 | `lib/utils.ts` | `cn()` — combines `clsx` and `tailwind-merge` for conditional class names. `unwrapSettled(result, fallback)` — one-line `PromiseSettledResult` unwrap, used wherever a page fans out `Promise.allSettled()` calls. Plus `format*` display helpers. |

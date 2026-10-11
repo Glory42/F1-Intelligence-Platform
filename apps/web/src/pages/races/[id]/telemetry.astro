@@ -1,15 +1,15 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
-import LineChart from '@/components/charts/LineChart.astro';
-import PageHeader from '@/components/shared/PageHeader.astro';
-import SectionKicker from '@/components/shared/SectionKicker.astro';
-import StatTiles from '@/components/shared/StatTiles.astro';
+import LineChart from '@/components/data/LineChart.astro';
+import PageHeader from '@/components/page/PageHeader.astro';
+import SectionKicker from '@/components/page/SectionKicker.astro';
+import StatTiles from '@/components/data/StatTiles.astro';
 import { Map as MapIcon} from 'lucide-react';
 import DominanceMap from '@/features/telemetry/components/DominanceMap.astro';
 import { api } from '@/lib/api';
-import { getTeamColor } from '@/lib/teamColors';
+import { getTeamColor } from '@/lib/f1/teamColors';
 import { formatMs, unwrapSettled } from '@/lib/utils';
-import { lapDelta, miniSectorWinners } from '@/lib/telemetryCompare';
+import { lapDelta, miniSectorWinners } from '@/features/telemetry/telemetryCompare';
 import type { QualifyingSession } from '@/types';
 
 const { id } = Astro.params;

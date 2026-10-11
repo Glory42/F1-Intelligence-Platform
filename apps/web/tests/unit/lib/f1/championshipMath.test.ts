@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { championshipPoints, formatTitleOdds, remainingSessions, titleContention } from '@/lib/championshipMath';
+import { championshipPoints, formatTitleOdds, remainingSessions, titleContention } from '@/lib/f1/championshipMath';
 
 // 2021, before Abu Dhabi: VER and HAM level on 369.5 with one GP (25 + fastest-lap point) left.
 const ABU_DHABI_2021 = [

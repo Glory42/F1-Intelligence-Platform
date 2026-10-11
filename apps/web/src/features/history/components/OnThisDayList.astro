@@ -1,10 +1,10 @@
 ---
 import type { OnThisDay } from '@/types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { getTeamColor } from '@/lib/teamColors';
-import { getDriverFlagByCode, getNationalityFlag } from '@/lib/countryFlags';
+import { getTeamColor } from '@/lib/f1/teamColors';
+import { getDriverFlagByCode, getNationalityFlag } from '@/lib/f1/countryFlags';
 import { formatMonthDay, shiftMonthDay, yearsAgoLabel } from '../historyView';
-import EmptyState from '@/components/shared/EmptyState.astro';
+import EmptyState from '@/components/page/EmptyState.astro';
 
 interface Props {
   result: OnThisDay | null;

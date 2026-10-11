@@ -1,12 +1,12 @@
 ---
-import StatTiles from '@/components/shared/StatTiles.astro';
-import TabIntro from '@/components/shared/TabIntro.astro';
-import DataList from '@/components/shared/DataList.astro';
-import DataRow from '@/components/shared/DataRow.astro';
+import StatTiles from '@/components/data/StatTiles.astro';
+import TabIntro from '@/components/page/TabIntro.astro';
+import DataList from '@/components/data/DataList.astro';
+import DataRow from '@/components/data/DataRow.astro';
 import PitCrewRankingTable from './PitCrewRankingTable.astro';
 import { driverStopSummaries } from '../pitStopSummary';
 import { formatStopSeconds } from '@/lib/utils';
-import { getTeamColor } from '@/lib/teamColors';
+import { getTeamColor } from '@/lib/f1/teamColors';
 import type { PitCrewRanking, Team, TeamPitStop } from '@/types';
 
 interface Props {

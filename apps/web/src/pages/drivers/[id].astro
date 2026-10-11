@@ -9,13 +9,13 @@ import CareerCard from '@/features/history/components/CareerCard.astro';
 import DriverCareerTable from '@/features/drivers/components/DriverCareerTable.astro';
 import ModelTrackRecord from '@/features/drivers/components/ModelTrackRecord.astro';
 import { Trophy } from 'lucide-react';
-import YearSelectLinks from '@/components/shared/YearSelectLinks.astro';
-import PageTabs from '@/components/shared/PageTabs.astro';
-import EmptyState from '@/components/shared/EmptyState.astro';
-import { getTeamColor } from '@/lib/teamColors';
-import { driverPredictionRecord } from '@/lib/predictionMath';
+import YearSelectLinks from '@/components/page/YearSelectLinks.astro';
+import PageTabs from '@/components/page/PageTabs.astro';
+import EmptyState from '@/components/page/EmptyState.astro';
+import { getTeamColor } from '@/lib/f1/teamColors';
+import { driverPredictionRecord } from '@/lib/f1/predictionMath';
 import { resolveTab, TAB_PARAM } from '@/lib/pageTabs';
-import { getNationalityFlag, getDriverFlagByCode } from '@/lib/countryFlags';
+import { getNationalityFlag, getDriverFlagByCode } from '@/lib/f1/countryFlags';
 
 const TABS = [
   { id: 'season', label: 'This season' },

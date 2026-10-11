@@ -1,9 +1,9 @@
 ---
 import { CheckCircle2, XCircle, Clock } from 'lucide-react';
-import StatTiles from '@/components/shared/StatTiles.astro';
+import StatTiles from '@/components/data/StatTiles.astro';
 import CalibrationChart from '@/features/predictions/components/CalibrationChart.astro';
 import { formatDate } from '@/lib/utils';
-import { brierScore, bestCall, worstMiss, longestStreak } from '@/lib/predictionMath';
+import { brierScore, bestCall, worstMiss, longestStreak } from '@/lib/f1/predictionMath';
 import type { PredictionHistoryItem, SeasonAccuracy } from '@/types';
 
 interface Props {

@@ -3,16 +3,16 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import { api } from '@/lib/api';
 import type { TeamYearStats, DriverStanding, PitCrewRanking, TeamHistory, TeamPitStop } from '@/types';
 import TeamPitCrew from '@/features/teams/components/TeamPitCrew.astro';
-import HeadToHead, { type HeadToHeadRow } from '@/features/drivers/components/HeadToHead.astro';
+import HeadToHead, { type HeadToHeadRow } from '@/components/data/HeadToHead.astro';
 import TeamHistoryTable from '@/features/teams/components/TeamHistoryTable.astro';
 import { Info } from 'lucide-react';
-import YearSelectLinks from '@/components/shared/YearSelectLinks.astro';
-import PageTabs from '@/components/shared/PageTabs.astro';
-import EmptyState from '@/components/shared/EmptyState.astro';
+import YearSelectLinks from '@/components/page/YearSelectLinks.astro';
+import PageTabs from '@/components/page/PageTabs.astro';
+import EmptyState from '@/components/page/EmptyState.astro';
 import { resolveTab, TAB_PARAM } from '@/lib/pageTabs';
-import { getTeamColor } from '@/lib/teamColors';
-import { championshipPoints } from '@/lib/championshipMath';
-import { getTeamLogo } from '@/lib/teamLogos';
+import { getTeamColor } from '@/lib/f1/teamColors';
+import { championshipPoints } from '@/lib/f1/championshipMath';
+import { getTeamLogo } from '@/lib/f1/teamLogos';
 
 const TABS = [
   { id: 'season', label: 'This season' },

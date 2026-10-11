@@ -1,5 +1,5 @@
 import type { DriverRecordStat, LineageMember, RecordChase, RecordEntry } from '@/types';
-import { getTeamColor } from '@/lib/teamColors';
+import { getTeamColor } from '@/lib/f1/teamColors';
 
 export const RANK_COLORS = ['#f5c542', '#c9d1db', '#cd7f32'] as const;
 

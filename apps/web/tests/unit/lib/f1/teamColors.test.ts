@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { getTeamColor } from '../../../src/lib/teamColors';
+import { getTeamColor } from '../../../../src/lib/f1/teamColors';
 
 describe('getTeamColor', () => {
   test('returns the known hex color for a current team key', () => {

@@ -2,10 +2,10 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { api } from '@/lib/api';
 import type { PredictionHistoryItem, IntelStandingRow, SeasonSummary, SprintPredictionResponse, PredictionResponse, ModelInfo, SeasonAccuracy } from '@/types';
-import PageHeader from '@/components/shared/PageHeader.astro';
-import PageTabs from '@/components/shared/PageTabs.astro';
-import EmptyState from '@/components/shared/EmptyState.astro';
-import YearSelect from '@/components/shared/YearSelect.astro';
+import PageHeader from '@/components/page/PageHeader.astro';
+import PageTabs from '@/components/page/PageTabs.astro';
+import EmptyState from '@/components/page/EmptyState.astro';
+import YearSelect from '@/components/page/YearSelect.astro';
 import { GP_ACCENT, SPRINT_ACCENT } from '@/features/predictions/types';
 import UpcomingPredictionPanel from '@/features/predictions/components/UpcomingPredictionPanel.astro';
 import ModelRatingsTable from '@/features/predictions/components/ModelRatingsTable.astro';

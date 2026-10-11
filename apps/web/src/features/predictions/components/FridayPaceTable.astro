@@ -1,11 +1,11 @@
 ---
-import SectionKicker from '@/components/shared/SectionKicker.astro';
-import DataList from '@/components/shared/DataList.astro';
-import DataRow from '@/components/shared/DataRow.astro';
-import DriverIdentity from '@/components/shared/DriverIdentity.astro';
-import RankCell from '@/components/shared/RankCell.astro';
-import { compoundToken } from '@/lib/tyres';
-import { getTeamColor } from '@/lib/teamColors';
+import SectionKicker from '@/components/page/SectionKicker.astro';
+import DataList from '@/components/data/DataList.astro';
+import DataRow from '@/components/data/DataRow.astro';
+import DriverIdentity from '@/components/identity/DriverIdentity.astro';
+import RankCell from '@/components/data/RankCell.astro';
+import { compoundToken } from '@/lib/f1/tyres';
+import { getTeamColor } from '@/lib/f1/teamColors';
 import { formatMs } from '@/lib/utils';
 import type { PredictionAccent } from '../types';
 import type { FridayPaceRow } from '@/types';

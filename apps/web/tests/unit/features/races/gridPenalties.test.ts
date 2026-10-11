@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { gridDrops } from '@/lib/gridPenalties';
+import { gridDrops } from '@/features/races/gridPenalties';
 
 const entry = (driverId: number, code: string) => ({ driverId, driver: { code } });
 

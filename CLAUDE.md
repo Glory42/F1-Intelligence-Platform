@@ -416,7 +416,7 @@ Full detail in `docs/prediction-model.md`.
 - `circuits.overtake_rate` — seeded once per circuit, never changes
 - `circuits.sc_probability` — **not static**: recomputed after every race ingest from `races.safety_car_laps`
   (`ingest_race._recompute_circuit_sc_probability`)
-- Softmax temperature T=0.3 — `SOFTMAX_TEMPERATURE` in `data-engine/src/utils/feature_manifest.py`, imported by `prediction_runner.py`/`math_utils.py` (Python) and `apps/web/src/lib/predictionMath.ts` (TS)
+- Softmax temperature T=0.3 — `SOFTMAX_TEMPERATURE` in `data-engine/src/utils/feature_manifest.py`, imported by `prediction_runner.py`/`math_utils.py` (Python) and `apps/web/src/lib/f1/predictionMath.ts` (TS)
 - Model weights — `GP_FEATURES`/`SPRINT_FEATURES` in `feature_manifest.py`, re-exported as `WEIGHTS` by `compute_features.py`/`compute_sprint_features.py`; checked against `docs/feature-weights.json` and `apps/web`'s `FEATURE_META`/`SPRINT_FEATURE_META`
 
 ### Softmax

@@ -8,7 +8,7 @@ import {
   SPRINT_FEATURE_META,
   type FeatureContribution,
   type Weights,
-} from '@/lib/predictionMath';
+} from '@/lib/f1/predictionMath';
 import { GP_ACCENT, SPRINT_ACCENT, type PredictionAccent, type PredictionDriverVM, type FeatureMeta, type PredictionPageKind } from './types';
 import type { Race, Driver, FridayPaceRow } from '@/types';
 

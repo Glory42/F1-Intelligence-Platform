@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nextSession, weekendSessions } from '@/lib/nextSession';
+import { nextSession, weekendSessions } from '@/features/hub/nextSession';
 
 const sprintWeekend = {
   sprintQualifyingDate: '2026-11-06T18:30:00.000Z',

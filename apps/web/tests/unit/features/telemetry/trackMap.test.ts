@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { projectTrack } from '@/lib/trackMap';
+import { projectTrack } from '@/features/telemetry/trackMap';
 
 describe('projectTrack', () => {
   it('fits the lap into a square viewBox, centring the narrow axis and flipping y for SVG', () => {

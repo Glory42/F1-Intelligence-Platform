@@ -57,7 +57,7 @@ Some inputs never change and are seeded once into the database or hardcoded in P
 |-------|-------------|---------|
 | Circuit overtake rate | `circuits.overtake_rate` | Never — seeded once per track |
 | Circuit SC probability | `circuits.sc_probability` | Never — seeded once per track |
-| Model weights | `feature_manifest.py` `GP_FEATURES` (re-exported as `WEIGHTS` by `compute_features.py`); mirrored in `apps/web/src/lib/predictionMath.ts` `FEATURE_META`, both checked against `docs/feature-weights.json` | Only when model is intentionally updated |
+| Model weights | `feature_manifest.py` `GP_FEATURES` (re-exported as `WEIGHTS` by `compute_features.py`); mirrored in `apps/web/src/lib/f1/predictionMath.ts` `FEATURE_META`, both checked against `docs/feature-weights.json` | Only when model is intentionally updated |
 | Sprint model weights | `feature_manifest.py` `SPRINT_FEATURES` (re-exported as `WEIGHTS` by `compute_sprint_features.py`); mirrored in `predictionMath.ts` `SPRINT_FEATURE_META` | Only when model is intentionally updated |
 | Softmax temperature T=0.3 | `feature_manifest.py` `SOFTMAX_TEMPERATURE` (Python), `predictionMath.ts` `SOFTMAX_TEMPERATURE` (TS) — imported by every caller in each language | Only when model is intentionally updated |
 
@@ -221,7 +221,7 @@ For races without qualifying data, `compute_features` cannot run — those races
    same simulated seasons, so driver and constructor odds are consistent.
 
 The web standings additionally show pure mathematical contention (`titleContention` in
-`apps/web/src/lib/championshipMath.ts`): a driver is eliminated once their points plus every point
+`apps/web/src/lib/f1/championshipMath.ts`): a driver is eliminated once their points plus every point
 still available (26 per GP 2019–2024, 25 otherwise; 8 per sprint, 3 in 2021) fall short of the leader.
 
 

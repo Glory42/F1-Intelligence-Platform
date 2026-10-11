@@ -112,8 +112,8 @@ suite never touches Neon.
 
 Vitest, config in `vitest.config.ts` (include `tests/unit/**/*.test.{ts,tsx}`, `@` alias, setup file).
 
-- **Default environment is `node`** — pure logic runs there: `lib/predictionMath.ts` (all exports),
-  `lib/teamColors` / `lib/teamLogos` / `lib/f1dbCountries`, `features/compare/compareStats.ts`,
+- **Default environment is `node`** — pure logic runs there: `lib/f1/predictionMath.ts` (all exports),
+  `lib/f1/teamColors` / `lib/f1/teamLogos` / `features/history/f1dbCountries`, `features/compare/compareStats.ts`,
   `features/history/historyView.ts`, the hub/circuits/drivers/teams feature helpers,
   `features/predictions/{buildPredictionPageData,predictionCopy}` (API mocked with `vi.mock`, not MSW).
 - **jsdom is opt-in per file** via a `// @vitest-environment jsdom` docblock on line 1 — used for

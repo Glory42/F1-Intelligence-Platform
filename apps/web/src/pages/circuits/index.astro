@@ -3,9 +3,9 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import { CircuitsGrid } from '@/features/circuits/components/CircuitsGrid';
 import { api } from '@/lib/api';
 import type { Circuit, Race } from '@/types';
-import PageHeader from '@/components/shared/PageHeader.astro';
-import PageTabs from '@/components/shared/PageTabs.astro';
-import EmptyState from '@/components/shared/EmptyState.astro';
+import PageHeader from '@/components/page/PageHeader.astro';
+import PageTabs from '@/components/page/PageTabs.astro';
+import EmptyState from '@/components/page/EmptyState.astro';
 import { resolveTab } from '@/lib/pageTabs';
 
 const TABS = [

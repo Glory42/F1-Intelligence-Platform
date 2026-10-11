@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import type { Circuit } from '@/types';
-import { getCountryFlag } from '@/lib/countryFlags';
+import { getCountryFlag } from '@/lib/f1/countryFlags';
 import { MapPin, Gauge, CornerDownRight, Wind, Zap } from 'lucide-react';
 
 interface Props {

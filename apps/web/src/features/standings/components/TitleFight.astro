@@ -1,13 +1,13 @@
 ---
-import LineChart, { type LineSeries } from '@/components/charts/LineChart.astro';
-import DataList from '@/components/shared/DataList.astro';
-import TabIntro from '@/components/shared/TabIntro.astro';
-import DataRow from '@/components/shared/DataRow.astro';
-import DriverIdentity from '@/components/shared/DriverIdentity.astro';
-import RankCell from '@/components/shared/RankCell.astro';
-import ShareBar from '@/components/shared/ShareBar.astro';
-import { getTeamColor } from '@/lib/teamColors';
-import { championshipPoints, formatTitleOdds, titleContention, remainingSessions } from '@/lib/championshipMath';
+import LineChart, { type LineSeries } from '@/components/data/LineChart.astro';
+import DataList from '@/components/data/DataList.astro';
+import TabIntro from '@/components/page/TabIntro.astro';
+import DataRow from '@/components/data/DataRow.astro';
+import DriverIdentity from '@/components/identity/DriverIdentity.astro';
+import RankCell from '@/components/data/RankCell.astro';
+import ShareBar from '@/features/standings/components/ShareBar.astro';
+import { getTeamColor } from '@/lib/f1/teamColors';
+import { championshipPoints, formatTitleOdds, titleContention, remainingSessions } from '@/lib/f1/championshipMath';
 import type { DriverStanding, Race, TitleOddsResponse } from '@/types';
 
 interface Props {

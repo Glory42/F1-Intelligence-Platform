@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { spreadLabels } from '@/lib/labelLayout';
+import { spreadLabels } from '@/components/data/labelLayout';
 
 describe('spreadLabels', () => {
   it('pushes crowded labels apart by the minimum gap, keeping their order', () => {

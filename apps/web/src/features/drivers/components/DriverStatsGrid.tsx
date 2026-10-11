@@ -1,4 +1,4 @@
-import { championshipPoints } from '@/lib/championshipMath';
+import { championshipPoints } from '@/lib/f1/championshipMath';
 import type { DriverSeasonStats } from '@/types';
 
 
