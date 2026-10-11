@@ -75,5 +75,5 @@ test('the driver page shows all-time career totals and milestones', async ({ pag
 test('the team page shows its chassis and engine lineage', async ({ page }) => {
   await page.goto('/teams/1?year=2026&tab=history');
 
-  await expect(page.getByRole('table', { name: 'Chassis and engines' }).getByRole('row', { name: /2026.*RB22.*Red Bull Ford/ })).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Season by season' }).getByRole('row', { name: /2026.*RB22.*Red Bull Ford/ })).toBeVisible();
 });
