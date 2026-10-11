@@ -3,6 +3,7 @@ import { api } from '@/lib/api';
 import type { Team, TeamDetailResponse, TeamSeasonStats, TeamYearStats, SeasonSummary } from '@/types';
 import { getTeamColor } from '@/lib/f1/teamColors';
 import { getTeamLogo } from '@/lib/f1/teamLogos';
+import { championshipPoints } from '@/lib/f1/championshipMath';
 import { aggregateCareerStats, DEFAULT_COMPARE_YEAR, type CareerTotals } from '../compareStats';
 import { useCompareController } from '../useCompareController';
 import { SearchSelect } from '@/components/ui/search-select';
@@ -24,7 +25,7 @@ const teamSubtitle = (
 const seasonStatConfig: StatRowConfig<TeamSeasonStats>[] = [
   {
     label: 'Championship Points',
-    value: (s) => parseFloat(s.totalPoints),
+    value: (s) => championshipPoints(s),
     format: (v) => v.toString(),
   },
   { label: 'Grand Prix Wins', value: (s) => s.wins },
