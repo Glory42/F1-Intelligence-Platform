@@ -12,7 +12,7 @@ test('the sidebar lists every destination in Season and Explore groups', async (
 });
 
 test('the sidebar marks the destination that owns the current page', async ({ page }) => {
-  await page.goto('/drivers/compare');
+  await page.goto('/compare/drivers');
 
   await expect(siteNav(page).getByRole('link', { name: 'compare' })).toHaveAttribute('aria-current', 'page');
   await expect(siteNav(page).getByRole('link', { name: 'drivers' })).not.toHaveAttribute('aria-current', 'page');

@@ -11,6 +11,13 @@ describe('legacyRedirect', () => {
     expect(legacyRedirect('/prediction/recap')).toBe('/prediction?tab=scorecard');
   });
 
+  it('moves compare and history to their own sections, keeping the query string', () => {
+    expect(legacyRedirect('/drivers/compare', '?a=1&b=2')).toBe('/compare/drivers?a=1&b=2');
+    expect(legacyRedirect('/teams/compare/')).toBe('/compare/teams');
+    expect(legacyRedirect('/compare')).toBe('/compare/drivers');
+    expect(legacyRedirect('/records', '?tab=lineage')).toBe('/history?tab=lineage');
+  });
+
   it('leaves every other page alone', () => {
     expect(legacyRedirect('/prediction')).toBeNull();
     expect(legacyRedirect('/prediction/42')).toBeNull();

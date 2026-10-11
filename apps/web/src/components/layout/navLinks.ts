@@ -28,8 +28,8 @@ export function buildNavGroups(): NavGroup[] {
       label: 'explore',
       destinations: [
         { href: '/circuits', label: 'circuits', icon: MapPin, owns: ['/circuits'] },
-        { href: '/drivers/compare', label: 'compare', icon: ArrowLeftRight, owns: ['/drivers/compare', '/teams/compare'] },
-        { href: '/records', label: 'history', icon: Trophy, owns: ['/records'] },
+        { href: '/compare/drivers', label: 'compare', icon: ArrowLeftRight, owns: ['/compare'] },
+        { href: '/history', label: 'history', icon: Trophy, owns: ['/history'] },
       ],
     },
   ];
@@ -51,7 +51,7 @@ export function buildNavUtilities(isDev: boolean): NavUtility[] {
 const ownsPath = (prefix: string, path: string): boolean =>
   prefix === '/' ? path === '/' : path === prefix || path.startsWith(`${prefix}/`);
 
-// Longest owned prefix wins, so /drivers/compare lights Compare rather than Drivers.
+// Longest owned prefix wins, so a destination can own a sub-path of another one.
 export function activeDestination(groups: NavGroup[], path: string): NavDestination | null {
   let best: { destination: NavDestination; length: number } | null = null;
   for (const destination of groups.flatMap((g) => g.destinations)) {

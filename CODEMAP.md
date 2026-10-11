@@ -298,7 +298,10 @@ apps/web/
 │   │   ├── prediction.astro       # Tabs: Upcoming (GP + sprint panels, model ratings) · Scorecard (history, calibration, Brier)
 │   │   ├── prediction/[id].astro  # Historical GP prediction — contribution breakdown, radar compare, Friday pace, what-if lab
 │   │   ├── health-quality.astro   # Dev-only data-quality dashboard (404-guarded outside DEV)
-│   │   ├── records.astro          # History page — tabs Records · Milestones · On this day · Lineage (F1DB)
+│   │   ├── history.astro          # /history — tabs Records · Milestones · On this day · Lineage (F1DB)
+│   │   ├── compare/
+│   │   │   ├── drivers.astro      # /compare/drivers — driver head-to-head comparison tool
+│   │   │   └── teams.astro        # /compare/teams — team head-to-head comparison tool
 │   │   ├── docs/
 │   │   │   ├── index.astro        # Docs index — card grid of all docs
 │   │   │   └── [slug].astro       # Individual doc page — all-docs sidebar, content, on-this-page rail
@@ -318,11 +321,9 @@ apps/web/
 │   │   │       └── [id].astro     # Sprint prediction detail — same feature set as GP, sprint model (8 weights)
 │   │   ├── drivers/
 │   │   │   ├── index.astro        # Tabs: Standings · Title fight · Racecraft
-│   │   │   ├── compare.astro      # Driver head-to-head comparison tool
 │   │   │   └── [id].astro         # Driver profile — tabs This season · Teammate battle · Career (F1DB card + seasons) · Model
 │   │   └── teams/
 │   │       ├── index.astro        # Tabs: Standings · Title odds · Pit crews
-│   │       ├── compare.astro      # Team head-to-head comparison tool
 │   │       └── [id].astro         # Team profile — tabs This season · Pit crew · History
 │   ├── layouts/
 │   │   └── BaseLayout.astro       # Shared layout — Sidebar + MobileNav, slot, Footer, GlobalSearch; reads the sidebar cookie
@@ -433,7 +434,7 @@ apps/web/
 │   │   │       ├── NextRaceBlock.astro # Countdown, weekend schedule (local times), circuit facts, model top 3
 │   │   │       ├── LastRaceBlock.astro # Podium, race facts, model check, Recap lines
 │   │   │       └── ChampionshipBlock.astro # Top 5 drivers + teams: points, gap, title odds
-│   │   ├── history/                   # F1DB all-time history — /records + driver/team career tabs
+│   │   ├── history/                   # F1DB all-time history — /history + driver/team career tabs
 │   │   │   ├── historyView.ts         # Pure view helpers — bar widths, record holders, rate/chase summary, month-day
 │   │   │   │                          #   parse/step/format, years-ago label, lineage timeline spans + totals + colours
 │   │   │   └── components/
@@ -500,7 +501,7 @@ apps/web/
 │   │   ├── nextSession.ts         # nextSession(), weekendSessions() — done/next/upcoming session state for a race weekend
 │   │   ├── pageTabs.ts            # resolveTab() + tabHref() — ?tab= link tabs that keep other params
 │   │   ├── sidebarState.ts        # Sidebar collapse cookie — isSidebarCollapsed() + sidebarCookie()
-│   │   ├── legacyRedirects.ts     # legacyRedirect(path) — retired URLs → their new home
+│   │   ├── legacyRedirects.ts     # legacyRedirect(path, search) — retired URLs (prediction recap, /records, /drivers|teams/compare) → their new home
 │   │   └── utils.ts               # cn() (clsx + tailwind-merge), unwrapSettled(), formatMs/Probability/Date/StopSeconds/AgeFromDays
 │   ├── middleware.ts              # 301s retired URLs via legacyRedirect()
 │   ├── types/
@@ -580,10 +581,10 @@ apps/web/
 | `/circuits` | `races/circuits` + `races?year=N` | Tabs: All circuits · This season |
 | `/circuits/[key]` | `races/circuit/:circuitKey` + `races/circuit/:circuitKey/telemetry` + Open-Meteo | Tabs: Overview · Winners · Dominance · Telemetry |
 | `/drivers` | `drivers/standings` · `predictions/title-odds` + `races` · `drivers/racecraft` | Tabs: Standings · Title fight · Racecraft |
-| `/drivers/compare` | `drivers?year=N` + `seasons` + `search`; details fetched client-side | Driver head-to-head comparison page |
+| `/compare/drivers` | `drivers?year=N` + `seasons` + `search`; details fetched client-side | Driver head-to-head comparison page |
 | `/drivers/[id]` | `drivers/:id?year=N` · `drivers/:id/teammate-battle` · `drivers/:id/career` + `drivers/:id/history` · `predictions/history` | Tabs: This season · Teammate battle · Career · Model |
 | `/teams` | `teams/standings` · `predictions/title-odds` · `teams/pit-stops` | Tabs: Standings · Title odds · Pit crews |
-| `/teams/compare` | `teams?year=N` + `seasons` + `search`; details fetched client-side | Team head-to-head comparison page |
+| `/compare/teams` | `teams?year=N` + `seasons` + `search`; details fetched client-side | Team head-to-head comparison page |
 | `/teams/[id]` | `teams/:id?year=N` + driver standings · `teams/:id/pit-stops` + `teams/pit-stops` · `teams/:id/career` + `teams/:id/history` | Tabs: This season · Pit crew · History |
 | `/records` | `history/records` · `history/milestones` · `history/on-this-day?date=` · `history/lineages` | History — tabs Records · Milestones · On this day · Lineage (F1DB, credited) |
 | `/health-quality` | `quality?year=N` + `seasons` | Dev-only data-quality dashboard |
@@ -643,11 +644,11 @@ apps/e2e/
 │       ├── circuit-detail.spec.ts  # /circuits/monza — overview + tabs, winners facts, telemetry outline
 │       ├── drivers-standings.spec.ts # /drivers — standings, title fight, racecraft tabs keep the season
 │       ├── driver-detail.spec.ts   # /drivers/10 — stats grid + recent results, tabs, teammate battle
-│       ├── driver-compare.spec.ts  # /drivers/compare — URL-param-driven season comparison, drivers ⇄ teams switch (client-side fetch)
+│       ├── driver-compare.spec.ts  # /compare/drivers — URL-param-driven season comparison, drivers ⇄ teams switch (client-side fetch)
 │       ├── teams-standings.spec.ts # /teams — standings, title odds, pit crews tabs
 │       ├── team-detail.spec.ts     # /teams/1 — stats + roster, history tab, pit crew tab
-│       ├── teams-compare.spec.ts   # /teams/compare — URL-param-driven constructor comparison (client-side fetch)
-│       └── history.spec.ts         # /records tabs (records, chases, milestones, on this day, lineage) + driver/team history tabs
+│       ├── teams-compare.spec.ts   # /compare/teams — URL-param-driven constructor comparison (client-side fetch)
+│       └── history.spec.ts         # /history tabs (records, chases, milestones, on this day, lineage), old-URL redirects, driver/team history tabs
 ├── playwright.config.ts           # webServer: [fixture server, `astro dev` in ../web]
 ├── tsconfig.json
 └── package.json

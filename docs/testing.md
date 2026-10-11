@@ -142,7 +142,7 @@ Playwright, its own `package.json` and `playwright.config.ts` (see
   only ever hit server-side.
 - Smoke specs (`tests/smoke/`) cover the home hub, `/prediction`, `/prediction/sprint/[id]`,
   `/races/[id]` (+ sprint, race story, telemetry), `/circuits` + `/circuits/[key]`, `/drivers` +
-  `/drivers/[id]`, `/teams` + `/teams/[id]`, both compare pages, `/records` (all four History tabs),
+  `/drivers/[id]`, `/teams` + `/teams/[id]`, both compare pages, `/history` (all four tabs, old-URL redirects),
   the sidebar, branding, and the global search palette — each asserts key content renders against
   the fixtures.
 - `reuseExistingServer` is on outside CI, so a developer's own `astro dev` on `:4321` would be

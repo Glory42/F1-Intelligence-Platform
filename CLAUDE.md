@@ -284,7 +284,7 @@ All queries use Drizzle joins. Never fetch a list then loop-query for each item.
 | `/races/[id]` | BaseLayout | `GET /api/races/:id` (+ strategy, race events) |
 | `/races/[id]/race-story` | BaseLayout | `GET /api/races/:id/race-story` (`?session=sprint` for the sprint) |
 | `/races/[id]/telemetry` | BaseLayout | `GET /api/races/:id/telemetry` — drivers picked with a plain GET form, so no client fetch |
-| `/records` | BaseLayout | `GET /api/history/records`; `?tab=milestones`/`on-this-day` (`&date=MM-DD`)/`lineage` each fetch their own route |
+| `/history` | BaseLayout | `GET /api/history/records`; `?tab=milestones`/`on-this-day` (`&date=MM-DD`)/`lineage` each fetch their own route |
 | `/drivers/[id]` | BaseLayout | `GET /api/drivers/:id` |
 | `/teams/[id]` | BaseLayout | `GET /api/teams/:id` |
 

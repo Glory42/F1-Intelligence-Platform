@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
-test('the records page leads with headline records and ranks leaders with flags and active drivers', async ({ page }) => {
-  await page.goto('/records');
+test('the history page leads with headline records and ranks leaders with flags and active drivers', async ({ page }) => {
+  await page.goto('/history');
 
   await expect(page.getByRole('group', { name: 'Most championships: 7' })).toContainText('Michael Schumacher');
   const wins = page.getByRole('table', { name: 'Most race wins' });
@@ -13,15 +13,15 @@ test('the records page leads with headline records and ranks leaders with flags 
 });
 
 test('former drivers link to their page without the current-grid marker', async ({ page }) => {
-  await page.goto('/records');
+  await page.goto('/history');
 
   const schumacher = page.getByRole('table', { name: 'Most race wins' }).getByRole('row', { name: /Michael Schumacher/ });
   await expect(schumacher.getByRole('link', { name: 'Michael Schumacher' })).toHaveAttribute('href', '/drivers/20');
   await expect(schumacher.getByTitle('On the current grid')).toHaveCount(0);
 });
 
-test('the records page shows how far active drivers are from each record', async ({ page }) => {
-  await page.goto('/records');
+test('the history page shows how far active drivers are from each record', async ({ page }) => {
+  await page.goto('/history');
 
   const chases = page.getByRole('list', { name: 'Chasing the record' });
   await expect(chases).toContainText('Max Verstappen');
@@ -29,32 +29,32 @@ test('the records page shows how far active drivers are from each record', async
 });
 
 test('history keeps milestones, on this day and lineage in tabs', async ({ page }) => {
-  await page.goto('/records');
+  await page.goto('/history');
 
   const views = page.getByRole('navigation', { name: 'History views' });
   await expect(views.getByRole('link')).toHaveText(['Records', 'Milestones', 'On this day', 'Lineage']);
   await expect(views.getByRole('link', { name: 'Records' })).toHaveAttribute('aria-current', 'page');
 
   await views.getByRole('link', { name: 'Milestones' }).click();
-  await expect(page).toHaveURL(/\/records\?tab=milestones$/);
+  await expect(page).toHaveURL(/\/history\?tab=milestones$/);
   await expect(page.getByRole('table', { name: 'Youngest winners' })).toContainText('18 y 228 d');
   await expect(page.getByRole('table', { name: 'Oldest first-time winners' })).toContainText('Luigi Fagioli');
 });
 
 test('on this day steps between dates and falls back to the nearest day with a race', async ({ page }) => {
-  await page.goto('/records?tab=on-this-day&date=09-08');
+  await page.goto('/history?tab=on-this-day&date=09-08');
 
   await expect(page.getByRole('list', { name: /^On this day/ }).getByRole('link', { name: /2019 · Italian Grand Prix/ })).toBeVisible();
   await page.getByRole('navigation', { name: 'Change date' }).getByRole('link', { name: /9 September/ }).click();
   await expect(page).toHaveURL(/date=09-09/);
 
-  await page.goto('/records?tab=on-this-day&date=12-25');
+  await page.goto('/history?tab=on-this-day&date=12-25');
   await expect(page.getByText(/No Grand Prix on 25 December — showing the nearest date/)).toBeVisible();
   await expect(page.getByRole('list', { name: 'On this day, 13 December' })).toBeVisible();
 });
 
 test('the lineage tab traces a team through every name it raced under', async ({ page }) => {
-  await page.goto('/records?tab=lineage');
+  await page.goto('/history?tab=lineage');
 
   const family = page.getByRole('list', { name: 'Red Bull lineage' });
   await expect(family.getByRole('listitem')).toHaveText([/Stewart.*1997–1999/, /Jaguar.*2000–2004/, /Red Bull.*2005–/]);
@@ -76,4 +76,12 @@ test('the team page shows its chassis and engine lineage', async ({ page }) => {
   await page.goto('/teams/1?year=2026&tab=history');
 
   await expect(page.getByRole('table', { name: 'Season by season' }).getByRole('row', { name: /2026.*RB22.*Red Bull Ford/ })).toBeVisible();
+});
+
+test('old records and compare links redirect to their new sections', async ({ page }) => {
+  await page.goto('/records?tab=lineage');
+  await expect(page).toHaveURL(/\/history\?tab=lineage$/);
+
+  await page.goto('/drivers/compare?year=2025&a=10&b=11');
+  await expect(page).toHaveURL(/\/compare\/drivers\?year=2025&a=10&b=11$/);
 });

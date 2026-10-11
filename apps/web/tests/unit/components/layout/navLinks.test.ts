@@ -35,13 +35,13 @@ describe('activeDestination', () => {
     ['/races/12/telemetry', 'calendar'],
     ['/drivers', 'drivers'],
     ['/drivers/42', 'drivers'],
-    ['/drivers/compare', 'compare'],
-    ['/teams/compare', 'compare'],
+    ['/compare/drivers', 'compare'],
+    ['/compare/teams', 'compare'],
     ['/teams/7', 'teams'],
     ['/prediction/recap/2025', 'predictions'],
     ['/prediction/sprint/88', 'predictions'],
     ['/circuits/monza', 'circuits'],
-    ['/records', 'history'],
+    ['/history', 'history'],
   ])('lights up the destination that owns %s', (path, expected) => {
     expect(activeLabel(path)).toBe(expected);
   });

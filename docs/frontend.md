@@ -97,8 +97,8 @@ second unrelated feature needs it.
 
 - **Sidebar** — `Sidebar.astro` on `md+`, `MobileNav.astro` (top bar + drawer) below; both render `NavGroups`
   from `navLinks.ts`. Two groups: **Season** (home, calendar, drivers, teams, predictions) and **Explore**
-  (circuits, compare, history). `activeDestination()` picks the longest owned prefix, so `/drivers/compare`
-  lights Compare, not Drivers. Collapse state lives in the `sidebar` cookie (`lib/sidebarState.ts`) so the
+  (circuits, compare, history). Compare (`/compare/drivers`, `/compare/teams`) and History (`/history`) are their
+  own sections; `activeDestination()` picks the longest owned prefix. Collapse state lives in the `sidebar` cookie (`lib/sidebarState.ts`) so the
   server renders the right width on first paint.
 - **One question per page** — each page leads with one main view; everything else is a `?tab=` link tab
   (`PageTabs.astro`, `resolveTab`/`tabHref` in `lib/pageTabs.ts`). The default tab keeps the plain URL, other
@@ -127,8 +127,8 @@ second unrelated feature needs it.
 | `/drivers/[id]` | Season: `drivers/:id?year=` · Teammate: `drivers/:id/teammate-battle` · Career: `drivers/:id/career` + `drivers/:id/history` · Model: `predictions/history` |
 | `/teams` | Standings / Title odds / Pit crews tabs: `teams/standings` · `predictions/title-odds` · `teams/pit-stops` |
 | `/teams/[id]` | Season: `teams/:id?year=` · Pit crew: `teams/pit-stops` + `teams/:id/pit-stops` · History: `teams/:id/career` + `teams/:id/history` |
-| `/drivers/compare` · `/teams/compare` | `seasons` + `drivers?year=` / `teams?year=` + `search` in frontmatter; the compare island then fetches `:id?year=` / `:id/career` client-side |
-| `/records` (History) | Records: `history/records` · Milestones: `history/milestones` · On this day: `history/on-this-day?date=MM-DD` (`?date=` param, nearest-day fallback) · Lineage: `history/lineages` |
+| `/compare/drivers` · `/compare/teams` | `seasons` + `drivers?year=` / `teams?year=` + `search` in frontmatter; the compare island then fetches `:id?year=` / `:id/career` client-side |
+| `/history` | Records: `history/records` · Milestones: `history/milestones` · On this day: `history/on-this-day?date=MM-DD` (`?date=` param, nearest-day fallback) · Lineage: `history/lineages` |
 | `/docs` · `/docs/[slug]` | Astro content collection (`prerender = true`) |
 | `/health-quality` | `quality?year=` — dev-only, 404-guarded outside `import.meta.env.DEV` |
 

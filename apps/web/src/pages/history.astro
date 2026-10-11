@@ -60,7 +60,7 @@ const holder = (e: RecordEntry | MilestoneEntry) => ({
 });
 
 const lineageStart = Math.floor(Math.min(...lineages.flatMap((l) => l.members.map((m) => m.yearFrom)), currentYear) / 10) * 10;
-const onThisDayHref = (monthDay: string) => `/records?tab=on-this-day&date=${monthDay}`;
+const onThisDayHref = (monthDay: string) => `/history?tab=on-this-day&date=${monthDay}`;
 ---
 
 <BaseLayout title={TITLES[tab]}>
