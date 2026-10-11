@@ -4,6 +4,7 @@ import { api } from '@/lib/api';
 import { unwrapSettled } from '@/lib/utils';
 import type { Race } from '@/types';
 import PageHeader from '@/components/shared/PageHeader.astro';
+import SeasonProgress from '@/features/hub/components/SeasonProgress.astro';
 import NextRaceBlock from '@/features/hub/components/NextRaceBlock.astro';
 import LastRaceBlock from '@/features/hub/components/LastRaceBlock.astro';
 import ChampionshipBlock from '@/features/hub/components/ChampionshipBlock.astro';
@@ -11,11 +12,13 @@ import ChampionshipBlock from '@/features/hub/components/ChampionshipBlock.astro
 const year = new Date().getFullYear();
 const today = new Date();
 
-const [racesResult, predictionResult, driversResult, teamsResult] = await Promise.allSettled([
+const [racesResult, predictionResult, driversResult, teamsResult, oddsResult, historyResult] = await Promise.allSettled([
   api.getRaces(year),
   api.getUpcomingPrediction(),
   api.getDriverStandings(year),
   api.getTeamStandings(year),
+  api.getTitleOdds(year),
+  api.getPredictionHistory(year),
 ]);
 const races: Race[] = unwrapSettled(racesResult, []);
 const prediction = unwrapSettled(predictionResult, null);
@@ -27,18 +30,33 @@ const lastRace = races
 const nextRace = prediction?.race ?? races
   .filter((r) => r.status !== 'completed')
   .sort((a, b) => a.roundNumber - b.roundNumber)[0] ?? null;
-const recap = lastRace ? await api.getRaceRecap(lastRace.id).catch(() => null) : null;
+const [recapResult, detailResult] = lastRace
+  ? await Promise.allSettled([api.getRaceRecap(lastRace.id), api.getRaceById(lastRace.id)])
+  : [];
+const roundsLeft = races.filter((r) => r.status !== 'completed').length;
 ---
 
 <BaseLayout title="Dashboard">
   <div class="space-y-6">
-    <PageHeader kicker="./home" title={`${year} season`} />
+    <PageHeader kicker="./home" title={`${year} season`}>
+      <SeasonProgress slot="aside" races={races} nextRaceId={nextRace?.id ?? null} />
+    </PageHeader>
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <NextRaceBlock race={nextRace} prediction={prediction} today={today} />
-      <LastRaceBlock race={lastRace} recap={recap} />
+      <LastRaceBlock
+        race={lastRace}
+        recap={recapResult ? unwrapSettled(recapResult, null) : null}
+        detail={detailResult ? unwrapSettled(detailResult, null) : null}
+        history={unwrapSettled(historyResult, [])}
+      />
     </div>
 
-    <ChampionshipBlock drivers={unwrapSettled(driversResult, [])} teams={unwrapSettled(teamsResult, [])} />
+    <ChampionshipBlock
+      drivers={unwrapSettled(driversResult, [])}
+      teams={unwrapSettled(teamsResult, [])}
+      titleOdds={unwrapSettled(oddsResult, null)}
+      roundsLeft={roundsLeft}
+    />
   </div>
 </BaseLayout>

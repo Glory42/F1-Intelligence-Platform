@@ -1,0 +1,36 @@
+---
+import type { Race } from '@/types';
+
+interface Props {
+  races: Race[];
+  nextRaceId: number | null;
+}
+
+const { races, nextRaceId } = Astro.props;
+const rounds = [...races].sort((a, b) => a.roundNumber - b.roundNumber);
+const completed = rounds.filter((r) => r.status === 'completed').length;
+---
+
+{rounds.length > 0 && (
+  <div class="w-full sm:w-72">
+    <p class="mb-2 flex justify-between text-[12px] text-muted-foreground">
+      <span>Season progress</span>
+      <span class="font-mono tabular-nums"><span class="text-foreground">{completed}</span> / {rounds.length} rounds</span>
+    </p>
+    <ol class="flex gap-[3px]" aria-label="Rounds">
+      {rounds.map((r) => (
+        <li class="flex-1">
+          <a
+            href={`/races/${r.id}`}
+            title={`R${r.roundNumber} · ${r.name}`}
+            aria-label={`Round ${r.roundNumber}, ${r.name}`}
+            class:list={[
+              'block h-2 transition-opacity duration-150 hover:opacity-70',
+              r.id === nextRaceId ? 'bg-[#a855f7]' : r.status === 'completed' ? 'bg-white/45' : 'bg-white/[0.08]',
+            ]}
+          />
+        </li>
+      ))}
+    </ol>
+  </div>
+)}

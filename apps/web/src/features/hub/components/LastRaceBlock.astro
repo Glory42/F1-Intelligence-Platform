@@ -1,22 +1,50 @@
 ---
 import HomeBlock from './HomeBlock.astro';
+import HomeFacts from './HomeFacts.astro';
+import type { HomeFact } from '../types';
+import { raceHighlights } from '../raceHighlights';
+import { modelVerdict } from '../modelVerdict';
 import { formatStopSeconds } from '@/lib/utils';
-import type { Race, RaceRecap } from '@/types';
+import { getTeamColor } from '@/lib/teamColors';
+import type { PredictionHistoryItem, Race, RaceDetailResponse, RaceRecap } from '@/types';
 
 interface Props {
   race: Race | null;
+  detail: RaceDetailResponse | null;
   recap: RaceRecap | null;
+  history: PredictionHistoryItem[];
 }
 
-const { race, recap } = Astro.props;
+const { race, detail, recap, history } = Astro.props;
+const verdict = race ? modelVerdict(history, race.id) : null;
+const verdictFacts: HomeFact[] = verdict
+  ? [
+      { label: "Model's pick", value: `${verdict.pick.code} · ${Math.round(verdict.probability * 100)}%` },
+      { label: 'Winner ranked', value: verdict.winnerRank != null ? `#${verdict.winnerRank}` : '—' },
+      { label: 'Season calls', value: `${verdict.seasonCorrect} / ${verdict.seasonDecided}` },
+    ]
+  : [];
+const highlights = detail ? raceHighlights(detail.results, detail.qualifying) : null;
+const facts = highlights
+  ? ([
+      highlights.pole && { label: 'Pole', value: highlights.pole.code },
+      highlights.fastestLap && { label: 'Fastest lap', value: highlights.fastestLap.code },
+      { label: 'Retirements', value: highlights.retirements },
+      race?.safetyCarLaps != null && { label: 'Safety car laps', value: race.safetyCarLaps },
+    ] as Array<HomeFact | false | null>).filter((f): f is HomeFact => Boolean(f))
+  : [];
 const lines = recap
   ? [
-      recap.winner && `${recap.winner.code} won`,
-      recap.predictedWinner && `Model picked ${recap.predictedWinner.code}${recap.predictionHit ? ' ✓' : ''}`,
-      recap.fastestStop && `Fastest stop ${recap.fastestStop.driver.code} ${formatStopSeconds(recap.fastestStop.stationaryMs)}`,
-      recap.topBattle && `${recap.topBattle.chaser.code} chased ${recap.topBattle.leader.code} laps ${recap.topBattle.lapStart}–${recap.topBattle.lapEnd}`,
-    ].filter(Boolean)
+      !verdict && recap.predictedWinner && {
+        text: `Model picked ${recap.predictedWinner.code}`,
+        mark: recap.predictionHit == null ? '' : recap.predictionHit ? '✓' : '✗',
+        hit: recap.predictionHit,
+      },
+      recap.fastestStop && { text: `Fastest stop ${recap.fastestStop.driver.code} ${formatStopSeconds(recap.fastestStop.stationaryMs)}`, mark: '', hit: null },
+      recap.topBattle && { text: `${recap.topBattle.chaser.code} chased ${recap.topBattle.leader.code} laps ${recap.topBattle.lapStart}–${recap.topBattle.lapEnd}`, mark: '', hit: null },
+    ].filter((l): l is { text: string; mark: string; hit: boolean | null } => Boolean(l))
   : [];
+const podium = highlights?.podium ?? [];
 ---
 
 <HomeBlock
@@ -25,17 +53,55 @@ const lines = recap
   links={race ? [{ href: `/races/${race.id}`, label: 'Results' }, { href: `/races/${race.id}/race-story`, label: 'Race story' }] : []}
 >
   {race ? (
-    <div class="space-y-4">
+    <div class="space-y-5">
       <div>
         <p class="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Round {race.roundNumber} · {race.circuit.city}, {race.circuit.country}</p>
         <p class="mt-1 text-xl font-semibold">{race.name}</p>
+        <p class="mt-0.5 text-[13px] text-muted-foreground">{race.circuit.name}</p>
       </div>
+
+      {podium.length > 0 ? (
+        <ol class="space-y-1" aria-label="Podium">
+          {podium.map((r) => (
+            <li class="flex items-center gap-3 border-l-[3px] py-1.5 pl-3 text-[13px]" style={`border-color: ${getTeamColor(r.driver.team.teamKey)}`}>
+              <span class="w-4 font-mono text-[11px] text-muted-foreground">{r.finishPosition}</span>
+              <span class="w-10 font-mono font-bold">{r.driver.code}</span>
+              <span class="flex-1 truncate">{r.driver.fullName}</span>
+              <span class="hidden truncate text-muted-foreground sm:inline">{r.driver.team.name}</span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        recap?.winner && <p class="text-[13px]">{recap.winner.code} won</p>
+      )}
+
+      <HomeFacts facts={facts} />
+
+      {verdict && (
+        <div>
+          <div class="mb-2 flex items-center justify-between text-[12px]">
+            <span class="text-muted-foreground">Model check</span>
+            {verdict.hit != null && (
+              <span class:list={['font-mono text-[11px]', verdict.hit ? 'text-emerald-400' : 'text-red-400']}>
+                {verdict.hit ? '✓ called it' : '✗ missed'}
+              </span>
+            )}
+          </div>
+          <HomeFacts facts={verdictFacts} cols="grid-cols-3" />
+        </div>
+      )}
+
       {lines.length > 0 ? (
         <ul class="space-y-1.5 text-[13px]">
-          {lines.map((l) => <li>{l}</li>)}
+          {lines.map((l) => (
+            <li>
+              {l.text}
+              {l.mark && <span class:list={['ml-1', l.hit ? 'text-emerald-400' : 'text-red-400']}>{l.mark}</span>}
+            </li>
+          ))}
         </ul>
       ) : (
-        <p class="text-[13px] text-muted-foreground">The recap appears once the race data is in.</p>
+        podium.length === 0 && <p class="text-[13px] text-muted-foreground">The recap appears once the race data is in.</p>
       )}
     </div>
   ) : (

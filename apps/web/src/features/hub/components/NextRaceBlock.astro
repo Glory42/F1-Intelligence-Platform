@@ -1,6 +1,9 @@
 ---
 import HomeBlock from './HomeBlock.astro';
-import { nextSession } from '@/lib/nextSession';
+import HomeFacts from './HomeFacts.astro';
+import type { HomeFact } from '../types';
+import { nextSession, weekendSessions } from '@/lib/nextSession';
+import { getTeamColor } from '@/lib/teamColors';
 import type { PredictionResponse, Race } from '@/types';
 
 interface Props {
@@ -11,35 +14,87 @@ interface Props {
 
 const { race, prediction, today } = Astro.props;
 const session = race ? nextSession(race, today) : null;
-const favourite = prediction && race && prediction.race.id === race.id
-  ? [...prediction.drivers].sort((a, b) => (a.predictedPosition ?? 99) - (b.predictedPosition ?? 99))[0]
-  : null;
+const schedule = race ? weekendSessions(race, today) : [];
+const favourites = prediction && race && prediction.race.id === race.id
+  ? [...prediction.drivers].sort((a, b) => Number(b.winProbability) - Number(a.winProbability)).slice(0, 3)
+  : [];
+const leaderProbability = Number(favourites[0]?.winProbability ?? 1);
+
+const utcTime = (iso: string) => new Intl.DateTimeFormat('en-GB', {
+  weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'UTC',
+}).format(new Date(iso)) + ' UTC';
+
+const facts = race
+  ? ([
+      { label: 'Length', value: `${Number(race.circuit.trackLengthKm).toFixed(2)} km` },
+      { label: 'Laps', value: race.circuit.lapCount },
+      race.circuit.numberOfCorners != null && { label: 'Corners', value: race.circuit.numberOfCorners },
+      race.circuit.scProbability != null && { label: 'SC chance', value: `${Math.round(Number(race.circuit.scProbability) * 100)}%` },
+    ] as Array<HomeFact | false | null>).filter((f): f is HomeFact => Boolean(f))
+  : [];
 ---
 
 <HomeBlock
   title="Next race"
   id="home-next-race"
-  links={race ? [{ href: '/prediction', label: 'Prediction' }, { href: `/races/${race.id}`, label: 'Race' }] : [{ href: '/races', label: 'Calendar' }]}
+  links={race ? [{ href: '/prediction', label: 'Prediction' }, { href: `/races/${race.id}`, label: 'Race' }, { href: `/circuits/${race.circuit.circuitKey}`, label: 'Circuit' }] : [{ href: '/races', label: 'Calendar' }]}
 >
   {race ? (
-    <div class="space-y-4">
+    <div class="space-y-5">
       <div>
-        <p class="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Round {race.roundNumber} · {race.circuit.city}, {race.circuit.country}</p>
-        <p class="mt-1 text-xl font-semibold">{race.name}</p>
+        <p class="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          Round {race.roundNumber} · {race.circuit.city}, {race.circuit.country}
+        </p>
+        <p class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xl font-semibold">
+          {race.name}
+          {race.hasSprint && <span class="border border-[#f59e0b]/40 px-1.5 py-0.5 font-mono text-[9px] font-normal uppercase tracking-widest text-[#f59e0b]">sprint weekend</span>}
+        </p>
+        <p class="mt-0.5 text-[13px] text-muted-foreground">{race.circuit.name}</p>
       </div>
-      {session && (
-        <p class="text-[13px] text-muted-foreground">
-          {session.label} in <span id="home-countdown" data-target={session.date} class="font-mono text-foreground">—</span>
-        </p>
-      )}
-      {favourite ? (
-        <p class="text-[13px]">
-          Model favourite <span class="font-mono font-bold">{favourite.driver.code}</span>
-          <span class="font-mono text-[#a855f7]"> {Math.round(Number(favourite.winProbability) * 100)}%</span>
-        </p>
-      ) : (
-        <p class="text-[13px] text-muted-foreground">Prediction after qualifying.</p>
-      )}
+
+      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        {session && (
+          <div>
+            <p class="text-[12px] text-muted-foreground">{session.label} in</p>
+            <p id="home-countdown" data-target={session.date} class="mt-1 font-mono text-3xl font-bold tabular-nums">—</p>
+          </div>
+        )}
+        {schedule.length > 0 && (
+          <ol class="space-y-1.5 text-[13px]" aria-label="Weekend schedule">
+            {schedule.map((s) => (
+              <li class="flex items-center gap-2.5">
+                <span
+                  aria-hidden="true"
+                  class:list={['h-1.5 w-1.5 shrink-0 rounded-full', s.state === 'next' ? 'bg-[#a855f7]' : s.state === 'done' ? 'bg-white/30' : 'bg-white/[0.12]']}
+                />
+                <span class:list={['flex-1', s.state === 'done' && 'text-muted-foreground line-through decoration-white/20']}>{s.label}</span>
+                <time datetime={s.date} data-local-time class="font-mono text-[12px] tabular-nums text-muted-foreground">{utcTime(s.date)}</time>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+
+      <HomeFacts facts={facts} />
+
+      <div>
+        <p class="mb-2 text-[12px] text-muted-foreground">Model favourites</p>
+        {favourites.length > 0 ? (
+          <ol class="space-y-1.5">
+            {favourites.map((f) => (
+              <li class="flex items-center gap-3 text-[13px]">
+                <span class="w-10 font-mono font-bold">{f.driver.code}</span>
+                <span class="h-1.5 flex-1 bg-white/[0.05]">
+                  <span class="block h-full" style={`width: ${(Number(f.winProbability) / leaderProbability) * 100}%; background: ${getTeamColor(f.driver.team.teamKey)}`} />
+                </span>
+                <span class="w-10 text-right font-mono tabular-nums text-[#a855f7]">{Math.round(Number(f.winProbability) * 100)}%</span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p class="text-[13px] text-muted-foreground">Prediction after qualifying.</p>
+        )}
+      </div>
     </div>
   ) : (
     <p class="text-[13px] text-muted-foreground">The season is over — next year's calendar soon.</p>
@@ -48,6 +103,13 @@ const favourite = prediction && race && prediction.race.id === race.id
 
 <script>
   let timer: ReturnType<typeof setInterval> | null = null;
+
+  function localiseTimes() {
+    const format = new Intl.DateTimeFormat(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+    document.querySelectorAll<HTMLTimeElement>('time[data-local-time]').forEach((el) => {
+      el.textContent = format.format(new Date(el.dateTime));
+    });
+  }
 
   function initCountdown() {
     if (timer) clearInterval(timer);
@@ -73,5 +135,8 @@ const favourite = prediction && race && prediction.race.id === race.id
     timer = setInterval(update, 30_000);
   }
 
-  document.addEventListener('astro:page-load', initCountdown);
+  document.addEventListener('astro:page-load', () => {
+    localiseTimes();
+    initCountdown();
+  });
 </script>
