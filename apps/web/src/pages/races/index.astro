@@ -1,14 +1,17 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { api } from '@/lib/api';
-import { formatDate } from '@/lib/utils';
 import type { Race, SeasonSummary } from '@/types';
 import YearSelect from '@/components/page/YearSelect.astro';
-import { MapPin, CalendarDays, ChevronRight, Flag, Zap } from 'lucide-react';
+import CalendarRow from '@/features/races/components/CalendarRow.astro';
+import CalendarCard from '@/features/races/components/CalendarCard.astro';
+import {
+  calendarEntries, calendarQuery, calendarSummary, parseCalendarFilter, parseCalendarSort, type CalendarFilter,
+} from '@/features/races/calendar';
 
-const year   = Number(Astro.url.searchParams.get('year') ?? new Date().getFullYear());
-const filter = (Astro.url.searchParams.get('filter') ?? 'all') as 'all' | 'sprint' | 'gp';
-const sort   = (Astro.url.searchParams.get('sort') ?? 'asc') as 'asc' | 'desc';
+const year = Number(Astro.url.searchParams.get('year') ?? new Date().getFullYear());
+const filter = parseCalendarFilter(Astro.url.searchParams.get('filter'));
+const sort = parseCalendarSort(Astro.url.searchParams.get('sort'));
 
 let races: Race[] = [];
 let seasons: SeasonSummary[] = [];
@@ -20,50 +23,18 @@ try {
 }
 
 const completed = races.filter((r) => r.status === 'completed');
-const upcoming  = races.filter((r) => r.status !== 'completed');
+const upcoming = races.filter((r) => r.status !== 'completed');
+const completedRows = calendarEntries(completed, filter, sort);
+const upcomingCards = calendarEntries(upcoming, filter, sort);
+const statsLabel = calendarSummary(
+  filter,
+  { races: completed.length, entries: completedRows.length },
+  { races: upcoming.length, entries: upcomingCards.length },
+);
 
-// Sprint weekends expand into two display rows — sprint entry first (chronologically earlier),
-// then the main GP. The sprint entry links to /races/[id]/sprint.
-type DisplayRace = Race & { _sprint: boolean };
-const expandRaces = (list: Race[]): DisplayRace[] =>
-  list.flatMap((r) =>
-    r.hasSprint
-      ? [{ ...r, _sprint: true }, { ...r, _sprint: false }]
-      : [{ ...r, _sprint: false }]
-  );
-
-const applyFilter = (rows: DisplayRace[]) =>
-  filter === 'sprint' ? rows.filter((r) => r._sprint) :
-  filter === 'gp'     ? rows.filter((r) => !r._sprint) :
-  rows;
-
-const applySort = (rows: DisplayRace[]) =>
-  sort === 'desc' ? [...rows].reverse() : rows;
-
-const completedRows = applySort(applyFilter(expandRaces(completed)));
-const upcomingCards = applySort(applyFilter(expandRaces(upcoming)));
-
-// Stats shown in the subtitle depend on active filter
-const statsLabel =
-  filter === 'sprint'
-    ? `${completedRows.length} sprint completed · ${upcomingCards.length} remaining`
-    : filter === 'gp'
-    ? `${completed.length} GP completed · ${upcoming.length} remaining`
-    : `${completed.length} races completed · ${upcoming.length} remaining`;
-
-// Preserve filter+sort when changing year
-const yearExtraParams = [
-  filter !== 'all' ? `&filter=${filter}` : '',
-  sort   !== 'asc' ? `&sort=${sort}`     : '',
-].join('');
-
-// URL helpers — each preserves the other params
-const filterHref = (f: string) =>
-  `?year=${year}${f !== 'all' ? `&filter=${f}` : ''}${sort !== 'asc' ? `&sort=${sort}` : ''}`;
-
-const sortHref = sort === 'asc'
-  ? `?year=${year}${filter !== 'all' ? `&filter=${filter}` : ''}&sort=desc`
-  : `?year=${year}${filter !== 'all' ? `&filter=${filter}` : ''}`;
+const filterHref = (f: CalendarFilter) => calendarQuery(year, f, sort);
+const sortHref = calendarQuery(year, filter, sort === 'asc' ? 'desc' : 'asc');
+const yearExtraParams = calendarQuery(year, filter, sort).replace(`?year=${year}`, '');
 ---
 
 <BaseLayout title={`${year} Race Calendar`}>
@@ -90,7 +61,7 @@ const sortHref = sort === 'asc'
         </a>
         <!-- Filter buttons -->
         <div class="flex items-center border border-white/[0.08]">
-          {(['all', 'sprint', 'gp'] as const).map((f) => (
+          {(['all', 'sprint', 'gp'] as const satisfies readonly CalendarFilter[]).map((f) => (
             <a
               href={filterHref(f)}
               class={`font-mono text-[8px] tracking-[0.15em] uppercase px-3 py-1.5 transition-colors duration-150 ${
@@ -128,48 +99,7 @@ const sortHref = sort === 'asc'
               <div class="h-px flex-1 bg-white/[0.05]" />
             </div>
             <div class="border border-white/[0.06]">
-              {completedRows.map((race, i) => {
-                const isSprint = race._sprint;
-                const href = isSprint ? `/races/${race.id}/sprint` : `/races/${race.id}`;
-                const date = isSprint && race.sprintDate ? race.sprintDate : race.raceDate;
-                return (
-                  <div
-                    class={`relative flex items-center gap-4 px-5 py-3.5 hover:bg-white/[0.02] transition-colors duration-150 group ${i !== 0 ? 'border-t border-white/[0.04]' : ''} ${isSprint ? 'border-l-2 border-l-orange-500/30' : ''}`}
-                  >
-                    <a href={href} class="absolute inset-0 z-0" aria-label={race.name} />
-                    <span class={`font-mono text-[10px] w-6 shrink-0 ${isSprint ? 'text-orange-400/50' : 'text-muted-foreground'}`}>
-                      {race.roundNumber}
-                    </span>
-                    <div class="flex-1 min-w-0">
-                      <div class="flex items-center gap-2">
-                        <span class={`font-medium text-sm transition-colors duration-150 truncate ${isSprint ? 'group-hover:text-orange-400' : 'group-hover:text-[#a855f7]'}`}>
-                          {race.name}
-                        </span>
-                        {isSprint && (
-                          <span class="shrink-0 font-mono text-[7px] tracking-[0.15em] uppercase px-1.5 py-0.5 border border-orange-500/35 text-orange-400/75 hidden sm:inline">
-                            SPRINT
-                          </span>
-                        )}
-                      </div>
-                      <div class="relative z-10 flex items-center gap-1 font-mono text-[9px] text-muted-foreground mt-0.5 truncate sm:flex">
-                        <MapPin size={9} />
-                        <a href={`/circuits/${race.circuit.circuitKey}`} class="hover:text-white underline decoration-white/30 underline-offset-[2px] transition-all">
-                          {race.circuit.city}, {race.circuit.country}
-                        </a>
-                      </div>
-                    </div>
-                    <span class="flex items-center gap-1 font-mono text-[9px] text-muted-foreground md:flex shrink-0">
-                      <CalendarDays size={10} />{formatDate(date)}
-                    </span>
-                    {race.weather && (
-                      <span class="font-mono text-[9px] text-muted-foreground capitalize hidden lg:inline shrink-0">{race.weather}</span>
-                    )}
-                    <span class={`flex items-center gap-1 font-mono text-[9px] tracking-[0.12em] uppercase shrink-0 transition-colors duration-150 ${isSprint ? 'text-orange-400/60 group-hover:text-orange-400' : 'text-muted-foreground group-hover:text-[#a855f7]'}`}>
-                      results <ChevronRight size={10} />
-                    </span>
-                  </div>
-                );
-              })}
+              {completedRows.map((entry, i) => <CalendarRow entry={entry} first={i === 0} />)}
             </div>
           </div>
         )}
@@ -182,75 +112,7 @@ const sortHref = sort === 'asc'
               <div class="h-px flex-1 bg-white/[0.05]" />
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-white/[0.06]">
-              {upcomingCards.map((race) => {
-                const isSprint    = race._sprint;
-                const href        = isSprint ? `/races/${race.id}/sprint` : `/races/${race.id}`;
-                const date        = isSprint && race.sprintDate ? race.sprintDate : race.raceDate;
-                const isQualiDone = race.status === 'qualifying_done';
-                const isSprintDone = race.status === 'sprint_done';
-                const isSQDone    = race.status === 'sprint_qualifying_done';
-
-                return (
-                  <div class={`relative p-5 transition-colors duration-150 group ${isSprint ? 'bg-[rgba(249,115,22,0.03)] hover:bg-[rgba(249,115,22,0.05)] border-l-2 border-l-orange-500/30' : 'bg-black hover:bg-white/[0.02]'}`}>
-                    <a href={href} class="absolute inset-0 z-0" aria-label={race.name} />
-                    <div class="flex items-start justify-between gap-2 mb-3">
-                      <div class="flex items-center gap-2">
-                        <span class={`flex items-center gap-1.5 font-mono text-[9px] tracking-[0.18em] uppercase ${isSprint ? 'text-orange-400/60' : 'text-muted-foreground'}`}>
-                          <Flag size={10} />R{race.roundNumber.toString().padStart(2, '0')}
-                        </span>
-                        {isSprint && (
-                          <span class="font-mono text-[7px] tracking-[0.15em] uppercase px-1.5 py-0.5 border border-orange-500/35 text-orange-400/75">
-                            SPRINT
-                          </span>
-                        )}
-                      </div>
-                      {(isQualiDone || isSprintDone || isSQDone) && (
-                        <span class={`flex items-center gap-1 font-mono text-[8px] tracking-[0.12em] uppercase px-1.5 py-0.5 border ${
-                          isQualiDone && !isSprint
-                            ? 'border-[rgba(168,85,247,0.3)] text-[rgba(168,85,247,0.7)]'
-                            : 'border-orange-500/30 text-orange-400/70'
-                        }`}>
-                          {isQualiDone && !isSprint  ? <><Zap size={9} />quali done</>   :
-                           isSQDone && isSprint       ? <><Zap size={9} />sq done</>      :
-                                                        <><Zap size={9} />sprint done</>}
-                        </span>
-                      )}
-                    </div>
-                    <span class={`font-semibold text-sm leading-snug block mb-1 transition-colors duration-150 ${isSprint ? 'group-hover:text-orange-400' : 'group-hover:text-[#a855f7]'}`}>
-                      {race.name}
-                    </span>
-                    <div class="relative z-10 flex items-center gap-1 font-mono text-[9px] text-muted-foreground mb-3">
-                      <MapPin size={9} />
-                      <a href={`/circuits/${race.circuit.circuitKey}`} class="hover:text-white underline decoration-white/30 underline-offset-[2px] transition-all">
-                        {race.circuit.city}, {race.circuit.country}
-                      </a>
-                    </div>
-                    <div class="flex items-center gap-1 font-mono text-[9px] text-muted-foreground tracking-widest">
-                      <CalendarDays size={10} />{formatDate(date)}
-                    </div>
-                    {/* Action links — relative z-10 to sit above the stretched overlay */}
-                    {((isQualiDone && !isSprint) || ((isSQDone || isSprintDone || isQualiDone) && isSprint)) && (
-                      <div class="relative z-10 mt-4 pt-3 border-t border-white/[0.06]">
-                        {isQualiDone && !isSprint && (
-                          <a href="/prediction" class="flex items-center gap-1 font-mono text-[9px] tracking-[0.15em] uppercase text-[rgba(168,85,247,0.7)] hover:text-[#a855f7] transition-colors duration-150">
-                            <Zap size={10} />race prediction
-                          </a>
-                        )}
-                        {isSQDone && isSprint && (
-                          <a href={`/races/${race.id}/sprint`} class="flex items-center gap-1 font-mono text-[9px] tracking-[0.15em] uppercase text-orange-400/70 hover:text-orange-400 transition-colors duration-150">
-                            <Zap size={10} />sprint prediction
-                          </a>
-                        )}
-                        {(isSprintDone || isQualiDone) && isSprint && (
-                          <a href={`/races/${race.id}/sprint`} class="flex items-center gap-1 font-mono text-[9px] tracking-[0.15em] uppercase text-orange-400/70 hover:text-orange-400 transition-colors duration-150">
-                            <Zap size={10} />sprint results
-                          </a>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {upcomingCards.map((entry) => <CalendarCard entry={entry} />)}
             </div>
           </div>
         )}

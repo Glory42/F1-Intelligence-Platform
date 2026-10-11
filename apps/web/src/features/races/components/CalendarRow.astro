@@ -1,0 +1,49 @@
+---
+import { MapPin, CalendarDays, ChevronRight } from 'lucide-react';
+import { formatDate } from '@/lib/utils';
+import type { CalendarEntry } from '../calendar';
+
+interface Props {
+  entry: CalendarEntry;
+  first: boolean;
+}
+
+const { entry, first } = Astro.props;
+const { race, sprint: isSprint, href, date } = entry;
+---
+
+<div
+  class={`relative flex items-center gap-4 px-5 py-3.5 hover:bg-white/[0.02] transition-colors duration-150 group ${first ? '' : 'border-t border-white/[0.04]'} ${isSprint ? 'border-l-2 border-l-orange-500/30' : ''}`}
+>
+  <a href={href} class="absolute inset-0 z-0" aria-label={race.name} />
+  <span class={`font-mono text-[10px] w-6 shrink-0 ${isSprint ? 'text-orange-400/50' : 'text-muted-foreground'}`}>
+    {race.roundNumber}
+  </span>
+  <div class="flex-1 min-w-0">
+    <div class="flex items-center gap-2">
+      <span class={`font-medium text-sm transition-colors duration-150 truncate ${isSprint ? 'group-hover:text-orange-400' : 'group-hover:text-[#a855f7]'}`}>
+        {race.name}
+      </span>
+      {isSprint && (
+        <span class="shrink-0 font-mono text-[7px] tracking-[0.15em] uppercase px-1.5 py-0.5 border border-orange-500/35 text-orange-400/75 hidden sm:inline">
+          SPRINT
+        </span>
+      )}
+    </div>
+    <div class="relative z-10 flex items-center gap-1 font-mono text-[9px] text-muted-foreground mt-0.5 truncate sm:flex">
+      <MapPin size={9} />
+      <a href={`/circuits/${race.circuit.circuitKey}`} class="hover:text-white underline decoration-white/30 underline-offset-[2px] transition-all">
+        {race.circuit.city}, {race.circuit.country}
+      </a>
+    </div>
+  </div>
+  <span class="flex items-center gap-1 font-mono text-[9px] text-muted-foreground md:flex shrink-0">
+    <CalendarDays size={10} />{formatDate(date)}
+  </span>
+  {race.weather && (
+    <span class="font-mono text-[9px] text-muted-foreground capitalize hidden lg:inline shrink-0">{race.weather}</span>
+  )}
+  <span class={`flex items-center gap-1 font-mono text-[9px] tracking-[0.12em] uppercase shrink-0 transition-colors duration-150 ${isSprint ? 'text-orange-400/60 group-hover:text-orange-400' : 'text-muted-foreground group-hover:text-[#a855f7]'}`}>
+    results <ChevronRight size={10} />
+  </span>
+</div>
