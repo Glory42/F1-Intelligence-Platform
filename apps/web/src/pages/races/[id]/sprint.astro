@@ -3,142 +3,68 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import { RaceResultsTable } from '@/features/races/components/RaceResultsTable';
 import { QualifyingGrid } from '@/features/races/components/QualifyingGrid';
 import LapChart from '@/features/races/components/LapChart.astro';
-import RaceControlTimeline from '@/features/races/components/RaceControlTimeline.astro';
-import OvertakesList from '@/features/races/components/OvertakesList.astro';
-import TeamRadioList from '@/features/races/components/TeamRadioList.astro';
 import RaceHeroInfo from '@/features/races/components/RaceHeroInfo.astro';
 import RacePredictionPanel from '@/features/races/components/RacePredictionPanel.astro';
 import SessionSwitcher from '@/features/races/components/SessionSwitcher.astro';
 import RaceTabs from '@/features/races/components/RaceTabs.astro';
 import RaceTabPanel from '@/features/races/components/RaceTabPanel.astro';
-import StintChart from '@/features/races/components/StintChart.astro';
-import { PitStopTable } from '@/features/races/components/PitStopTable';
+import RaceEventPanels from '@/features/races/components/RaceEventPanels.astro';
+import CircuitStatsGrid from '@/features/races/components/CircuitStatsGrid.astro';
 import { api } from '@/lib/api';
-import { formatDate, formatMs, unwrapSettled } from '@/lib/utils';
-import type { SprintDetailResponse, RaceResult, QualifyingResult, CircuitHistoryItem, RaceControlMessage, RaceOvertake, TeamRadioClip, Driver, StrategyResponse } from '@/types';
-import { RotateCcw, Gauge, Zap, Flag, CornerDownRight, Wind } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { formatDate } from '@/lib/utils';
+import { NO_RACE_EVENTS, loadRaceEvents, raceEventTabs } from '@/features/races/loadRaceEvents';
+import {
+  circuitYearItems, conditionsOf, driverMapOf, fastestLapOf, predictedPodium, sprintQualifyingGrid, winnerOf,
+} from '@/features/races/raceView';
+import type { SprintDetailResponse, RaceResult, CircuitHistoryItem } from '@/types';
+import { Zap } from 'lucide-react';
 import { SPRINT_ACCENT } from '@/features/predictions/types';
 
 const { id } = Astro.params;
 
-let sprintData: SprintDetailResponse | null = null;
-let circuitHistory: CircuitHistoryItem[] = [];
-let error: string | null = null;
-
-let raceControlMessages: RaceControlMessage[] = [];
-let overtakes: RaceOvertake[] = [];
-let teamRadio: TeamRadioClip[] = [];
-let strategy: StrategyResponse | null = null;
-
-const [sprintResult, raceControlResult, overtakesResult, teamRadioResult, strategyResult] = await Promise.allSettled([
+const [sprintResult, eventsResult] = await Promise.allSettled([
   api.getSprintDetail(Number(id)),
-  api.getRaceControlMessages(Number(id), 'sprint'),
-  api.getOvertakes(Number(id), 'sprint'),
-  api.getTeamRadio(Number(id), 'sprint'),
-  api.getStrategy(Number(id), 'sprint'),
+  loadRaceEvents(Number(id), 'sprint'),
 ]);
-if (sprintResult.status === 'fulfilled') {
-  sprintData = sprintResult.value;
-} else {
-  error = sprintResult.reason instanceof Error ? sprintResult.reason.message : 'Failed to load sprint data';
-}
-raceControlMessages = unwrapSettled(raceControlResult, []);
-overtakes = unwrapSettled(overtakesResult, []);
-teamRadio = unwrapSettled(teamRadioResult, []);
-strategy = unwrapSettled(strategyResult, null);
-const hasStrategy = (strategy?.drivers ?? []).some((d) => d.stints.length > 0);
+const sprintData: SprintDetailResponse | null = sprintResult.status === 'fulfilled' ? sprintResult.value : null;
+const error = sprintResult.status === 'rejected'
+  ? (sprintResult.reason instanceof Error ? sprintResult.reason.message : 'Failed to load sprint data')
+  : null;
+const events = eventsResult.status === 'fulfilled' ? eventsResult.value : NO_RACE_EVENTS;
 
 const race = sprintData?.race ?? null;
+let circuitHistory: CircuitHistoryItem[] = [];
+if (race) circuitHistory = await api.getCircuitDetails(race.circuit.circuitKey).then((d) => d.history, () => []);
+
 const prediction = sprintData?.prediction ?? null;
 const rawResults = sprintData?.results ?? [];
 const results = rawResults.filter((r) => r.status !== 'grid_set');
 const laps = sprintData?.laps ?? [];
-
-if (race) {
-  try {
-    circuitHistory = (await api.getCircuitDetails(race.circuit.circuitKey)).history;
-  } catch {
-    circuitHistory = [];
-  }
-}
+const sqGrid = sprintQualifyingGrid(rawResults);
 
 const isSprintDone = race != null && ['sprint_done', 'qualifying_done', 'completed'].includes(race.status);
 const isUpcoming = race != null && !isSprintDone;
-
-const hasResults = results.length > 0;
-const hasLaps = laps.length > 0;
-const hasPrediction = prediction != null;
-const driverMap = new Map<number, Driver>(results.map((r) => [r.driverId, r.driver]));
-
-const sprintWinner = hasResults ? results.find((r) => r.finishPosition === 1) : null;
-const flResult = hasResults ? results.find((r) => r.fastestLap) : null;
-const flLapMs = flResult ? (laps.find((l) => l.driverId === flResult.driver.id)?.fastestLapMs ?? null) : null;
-
-const predCorrect = prediction && sprintWinner
-  ? prediction.predictedWinner.id === sprintWinner.driver.id
-  : null;
-
-const podium = (prediction?.drivers ?? [])
-  .sort((a, b) => (a.predictedPosition ?? 99) - (b.predictedPosition ?? 99))
-  .slice(0, 5);
-
-// SQ grid — map SprintResult → QualifyingResult shape so QualifyingGrid can be reused
-const sqGrid: QualifyingResult[] = [...rawResults]
-  .sort((a, b) => a.gridPosition - b.gridPosition)
-  .map((r) => ({
-    id: r.id,
-    driverId: r.driverId,
-    gridPosition: r.gridPosition,
-    q1TimeMs: r.sq1TimeMs ?? null,
-    q2TimeMs: r.sq2TimeMs ?? null,
-    q3TimeMs: r.sq3TimeMs ?? null,
-    sector1Ms: r.sqSector1Ms ?? null,
-    sector2Ms: r.sqSector2Ms ?? null,
-    sector3Ms: r.sqSector3Ms ?? null,
-    speedSt: r.sqSpeedSt ?? null,
-    driver: r.driver,
-  }));
-const hasGrid = sqGrid.length > 0;
-
-type Tab = { id: string; label: string };
-const tabs: Tab[] = [];
-if (isSprintDone && hasResults) tabs.push({ id: 'results', label: 'Results' });
-if (hasGrid) tabs.push({ id: 'qualifying', label: 'Sprint Quali' });
-if (isSprintDone && hasLaps) tabs.push({ id: 'laps', label: 'Lap Chart' });
-if (isSprintDone && hasStrategy) tabs.push({ id: 'strategy', label: 'Strategy' });
-if (isSprintDone && raceControlMessages.length > 0) tabs.push({ id: 'incidents', label: 'Incidents' });
-if (isSprintDone && overtakes.length > 0) tabs.push({ id: 'overtakes', label: 'Overtakes' });
-if (isSprintDone && teamRadio.length > 0) tabs.push({ id: 'team-radio', label: 'Team Radio' });
-tabs.push({ id: 'circuit', label: 'Circuit' });
-
-const defaultTab = tabs[0]?.id ?? 'circuit';
 const raceYear = race ? new Date(race.raceDate).getFullYear() : new Date().getFullYear();
 
-const circuitYearItems = circuitHistory
-  .filter((h) => h.hasSprint)
-  .sort((a, b) => b.year - a.year)
-  .map((h) => ({ year: h.year, href: `/races/${h.raceId}/sprint` }));
+const eventTabs = isSprintDone ? raceEventTabs(events) : [];
+const tabs = [
+  ...(isSprintDone && results.length > 0 ? [{ id: 'results', label: 'Results' }] : []),
+  ...(sqGrid.length > 0 ? [{ id: 'qualifying', label: 'Sprint Quali' }] : []),
+  ...(isSprintDone && laps.length > 0 ? [{ id: 'laps', label: 'Lap Chart' }] : []),
+  ...eventTabs,
+  { id: 'circuit', label: 'Circuit' },
+];
+const defaultTab = tabs[0].id;
 
-const sprintDistKm = race ? (17 * Number(race.circuit.trackLengthKm)).toFixed(1) : null;
-
-const conditions: { label: string; val: string | number }[] = [];
-if (race) {
-  if (race.sprintSafetyCarLaps != null) conditions.push({ label: 'SC Laps', val: race.sprintSafetyCarLaps });
-  if (race.sprintVscLaps != null) conditions.push({ label: 'VSC', val: race.sprintVscLaps });
-  if (race.sprintAirTempAvg) conditions.push({ label: 'Air', val: `${Math.round(Number(race.sprintAirTempAvg))}°C` });
-  if (race.sprintTrackTempAvg) conditions.push({ label: 'Track', val: `${Math.round(Number(race.sprintTrackTempAvg))}°C` });
-  if (race.sprintHumidityAvg) conditions.push({ label: 'Humidity', val: `${Math.round(Number(race.sprintHumidityAvg))}%` });
-}
-
-const sprintStats: Array<{ Icon: LucideIcon; label: string; val: string | number }> = race ? [
-  { Icon: RotateCcw, label: 'Sprint Laps', val: '~17' },
-  { Icon: Gauge, label: 'Length', val: `${race.circuit.trackLengthKm} km` },
-  { Icon: Flag, label: 'Sprint Dist', val: `${sprintDistKm} km` },
-  { Icon: CornerDownRight, label: 'Corners', val: race.circuit.numberOfCorners ?? '—' },
-  { Icon: Wind, label: 'DRS Zones', val: race.circuit.drsZones ?? '—' },
-  { Icon: Zap, label: 'Overtake Rate', val: race.circuit.overtakeRate ? `${Math.round(Number(race.circuit.overtakeRate) * 100)}%` : '—' },
-] : [];
+const podium = predictedPodium(prediction?.drivers ?? []);
+const sprintWinner = winnerOf(results);
+const predCorrect = prediction && sprintWinner ? prediction.predictedWinner.id === sprintWinner.driver.id : null;
+const conditions = race
+  ? conditionsOf({
+      safetyCarLaps: race.sprintSafetyCarLaps, vscLaps: race.sprintVscLaps, airTempAvg: race.sprintAirTempAvg,
+      trackTempAvg: race.sprintTrackTempAvg, humidityAvg: race.sprintHumidityAvg,
+    })
+  : [];
 ---
 
 <BaseLayout title={race ? `Sprint · ${race.name}` : 'Sprint Race'}>
@@ -172,10 +98,10 @@ const sprintStats: Array<{ Icon: LucideIcon; label: string; val: string | number
               lengthKm={race.circuit.trackLengthKm}
               weather={race.weather}
               conditions={conditions}
-              fastestLap={flResult ? { code: flResult.driver.code, timeStr: flLapMs ? formatMs(flLapMs) : null } : null}
+              fastestLap={fastestLapOf(results, laps)}
               accent={SPRINT_ACCENT}
               countdown={isUpcoming ? { id: 'sprint-countdown', date: race.sprintDate ?? race.raceDate, borderClass: 'border-orange-500/20', digitClass: 'sprint-cd' } : null}
-              yearItems={circuitYearItems}
+              yearItems={circuitYearItems(circuitHistory, 'sprint')}
               currentYear={raceYear}
               yearVariant="orange"
             />
@@ -184,7 +110,7 @@ const sprintStats: Array<{ Icon: LucideIcon; label: string; val: string | number
               accent={SPRINT_ACCENT}
               heading="./sprint prediction"
               fullHref={`/prediction/sprint/${id}`}
-              hasPrediction={hasPrediction}
+              hasPrediction={prediction != null}
               predictedWinnerName={prediction?.predictedWinner.fullName}
               winnerLabel="predicted sprint winner"
               confidence={Math.round(Number(podium[0]?.winProbability ?? 0) * 100)}
@@ -199,90 +125,44 @@ const sprintStats: Array<{ Icon: LucideIcon; label: string; val: string | number
         </div>
 
         {/* ── TABS ── */}
-        {tabs.length > 0 && (
-          <div>
-            <RaceTabs tabs={tabs} defaultTab={defaultTab} accent={SPRINT_ACCENT} namespace="sprint-" links={isSprintDone && race ? [
-              { href: `/races/${race.id}/race-story?session=sprint`, label: 'Race story' },
-              { href: `/races/${race.id}/telemetry?session=SQ`, label: 'Telemetry' },
-            ] : []} />
+        <div>
+          <RaceTabs tabs={tabs} defaultTab={defaultTab} accent={SPRINT_ACCENT} namespace="sprint-" links={isSprintDone && race ? [
+            { href: `/races/${race.id}/race-story?session=sprint`, label: 'Race story' },
+            { href: `/races/${race.id}/telemetry?session=SQ`, label: 'Telemetry' },
+          ] : []} />
 
-            {isSprintDone && hasResults && (
-              <RaceTabPanel id="results" defaultTab={defaultTab} namespace="sprint-">
-                <div class="border border-white/[0.06] overflow-hidden">
-                  <RaceResultsTable results={results as unknown as RaceResult[]} year={raceYear} laps={laps} flColor="#fb923c" />
-                </div>
-              </RaceTabPanel>
-            )}
-
-            {hasGrid && (
-              <RaceTabPanel id="qualifying" defaultTab={defaultTab} namespace="sprint-">
-                <div class="border border-white/[0.06] overflow-hidden">
-                  <QualifyingGrid qualifying={sqGrid} year={raceYear} labelPrefix="SQ" />
-                </div>
-              </RaceTabPanel>
-            )}
-
-            {isSprintDone && hasLaps && (
-              <RaceTabPanel id="laps" defaultTab={defaultTab} namespace="sprint-">
-                <div class="border border-white/[0.06] overflow-hidden">
-                  <LapChart laps={laps} />
-                </div>
-              </RaceTabPanel>
-            )}
-
-            {hasStrategy && strategy && (
-              <RaceTabPanel id="strategy" defaultTab={defaultTab} namespace="sprint-">
-                <div class="space-y-4">
-                  <div class="border border-white/[0.06] p-5">
-                    <StintChart drivers={strategy.drivers} approximate={strategy.source === 'derived'} />
-                  </div>
-                  <div class="border border-white/[0.06] overflow-hidden">
-                    <PitStopTable drivers={strategy.drivers} year={raceYear} />
-                  </div>
-                </div>
-              </RaceTabPanel>
-            )}
-
-            {raceControlMessages.length > 0 && (
-              <RaceTabPanel id="incidents" defaultTab={defaultTab} namespace="sprint-">
-                <div class="border border-white/[0.06] overflow-hidden">
-                  <RaceControlTimeline messages={raceControlMessages} />
-                </div>
-              </RaceTabPanel>
-            )}
-
-            {overtakes.length > 0 && (
-              <RaceTabPanel id="overtakes" defaultTab={defaultTab} namespace="sprint-">
-                <div class="border border-white/[0.06] overflow-hidden">
-                  <OvertakesList overtakes={overtakes} driverMap={driverMap} />
-                </div>
-              </RaceTabPanel>
-            )}
-
-            {teamRadio.length > 0 && (
-              <RaceTabPanel id="team-radio" defaultTab={defaultTab} namespace="sprint-">
-                <div class="border border-white/[0.06] overflow-hidden">
-                  <TeamRadioList clips={teamRadio} driverMap={driverMap} />
-                </div>
-              </RaceTabPanel>
-            )}
-
-            <RaceTabPanel id="circuit" defaultTab={defaultTab} namespace="sprint-">
-              <div class="grid grid-cols-2 sm:grid-cols-3 gap-px bg-white/[0.06]">
-                {sprintStats.map(({ Icon, label, val }) => (
-                  <div class="bg-black p-5">
-                    <div class="flex items-center gap-1 text-[11px] text-muted-foreground mb-2">
-                      <Icon size={10} />{label}
-                    </div>
-                    <div class="font-bold text-xl">{val}</div>
-                  </div>
-                ))}
+          {isSprintDone && results.length > 0 && (
+            <RaceTabPanel id="results" defaultTab={defaultTab} namespace="sprint-">
+              <div class="border border-white/[0.06] overflow-hidden">
+                <RaceResultsTable results={results as unknown as RaceResult[]} year={raceYear} laps={laps} flColor="#fb923c" />
               </div>
             </RaceTabPanel>
-          </div>
-        )}
+          )}
 
-        {!hasPrediction && !hasResults && (
+          {sqGrid.length > 0 && (
+            <RaceTabPanel id="qualifying" defaultTab={defaultTab} namespace="sprint-">
+              <div class="border border-white/[0.06] overflow-hidden">
+                <QualifyingGrid qualifying={sqGrid} year={raceYear} labelPrefix="SQ" />
+              </div>
+            </RaceTabPanel>
+          )}
+
+          {isSprintDone && laps.length > 0 && (
+            <RaceTabPanel id="laps" defaultTab={defaultTab} namespace="sprint-">
+              <div class="border border-white/[0.06] overflow-hidden">
+                <LapChart laps={laps} />
+              </div>
+            </RaceTabPanel>
+          )}
+
+          <RaceEventPanels events={events} tabs={eventTabs} defaultTab={defaultTab} namespace="sprint-" driverMap={driverMapOf(results)} year={raceYear} />
+
+          <RaceTabPanel id="circuit" defaultTab={defaultTab} namespace="sprint-">
+            <CircuitStatsGrid circuit={race.circuit} session="sprint" />
+          </RaceTabPanel>
+        </div>
+
+        {prediction == null && results.length === 0 && (
           <div class="border border-white/[0.06] p-10 text-center">
             <Zap size={20} className="text-muted-foreground opacity-20 mx-auto mb-3" />
             <p class="font-mono text-[9px] text-muted-foreground tracking-[0.25em] uppercase">Sprint prediction available after sprint qualifying</p>

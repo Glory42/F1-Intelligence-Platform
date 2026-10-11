@@ -1,0 +1,35 @@
+---
+import { RotateCcw, Gauge, Zap, Flag, CornerDownRight, Wind } from 'lucide-react';
+import type { Circuit } from '@/types';
+
+interface Props {
+  circuit: Circuit;
+  session: 'race' | 'sprint';
+}
+
+// A sprint runs about 100 km, roughly 17 laps at most circuits.
+const SPRINT_LAPS = 17;
+
+const { circuit, session } = Astro.props;
+const laps = session === 'race' ? circuit.lapCount : SPRINT_LAPS;
+const distanceKm = (laps * Number(circuit.trackLengthKm)).toFixed(1);
+const stats = [
+  { Icon: RotateCcw, label: session === 'race' ? 'Laps' : 'Sprint Laps', val: session === 'race' ? laps : `~${laps}` },
+  { Icon: Gauge, label: 'Length', val: `${circuit.trackLengthKm} km` },
+  { Icon: Flag, label: session === 'race' ? 'Race Dist' : 'Sprint Dist', val: `${distanceKm} km` },
+  { Icon: CornerDownRight, label: 'Corners', val: circuit.numberOfCorners ?? '—' },
+  { Icon: Wind, label: 'DRS Zones', val: circuit.drsZones ?? '—' },
+  { Icon: Zap, label: 'Overtake Rate', val: circuit.overtakeRate ? `${Math.round(Number(circuit.overtakeRate) * 100)}%` : '—' },
+];
+---
+
+<div class="grid grid-cols-2 sm:grid-cols-3 gap-px bg-white/[0.06]">
+  {stats.map(({ Icon, label, val }) => (
+    <div class="bg-black p-5">
+      <div class="flex items-center gap-1 text-[11px] text-muted-foreground mb-2">
+        <Icon size={10} />{label}
+      </div>
+      <div class="font-bold text-xl">{val}</div>
+    </div>
+  ))}
+</div>

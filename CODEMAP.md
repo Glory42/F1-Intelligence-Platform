@@ -382,10 +382,14 @@ apps/web/
 │   │   ├── races/
 │   │   │   ├── raceTabs.ts            # initRaceCountdown() + initRaceTabs() — shared by GP + sprint detail scripts
 │   │   │   ├── raceEventDisplay.ts    # timeOf(), dotColor() — shared by the three Race Event list components
+│   │   │   ├── loadRaceEvents.ts      # loadRaceEvents(id, session) — strategy + incidents + overtakes + radio, each degrading alone; raceEventTabs()
+│   │   │   ├── raceView.ts            # GP/sprint page view logic — predicted podium, winner, fastest lap, conditions, year links, SQ grid
 │   │   │   ├── gridPenalties.ts       # gridDrops() — grid drops vs qualifying (pit-lane start = grid 0)
 │   │   │   ├── weatherSpells.ts       # rainSpells() — contiguous rainfall minutes → spells
 │   │   │   └── components/
 │   │   │       ├── LapChart.astro         # Plain SVG lap time chart (no chart library)
+│   │   │       ├── RaceEventPanels.astro  # Strategy / Incidents / Overtakes / Team radio tab panels, shared by GP + sprint pages
+│   │   │       ├── CircuitStatsGrid.astro # Circuit tab — laps, length, distance, corners, DRS, overtake rate (race or sprint distance)
 │   │   │       ├── RaceTabs.astro / RaceTabPanel.astro # Client-side tab strip + panels (namespaced ids) + route links for heavy analysis
 │   │   │       ├── SessionSwitcher.astro  # Grand Prix ⇄ Sprint switch for a sprint weekend (overridable hrefs)
 │   │   │       ├── StintChart.astro       # Strategy tab — SVG tyre-stint bars per driver, compound colours
@@ -527,7 +531,7 @@ apps/web/
 │   │   │   └── data/                         # chartScale, labelLayout
 │   │   ├── lib/                              # pure, `node` env — pageTabs / sidebarState / legacyRedirects / utils
 │   │   │   └── f1/                           # predictionMath (all exports), championshipMath, teamColors, teamLogos, tyres
-│   │   ├── features/races/ · features/telemetry/  # gridPenalties, weatherSpells, raceEventDisplay · telemetryCompare, trackMap
+│   │   ├── features/races/ · features/telemetry/  # raceView + raceEventTabs, gridPenalties, weatherSpells, raceEventDisplay · telemetryCompare, trackMap
 │   │   ├── features/predictions/
 │   │   │   └── buildPredictionPageData.test.ts / predictionCopy.test.ts  # GP + sprint page data, copy table
 │   │   ├── features/history/
