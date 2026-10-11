@@ -1,14 +1,17 @@
 import fastf1
 from src.db.client import get_conn
-from src.utils.upsert import upsert
+from src.utils.driver_registry import register_session_drivers, session_entries
 
 
 def run(year: int, round_num: int = 1) -> None:
     """
     Syncs teams and drivers from a specific round's session data.
-    Defaults to round 1 — run again with a different round if drivers changed mid-season.
+    Ingest jobs register later arrivals themselves; re-run with a later round to refresh team moves.
     """
     print(f"[sync_season] year={year} round={round_num}")
+
+    session = fastf1.get_session(year, round_num, "R")
+    session.load(laps=False, telemetry=False, weather=False, messages=False)
 
     conn = get_conn()
     try:
@@ -17,86 +20,9 @@ def run(year: int, round_num: int = 1) -> None:
             row = cur.fetchone()
         if not row:
             raise ValueError(f"Season {year} not found")
-        season_id = row["id"]
 
-        session = fastf1.get_session(year, round_num, "R")
-        session.load(laps=False, telemetry=False, weather=False, messages=False)
-
-        # Build teams list from driver data
-        teams_seen: dict[str, dict] = {}
-        drivers_raw: list[dict] = []
-
-        for drv_num in session.drivers:
-            info = session.get_driver(drv_num)
-
-            team_name = str(info.get("TeamName", "Unknown"))
-            team_key = team_name.lower().replace(" ", "_").replace("-", "_").replace(".", "")
-
-            if team_key not in teams_seen:
-                teams_seen[team_key] = {
-                    "season_id": season_id,
-                    "team_key": team_key,
-                    "name": team_name,
-                    "nationality": None,
-                }
-
-            full_name = str(info.get("FullName", f"Driver {drv_num}"))
-            parts = full_name.split(" ", 1)
-            first_name = parts[0]
-            last_name = parts[1] if len(parts) > 1 else ""
-
-            try:
-                driver_number = int(info.get("DriverNumber", 0))
-            except (ValueError, TypeError):
-                driver_number = 0
-
-            # Resolve driver code, fallback to last name for legacy seasons
-            code = info.get("Abbreviation")
-            if not code or str(code).strip() == "":
-                code = "".join(c for c in last_name if c.isalpha())[:3].upper() if last_name else "".join(c for c in first_name if c.isalpha())[:3].upper()
-                if len(code) < 3:
-                    code = (code + str(driver_number))[:3].upper()
-            code = str(code).upper()[:3]
-
-            drivers_raw.append({
-                "season_id": season_id,
-                "team_key": team_key,
-                "driver_number": driver_number,
-                "code": code,
-                "first_name": first_name,
-                "last_name": last_name,
-                "nationality": str(info.get("CountryCode", "")) or None,
-            })
-
-        # Upsert teams first
-        upsert(conn, "teams", list(teams_seen.values()), ["season_id", "team_key"])
-        print(f"  Synced {len(teams_seen)} teams")
-
-        # Reload team_key → id map
-        with conn.cursor() as cur:
-            cur.execute("SELECT id, team_key FROM teams WHERE season_id = %s", (season_id,))
-            team_id_map: dict[str, int] = {r["team_key"]: r["id"] for r in cur.fetchall()}
-
-        # Resolve team_id for each driver
-        drivers_to_upsert = []
-        for d in drivers_raw:
-            team_id = team_id_map.get(d["team_key"])
-            if not team_id:
-                print(f"  [warn] team_id not found for {d['code']} (team_key={d['team_key']})")
-                continue
-            drivers_to_upsert.append({
-                "season_id": season_id,
-                "team_id": team_id,
-                "driver_number": d["driver_number"],
-                "code": d["code"],
-                "first_name": d["first_name"],
-                "last_name": d["last_name"],
-                "nationality": d["nationality"],
-            })
-
-        if drivers_to_upsert:
-            upsert(conn, "drivers", drivers_to_upsert, ["season_id", "driver_number"])
-            print(f"  Synced {len(drivers_to_upsert)} drivers")
-
+        driver_map = register_session_drivers(conn, row["id"], session_entries(session), update_existing=True)
+        conn.commit()
+        print(f"  Synced {len(driver_map)} drivers")
     finally:
         conn.close()

@@ -9,7 +9,8 @@ from typing import Any, Callable
 from psycopg2.extras import execute_batch
 
 from src.db.client import get_conn
-from src.utils.driver_map import build_driver_code_map, build_driver_number_map
+from src.utils.driver_map import build_driver_number_map
+from src.utils.driver_registry import register_session_drivers, session_entries
 from src.utils.fastf1_helpers import (
     get_sc_vsc_laps,
     get_session,
@@ -99,7 +100,6 @@ def run_ingest_job(year: int, round_num: int, config: IngestJobConfig) -> None:
     conn = get_conn()
     try:
         race_ctx = config.resolve_race(conn, year, round_num)
-        driver_map = build_driver_code_map(conn, race_ctx.season_id)
     finally:
         conn.close()
 
@@ -109,6 +109,7 @@ def run_ingest_job(year: int, round_num: int, config: IngestJobConfig) -> None:
         raise RuntimeError(
             f"{config.session_label} results not fully available or complete yet — retry later"
         )
+    entries = session_entries(session)
     weather = get_weather(session)
     weather_details = get_weather_details(session)
     sc_vsc = get_sc_vsc_laps(session)
@@ -120,6 +121,8 @@ def run_ingest_job(year: int, round_num: int, config: IngestJobConfig) -> None:
 
     conn = get_conn()
     try:
+        driver_map = register_session_drivers(conn, race_ctx.season_id, entries)
+
         headshot_updates: dict[int, str] = {}
         for rr in result_rows:
             if rr.get("headshot_url"):
@@ -140,8 +143,9 @@ def run_ingest_job(year: int, round_num: int, config: IngestJobConfig) -> None:
         for rr in result_rows:
             driver_id = driver_map.get(rr["driver_code"])
             if not driver_id:
-                print(f"  [warn] Unknown driver: {rr['driver_code']}")
-                continue
+                raise RuntimeError(
+                    f"{config.session_label} result for unknown driver {rr['driver_code']} — not registered from the session"
+                )
             results_to_upsert.append({
                 "race_id": race_ctx.race_id,
                 "driver_id": driver_id,
@@ -251,21 +255,23 @@ def run_qualifying_ingest_job(year: int, round_num: int, config: QualifyingJobCo
         session_type = config.session_type_for(ctx.event_format)
         print(f"  event_format={ctx.event_format} — ingesting {session_type} session")
 
-        driver_map = build_driver_code_map(conn, ctx.season_id)
     finally:
         conn.close()
 
     # Loaded with no connection held: a FastF1 download takes minutes and would keep Neon awake.
     session = get_session(year, round_num, session_type, messages=True)
     quali_rows = session_to_quali_results(session)
-    rows = config.rows_from_quali(quali_rows, driver_map, ctx.race_id)
-    if not rows:
-        raise RuntimeError(
-            config.no_results_error.format(year=year, round_num=round_num, race_id=ctx.race_id)
-        )
+    entries = session_entries(session)
 
     conn = get_conn()
     try:
+        driver_map = register_session_drivers(conn, ctx.season_id, entries)
+        rows = config.rows_from_quali(quali_rows, driver_map, ctx.race_id)
+        if not rows:
+            raise RuntimeError(
+                config.no_results_error.format(year=year, round_num=round_num, race_id=ctx.race_id)
+            )
+
         upsert(conn, config.results_table, rows, ["race_id", "driver_id"], exclude_update=config.exclude_update)
         print(f"  Upserted {len(rows)} {config.results_row_label} rows")
 
