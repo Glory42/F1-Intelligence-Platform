@@ -91,6 +91,18 @@
 }
 
 @layer utilities {
+  /* Tab rows scroll sideways on narrow screens; the bar itself shows the overflow. */
+  .scrollbar-none { scrollbar-width: none; }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+
+  .tab-panel-enter { animation: tab-panel-in 200ms ease-out; }
+  @keyframes tab-panel-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tab-panel-enter { animation: none; }
+  }
   /* Sidebar chrome that only makes sense at one width — toggled by <html data-sidebar>. */
   html[data-sidebar='collapsed'] .sidebar-label { display: none; }
   html:not([data-sidebar='collapsed']) .sidebar-collapsed-only { display: none; }

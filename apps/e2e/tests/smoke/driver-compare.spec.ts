@@ -19,6 +19,7 @@ test('compare switches between drivers and teams from one place', async ({ page 
   await expect(views.getByRole('link', { name: 'Drivers' })).toHaveAttribute('aria-current', 'page');
 
   await views.getByRole('link', { name: 'Teams' }).click();
-  await expect(page).toHaveURL(/\/teams\/compare$/);
+  // Once hydrated, the compare tool writes its default picks into the query string.
+  await expect(page).toHaveURL(/\/teams\/compare(\?.*)?$/);
   await expect(page.getByRole('navigation', { name: 'Compare views' }).getByRole('link', { name: 'Teams' })).toHaveAttribute('aria-current', 'page');
 });

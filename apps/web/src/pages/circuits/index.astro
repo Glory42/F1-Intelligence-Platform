@@ -47,7 +47,7 @@ const shown = tab === 'season' ? circuits.filter((c) => seasonCircuitIds.has(c.i
     ) : shown.length === 0 ? (
       <EmptyState message={`No ${year} calendar yet.`} />
     ) : (
-      <CircuitsGrid initialCircuits={shown} client:load />
+      <div><CircuitsGrid initialCircuits={shown} client:load /></div>
     )}
   </div>
 </BaseLayout>

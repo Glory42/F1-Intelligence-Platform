@@ -67,3 +67,20 @@ test('flags drivers who started behind their qualifying position', async ({ page
 
   await expect(page.locator('#panel-results')).toContainText('LEC qualified P2, started P12 (−10)');
 });
+
+test('the race tab row never scrolls vertically and its indicator follows the selected tab', async ({ page }) => {
+  await page.goto('/races/1');
+
+  const tablist = page.getByRole('tablist').first();
+  const overflowY = await tablist.evaluate((el) => el.scrollHeight - el.clientHeight);
+  expect(overflowY).toBe(0);
+
+  const strategy = page.getByRole('tab', { name: 'Strategy' });
+  await strategy.click();
+  const indicator = tablist.locator('[data-tab-indicator]');
+  await expect(async () => {
+    const [tabBox, barBox] = [await strategy.boundingBox(), await indicator.boundingBox()];
+    expect(Math.abs(tabBox!.x - barBox!.x)).toBeLessThan(1);
+    expect(Math.abs(tabBox!.width - barBox!.width)).toBeLessThan(1);
+  }).toPass();
+});
