@@ -13,13 +13,32 @@ function parseId(c: Context<{ Bindings: Bindings }>): number | null {
   return isNaN(id) ? null : id;
 }
 
+function isMonthDay(value: string): boolean {
+  const match = /^(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const [month, day] = [Number(match[1]), Number(match[2])];
+  return month >= 1 && month <= 12 && day >= 1 && day <= new Date(Date.UTC(2024, month, 0)).getUTCDate();
+}
+
 export const HistoryController = {
   async getOnThisDay(c: Context<{ Bindings: Bindings }>) {
     const monthDay = c.req.query('date') ?? '';
-    if (!/^\d{2}-\d{2}$/.test(monthDay)) {
+    if (!isMonthDay(monthDay)) {
       return c.json({ data: null, error: { code: 'INVALID_DATE', message: 'date must be MM-DD' } }, 400);
     }
     const data = await service.findOnThisDay(createDb(c.env.DATABASE_URL), monthDay);
+    c.header('Cache-Control', cacheIfData(CACHE_HISTORY, data.races.length > 0));
+    return c.json({ data, error: null });
+  },
+
+  async getMilestones(c: Context<{ Bindings: Bindings }>) {
+    const data = await service.findMilestones(createDb(c.env.DATABASE_URL));
+    c.header('Cache-Control', cacheIfData(CACHE_HISTORY, data.youngestWinner.length > 0));
+    return c.json({ data, error: null });
+  },
+
+  async getLineages(c: Context<{ Bindings: Bindings }>) {
+    const data = await service.findLineages(createDb(c.env.DATABASE_URL));
     c.header('Cache-Control', cacheIfData(CACHE_HISTORY, data.length > 0));
     return c.json({ data, error: null });
   },

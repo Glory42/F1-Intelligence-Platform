@@ -12,6 +12,10 @@ const CONSTRUCTOR_ALIASES: Record<string, string> = {
   haas_f1_team: 'haas',
   alfa_romeo_racing: 'alfa-romeo',
   manor_marussia: 'manor',
+  team_lotus: 'lotus',
+  mf1: 'midland',
+  lambo: 'modena',
+  euro_brun: 'eurobrun',
 };
 
 export function f1dbConstructorId(teamKey: string): string {

@@ -58,9 +58,9 @@ describe('home hub (integration)', () => {
 
   it('lists races held on the same calendar day in earlier seasons, newest first', async () => {
     const res = await apiRequest('/api/history/on-this-day?date=09-01');
-    const { data } = (await res.json()) as { data: Array<{ name: string; year: number; winner: { code: string } | null }> };
+    const { data } = (await res.json()) as { data: { races: Array<{ name: string; year: number; winner: { code: string } | null }> } };
 
-    expect(data.map((r) => [r.year, r.name, r.winner?.code ?? null])).toEqual([
+    expect(data.races.map((r) => [r.year, r.name, r.winner?.code ?? null])).toEqual([
       [2084, 'Hub Grand Prix', 'LEC'],
       [2064, 'Older Grand Prix', 'PIA'],
     ]);
