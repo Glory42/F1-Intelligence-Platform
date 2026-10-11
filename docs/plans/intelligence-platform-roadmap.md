@@ -1,4 +1,4 @@
-# F1 Intelligence Platform — Roadmap
+# F1 Intelligence Platform: Roadmap
 
 Goal: grow the site from a race-winner predictor into an F1 analysis platform, with no big-bang redesign.
 Two hard constraints shape every item:
@@ -13,25 +13,25 @@ recommended; brand `F1 Intelligence Platform`.
 
 | Phase | Status | Notes / deviations |
 |---|---|---|
-| 0 Foundations | ✅ | Tests on local Postgres (ADR 0003); storage guard; quiet worker cycles; edge cache (ADR 0005); OpenF1 pacing/budget (ADR 0004); session-key cache; peak-RSS logs; chart kit; tyre tokens; shared race tabs + GP↔Sprint switcher; rebrand. Sprint page fetch stays sequential — the circuit lookup genuinely needs the sprint detail first. |
-| 1 Strategy & pits | ✅ | `session_type` on race events (ADR 0006); stints + pit stops; strategy tab (derived pre-2023); pit-crew rankings; Friday pace; 2026 radio empty state. Strategy is an in-page tab (small payload), not a sub-route. |
-| 2 Analysis | ✅ | Title odds (ADR 0007), contention maths, teammate battles, racecraft (API aggregate, no new columns). No lap-1 split — OpenF1 overtakes carry no lap number. |
+| 0 Foundations | ✅ | Tests on local Postgres (ADR 0003); storage guard; quiet worker cycles; edge cache (ADR 0005); OpenF1 pacing/budget (ADR 0004); session-key cache; peak-RSS logs; chart kit; tyre tokens; shared race tabs + GP↔Sprint switcher; rebrand. Sprint page fetch stays sequential: the circuit lookup genuinely needs the sprint detail first. |
+| 1 Strategy & pits | ✅ | `session_type` on race events (ADR 0006); stints + pit stops (2018+: FastF1 backfill before 2023); strategy tab (derived only as the fallback); pit-crew rankings; Friday pace; 2026 radio empty state. Strategy is an in-page tab (small payload), not a sub-route. |
+| 2 Analysis | ✅ | Title odds (ADR 0007), contention maths, teammate battles, racecraft (API aggregate, no new columns). No lap-1 split: OpenF1 overtakes carry no lap number. |
 | 3 Race story | ✅ | Lap traces, battles, weather from FastF1 full laps; grid drops from existing data (no `/starting_grid` needed). All FastF1 runners now load with no DB connection held. |
 | 4 Telemetry | ✅ | Resumable OpenF1 ingest (ADR 0008); server-rendered comparison; circuit outline derived in the API from the latest pole lap (no new column). |
-| 5 History | ✅ | Scoped F1DB import (~700 KB): bios, totals, milestones, chassis/engine lineage. Local-only import script (not in the worker — Render RAM). "On this day" uses core 1980+ races. Later: History page split into Records (headline tiles, record chases, strike rates, min 50 starts) / Milestones / On this day (date stepping, nearest-day fallback) / Lineage (F1DB chronology as a team family timeline) — `history/milestones` + `history/lineages`, no new tables. |
+| 5 History | ✅ | Scoped F1DB import (~700 KB): bios, totals, milestones, chassis/engine lineage. Import runs weekly as a GitHub Action (`f1db-import.yml`) or locally, never in the worker (Render RAM). "On this day" uses core 1980+ races. Later: History page split into Records (headline tiles, record chases, strike rates, min 50 starts) / Milestones / On this day (date stepping, nearest-day fallback) / Lineage (F1DB chronology as a team family timeline), `history/milestones` + `history/lineages`, no new tables. |
 | 6 Home hub | ✅ | Last-race recap, championship card, on this day, next-session countdown. Later: season progress strip, next race with schedule + model top 3, last-race podium, championship top 5 with title odds. |
-| 7 Model v4 | ⛔ rejected | Measured overtake rate backtested over 208 races: no gain (`docs/prediction-model.md`). SC/VSC split and wet pace not built — deferred until a candidate shows promise. |
+| 7 Model v4 | ⛔ rejected | Measured overtake rate backtested over 208 races: no gain (`docs/prediction-model.md`). SC/VSC split and wet pace not built: deferred until a candidate shows promise. |
 | N4 skip-unchanged upserts | ✅ | `IS DISTINCT FROM` guard in `utils/upsert.py`, verified against local Postgres. |
 
 ### Actions only the owner can take
-1. Apply migrations 0019–0026 to Neon (`cd apps/api && bun run db:migrate`) before deploying — all additive.
-2. Neon console: cap compute autoscaling (prod 0.25→0.5 CU, test 0.25 fixed) — D8/N1.
+1. Apply migrations 0019–0026 to Neon (`cd apps/api && bun run db:migrate`) before deploying: all additive.
+2. Neon console: cap compute autoscaling (prod 0.25→0.5 CU, test 0.25 fixed), D8/N1.
 3. Record the usage baseline (§7): Neon CU-h + egress, Render hours + bandwidth.
-4. Attach the API Worker to a custom domain and point `PUBLIC_API_URL` at it — the edge cache is a no-op on `*.workers.dev`.
+4. Attach the API Worker to a custom domain and point `PUBLIC_API_URL` at it: the edge cache is a no-op on `*.workers.dev`.
 5. Run local backfills: `backfill_openf1.py ingest_stints|ingest_pit_stops|ingest_qualifying_telemetry 2023 2026`,
    `backfill_race_story.py 2018 2025`, `import_f1db.py`, `--job compute_title_odds --year Y`.
 6. Delete the now-unused Neon test branch and the `TEST_DATABASE_URL` GitHub secret.
-7. Decide on the pre-existing standings bug: `driver_season_stats.total_points` / championship position ignore sprint points.
+7. Add a `DATABASE_URL` repository secret so the weekly F1DB import (`f1db-import.yml`) runs; it skips without one.
 
 ---
 
@@ -41,11 +41,11 @@ recommended; brand `F1 Intelligence Platform`.
 | Limit | Value | What happens when exceeded |
 |---|---|---|
 | Storage | **1 GB** per project | Inserts/updates/deletes **fail** until space is freed |
-| Compute | **100 CU-hours / month** (= 400 h at 0.25 CU) | Compute **suspended until next month** — site and ETL go down |
+| Compute | **100 CU-hours / month** (= 400 h at 0.25 CU) | Compute **suspended until next month**: site and ETL go down |
 | Egress | **5 GB / month** (all reads leaving Neon) | Compute **suspended until next month** |
-| Scale to zero | after 5 min idle (can't disable) | — every wake costs ≥ 5 min of compute |
+| Scale to zero | after 5 min idle (can't disable) |: every wake costs ≥ 5 min of compute |
 | Branches | 10 | Branch creation fails |
-| History | 6 h restore window, capped at 1 GB-month of changes | — |
+| History | 6 h restore window, capped at 1 GB-month of changes | - |
 
 **Measured 2026-10-10 (read-only queries):**
 - Production DB: **70 MB (7 % of 1 GB)**. `lap_times` is 42 MB of it (174k rows, ~250 B/row including indexes). Every other table is ≤ 3.6 MB.
@@ -75,24 +75,24 @@ recommended; brand `F1 Intelligence Platform`.
 
 ---
 
-## 2. Budget rules — every slice must follow these
+## 2. Budget rules: every slice must follow these
 
 **Neon**
-- **N1 — Cap compute size.** Set the production branch to autoscale 0.25 → 0.5 CU max, and the test branch to a fixed 0.25 CU. One-time console change, done before any new job ships.
-- **N2 — Connect late, close early.** Fetch and transform outside the DB connection; open it only for the write. Never hold a connection while waiting on FastF1 or OpenF1 HTTP.
-- **N3 — No new wake-ups.** New steps ride the existing cycle inside the race-weekend window. Nothing new polls outside it.
-- **N4 — Skip unchanged writes.** Upserts use `ON CONFLICT … DO UPDATE … WHERE (cols) IS DISTINCT FROM (excluded cols)`. Retries that rewrite a whole race every 20 min then stop creating dead tuples and history.
-- **N5 — Compact storage.** Data that is always read as a whole race goes in one row per (race, session, driver) with arrays or JSONB, not one row per lap or sample (§5). TOAST compresses large values for free.
-- **N6 — Tests never touch Neon.** Run `apps/api` integration tests against local Postgres behind a Neon HTTP proxy, locally and in CI (decision D7). Python, web and e2e tests are already DB-free.
-- **N7 — Storage guard.** `storage_guard` reads `pg_database_size()` once per cycle and decides:
+- **N1: Cap compute size.** Set the production branch to autoscale 0.25 → 0.5 CU max, and the test branch to a fixed 0.25 CU. One-time console change, done before any new job ships.
+- **N2: Connect late, close early.** Fetch and transform outside the DB connection; open it only for the write. Never hold a connection while waiting on FastF1 or OpenF1 HTTP.
+- **N3: No new wake-ups.** New steps ride the existing cycle inside the race-weekend window. Nothing new polls outside it.
+- **N4: Skip unchanged writes.** Upserts use `ON CONFLICT … DO UPDATE … WHERE (cols) IS DISTINCT FROM (excluded cols)`. Retries that rewrite a whole race every 20 min then stop creating dead tuples and history.
+- **N5: Compact storage.** Data that is always read as a whole race goes in one row per (race, session, driver) with arrays or JSONB, not one row per lap or sample (§5). TOAST compresses large values for free.
+- **N6: Tests never touch Neon.** Run `apps/api` integration tests against local Postgres behind a Neon HTTP proxy, locally and in CI (decision D7). Python, web and e2e tests are already DB-free.
+- **N7: Storage guard.** `storage_guard` reads `pg_database_size()` once per cycle and decides:
   - < 50 % (500 MB): allow everything;
   - 50–75 %: block backfills and optional feature tables;
   - > 75 %: core pipeline only (results, features, predictions).
   The decision appears on `/health-quality`.
 
 **Egress (Neon 5 GB)**
-- **E1 — Edge-cache completed races.** Data for a completed race never changes. Every new heavy route uses the existing `cacheControlForStatus`. Slice 0.4 verifies Cloudflare actually caches (`cf-cache-status: HIT`); if not, add `caches.default` in the Worker for completed-race responses.
-- **E2 — Payload ceilings.** Targets for one completed race (gzip ≈ 5× smaller on the wire):
+- **E1: Edge-cache completed races.** Data for a completed race never changes. Every new heavy route uses the existing `cacheControlForStatus`. Slice 0.4 verifies Cloudflare actually caches (`cf-cache-status: HIT`); if not, add `caches.default` in the Worker for completed-race responses.
+- **E2: Payload ceilings.** Targets for one completed race (gzip ≈ 5× smaller on the wire):
 
   | Route | Max size |
   |---|---|
@@ -104,13 +104,13 @@ recommended; brand `F1 Intelligence Platform`.
   Telemetry returns only the two requested drivers.
 
 **Render**
-- **R1 — One process.** All new jobs live in the existing worker. No new Render services.
-- **R2 — Memory headroom.** Each step logs peak RSS (`resource.getrusage`) in its structured log line. A step that peaks above 400 MB gets fixed before more work is added to it. FastF1 sessions are released (`del` + `gc.collect()`) before the next step.
-- **R3 — Backfills run locally**, never on Render: in bounded chunks (one season per run), each logging rows written and DB size afterwards. This keeps Render's RAM and 5 GB outbound free for the live pipeline.
-- **R4 — Bounded CPU.** Monte Carlo uses the vectorised Gumbel-top-k trick (one `argsort` per batch). 10,000 simulations × 20 drivers × remaining races takes seconds at 0.1 CPU.
+- **R1: One process.** All new jobs live in the existing worker. No new Render services.
+- **R2: Memory headroom.** Each step logs peak RSS (`resource.getrusage`) in its structured log line. A step that peaks above 400 MB gets fixed before more work is added to it. FastF1 sessions are released (`del` + `gc.collect()`) before the next step.
+- **R3: Backfills run locally**, never on Render: in bounded chunks (one season per run), each logging rows written and DB size afterwards. This keeps Render's RAM and 5 GB outbound free for the live pipeline.
+- **R4: Bounded CPU.** Monte Carlo uses the vectorised Gumbel-top-k trick (one `argsort` per batch). 10,000 simulations × 20 drivers × remaining races takes seconds at 0.1 CPU.
 
 **OpenF1**
-- **O1 — Request budget per cycle** (default 25), plus bounded backoff on 429/5xx. Work that needs more, like telemetry, is resumable across cycles.
+- **O1: Request budget per cycle** (default 25), plus bounded backoff on 429/5xx. Work that needs more, like telemetry, is resumable across cycles.
 
 ---
 
@@ -134,9 +134,9 @@ recommended; brand `F1 Intelligence Platform`.
 ### Slice template
 Every item in §4 is a list of vertical slices. Each slice is one red test at one seam, then the minimal code to pass it:
 ```
-Slice N.M — <behaviour in domain words>
+Slice N.M: <behaviour in domain words>
   Seam:   <ID>
-  Red:    <test name> — expected value from <independent source>
+  Red:    <test name>, expected value from <independent source>
   Green:  <minimal change, incl. migration if needed>
   Budget: storage / compute / egress / OpenF1 requests
 ```
@@ -147,10 +147,10 @@ Slice N.M — <behaviour in domain words>
 
 ## 4. Phases as slices
 
-### Phase 0 — Foundations and guardrails
+### Phase 0: Foundations and guardrails
 | Slice | Behaviour | Seam | Red test / truth source |
 |---|---|---|---|
-| 0.0 | Usage baseline recorded (Neon CU-h + egress, Render hours + bandwidth) | — | Manual: numbers go into the §7 table |
+| 0.0 | Usage baseline recorded (Neon CU-h + egress, Render hours + bandwidth) | - | Manual: numbers go into the §7 table |
 | 0.1 | Tests run without Neon (local Postgres + Neon HTTP proxy, docker-compose, CI service container) | API-1 | Existing `races`/`drivers` integration suite passes with `TEST_DATABASE_URL` pointing at the proxy |
 | 0.2 | Storage guard returns allow / block-backfill / core-only for given DB sizes | PY-2 | 400 MB → allow; 600 MB → block-backfill; 800 MB → core-only |
 | 0.3 | Worker skips the DB when no session is ready inside the window | PY-4 | In-window cycle, cached race status, no session past its ready time → `conn_factory` never called |
@@ -161,12 +161,12 @@ Slice N.M — <behaviour in domain words>
 | 0.8 | Chart scales: `linearScale`, `niceTicks`, `formatLapMs` | WEB-1 | `niceTicks(0, 87, 5)` → `[0, 20, 40, 60, 80]`; `formatLapMs(83456)` → `"1:23.456"` |
 | 0.9 | Compound string → tyre token (FastF1 + OpenF1 spellings) | WEB-1 | `"SOFT"`, `"soft"` → `tyre-soft`; `"UNKNOWN"`/null → `tyre-unknown` |
 | 0.10 | Shared `RaceTabs` on GP and sprint pages; sprint switcher on the GP hero | WEB-2 | Existing `race-detail.spec.ts` stays green; new: `/races/2` shows "Sprint" link → `/races/2/sprint` |
-| 0.11 | Rebrand; tab title shows the brand once | WEB-2 | `/` title is exactly `"Dashboard — <Brand>"` |
-| 0.12 | `drivers/[id]` and sprint page fetch in parallel | — | Refactor under existing green e2e; no new test |
+| 0.11 | Rebrand; tab title shows the brand once | WEB-2 | `/` title is exactly `"Dashboard: <Brand>"` |
+| 0.12 | `drivers/[id]` and sprint page fetch in parallel | - | Refactor under existing green e2e; no new test |
 
 Phase 0 budget: no new storage; compute should **drop** (0.3, N1, N6).
 
-### Phase 1 — Strategy and pit stops
+### Phase 1: Strategy and pit stops
 | Slice | Behaviour | Seam | Red test / truth source |
 |---|---|---|---|
 | 1.1 | Race events carry `session_type`; existing rows backfilled by date | API-1 | Seed a GP + sprint weekend; `/:id/overtakes?session=sprint` returns only sprint rows |
@@ -187,7 +187,7 @@ Phase 1 budget:
 - OpenF1: +4 requests per race (stints + pit for GP and sprint).
 - Compute: rides the existing ingest cycle.
 
-### Phase 2 — Analysis from own data (no new sources)
+### Phase 2: Analysis from own data (no new sources)
 | Slice | Behaviour | Seam | Red test / truth source |
 |---|---|---|---|
 | 2.1 | Championship maths: alive/eliminated, points still available | WEB-1 | Worked example: 2021 before Abu Dhabi, VER and HAM both on 369.5 with 26 points left → both alive; a driver 30 behind → eliminated |
@@ -205,7 +205,7 @@ Phase 2 budget:
 - CPU: seconds per run (R4).
 - Backfilling 2023–2025 runs locally (R3).
 
-### Phase 3 — Race story (FastF1, already loaded during ingest)
+### Phase 3: Race story (FastF1, already loaded during ingest)
 | Slice | Behaviour | Seam | Red test / truth source |
 |---|---|---|---|
 | 3.1 | Per-lap position / gap / interval traces from **full** laps | PY-2 | Hand-built 3-driver × 4-lap laps frame with known cumulative times → known gaps; lapped car → null gap + `laps_down` |
@@ -222,7 +222,7 @@ Phase 3 budget:
 - `race_weather_traces`: one row per session.
 - Backfilling 2018–2025 is local and season by season (R3). It's the largest FastF1 job, so check storage after each season.
 
-### Phase 4 — Telemetry and track maps (OpenF1, 2023+)
+### Phase 4: Telemetry and track maps (OpenF1, 2023+)
 | Slice | Behaviour | Seam | Red test / truth source |
 |---|---|---|---|
 | 4.1 | Lap window from `/laps` for each driver's fastest Q/SQ lap | PY-1 | Recorded `/laps` payload → expected window |
@@ -239,7 +239,7 @@ Phase 4 budget:
 - OpenF1: ~41 requests per session, spread over ~2 cycles (O1).
 - Egress: ≤ 60 KB per uncached comparison. E1 matters most here.
 
-### Phase 5 — History (F1DB)
+### Phase 5: History (F1DB)
 | Slice | Behaviour | Seam | Red test / truth source |
 |---|---|---|---|
 | 5.1 | F1DB driver → `history_drivers` row (bio + career totals) | PY-1-style mapper | Recorded F1DB JSON for 2–3 drivers |
@@ -255,7 +255,7 @@ Budget scope (decision D5):
 - The initial import runs locally (R3). The worker applies only the current-season delta after each F1DB release, checked weekly.
 - Credit F1DB in the footer (CC-BY-4.0).
 
-### Phase 6 — Home hub
+### Phase 6: Home hub
 | Slice | Behaviour | Seam | Red test |
 |---|---|---|---|
 | 6.1 | Hub cards degrade independently when one API call fails | WEB-2 | Fixture with title-odds route 500 → other cards still render |
@@ -264,14 +264,14 @@ Budget scope (decision D5):
 
 Budget: page fetches use `Promise.allSettled` over already-cached routes, so no new DB queries.
 
-### Phase 7 — Model v4 (backtest-gated)
+### Phase 7: Model v4 (backtest-gated)
 | Slice | Behaviour | Seam | Red test / truth source |
 |---|---|---|---|
 | 7.1 | Measured overtake rate, shrunk toward the seeded prior `w = n/(n+k)` | PY-2 | n = 0 → prior exactly; n = k → midpoint |
 | 7.2 | SC / VSC / red-flag counts from race control | PY-2 | Recorded race-control payload → 1 SC, 2 VSC |
 | 7.3 | Wet pace vs teammate on INTER/WET laps | PY-2 | Hand-built laps → expected delta |
 | 7.4 | Backtest harness: v3 vs v4 on 2023–2025 (Brier, top-1/3/5) | PY-2 | Two hand-built prediction sets with known Brier values |
-| 7.5 | Ship v4 only if the backtest wins | — | Decision |
+| 7.5 | Ship v4 only if the backtest wins | - | Decision |
 
 - Weight changes flow through the existing invariant tests (`test_weights.py`, `predictionMath.test.ts`).
 - Fix the docs that call `sc_probability` static.
@@ -297,7 +297,7 @@ Budget: page fetches use `Promise.allSettled` over already-cached routes, so no 
 
 | # | Decision | Recommendation |
 |---|---|---|
-| D1 | Strategy source: OpenF1 `/stints` (2023+) + derived fallback, or re-ingest all FastF1 laps with `is_accurate` | OpenF1 now; revisit `is_accurate` in Phase 7 |
+| D1 | Strategy source: OpenF1 `/stints` (2023+) + derived fallback, or re-ingest all FastF1 laps with `is_accurate` | OpenF1 from 2023, FastF1 stints backfilled for 2018–2022; derived stays the fallback |
 | D2 | Telemetry storage: JSONB per lap or row per sample | JSONB int arrays |
 | D3 | OpenF1 pacing. CLAUDE.md bans `sleep()` in jobs, but that rule came from Render cron timeouts, and the worker loop now `sleep`s between cycles itself (`server.py:183`) | Per-cycle request budget + resumable work. Allow ≤ 0.4 s spacing between OpenF1 calls; record it in an ADR and update CLAUDE.md |
 | D4 | Telemetry comparison: server-rendered GET form or client island | Server-rendered (no new §3 exception) |

@@ -19,7 +19,7 @@ All responses follow this envelope:
 No authentication. All endpoints are read-only GET.
 
 **Caching:** race/prediction/sprint endpoints set `Cache-Control` based on whether the
-underlying race is `completed` — `public, max-age=86400, immutable` once a race is done
+underlying race is `completed`: `public, max-age=86400, immutable` once a race is done
 (results and predictions for a finished race never change), otherwise `public, max-age=30`
 while the weekend is still in progress. See `apps/api/src/common/cache.ts`.
 
@@ -76,31 +76,31 @@ Returns all races for the year. Each race includes `eventFormat`, `hasSprint`, `
 Returns a single race with circuit, results (if completed), qualifying, and lap summaries.
 
 The `Race` object includes:
-- `eventFormat` — `conventional` | `sprint` | `sprint_qualifying` | `sprint_shootout`
-- `hasSprint` — boolean derived from eventFormat
-- `sprintDate` / `sprintQualifyingDate` — ISO strings, null for conventional weekends
-- `sprintWeather`, `sprintSafetyCarLaps`, `sprintVscLaps`, `sprintAirTempAvg`, `sprintTrackTempAvg`, `sprintHumidityAvg` — sprint-specific conditions
+- `eventFormat`: `conventional` | `sprint` | `sprint_qualifying` | `sprint_shootout`
+- `hasSprint`: boolean derived from eventFormat
+- `sprintDate` / `sprintQualifyingDate`: ISO strings, null for conventional weekends
+- `sprintWeather`, `sprintSafetyCarLaps`, `sprintVscLaps`, `sprintAirTempAvg`, `sprintTrackTempAvg`, `sprintHumidityAvg`: sprint-specific conditions
 
 ### `GET /api/races/:id/race-control`
 
 Returns race-control messages (flags, safety car/VSC, incidents) for a race, ordered by
-timestamp ascending. Empty until `ingest_race_control` has run for that race — sourced from
-OpenF1, which only has data for completed races from 2023 onward.
+timestamp ascending. Covers 2018+: OpenF1 for completed races from 2023 onward (empty until
+`ingest_race_control` has run), FastF1's race control feed for 2018–2022.
 
 ### `GET /api/races/:id/overtakes`
 
 Returns on-track overtakes for a race, ordered by timestamp ascending. `overtakingDriverId`/
-`overtakenDriverId` reference `drivers.id` (already resolved from OpenF1's car numbers) —
+`overtakenDriverId` reference `drivers.id` (already resolved from OpenF1's car numbers):
 look them up in the race's own `results`/`qualifying` response rather than re-fetching driver
-details. Empty until `ingest_overtakes` has run — same OpenF1 2023+/completed-only coverage
-as race-control.
+details. Empty until `ingest_overtakes` has run: OpenF1 only, so 2023+ and completed races only
+(no source before 2023).
 
 ### `GET /api/races/:id/team-radio`
 
 Returns team radio clips for a race, ordered by timestamp ascending. `driverId` references
-`drivers.id` (resolved from OpenF1's car number) — look it up the same way as overtakes.
+`drivers.id` (resolved from OpenF1's car number): look it up the same way as overtakes.
 `recordingUrl` points directly at F1's own CDN. F1 doesn't release radio for every session,
-so an empty or partial list is expected, not an error — and since 2026 F1 releases far fewer clips.
+so an empty or partial list is expected, not an error: and since 2026 F1 releases far fewer clips.
 
 All three race-event routes take `?session=race|sprint` (default `race`): both sessions of a
 sprint weekend share one `race_id`, and each row carries its `session_type`. Any other value → 400
@@ -116,9 +116,11 @@ Tyre strategy for one session, drivers in finishing order (`race_results` or `sp
   "pitStops": [{ "lapNumber": 15, "pitLaneMs": 24500, "stationaryMs": null }] }] }
 ```
 
-`source` is `openf1` (real stints, 2023+), `derived` (pre-2023: rebuilt from accurate `lap_times`,
-so stints span first..last *timed* lap and `tyreAgeAtStart` is null), or `none`. `stationaryMs` is
-only available from the 2024 US GP onward. Cached like other race routes (`cacheControlForStatus`).
+`source` is `openf1` (recorded stints: OpenF1 from 2023, FastF1 for 2018–2022), `derived` (fallback when
+a race has no recorded stints: rebuilt from accurate `lap_times`, so stints span first..last *timed* lap
+and `tyreAgeAtStart` is null), or `none`. 2018 stints keep Pirelli's named compounds (`HYPERSOFT`,
+`ULTRASOFT`, `SUPERSOFT`, `SUPERHARD` alongside `SOFT`/`MEDIUM`/`HARD`). `stationaryMs` is only
+available from the 2024 US GP onward; pre-2023 stops carry `pitLaneMs` only. Cached like other race routes (`cacheControlForStatus`).
 
 ### `GET /api/races/:id/race-story?session=race|sprint`
 
@@ -137,9 +139,9 @@ is null when FastF1 had no samples. About 40 KB per race before gzip.
 
 ### `GET /api/races/:id/telemetry?session=Q|SQ&a=CODE&b=CODE`
 
-Fastest-lap telemetry for a qualifying session (OpenF1, 2023+). `drivers` lists everyone with a
-stored lap (fastest first, no samples); `laps` holds full samples for only the two requested codes —
-defaulting to the two fastest — to keep the payload (and Neon egress) small:
+Fastest-lap telemetry for a qualifying session (2018+: OpenF1 from 2023, FastF1 `Q` laps before). `drivers` lists everyone with a
+stored lap (fastest first, no samples); `laps` holds full samples for only the two requested codes:
+defaulting to the two fastest: to keep the payload (and Neon egress) small:
 
 ```json
 { "session": "Q",
@@ -158,7 +160,7 @@ Returns a list of all circuits in the database, ordered alphabetically by name.
 ### `GET /api/races/circuit/:circuitKey`
 
 Also returns `outlinePath`: an SVG path (1000×1000 viewBox) drawn from the latest stored pole lap's
-x/y at the circuit, or null before any 2023+ telemetry exists.
+x/y at the circuit, or null before any telemetry exists (car data starts in 2018).
 
 
 Returns historical race results at a specific circuit across all years. Each item includes `hasSprint: boolean`.
@@ -166,10 +168,10 @@ Returns historical race results at a specific circuit across all years. Each ite
 ### `GET /api/races/circuit/:circuitKey/telemetry`
 
 Track character from one real lap: the circuit's latest pole lap (falling back to that race's fastest
-stored qualifying lap when the pole sitter's telemetry is missing — `isPoleLap` says which). Returns
-`{ raceId, year, raceName, driver, lapTimeMs, isPoleLap, profile, trace }` or `null` before 2023 data
-exists. `profile` (`modules/circuits/track-profile.helpers.ts`): full-throttle share (≥98%), longest flat-out run, top
-speed, braking zones, and corners — every lift or brake, classed by apex speed (low < 130, medium
+stored qualifying lap when the pole sitter's telemetry is missing: `isPoleLap` says which). Returns
+`{ raceId, year, raceName, driver, lapTimeMs, isPoleLap, profile, trace }` or `null` when the circuit
+has no telemetry (car data starts in 2018). `profile` (`modules/circuits/track-profile.helpers.ts`): full-throttle share (≥98%), longest flat-out run, top
+speed, braking zones, and corners: every lift or brake, classed by apex speed (low < 130, medium
 < 210 km/h). `trace` is speed/throttle/brake thinned to every 50 m.
 
 ---
@@ -198,7 +200,7 @@ Head-to-head against the team-mate with the most shared races that season (`:id`
 season-scoped driver id): `{ teammate, sharedRaces, qualifying, race, points }`, each a
 `{ driver, teammate }` count. `qualifying` compares classified qualifying position; `race` only
 counts races both drivers finished (`Finished`/`Lapped`/`+N Lap(s)`, ADR 0002); `points` are GP
-points. `races` lists every shared race in round order — `{ raceId, roundNumber, raceName, qualiGapMs,
+points. `races` lists every shared race in round order: `{ raceId, roundNumber, raceName, qualiGapMs,
 driver, teammate }`, each side `{ qualiPosition, finishPosition, status, points }`. `qualiGapMs` compares
 lap times in the deepest session both reached (Q3, else Q2, else Q1); negative means the driver was
 faster. `medianQualiGapMs` is the median of those gaps. `year` only drives the cache header.
@@ -253,7 +255,7 @@ Returns a team's stats across all seasons they have data in.
 
 ### `GET /api/predictions/model-info`
 
-Returns the most recently computed model versions for GP and sprint predictions. Updates automatically whenever `compute_predictions` or `compute_sprint_predictions` runs — no deploy needed.
+Returns the most recently computed model versions for GP and sprint predictions. Updates automatically whenever `compute_predictions` or `compute_sprint_predictions` runs: no deploy needed.
 
 ```json
 {
@@ -268,7 +270,7 @@ Returns the most recently computed model versions for GP and sprint predictions.
 
 ### `GET /api/predictions/upcoming`
 
-Returns the prediction for the next `qualifying_done` race with `race_date >= today`. Ordered ascending so the chronologically next race always wins — historical races stuck in `qualifying_done` from a partial backfill are excluded by the date guard.
+Returns the prediction for the next `qualifying_done` race with `race_date >= today`. Ordered ascending so the chronologically next race always wins: historical races stuck in `qualifying_done` from a partial backfill are excluded by the date guard.
 
 ```json
 {
@@ -316,7 +318,8 @@ Latest Monte Carlo championship odds plus their per-round history (written by `c
   "history": [{ "afterRound": 18, "driverId": 10, "titleProbability": 0.93 }] }
 ```
 
-404 if no odds exist for the season yet.
+`history` has one entry per contender per completed round (2018–2026 replayed by
+`scripts/backfill_title_odds.py`). 404 if no odds exist for the season yet.
 
 ### `GET /api/predictions/race/:raceId/friday-pace`
 
@@ -326,11 +329,11 @@ input), fastest first: `[{ driver, compound, sessionType, medianLapMs, stintLeng
 
 ### `GET /api/predictions/history?year=N`
 
-Returns all predictions for the year — both grand prix and sprint races merged and sorted by date descending. Includes actual results alongside predicted results for accuracy tracking.
+Returns all predictions for the year: both grand prix and sprint races merged and sorted by date descending. Includes actual results alongside predicted results for accuracy tracking.
 
 Each item includes `isSprint: boolean`. Sprint items link to `/races/:id/sprint`; main race items link to `/prediction/:id`.
 
-`actualWinnerPredictedPosition` is the grid slot the model had put the actual winner in — non-null
+`actualWinnerPredictedPosition` is the grid slot the model had put the actual winner in: non-null
 only once the race is decided; used by the frontend to show "model had them P4" on a missed call.
 
 ```json
@@ -368,7 +371,7 @@ only once the race is decided; used by the frontend to show "model had them P4" 
 
 ### `GET /api/predictions/accuracy`
 
-Season-by-season accuracy breakdown, across every season with at least one decided race —
+Season-by-season accuracy breakdown, across every season with at least one decided race:
 no `year` param; a single call returns the full history. Built from the same predicted/actual
 comparison as `/history`, aggregated per year and split into `gp`/`sprint`/`overall` buckets.
 A season with no decided races yet (e.g. it's just started) is omitted entirely. `accuracyPct`
@@ -395,7 +398,7 @@ is `null` when a bucket has zero races (e.g. `sprint` for a season with no sprin
 
 ### `GET /api/predictions/standings?year=N`
 
-Returns the "Intelligence Standings" — driver rankings by average prediction score. Each row includes sprint aggregates (`sprintWins`, `sprintPodiums`, `sprintTotalPoints`).
+Returns the "Intelligence Standings": driver rankings by average prediction score. Each row includes sprint aggregates (`sprintWins`, `sprintPodiums`, `sprintTotalPoints`).
 
 ---
 
@@ -407,12 +410,12 @@ Returns the sprint prediction for the next upcoming sprint weekend. Same envelop
 
 ### `GET /api/sprint/race/:raceId`
 
-The sprint prediction for that race weekend — same envelope as `/api/sprint/upcoming`. 404 when the
+The sprint prediction for that race weekend: same envelope as `/api/sprint/upcoming`. 404 when the
 weekend has no sprint prediction.
 
 ### `GET /api/sprint/race/:raceId/detail`
 
-Everything the sprint page needs: `{ race, prediction, results, laps }` — `prediction` is null
+Everything the sprint page needs: `{ race, prediction, results, laps }`, `prediction` is null
 before sprint qualifying, `results`/`laps` are empty until the sprint has run. 404 for a
 conventional (non-sprint) weekend.
 
@@ -521,9 +524,9 @@ an F1DB country id. `coreId` is the core driver/team id for the page link (null 
 data starts): a driver's latest season, and for a constructor its current core key or else its
 longest-running one. `active` is true only for the latest season's grid.
 Ties sort by wins, then name. Also:
-- `rates` — top-10 `winRate`/`poleRate`/`podiumRate` (`value` is a 0–1 ratio), only drivers with
+- `rates`: top-10 `winRate`/`poleRate`/`podiumRate` (`value` is a 0–1 ratio), only drivers with
   at least `rateMinStarts` (50) starts.
-- `chases` — per driver stat, the `record` holder and the best active `chaser` who doesn't hold it
+- `chases`: per driver stat, the `record` holder and the best active `chaser` who doesn't hold it
   (null when no active driver has scored).
 
 ### `GET /api/history/milestones`
@@ -541,7 +544,7 @@ recurs (Renault, Sauber) repeats them. Active families first.
 
 ### `GET /api/history/on-this-day?date=MM-DD`
 
-`{ requested, date, races }` — up to 10 completed races (core DB, 1980+) held on that calendar
+`{ requested, date, races }`: up to 10 completed races (core DB, 1980+) held on that calendar
 day, newest first, with the winner. When the day has none, `date` is the nearest day that does.
 400 for a day that doesn't exist.
 
@@ -558,7 +561,7 @@ The constructor's all-time totals plus chassis and engine per season, matched vi
 ### `GET /api/races/:id/recap`
 
 Home-hub summary: `{ winner, predictedWinner, predictionHit, fastestStop: { driver, stationaryMs },
-topBattle }` — the longest race battle. Each part is null when its data doesn't exist.
+topBattle }`: the longest race battle. Each part is null when its data doesn't exist.
 
 ## Data Quality
 
