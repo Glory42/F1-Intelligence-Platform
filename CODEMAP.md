@@ -506,7 +506,7 @@ data-engine/
 │   │   ├── client.py              # get_conn() — psycopg2 RealDictCursor connection
 │   │   └── __init__.py
 │   ├── jobs/
-│   │   ├── sync_schedule.py            # Populate races table — includes sprint_date, event_format
+│   │   ├── sync_schedule.py            # Populate races table — includes sprint_date, event_format; renumber-safe (matches by event name)
 │   │   ├── sync_season.py              # Populate teams + drivers from FastF1 session data
 │   │   ├── ingest_qualifying.py        # Q1/Q2/Q3 + sector times — 2018+; date guard rejects future rounds
 │   │   ├── ingest_qualifying_legacy.py # Qualifying from Ergast — pre-2018
@@ -584,7 +584,7 @@ data-engine/
 │   ├── test_data_quality_audit.py  # _audit_race gate/threshold branching per race status — via fake_db
 │   ├── test_data_quality_repair.py # run() audit-run selection, per-race issue grouping + step dedup, resolve/rollback — mocked jobs
 │   ├── test_main_auto_detect.py    # auto_detect_race/sprint_qualifying/sprint — row→(year,round), exit(1), query filters
-│   ├── test_sync_schedule.py       # _to_utc_iso + run() circuit-key resolution (Madrid/Spielberg year overrides), status-preserving upsert
+│   ├── test_sync_schedule.py       # _to_utc_iso + run() circuit-key resolution (Madrid/Spielberg year overrides), status-preserving upsert, round renumbering
 │   ├── test_sync_season.py         # run() team-key normalise, driver-code fallbacks, team_id remap — mocked FastF1 session
 │   └── test_compute_sprint_features.py # _compute_short_run_pace SQ-time source, main-quali fallback, min-max inversion
 ├── render.yaml                    # Render cron job definitions
