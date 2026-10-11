@@ -1,7 +1,7 @@
-import { eq, and, inArray, desc, isNotNull, sql } from 'drizzle-orm';
+import { eq, and, inArray, desc, asc, isNotNull, sql } from 'drizzle-orm';
 import type { Db } from '../../config/database';
-import { teams, seasons, drivers, teamSeasonStats, racePitStops } from '../../db/schema';
-import type { Team, Driver, TeamDetailResponse, TeamStanding, TeamYearStats, PitCrewRanking } from '../../common/types';
+import { teams, seasons, drivers, teamSeasonStats, racePitStops, races } from '../../db/schema';
+import type { Team, Driver, TeamDetailResponse, TeamStanding, TeamYearStats, PitCrewRanking, TeamPitStop } from '../../common/types';
 import { toTeam, toDriver } from '../../common/mappers';
 import { resolveSeason, buildStandings, buildCareerStats, type StatsAdapter } from '../../common/standings';
 
@@ -163,6 +163,27 @@ export class TeamsService {
       stops: Number(r.stops),
       medianStationaryMs: Math.round(Number(r.medianStationaryMs)),
       fastestStationaryMs: Number(r.fastestStationaryMs),
+    }));
+  }
+
+  // Grand prix stops only, and only timed ones (OpenF1 has stationary time from the 2024 US GP).
+  async findTeamPitStops(db: Db, teamId: number): Promise<TeamPitStop[]> {
+    const rows = await db
+      .select({ stop: racePitStops, race: races, driver: drivers, team: teams })
+      .from(racePitStops)
+      .innerJoin(drivers, eq(racePitStops.driverId, drivers.id))
+      .innerJoin(teams, eq(drivers.teamId, teams.id))
+      .innerJoin(races, eq(racePitStops.raceId, races.id))
+      .where(and(eq(teams.id, teamId), eq(racePitStops.sessionType, 'race'), isNotNull(racePitStops.stationaryMs)))
+      .orderBy(asc(races.roundNumber), asc(racePitStops.lapNumber));
+
+    return rows.map((r) => ({
+      raceId: r.race.id,
+      roundNumber: r.race.roundNumber,
+      raceName: r.race.name,
+      driver: toDriver(r.driver, r.team),
+      lapNumber: r.stop.lapNumber,
+      stationaryMs: r.stop.stationaryMs!,
     }));
   }
 }

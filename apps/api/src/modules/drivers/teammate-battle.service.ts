@@ -1,16 +1,19 @@
 import { and, eq, inArray, ne } from 'drizzle-orm';
 import type { Db } from '../../config/database';
-import { drivers, qualifyingResults, raceResults, teams } from '../../db/schema';
-import type { HeadToHead, TeammateBattle } from '../../common/types';
+import { drivers, qualifyingResults, raceResults, races, teams } from '../../db/schema';
+import type { HeadToHead, TeammateBattle, TeammateOuting, TeammateRace } from '../../common/types';
 import { toDriver } from '../../common/mappers';
 import { isClassifiedFinish } from '../../common/classification';
+import { median, qualifyingGapMs, type QualifyingTimes } from '../../common/qualifyingGap';
 
-interface Outing {
-  qualiPosition: number | null;
-  finishPosition: number | null;
-  status: string | null;
-  points: number;
+interface Outing extends TeammateOuting {
+  roundNumber: number;
+  raceName: string;
+  times: QualifyingTimes;
 }
+
+const publicOuting = ({ qualiPosition, finishPosition, status, points }: Outing): TeammateOuting =>
+  ({ qualiPosition, finishPosition, status, points });
 
 const EMPTY: HeadToHead = { driver: 0, teammate: 0 };
 
@@ -19,10 +22,15 @@ function score(mine: Map<number, Outing>, theirs: Map<number, Outing>) {
   const race = { ...EMPTY };
   const points = { ...EMPTY };
   let sharedRaces = 0;
+  const shared: TeammateRace[] = [];
   for (const [raceId, a] of mine) {
     const b = theirs.get(raceId);
     if (!b) continue;
     sharedRaces += 1;
+    shared.push({
+      raceId, roundNumber: a.roundNumber, raceName: a.raceName,
+      qualiGapMs: qualifyingGapMs(a.times, b.times), driver: publicOuting(a), teammate: publicOuting(b),
+    });
     points.driver += a.points;
     points.teammate += b.points;
     if (a.qualiPosition != null && b.qualiPosition != null) {
@@ -35,7 +43,9 @@ function score(mine: Map<number, Outing>, theirs: Map<number, Outing>) {
       else race.teammate += 1;
     }
   }
-  return { sharedRaces, qualifying, race, points };
+  shared.sort((x, y) => x.roundNumber - y.roundNumber);
+  const gaps = shared.map((r) => r.qualiGapMs).filter((g): g is number => g != null);
+  return { sharedRaces, qualifying, race, points, medianQualiGapMs: median(gaps), races: shared };
 }
 
 export class TeammateBattleService {
@@ -58,8 +68,14 @@ export class TeammateBattleService {
         status: raceResults.status,
         points: raceResults.points,
         qualiPosition: qualifyingResults.gridPosition,
+        q1TimeMs: qualifyingResults.q1TimeMs,
+        q2TimeMs: qualifyingResults.q2TimeMs,
+        q3TimeMs: qualifyingResults.q3TimeMs,
+        roundNumber: races.roundNumber,
+        raceName: races.name,
       })
       .from(raceResults)
+      .innerJoin(races, eq(races.id, raceResults.raceId))
       .leftJoin(
         qualifyingResults,
         and(eq(qualifyingResults.raceId, raceResults.raceId), eq(qualifyingResults.driverId, raceResults.driverId)),
@@ -70,6 +86,8 @@ export class TeammateBattleService {
     for (const r of rows) {
       outings.get(r.driverId)!.set(r.raceId, {
         qualiPosition: r.qualiPosition, finishPosition: r.finishPosition, status: r.status, points: Number(r.points ?? 0),
+        roundNumber: r.roundNumber, raceName: r.raceName,
+        times: { q1TimeMs: r.q1TimeMs, q2TimeMs: r.q2TimeMs, q3TimeMs: r.q3TimeMs },
       });
     }
 
@@ -78,7 +96,9 @@ export class TeammateBattleService {
       .map((t) => ({ teammate: t, battle: score(mine, outings.get(t.driver.id)!) }))
       .sort((x, y) => y.battle.sharedRaces - x.battle.sharedRaces);
     const primary = ranked[0];
-    if (!primary) return { teammate: null, sharedRaces: 0, qualifying: EMPTY, race: EMPTY, points: EMPTY };
+    if (!primary) {
+      return { teammate: null, sharedRaces: 0, qualifying: EMPTY, race: EMPTY, points: EMPTY, medianQualiGapMs: null, races: [] };
+    }
     return { teammate: toDriver(primary.teammate.driver, primary.teammate.team), ...primary.battle };
   }
 }

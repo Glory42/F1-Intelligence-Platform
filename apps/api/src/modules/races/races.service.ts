@@ -1,9 +1,10 @@
 import { eq, and, asc, desc, gte, lte, isNotNull, sql, inArray } from 'drizzle-orm';
 import type { Db } from '../../config/database';
 import {
-  races, circuits, raceResults, qualifyingResults, lapTimes, drivers, teams, raceStatusEnum, qualifyingLapTelemetry,
+  races, circuits, raceResults, qualifyingResults, lapTimes, drivers, teams, raceStatusEnum, qualifyingLapTelemetry, seasons,
 } from '../../db/schema';
-import type { Race, RaceDetailResponse, RaceResult, QualifyingResult, LapSummary, CircuitDetailResponse } from '../../common/types';
+import type { Race, RaceDetailResponse, RaceResult, QualifyingResult, LapSummary, CircuitDetailResponse, CircuitTelemetry } from '../../common/types';
+import { thinTrace, trackProfile } from '../../common/trackProfile';
 import { toDriver, toRace, toCircuit, toRaceResult, toQualifyingResult } from '../../common/mappers';
 import { aggregateEraWins, buildDominanceByEra } from './circuit-era.helpers';
 import { buildOutlinePath } from '../../common/trackOutline';
@@ -19,6 +20,7 @@ import {
 } from './circuit-stats.helpers';
 
 const OUTLINE_SIZE = 1000;
+const TRACE_EVERY_M = 50;
 
 export class RacesService {
   async findAll(db: Db, year: number, status?: string): Promise<Race[]> {
@@ -129,6 +131,37 @@ export class RacesService {
       .orderBy(desc(races.raceDate), asc(qualifyingLapTelemetry.lapTimeMs))
       .limit(1);
     return lap ? buildOutlinePath(lap.x, lap.y, OUTLINE_SIZE) : null;
+  }
+
+  // The latest race's pole lap; when that driver's telemetry is missing, its fastest stored Q lap.
+  async findCircuitTelemetry(db: Db, circuitKey: string): Promise<CircuitTelemetry | null> {
+    const isPole = sql<boolean>`coalesce(${qualifyingResults.gridPosition} = 1, false)`;
+    const [lap] = await db
+      .select({ lap: qualifyingLapTelemetry, race: races, year: seasons.year, driver: drivers, team: teams, isPole })
+      .from(qualifyingLapTelemetry)
+      .innerJoin(races, eq(qualifyingLapTelemetry.raceId, races.id))
+      .innerJoin(seasons, eq(races.seasonId, seasons.id))
+      .innerJoin(circuits, eq(races.circuitId, circuits.id))
+      .innerJoin(drivers, eq(qualifyingLapTelemetry.driverId, drivers.id))
+      .innerJoin(teams, eq(drivers.teamId, teams.id))
+      .leftJoin(qualifyingResults, and(
+        eq(qualifyingResults.raceId, qualifyingLapTelemetry.raceId),
+        eq(qualifyingResults.driverId, qualifyingLapTelemetry.driverId),
+      ))
+      .where(and(eq(circuits.circuitKey, circuitKey), eq(qualifyingLapTelemetry.sessionType, 'Q')))
+      .orderBy(desc(races.raceDate), desc(isPole), asc(qualifyingLapTelemetry.lapTimeMs))
+      .limit(1);
+    if (!lap) return null;
+    return {
+      raceId: lap.race.id,
+      year: lap.year,
+      raceName: lap.race.name,
+      driver: toDriver(lap.driver, lap.team),
+      lapTimeMs: lap.lap.lapTimeMs,
+      isPoleLap: Boolean(lap.isPole),
+      profile: trackProfile(lap.lap.samples),
+      trace: thinTrace(lap.lap.samples, TRACE_EVERY_M),
+    };
   }
 
   async findById(db: Db, raceId: number): Promise<RaceDetailResponse | null> {

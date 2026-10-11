@@ -20,6 +20,18 @@ export const TeamsController = {
     return c.json({ data, error: null });
   },
 
+  getTeamPitStops: async (c: Context<{ Bindings: Bindings }>) => {
+    const id = Number(c.req.param('id'));
+    if (isNaN(id)) {
+      return c.json({ data: null, error: { code: 'INVALID_ID', message: 'id must be a number' } }, 400);
+    }
+    // Team ids are season-scoped; `year` only picks the cache lifetime.
+    const year = Number(c.req.query('year') ?? new Date().getFullYear());
+    const data = await service.findTeamPitStops(createDb(c.env.DATABASE_URL), id);
+    c.header('Cache-Control', cacheIfData(cacheControlForYear(year), data.length > 0));
+    return c.json({ data, error: null });
+  },
+
   getStandings: async (c: Context<{ Bindings: Bindings }>) => {
     const year = Number(c.req.query('year') ?? new Date().getFullYear());
     const data = await service.findStandings(createDb(c.env.DATABASE_URL), year);
