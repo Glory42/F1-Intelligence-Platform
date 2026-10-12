@@ -75,6 +75,11 @@ pytest, config in `pyproject.toml` (`pythonpath = ["."]`, `testpaths = ["tests"]
   (`test_upsert.py`, `test_prediction_runner.py`) monkeypatch `execute_batch` itself and assert on the
   params it receives, the same pattern `test_ingest_runner.py` already uses for its own `execute_batch`
   call, rather than extending `FakeCursor` to fake SQL rendering.
+- `test_feature_runner.py` runs both feature jobs (`compute_features`, `compute_sprint_features`, each a
+  `feature_runner.FeatureJobSpec`) end to end and pins every written score to the rows weighted-v3 /
+  sprint-v2 produced before the runner existed. Its fake connection routes each read by a marker in its
+  SQL rather than call order (the reads are independent), and it reads the written rows back from
+  `execute_batch`'s params, naming columns from the composed INSERT.
 
 ## API unit (`apps/api/tests/unit/`)
 
