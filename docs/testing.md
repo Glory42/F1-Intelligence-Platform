@@ -120,13 +120,22 @@ Vitest, config in `vitest.config.ts` (include `tests/unit/**/*.test.{ts,tsx}`, `
   `features/history/historyView.ts`, `features/races/{raceView,calendar,loadRaceEvents}` (race page and
   calendar view logic), `components/data/{chartScale,labelLayout}`, the hub/circuits/drivers/teams feature helpers,
   `features/predictions/{buildPredictionPageData,predictionCopy}` (API mocked with `vi.mock`, not MSW).
+- **Page-data loaders are tested through MSW**: `features/drivers/loadDriverPageData`,
+  `features/teams/loadTeamPageData`, `features/races/loadRacePageData` (GP and sprint) and
+  `features/history/loadHistoryPageData`. Each test stubs the API routes the page hits with
+  `apiOk`/`apiError` (`tests/support/msw/routes.ts`), calls the loader with a URL and a pinned `now`, and
+  asserts on the returned view model; `recordApiRequests()` captures which endpoints were requested, so
+  "only the open tab is fetched" is asserted directly. Career-year resolution is covered for all three
+  fallbacks (requested → current → latest season).
 - **jsdom is opt-in per file** via a `// @vitest-environment jsdom` docblock on line 1: used for
   hook/component tests (`useCompareController`, `useGlobalSearch`, `GlobalSearch`) with Testing
   Library.
 - **`tests/support/setup.ts`**: jest-dom matchers, a `ResizeObserver` stub (cmdk needs it), and the
   MSW server lifecycle (`onUnhandledRequest: 'error'`, reset between tests).
 - **`tests/support/msw/`**: `handlers.ts` + `fixtures.ts` mock the `src/lib/api.ts` endpoints at
-  `http://localhost:8787`. Client-side fetches in the components under test hit these.
+  `http://localhost:8787`. Client-side fetches in the components under test hit these. `routes.ts` adds
+  per-test overrides (`apiOk`, `apiError`) and `recordApiRequests()`; `setup.ts` resets handlers and
+  request listeners after each test.
 - Not covered: `.astro` component rendering.
 
 ## Web e2e (`apps/e2e/`)
@@ -173,6 +182,8 @@ spends Neon CU-hours, and no `TEST_DATABASE_URL` secret is needed any more.
   part over testing a DB-bound method.
 - **New API endpoint / query** → an integration file under `tests/integration/<domain>/`; add a
   factory if a table has none; `truncateAll` in `beforeAll`/`afterAll`.
+- **New page logic (tabs, fallbacks, shaping)** → put it in a page-data loader under `features/<area>/` and
+  test the loader with MSW (`node` environment), mirroring `tests/unit/features/<area>/`.
 - **New interactive web island** → a `jsdom` Vitest file; add MSW handlers for any endpoint it
   calls; consider an e2e smoke spec + a fixture route if it's a whole page.
 - **New ETL scoring function** → pytest; pure if possible, otherwise script `FakeConnection` with

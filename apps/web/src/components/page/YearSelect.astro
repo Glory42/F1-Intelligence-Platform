@@ -2,10 +2,12 @@
 interface Props {
   years: { year: number; raceCount: number }[];
   currentYear: number;
-  basePath: string;
+  basePath?: string;
   extraParams?: string;
+  /** Builds each season's link itself, e.g. via seasonTabHref so the open tab is kept. */
+  hrefFor?: (year: number) => string;
 }
-const { years, currentYear, basePath, extraParams = '' } = Astro.props;
+const { years, currentYear, basePath = '', extraParams = '', hrefFor = (y: number) => `${basePath}?year=${y}${extraParams}` } = Astro.props;
 const activeYears = years.filter((y) => y.raceCount > 0);
 const uid = `ys-${Math.random().toString(36).slice(2, 7)}`;
 ---
@@ -29,7 +31,7 @@ const uid = `ys-${Math.random().toString(36).slice(2, 7)}`;
   >
     {activeYears.map((s) => (
       <a
-        href={`${basePath}?year=${s.year}${extraParams}`}
+        href={hrefFor(s.year)}
         class={`block px-4 py-2 font-mono text-[9px] tracking-[0.12em] uppercase transition-colors duration-100 ${
           s.year === currentYear
             ? 'text-[#a855f7] bg-[rgba(168,85,247,0.12)]'
