@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import featureWeights from '../../../../../docs/feature-weights.json';
 import {
   GP_FEATURE_MANIFEST,
   SPRINT_FEATURE_MANIFEST,
@@ -60,5 +61,26 @@ describe('mapFeatureRow', () => {
     for (const e of SPRINT_FEATURE_MANIFEST) raw[e.column as string] = '0.5';
     const out = mapFeatureRow<Row, Record<string, unknown>>(raw, asGenericEntries(SPRINT_FEATURE_MANIFEST));
     expect(Object.keys(out).sort()).toEqual(SPRINT_FEATURE_MANIFEST.map((e) => e.key).sort());
+  });
+});
+
+// The shared fixture is snake_case (Python-native) and lists only the weighted features; the API
+// manifest also maps unweighted columns (starting position, track overtake), which have no entry.
+function labelsOf(manifest: readonly { key: string; label: string }[], model: Record<string, { label: string }>) {
+  const byKey = new Map(manifest.map((e) => [e.key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`), e.label]));
+  return Object.fromEntries(Object.keys(model).map((key) => [key, byKey.get(key)]));
+}
+
+function fixtureLabels(model: Record<string, { label: string }>) {
+  return Object.fromEntries(Object.entries(model).map(([key, { label }]) => [key, label]));
+}
+
+describe('docs/feature-weights.json (cross-language drift check)', () => {
+  test('GP manifest labels match the shared fixture', () => {
+    expect(labelsOf(GP_FEATURE_MANIFEST, featureWeights.gp)).toEqual(fixtureLabels(featureWeights.gp));
+  });
+
+  test('sprint manifest labels match the shared fixture', () => {
+    expect(labelsOf(SPRINT_FEATURE_MANIFEST, featureWeights.sprint)).toEqual(fixtureLabels(featureWeights.sprint));
   });
 });

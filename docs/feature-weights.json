@@ -1,26 +1,27 @@
 {
+  "softmax_temperature": 0.3,
   "gp": {
-    "car_performance": 20,
-    "long_run_pace": 15,
-    "tyre_deg": 8,
-    "reliability": 8,
-    "qualifying_delta": 8,
-    "driver_rating": 8,
-    "win_rate": 8,
-    "luck_factor": 7,
-    "sector_strength": 6,
-    "circuit_adj_start_pos": 7,
-    "circuit_adj_position_gain": 3,
-    "weather_impact": 2
+    "car_performance": { "weight": 20, "label": "Car Performance" },
+    "long_run_pace": { "weight": 15, "label": "Long Run Pace" },
+    "tyre_deg": { "weight": 8, "label": "Tyre Degradation" },
+    "reliability": { "weight": 8, "label": "Reliability" },
+    "qualifying_delta": { "weight": 8, "label": "Qualifying Delta" },
+    "driver_rating": { "weight": 8, "label": "Driver Rating" },
+    "win_rate": { "weight": 8, "label": "Win Rate" },
+    "luck_factor": { "weight": 7, "label": "Luck Factor" },
+    "sector_strength": { "weight": 6, "label": "Sector Strength" },
+    "circuit_adj_start_pos": { "weight": 7, "label": "Circuit-Adj. Starting Position" },
+    "circuit_adj_position_gain": { "weight": 3, "label": "Circuit-Adj. Position Gain" },
+    "weather_impact": { "weight": 2, "label": "Weather Impact" }
   },
   "sprint": {
-    "car_performance": 25,
-    "circuit_adj_start_pos": 25,
-    "short_run_pace": 10,
-    "driver_rating": 10,
-    "weather_impact": 8,
-    "win_rate": 8,
-    "luck_factor": 8,
-    "sq_qualifying_delta": 6
+    "car_performance": { "weight": 25, "label": "Car Performance" },
+    "circuit_adj_start_pos": { "weight": 25, "label": "Circuit-Adj. Starting Position" },
+    "short_run_pace": { "weight": 10, "label": "Short Run Pace" },
+    "driver_rating": { "weight": 10, "label": "Driver Rating" },
+    "weather_impact": { "weight": 8, "label": "Weather Impact" },
+    "win_rate": { "weight": 8, "label": "Win Rate" },
+    "luck_factor": { "weight": 8, "label": "Luck Factor" },
+    "sq_qualifying_delta": { "weight": 6, "label": "SQ vs Teammate" }
   }
 }

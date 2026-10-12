@@ -26,4 +26,10 @@ export interface PredictionResultRow {
 
 export type FeatureMeta = Record<string, { label: string; weight: number }>;
 
+// Serialised into the What-If Lab's page so its client script can re-score without a fetch.
+export interface WhatIfPayload {
+  drivers: Array<{ id: number; code: string; fullName: string; winProbability: string; features: Record<string, unknown> }>;
+  weights: Record<string, number>;
+}
+
 export type PredictionPageKind = 'gp' | 'sprint';

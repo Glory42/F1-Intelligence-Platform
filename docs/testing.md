@@ -47,7 +47,8 @@ pytest, config in `pyproject.toml` (`pythonpath = ["."]`, `testpaths = ["tests"]
 
 - **Pure functions are tested directly**: `math_utils.py` (`normalize_minmax`, `softmax`,
   `bayesian_win_rate`, …), pure `feature_helpers.py` helpers, the model `WEIGHTS` invariants
-  (`test_weights.py`: sum-to-1 and positivity for both models), `rank_by_probability`,
+  (`test_weights.py`: sum-to-1 and positivity for both models, plus weights, labels and softmax
+  temperature against `docs/feature-weights.json`), `rank_by_probability`,
   `race_weekend_window`, `weekend_pipeline` (`test_weekend_pipeline.py`: `plan`, the chains,
   `due_statuses`, `repair_plan`, `prediction_steps`), `enrichment_coverage` (`test_enrichment_coverage.py`:
   `source_for`, `missing`, compound normalisation from either source; the coverage query through the
@@ -87,7 +88,8 @@ pytest, config in `pyproject.toml` (`pythonpath = ["."]`, `testpaths = ["tests"]
 `standings`, `cache`, `identity`, `feature-manifest`) and each module's
 pure `*.helpers.ts` (`circuits/` track outline, track profile, circuit era/stats; `drivers/`
 classification, qualifying gap; `history/` helpers; `predictions/` accuracy, prediction
-history, intel standings; `race-events/openf1.mappers`; `quality`). Fixtures are plain objects typed as
+history, intel standings; `race-events/openf1.mappers`; `quality`). `feature-manifest.test.ts` checks the
+manifest's labels against `docs/feature-weights.json`, the same file the Python and web drift tests read. Fixtures are plain objects typed as
 `typeof <table>.$inferSelect`; see `mappers.test.ts` for the pattern. `identity.test.ts` reads its
 cases from `docs/identity-cases.json`, the same file `data-engine/tests/test_f1db.py` checks
 `normalize_person_name` against, so the two languages can't drift on the F1DB join key. The GP/sprint reads in
@@ -131,7 +133,8 @@ suite never touches Neon.
 
 Vitest, config in `vitest.config.ts` (include `tests/unit/**/*.test.{ts,tsx}`, `@` alias, setup file).
 
-- **Default environment is `node`**: pure logic runs there: `lib/f1/predictionMath.ts` (all exports),
+- **Default environment is `node`**: pure logic runs there: `lib/f1/predictionMath.ts` (all exports; `FEATURE_META`
+  weights + labels and `SOFTMAX_TEMPERATURE` checked against `docs/feature-weights.json`),
   `lib/f1/teamColors` / `lib/f1/teamLogos` / `features/history/f1dbCountries`, `features/compare/compareStats.ts`,
   the compare stat rows (`features/compare/{driver,team}CompareConfig.ts`: Championship Points reads the API's
   `championshipPoints`, never a client-side GP + sprint sum), `features/history/historyView.ts`, `features/races/{raceView,calendar,loadRaceEvents}` (race page and

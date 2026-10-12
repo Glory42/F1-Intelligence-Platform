@@ -3,18 +3,18 @@ type FeatureInput = Record<string, unknown>;
 export type Weights = Record<string, number>;
 
 export const FEATURE_META: Record<string, { label: string; weight: number }> = {
-  carPerformance:           { label: 'Car Performance',    weight: 20 },
-  longRunPace:              { label: 'Long Run Pace',      weight: 15 },
-  tyreDeg:                  { label: 'Tyre Degradation',   weight: 8 },
-  reliability:              { label: 'Reliability',        weight: 8 },
-  qualifyingDelta:          { label: 'Quali vs Teammate',  weight: 8 },
-  driverRating:             { label: 'Driver Rating',      weight: 8 },
-  winRate:                  { label: 'Win Rate',           weight: 8 },
-  luckFactor:               { label: 'Luck Factor',        weight: 7 },
-  sectorStrength:           { label: 'Sector Strength',    weight: 6 },
-  circuitAdjStartPos:       { label: 'Adj. Grid Position', weight: 7 },
-  circuitAdjPositionGain:   { label: 'Adj. Position Gain', weight: 3 },
-  weatherImpact:            { label: 'Weather Impact',     weight: 2 },
+  carPerformance:           { label: 'Car Performance',                weight: 20 },
+  longRunPace:              { label: 'Long Run Pace',                  weight: 15 },
+  tyreDeg:                  { label: 'Tyre Degradation',               weight: 8 },
+  reliability:              { label: 'Reliability',                    weight: 8 },
+  qualifyingDelta:          { label: 'Qualifying Delta',               weight: 8 },
+  driverRating:             { label: 'Driver Rating',                  weight: 8 },
+  winRate:                  { label: 'Win Rate',                       weight: 8 },
+  luckFactor:               { label: 'Luck Factor',                    weight: 7 },
+  sectorStrength:           { label: 'Sector Strength',                weight: 6 },
+  circuitAdjStartPos:       { label: 'Circuit-Adj. Starting Position', weight: 7 },
+  circuitAdjPositionGain:   { label: 'Circuit-Adj. Position Gain',     weight: 3 },
+  weatherImpact:            { label: 'Weather Impact',                 weight: 2 },
 };
 
 export const GP_WEIGHTS: Weights = Object.fromEntries(
@@ -22,14 +22,14 @@ export const GP_WEIGHTS: Weights = Object.fromEntries(
 );
 
 export const SPRINT_FEATURE_META: Record<string, { label: string; weight: number }> = {
-  carPerformance:      { label: 'Car Performance',    weight: 25 },
-  circuitAdjStartPos:  { label: 'Adj. Grid Position', weight: 25 },
-  shortRunPace:        { label: 'Short Run Pace',     weight: 10 },
-  driverRating:        { label: 'Driver Rating',      weight: 10 },
-  weatherImpact:       { label: 'Weather Impact',     weight: 8 },
-  winRate:             { label: 'Win Rate',           weight: 8 },
-  luckFactor:          { label: 'Luck Factor',        weight: 8 },
-  sqQualifyingDelta:   { label: 'SQ vs Teammate',     weight: 6 },
+  carPerformance:      { label: 'Car Performance',                weight: 25 },
+  circuitAdjStartPos:  { label: 'Circuit-Adj. Starting Position', weight: 25 },
+  shortRunPace:        { label: 'Short Run Pace',                 weight: 10 },
+  driverRating:        { label: 'Driver Rating',                  weight: 10 },
+  weatherImpact:       { label: 'Weather Impact',                 weight: 8 },
+  winRate:             { label: 'Win Rate',                       weight: 8 },
+  luckFactor:          { label: 'Luck Factor',                    weight: 8 },
+  sqQualifyingDelta:   { label: 'SQ vs Teammate',                 weight: 6 },
 };
 
 export const SPRINT_WEIGHTS: Weights = Object.fromEntries(

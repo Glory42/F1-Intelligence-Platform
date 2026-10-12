@@ -1,5 +1,5 @@
 ---
-import type { FeatureMeta, PredictionAccent, PredictionDriverVM } from '../types';
+import type { FeatureMeta, PredictionAccent, PredictionDriverVM, WhatIfPayload } from '../types';
 
 interface Props {
   drivers: PredictionDriverVM[];
@@ -12,7 +12,7 @@ interface Props {
 
 const { drivers, featureMeta, weights, accent, sliderMax, blurb } = Astro.props;
 
-const payload = JSON.stringify({
+const whatIf: WhatIfPayload = {
   drivers: drivers.map((d) => ({
     id: d.driver.id,
     code: d.driver.code,
@@ -21,7 +21,8 @@ const payload = JSON.stringify({
     features: d.features,
   })),
   weights,
-}).replace(/</g, '\\u003c');
+};
+const payload = JSON.stringify(whatIf).replace(/</g, '\\u003c');
 ---
 
 <div class="whatif-lab border border-white/[0.06] p-5" data-whatif>
@@ -37,7 +38,7 @@ const payload = JSON.stringify({
     <div class="space-y-2">
       {Object.entries(featureMeta).map(([key, meta]) => (
         <label class="flex items-center gap-3">
-          <span class="font-mono text-[9px] text-muted-foreground w-28 shrink-0 truncate">{meta.label}</span>
+          <span class="font-mono text-[9px] text-muted-foreground w-28 shrink-0 truncate" title={meta.label}>{meta.label}</span>
           <input type="range" min="0" max={sliderMax} step="1" value={meta.weight} data-key={key} class="whatif-slider flex-1" />
           <span class="whatif-val font-mono text-[9px] font-bold w-7 text-right" data-key={key}>{meta.weight}</span>
         </label>
@@ -59,7 +60,8 @@ const payload = JSON.stringify({
 </style>
 
 <script>
-  import { softmax } from '@/lib/f1/predictionMath';
+  import { softmax, weightedScore } from '@/lib/f1/predictionMath';
+  import type { WhatIfPayload } from '../types';
 
   function escapeHtml(str: string) {
     return String(str)
@@ -71,7 +73,7 @@ const payload = JSON.stringify({
     document.querySelectorAll<HTMLElement>('[data-whatif]').forEach((lab) => {
       const payloadEl = lab.querySelector('[data-whatif-payload]');
       if (!payloadEl?.textContent) return;
-      const { drivers, weights: modelWeights } = JSON.parse(payloadEl.textContent);
+      const { drivers, weights: modelWeights }: WhatIfPayload = JSON.parse(payloadEl.textContent);
       if (!drivers.length) return;
 
       const accent = getComputedStyle(lab).getPropertyValue('--accent').trim() || '#a855f7';
@@ -79,7 +81,7 @@ const payload = JSON.stringify({
       const resultsEl = lab.querySelector<HTMLElement>('[data-role="results"]');
       const totalEl = lab.querySelector<HTMLElement>('[data-role="total"]');
       const resetBtn = lab.querySelector<HTMLElement>('[data-role="reset"]');
-      const modelOrder: number[] = drivers.map((d: any) => d.id);
+      const modelOrder = drivers.map((d) => d.id);
 
       function render() {
         const weights: Record<string, number> = {};
@@ -87,16 +89,10 @@ const payload = JSON.stringify({
         const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
         if (totalEl) totalEl.textContent = String(totalWeight);
 
-        const scored = drivers.map((d: any) => {
-          let score = 0;
-          for (const key of Object.keys(weights)) score += weights[key] * Number(d.features[key] ?? 0);
-          return { d, prob: 0, score: totalWeight > 0 ? score / totalWeight : 0 };
-        });
-        const probs = softmax(scored.map((s: any) => s.score));
-        scored.forEach((s: any, i: number) => { s.prob = probs[i]; });
-        scored.sort((a: any, b: any) => b.prob - a.prob);
+        const probs = softmax(drivers.map((d) => (totalWeight > 0 ? weightedScore(d.features, weights) / totalWeight : 0)));
+        const scored = drivers.map((d, i) => ({ d, prob: probs[i] })).sort((a, b) => b.prob - a.prob);
 
-        resultsEl!.innerHTML = scored.map((s: any, newRank: number) => {
+        resultsEl!.innerHTML = scored.map((s, newRank) => {
           const delta = modelOrder.indexOf(s.d.id) - newRank;
           const pct = Math.round(s.prob * 100);
           const move = delta === 0
