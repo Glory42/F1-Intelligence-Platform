@@ -2,8 +2,6 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { DriverStatsGrid } from '@/features/drivers/components/DriverStatsGrid';
 import { RecentResultsTable } from '@/features/drivers/components/RecentResultsTable';
-import { api } from '@/lib/api';
-import type { DriverYearStats, TeammateBattle, DriverHistory } from '@/types';
 import TeammateBattleCard from '@/features/drivers/components/TeammateBattleCard.astro';
 import CareerCard from '@/features/history/components/CareerCard.astro';
 import DriverCareerTable from '@/features/drivers/components/DriverCareerTable.astro';
@@ -13,67 +11,13 @@ import YearSelectLinks from '@/components/page/YearSelectLinks.astro';
 import PageTabs from '@/components/page/PageTabs.astro';
 import EmptyState from '@/components/page/EmptyState.astro';
 import { getTeamColor } from '@/lib/f1/teamColors';
-import { driverPredictionRecord } from '@/lib/f1/predictionMath';
-import { resolveTab, TAB_PARAM } from '@/lib/pageTabs';
-import { getNationalityFlag, getDriverFlagByCode } from '@/lib/f1/countryFlags';
+import { DRIVER_TABS, loadDriverPageData } from '@/features/drivers/loadDriverPageData';
 
-const TABS = [
-  { id: 'season', label: 'This season' },
-  { id: 'teammate', label: 'Teammate battle' },
-  { id: 'career', label: 'Career' },
-  { id: 'model', label: 'Model' },
-] as const;
-
-const { id } = Astro.params;
-const tab = resolveTab(Astro.url, TABS);
-const tabSuffix = tab === TABS[0].id ? '' : `&${TAB_PARAM}=${tab}`;
-let year = Number(Astro.url.searchParams.get('year') ?? new Date().getFullYear());
-
-let data = null;
-let career: DriverYearStats[] = [];
-let error = null;
-let predictionRecord: ReturnType<typeof driverPredictionRecord> | null = null;
-let teammateBattle: TeammateBattle | null = null;
-let driverHistory: DriverHistory | null = null;
-
-try {
-  career = await api.getDriverCareer(Number(id));
-  const activeYears = career.map((y) => y.year);
-  
-  if (activeYears.length > 0) {
-    const requestedYear = Astro.url.searchParams.get('year') ? Number(Astro.url.searchParams.get('year')) : null;
-    const targetYear = (requestedYear && activeYears.includes(requestedYear))
-      ? requestedYear
-      : (activeYears.includes(new Date().getFullYear()) ? new Date().getFullYear() : Math.max(...activeYears));
-    
-    year = targetYear;
-    const careerYear = career.find((y) => y.year === targetYear);
-    const [driverResult, historyResult, battleResult, careerHistoryResult] = await Promise.allSettled([
-      api.getDriverById(Number(id), targetYear),
-      tab === 'model' ? api.getPredictionHistory(targetYear) : null,
-      tab === 'teammate' ? api.getTeammateBattle(careerYear?.driverId ?? Number(id), targetYear) : null,
-      tab === 'career' ? api.getDriverHistory(careerYear?.driverId ?? Number(id)) : null,
-    ]);
-    if (driverResult.status === 'rejected') throw driverResult.reason;
-    data = driverResult.value;
-    predictionRecord = historyResult.status === 'fulfilled' && historyResult.value ? driverPredictionRecord(historyResult.value, Number(id)) : null;
-    teammateBattle = battleResult.status === 'fulfilled' ? battleResult.value : null;
-    driverHistory = careerHistoryResult.status === 'fulfilled' ? careerHistoryResult.value : null;
-  } else {
-    error = 'Driver has no career records';
-  }
-} catch (e) {
-  error = e instanceof Error ? e.message : 'Failed to load driver';
-}
-
+const {
+  tab, year, yearLinks, error, career, detail: data, headshotUrl, titles, nationalityFlag,
+  teammateBattle, driverHistory, predictionRecord,
+} = await loadDriverPageData(Astro.url, Number(Astro.params.id));
 const driver = data?.driver;
-const careerWithStats = career;
-const headshotUrl = driver?.headshotUrl ?? career.find((y) => y.headshotUrl)?.headshotUrl ?? null;
-const thisYear = new Date().getFullYear();
-const titles = careerWithStats.filter((y) => y.year < thisYear && y.stats?.championshipPosition === 1).length;
-const nationalityFlag = driver
-  ? (driver.nationality ? getNationalityFlag(driver.nationality) : getDriverFlagByCode(driver.code))
-  : '🏁';
 ---
 
 <BaseLayout title={driver?.fullName ?? 'Driver'}>
@@ -82,12 +26,9 @@ const nationalityFlag = driver
       <a href={`/drivers?year=${year}`} class="font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground hover:text-foreground transition-colors duration-150">
         ← all drivers
       </a>
-      {careerWithStats.length > 1 && (
+      {yearLinks.length > 1 && (
         <div class="ml-auto">
-          <YearSelectLinks
-            items={careerWithStats.map((y) => ({ year: y.year, href: `/drivers/${y.driverId}?year=${y.year}${tabSuffix}` }))}
-            currentYear={year}
-          />
+          <YearSelectLinks items={yearLinks} currentYear={year} />
         </div>
       )}
     </div>
@@ -141,7 +82,7 @@ const nationalityFlag = driver
           </div>
         </div>
 
-        <PageTabs tabs={TABS} active={tab} label="Driver views" />
+        <PageTabs tabs={DRIVER_TABS} active={tab} label="Driver views" />
 
         {tab === 'season' ? (
           <div class="space-y-8">
@@ -171,7 +112,7 @@ const nationalityFlag = driver
         ) : tab === 'career' ? (
           <div class="space-y-8">
             {driverHistory && <CareerCard history={driverHistory} />}
-            <DriverCareerTable career={careerWithStats} year={year} />
+            <DriverCareerTable career={career} year={year} />
           </div>
         ) : (
           predictionRecord
