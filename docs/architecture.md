@@ -114,59 +114,59 @@ Sunday
 
 **Home**
 
-![Home page](../preview/Preview-homePage.png)
+![Home page](../preview/Preview-homePage.webp)
 
 **Races calendar**
 
-![Races page](../preview/Preview-racesPage.png)
+![Races page](../preview/Preview-racesPage.webp)
 
 **Race detail**
 
-![Race detail page](../preview/Preview-races[id]Page.png)
+![Race detail page](../preview/Preview-races[id]Page.webp)
 
 **Race story: gap to leader and positions, lap by lap**
 
-![Race story page](../preview/Preview-raceStoryPage.png)
+![Race story page](../preview/Preview-raceStoryPage.webp)
 
 **Qualifying telemetry: two fastest laps compared**
 
-![Telemetry page](../preview/Preview-telemetryPage.png)
+![Telemetry page](../preview/Preview-telemetryPage.webp)
 
 **Driver standings**
 
-![Drivers page](../preview/Preview-driversPage.png)
+![Drivers page](../preview/Preview-driversPage.webp)
 
 **Driver detail**
 
-![Driver detail page](../preview/Preview-drivers[id]Page.png)
+![Driver detail page](../preview/Preview-drivers[id]Page.webp)
 
 **Constructors: pit crew rankings**
 
-![Teams page](../preview/Preview-teamsPage.png)
+![Teams page](../preview/Preview-teamsPage.webp)
 
 **Constructor detail**
 
-![Team detail page](../preview/Preview-teams[id]Page.png)
+![Team detail page](../preview/Preview-teams[id]Page.webp)
 
 **Circuits directory**
 
-![Circuits page](../preview/Preview-circuitsPage.png)
+![Circuits page](../preview/Preview-circuitsPage.webp)
 
 **Circuit detail**
 
-![Circuit detail page](../preview/Preview-circuit[id]Page.png)
+![Circuit detail page](../preview/Preview-circuit[id]Page.webp)
 
 **Driver comparison tool**
 
-![Driver comparison page](../preview/Preview-driverComparisonPage.png)
+![Driver comparison page](../preview/Preview-driverComparisonPage.webp)
 
 **Team comparison tool**
 
-![Team comparison page](../preview/Preview-teamComparisonPage.png)
+![Team comparison page](../preview/Preview-teamComparisonPage.webp)
 
 **All-time history (F1DB)**
 
-![History page](../preview/Preview-historyPage.png)
+![History page](../preview/Preview-historyPage.webp)
 
 ---
 

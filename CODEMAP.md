@@ -523,7 +523,7 @@ apps/web/
 ├── public/
 │   ├── favicon.svg
 │   ├── robots.txt
-│   ├── preview/                   # Page screenshots
+│   ├── og-image.jpg               # 1200×630 link-preview image (og:image / twitter:image)
 │   └── teams/                     # Static team logo files (PNG/SVG/JPG) served at /teams/<teamKey>.*
 ├── tests/
 │   ├── unit/

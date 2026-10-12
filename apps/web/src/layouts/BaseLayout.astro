@@ -15,7 +15,7 @@ interface Props {
 const {
   title,
   description = 'F1 race prediction and analytics platform',
-  image = '/preview/Preview-homePage.png',
+  image = '/og-image.jpg',
 } = Astro.props;
 const fullTitle = `${title} | ${SITE_NAME}`;
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);

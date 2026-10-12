@@ -1,6 +1,6 @@
 # [F1 Prediction Platform](https://f1.gorkemkaryol.dev/)
 
-![F1 Prediction Platform](./preview/Preview-homePage.png)
+![F1 Prediction Platform](./preview/Preview-homePage.webp)
 
 F1 race analysis and winner prediction built on FastF1, OpenF1 and F1DB. A weighted 12-feature model (8 for sprints) with softmax gives every driver a win probability after qualifying, and a Monte Carlo simulation turns those into championship odds after each round.
 

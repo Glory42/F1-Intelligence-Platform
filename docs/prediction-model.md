@@ -12,15 +12,15 @@ Two separate models run per race weekend: one for the grand prix, one for the sp
 
 **Prediction scorecard**
 
-![Prediction page](../preview/Preview-predictionPage.png)
+![Prediction page](../preview/Preview-predictionPage.webp)
 
 **Race prediction detail**
 
-![Prediction detail page](../preview/Preview-prediction[id]Page.png)
+![Prediction detail page](../preview/Preview-prediction[id]Page.webp)
 
 **Championship title odds**
 
-![Title odds](../preview/Preview-titleOddsPage.png)
+![Title odds](../preview/Preview-titleOddsPage.webp)
 
 ---
 
