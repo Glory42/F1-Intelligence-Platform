@@ -41,7 +41,8 @@ it's Python, and its jobs run once and exit rather than being a long-running dev
   `apps/api/.env.test`). Never against Neon: the test setup refuses `*.neon.tech` hosts. Seeds its own
   fixtures per file via `tests/support/factories/` and truncates after (`tests/support/db/test-db.ts`).
   Covers every module except `quality` (dev-only): `races`, race events/story/strategy/telemetry, `drivers`, `teams`,
-  `seasons`, `search`, `predictions`, `sprint`, `history`: plus the `edgeCache` middleware.
+  `seasons`, `search`, `predictions`, `sprint`, `history`: plus the `edgeCache` middleware, the route factories
+  (`integration/route/`) and per-kind GP/sprint reads (`integration/session-kind/`).
 - `apps/web/tests/unit/`: Vitest. Pure logic (`compareStats.ts`, `lib/` lookups) runs under the default `node`
   environment. Hook/component tests (`useCompareController`, `useGlobalSearch`, `GlobalSearch`) opt into `jsdom`
   per-file via a `// @vitest-environment jsdom` docblock, use Testing Library, and mock `src/lib/api.ts`'s
@@ -175,8 +176,8 @@ sprint weekend:
 apps/api/src/
 ├── common/                            # only what several modules share
 │   ├── types/                         # response types, one file per domain behind an index.ts barrel
-│   ├── mappers.ts, standings.ts, prediction-response.ts, feature-manifest.ts, driver-identity.ts
-│   └── cache.ts, edge-cache.ts, race-status.ts, session.ts, constants.ts
+│   ├── mappers.ts, standings.ts, feature-manifest.ts, identity.ts, session-kind.ts, session-reads.ts
+│   └── route.ts, cache.ts, edge-cache.ts, session.ts, constants.ts
 ├── config/database.ts                 # createDb(): Neon HTTP driver
 ├── db/schema/                         # Drizzle table definitions
 ├── modules/<domain>/
@@ -189,9 +190,12 @@ apps/api/src/
 ```
 
 - **service**: DB queries (Drizzle, no Hono context)
-- **controller**: parses Hono context, calls service, returns JSON
+- **controller**: declares handlers with `raceRoute`/`seasonRoute`/`driverRoute`/`teamRoute` (`common/route.ts`),
+  which own id/year/session validation, the 404, Cache-Control and the response envelope
 - **module**: Hono sub-router that wires controller handlers to routes
 - **helpers**: pure functions; code moves to `common/` only once a second module needs it
+- GP vs Sprint differences are data in `common/session-kind.ts` (`GP`/`SPRINT`), read through `session-reads.ts`;
+  "same driver / same team" is only ever decided by `common/identity.ts` (golden cases: `docs/identity-cases.json`)
 - A module with one route and a handful of query lines (`seasons`, `search`, `quality`) skips
   the split: one file holding the router + query is more readable than three near-empty ones.
 - File names are kebab-case. Sub-resources keep their public URL even when they get their own

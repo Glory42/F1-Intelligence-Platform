@@ -7,7 +7,7 @@ _SUFFIX = re.compile(r"\s+(jr|sr|ii|iii)\.?$")
 
 def normalize_person_name(name: str) -> str:
     """Join key between core drivers ("Sergio Perez") and F1DB ("Sergio Pérez", "Carlos Sainz Jr.").
-    Mirrored by apps/api/src/modules/history/f1db-match.helpers.ts: keep both in step."""
+    Mirrored by apps/api/src/common/identity.ts f1dbPersonKey (golden cases: docs/identity-cases.json)."""
     ascii_name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
     collapsed = " ".join(ascii_name.lower().split())
     return _SUFFIX.sub("", collapsed)
