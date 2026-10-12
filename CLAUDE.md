@@ -43,7 +43,7 @@ it's Python, and its jobs run once and exit rather than being a long-running dev
   Covers every module except `quality` (dev-only): `races`, race events/story/strategy/telemetry, `drivers`, `teams`,
   `seasons`, `search`, `predictions`, `sprint`, `history`: plus the `edgeCache` middleware, the route factories
   (`integration/route/`) and per-kind GP/sprint reads (`integration/session-kind/`).
-- `apps/web/tests/unit/`: Vitest. Pure logic (`compareStats.ts`, `lib/` lookups) runs under the default `node`
+- `apps/web/tests/unit/`: Vitest. Pure logic (`compareStats.ts`, compare configs, `lib/` lookups) runs under the default `node`
   environment. Hook/component tests (`useCompareController`, `useGlobalSearch`, `GlobalSearch`) opt into `jsdom`
   per-file via a `// @vitest-environment jsdom` docblock, use Testing Library, and mock `src/lib/api.ts`'s
   endpoints with MSW (`tests/support/msw/`). Page-data loaders (`load*PageData`) run in the `node`
@@ -53,7 +53,9 @@ it's Python, and its jobs run once and exit rather than being a long-running dev
   (`apps/e2e/fixtures/`) standing in for `apps/api`. Covers the hub, races, circuits, drivers, teams,
   compare, predictions and History pages and the global search palette. Playwright reuses an already-running
   `astro dev` on :4321 (your real-data dev server), set `E2E_WEB_PORT`/`E2E_API_PORT` to run against fixtures
-  while dev servers are up. The fixture server sends CORS
+  while dev servers are up. Fixtures in `apps/e2e/fixtures/data.ts` are typed against the API's response types
+  (`apps/web/src/types` re-exports `apps/api/src/common/types` type-only) and CI runs `bun run typecheck` on them,
+  so an API response change that the fixtures don't follow fails the build. The fixture server sends CORS
   headers because `GlobalSearch`/`DriverCompareTool`/`TeamCompareTool` fetch client-side (see the data-fetching
   exception below): that's a real cross-origin browser request, unlike every other route which is only ever
   hit server-side from Astro frontmatter.
@@ -438,7 +440,7 @@ Full detail in `docs/prediction-model.md`.
 - `circuits.sc_probability`: **not static**: recomputed after every race ingest from `races.safety_car_laps`
   (`ingest_race._recompute_circuit_sc_probability`)
 - Softmax temperature T=0.3: `SOFTMAX_TEMPERATURE` in `data-engine/src/utils/feature_manifest.py`, imported by `prediction_runner.py`/`math_utils.py` (Python) and `apps/web/src/lib/f1/predictionMath.ts` (TS)
-- Model weights: `GP_FEATURES`/`SPRINT_FEATURES` in `feature_manifest.py`, re-exported as `WEIGHTS` by `compute_features.py`/`compute_sprint_features.py` (both `feature_runner` specs); checked against `docs/feature-weights.json` and `apps/web`'s `FEATURE_META`/`SPRINT_FEATURE_META`
+- Model weights: `GP_FEATURES`/`SPRINT_FEATURES` in `feature_manifest.py`, re-exported as `WEIGHTS` by `compute_features.py`/`compute_sprint_features.py` (both `feature_runner` specs); weights, labels and the softmax temperature are checked against `docs/feature-weights.json` by `test_weights.py`, `apps/web`'s `predictionMath.test.ts` and the API's `feature-manifest.test.ts` (labels)
 
 ### Softmax
 Temperature T=0.3. Lower = more decisive. Do not increase T.

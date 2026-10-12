@@ -497,6 +497,7 @@ apps/web/
 │   │   │   │   └── CompareStatus.tsx      # Loading/error/empty-stats status display
 │   │   │   ├── compareStats.ts        # aggregateCareerStats() + DEFAULT_COMPARE_YEAR: career stat aggregation
 │   │   │   ├── driverCompareConfig.ts # seasonStatConfig + careerStatConfig: the driver stat rows
+│   │   │   ├── teamCompareConfig.ts   # the team stat rows (championship points from the API's championshipPoints)
 │   │   │   ├── compareReducer.ts      # Pure compareReducer(state, action, config): hydrate/year/selection/mode
 │   │   │   │                          #   transitions + stale-request guarding; no React import, tested directly
 │   │   │   ├── useCompareController.ts # Thin useReducer wiring over compareReducer.ts: URL sync via injectable
@@ -524,10 +525,10 @@ apps/web/
 │   │       │                      #   confidenceTier, brierScore, calibrationBuckets, driverPredictionRecord,
 │   │       │                      #   bestCall/worstMiss/longestStreak, GP_WEIGHTS/SPRINT_WEIGHTS + *_FEATURE_META
 │   │       │                      #   (the canonical TS-side manifest, checked against docs/feature-weights.json)
-│   │       ├── championshipMath.ts # titleContention() (mathematically out), remainingSessions(), formatTitleOdds(), championshipPoints()
+│   │       ├── championshipMath.ts # titleContention() (mathematically out), remainingSessions(), formatTitleOdds()
 │   │       └── tyres.ts           # compoundToken(compound, year): tyre compound → colour token (2018 named compounds use the 2018 palette)
 │   ├── middleware.ts              # 301s retired URLs via legacyRedirect()
-│   ├── types/                     # API response types per domain (mirrors apps/api common/types/): seasons, circuits,
+│   ├── types/                     # Type-only re-exports of apps/api common/types/ (+ search.ts GlobalSearchResponse): seasons, circuits,
 │   │                              #   drivers, teams, races, race-events, strategy, race-story, telemetry, predictions,
 │   │                              #   sprint, history, quality: imported via the index.ts barrel as '@/types'
 │   ├── styles/
@@ -542,6 +543,7 @@ apps/web/
 │   ├── unit/
 │   │   ├── features/compare/
 │   │   │   ├── compareStats.test.ts          # aggregateCareerStats(): pure, `node` env
+│   │   │   ├── driverCompareConfig.test.ts / teamCompareConfig.test.ts  # championship points row reads championshipPoints
 │   │   │   ├── compareReducer.test.ts        # pure, `node` env: hydrate/year/mode transitions, stale-request
 │   │   │   │                                 #   guarding, explicit 6bf3415 hydration-race regression case
 │   │   │   └── useCompareController.test.ts  # jsdom: URL hydration, career mode, location-adapter seam
@@ -620,7 +622,7 @@ apps/web/
 | `lib/f1/teamColors.ts` | Maps `team_key` strings (e.g. `red_bull`, `ferrari`) to official hex colors. Used for colored badges/dots across standings, driver pages, and result tables. |
 | `lib/f1/teamLogos.ts` | Maps `team_key` to a static logo path under `/teams/`. Returns `null` for historical teams with no logo file. Used on teams index, teams detail, and drivers standings pages. |
 | `features/history/f1dbCountries.ts` | `f1dbCountryFlag()` / `f1dbCountryName()`: F1DB kebab-case country ids → flag emoji (via ISO 3166 codes) and display name; used by the history leaderboards, record tiles and chases. |
-| `lib/f1/championshipMath.ts` | Title contention (who is mathematically out given remaining GPs + sprints and the era's points), title-odds formatting, and championship points as GP + sprint totals. |
+| `lib/f1/championshipMath.ts` | Title contention (who is mathematically out given remaining GPs + sprints and the era's points) and title-odds formatting. |
 | `components/data/chartScale.ts` / `labelLayout.ts` | Scale + tick + label-spreading primitives behind the plain-SVG `LineChart` and `StintChart` (no chart library). |
 | `lib/pageTabs.ts` | `resolveTab(url, tabs)` picks the open `?tab=` (first tab when absent/unknown); `tabHref()` builds a tab link that keeps `year` etc. and drops `tab` for the default. Pages fetch only the open tab's data. |
 | `lib/sidebarState.ts` | Reads/writes the `sidebar` cookie: a cookie (not localStorage) so `BaseLayout` renders the right width server-side and the layout never jumps. |
@@ -648,7 +650,7 @@ enforcement the real Hono API's `cors()` middleware handles in production.
 ```
 apps/e2e/
 ├── fixtures/
-│   ├── data.ts                    # Typed fixture objects (Driver, Race, PredictionResponse, history, telemetry, ...)
+│   ├── data.ts                    # Fixture objects typed against the API's response types (type-checked in CI)
 │   └── server.ts                  # Bun.serve(): serves { data, error: null } + CORS headers for the routes under test
 ├── tests/
 │   └── smoke/
@@ -919,7 +921,7 @@ data-engine/
 | `frontend.md` | Astro SSR app: stack, server-only data-fetch rule + 3 exceptions, `components/` vs `features/`, routes, styling, file-size budget |
 | `deployment.md` | Env vars for all three platforms, CORS config, first-time setup, local dev |
 | `testing.md` | The five suites (pytest, api unit/integration, web vitest, e2e Playwright): what each covers, how to run, CI jobs |
-| `feature-weights.json` | Canonical GP/sprint feature weights: checked by `test_weights.py` and `predictionMath.test.ts` |
+| `feature-weights.json` | Canonical GP/sprint feature weights, labels and `softmax_temperature`: checked by `test_weights.py`, `predictionMath.test.ts` and the API's `feature-manifest.test.ts` (labels) |
 | `plans/intelligence-platform-roadmap.md` | Intelligence-platform roadmap + free-tier budget rules (Neon, Render, OpenF1) |
 | `adr/0000`–`0009` | Legacy decisions; apps/ layout; DNF incl. DSQ/DNS; local-Postgres integration tests; OpenF1 pacing/budget; edge-cached responses; race events `session_type`; Plackett-Luce title odds; telemetry as resampled JSONB; drivers unique per person + pre-2018 results from F1DB |
 
