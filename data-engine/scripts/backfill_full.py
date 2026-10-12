@@ -9,6 +9,7 @@ sys.path.insert(0, ".")
 import src.config as _config  # triggers FastF1 cache + env setup
 
 from src.db.client import get_conn
+from src.weekend_pipeline import RaceRunContext, is_sprint_weekend, prediction_steps
 
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
@@ -31,36 +32,18 @@ def get_rounds(conn, year: int) -> list[dict]:
         return [dict(row) for row in cur.fetchall()]
 
 
-def get_completed_race_ids(conn, year: int) -> list[int]:
+def get_completed_rounds(conn, year: int) -> list[dict]:
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT r.id FROM races r
+            SELECT r.id, r.round_number, r.event_format FROM races r
             JOIN seasons s ON r.season_id = s.id
             WHERE s.year = %s AND r.status = 'completed'
-              AND r.event_format = 'conventional'
             ORDER BY r.race_date
             """,
             (year,),
         )
-        return [row["id"] for row in cur.fetchall()]
-
-
-def get_completed_sprint_race_ids(conn, year: int) -> list[tuple[int, int]]:
-    """Returns (race_id, round_number) for completed sprint rounds."""
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT r.id, r.round_number FROM races r
-            JOIN seasons s ON r.season_id = s.id
-            WHERE s.year = %s
-              AND r.sprint_date IS NOT NULL
-              AND r.status IN ('sprint_done', 'qualifying_done', 'completed')
-            ORDER BY r.race_date
-            """,
-            (year,),
-        )
-        return [(row["id"], row["round_number"]) for row in cur.fetchall()]
+        return [dict(row) for row in cur.fetchall()]
 
 
 # ── Per-job wrappers (all return True on success, False on failure) ───────────
@@ -121,54 +104,26 @@ def process_year(year: int) -> None:
     # SQ session has no classification, so load "S" (has grid + finish) instead.
     sprint_rounds = [r for r in rounds if r["has_sprint"]]
     if sprint_rounds:
-        print(f"[{year}] sprint pipeline for {len(sprint_rounds)} sprint rounds ...")
-
-        from src.jobs.compute_sprint_features    import run as csf
-        from src.jobs.compute_sprint_predictions import run as csp
-        from src.jobs.ingest_sprint              import run as ingest_sprint
-
+        print(f"[{year}] ingesting {len(sprint_rounds)} sprint rounds ...")
+        from src.jobs.ingest_sprint import run as ingest_sprint
         for r in sprint_rounds:
-            rn  = r["round_number"]
-            rid = r["id"]
-            tag = f"{year} R{rn:02d} sprint"
-
-            ok = _run(f"{tag} ingest_sprint", ingest_sprint, year, rn)
-            if not ok:
-                continue
-            ok = _run(f"{tag} csf", csf, rid)
-            if ok:
-                _run(f"{tag} csp", csp, rid)
+            _run(f"{year} R{r['round_number']:02d} ingest_sprint", ingest_sprint, year, r["round_number"])
 
     # 5 ── Season stats (includes sprint aggregates)
     print(f"[{year}] compute_season_stats ...")
     from src.jobs.compute_season_stats import run as css
     _run(f"compute_season_stats {year}", css, year)
 
-    # 6 ── Main race features + predictions for every completed race
+    # 6 ── Every completed weekend's predictions: sprint and GP, as the worker would build them
     conn = get_conn()
-    completed_ids = get_completed_race_ids(conn, year)
+    completed = get_completed_rounds(conn, year)
     conn.close()
 
-    if completed_ids:
-        print(f"[{year}] compute_features + predictions for {len(completed_ids)} completed races ...")
-        from src.jobs.compute_features   import run as cf
-        from src.jobs.compute_predictions import run as cp
-        for rid in completed_ids:
-            _run(f"compute_features race={rid}",    cf, rid)
-            _run(f"compute_predictions race={rid}", cp, rid)
-
-    # 7 ── Sprint features + predictions for completed sprint rounds
-    conn = get_conn()
-    completed_sprint_ids = get_completed_sprint_race_ids(conn, year)
-    conn.close()
-
-    if completed_sprint_ids:
-        print(f"[{year}] sprint features + predictions for {len(completed_sprint_ids)} sprint rounds ...")
-        from src.jobs.compute_sprint_features    import run as csf2
-        from src.jobs.compute_sprint_predictions import run as csp2
-        for rid, rn in completed_sprint_ids:
-            _run(f"sprint features race={rid}", csf2, rid)
-            _run(f"sprint predictions race={rid}", csp2, rid)
+    print(f"[{year}] predictions for {len(completed)} completed rounds ...")
+    for r in completed:
+        ctx = RaceRunContext(race_id=r["id"], year=year, round_number=r["round_number"])
+        for step in prediction_steps(is_sprint_weekend(r["event_format"])):
+            _run(f"{year} R{r['round_number']:02d} {step.name}", step.run, ctx)
 
     print(f"\n  ✓ {year} complete")
 

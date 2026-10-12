@@ -7,14 +7,13 @@ from psycopg2.extras import execute_batch
 
 from src.db.client import get_conn
 from src.utils.quality_utils import health_from_issues, is_fixable
+from src.weekend_pipeline import is_sprint_weekend
 
 # FP2 coverage below this triggers a flag: mirrors compute_features' fallback gate.
 FP2_COVERAGE_GATE = 0.7
 # Per-lap coverage below which a race is flagged. F1 fields normally retire mid-race,
 # so ~70-85% of (drivers × circuit lap_count) is healthy; only flag clearly-degraded sets.
 LAP_COVERAGE_GATE = 0.55
-
-SPRINT_FORMATS = ("sprint", "sprint_qualifying", "sprint_shootout")
 
 
 def _query(conn, sql: str, params=()) -> list[dict]:
@@ -58,7 +57,7 @@ def _audit_race(conn, race: dict, *, run_season_stats: bool) -> tuple[list[dict]
     round_number = race["round_number"]
     year = race["year"]
     status = race["status"]
-    is_sprint = race["event_format"] in SPRINT_FORMATS
+    is_sprint = is_sprint_weekend(race["event_format"])
     quali_count = race["quali_count"]
     result_count = race["result_count"]
     # Cross-table counts avoid a tautological self-check; ~20-car grid is the pre-race fallback.

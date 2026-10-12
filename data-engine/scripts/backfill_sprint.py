@@ -8,19 +8,7 @@ sys.path.insert(0, ".")
 import src.config as _config  # triggers FastF1 cache + env setup
 
 from src.db.client import get_conn
-
-
-def get_race_id(conn, year: int, round_num: int) -> int:
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT r.id FROM races r JOIN seasons s ON r.season_id = s.id "
-            "WHERE s.year = %s AND r.round_number = %s",
-            (year, round_num),
-        )
-        row = cur.fetchone()
-    if not row:
-        raise ValueError(f"Race not found: year={year} round={round_num}")
-    return int(row["id"])
+from src.weekend_pipeline import ActionKind, RaceRunContext, followups, statuses_after
 
 
 def get_completed_sprint_rounds(conn, year: int) -> list[tuple[int, int]]:
@@ -33,12 +21,12 @@ def get_completed_sprint_rounds(conn, year: int) -> list[tuple[int, int]]:
             JOIN seasons s ON r.season_id = s.id
             WHERE s.year = %s
               AND r.sprint_date IS NOT NULL
-              AND r.status IN ('sprint_done', 'qualifying_done', 'completed')
+              AND r.status = ANY(%s)
             ORDER BY r.race_date
             """,
-            (year,),
+            (year, list(statuses_after("ingest_sprint"))),
         )
-        return [(row["round_number"], row["id"]) for row in cur.fetchall()]
+        return [(row["round_number"], row["race_id"]) for row in cur.fetchall()]
 
 
 def run_year(year: int) -> None:
@@ -62,10 +50,8 @@ def run_year(year: int) -> None:
 
     print(f"  Found {len(rounds)} completed sprint rounds: rounds {[r[0] for r in rounds]}")
 
-    # Historical SQ sessions have no classification data, so ingest_sprint's "S"
-    # session (GridPosition + Position) is used instead of ingest_sprint_qualifying.
-    from src.jobs.compute_sprint_features import run as csf_run
-    from src.jobs.compute_sprint_predictions import run as csp_run
+    # Historical SQ sessions have no classification data, so ingest_sprint's "S" session
+    # (GridPosition + Position) stands in for ingest_sprint_qualifying.
     from src.jobs.ingest_sprint import run as sprint_run
 
     for round_num, race_id in rounds:
@@ -76,24 +62,14 @@ def run_year(year: int) -> None:
             print(f"    WARN: ingest_sprint failed ({e}), skipping this round")
             continue
 
-        print(f"  [{year} R{round_num:02d}] ── sprint features ──")
-        try:
-            csf_run(race_id)
-        except Exception as e:
-            print(f"    WARN: compute_sprint_features failed ({e})")
-            continue
-
-        print(f"  [{year} R{round_num:02d}] ── sprint predictions ──")
-        try:
-            csp_run(race_id)
-        except Exception as e:
-            print(f"    WARN: compute_sprint_predictions failed ({e})")
-
-        print(f"  [{year} R{round_num:02d}] ── ingest sprint results ──")
-        try:
-            sprint_run(year, round_num)
-        except Exception as e:
-            print(f"    WARN: ingest_sprint failed ({e})")
+        ctx = RaceRunContext(race_id=race_id, year=year, round_number=round_num)
+        for step in followups(ActionKind.SPRINT_QUALIFYING):
+            print(f"  [{year} R{round_num:02d}] ── {step.name} ──")
+            try:
+                step.run(ctx)
+            except Exception as e:
+                print(f"    WARN: {step.name} failed ({e})")
+                break
 
     # Step 4: recompute season stats to include sprint aggregates
     print(f"\n-> compute_season_stats {year}  (includes sprint aggregates)")

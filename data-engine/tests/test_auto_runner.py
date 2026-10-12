@@ -4,7 +4,9 @@ import pandas as pd
 import pytest
 
 from src import auto_runner
+from src import weekend_pipeline as wp
 from src.utils.schedule_window import RaceWeekendWindow
+from src.weekend_pipeline import ActionKind
 from tests.support.fake_db import FakeConnection
 
 
@@ -54,6 +56,25 @@ class _SpyScheduleProvider:
     def __call__(self):
         self.calls += 1
         return self._schedule
+
+
+def _jobs(monkeypatch, **fakes):
+    """Swaps entries of the pipeline's one job table: each fake takes the RaceRunContext."""
+    for name, fake in fakes.items():
+        monkeypatch.setitem(wp.JOBS, name, fake)
+
+
+def _boom(error):
+    def raise_(ctx):
+        raise error
+    return raise_
+
+
+def _action(kind):
+    return wp.Action(kind=kind, ready=True, label=kind.value)
+
+
+_CTX = wp.RaceRunContext(race_id=1, year=2026, round_number=5)
 
 
 def _active_race_row(race_id=1, round_number=1, year=2026, status="scheduled", event_format="sprint", name=None):
@@ -219,135 +240,6 @@ class TestPollIntervalForWindow:
         assert secs == auto_runner.ACTIVE_POLL_SECONDS
 
 
-class TestDecideNextAction:
-    _race = _utc(2026, 3, 8, 4, 0)
-    _event = _schedule_with_race(1, _race).iloc[0]
-
-    def test_sprint_scheduled_returns_sprint_qualifying(self):
-        # Session2DateUtc + 1.5h delay has passed
-        now = self._race - timedelta(days=2) + timedelta(hours=6)
-        action = auto_runner.decide_next_action(status="scheduled", is_sprint=True, event=self._event, now=now)
-        assert action.kind == auto_runner.ActionKind.SPRINT_QUALIFYING
-        assert action.ready is True
-        assert action.label == "Sprint Qualifying"
-        assert action.steps is auto_runner._ACTION_JOBS[auto_runner.ActionKind.SPRINT_QUALIFYING]
-
-    def test_sprint_after_qualifying_returns_sprint_race(self):
-        # Session3DateUtc + 1.5h delay has NOT passed yet
-        now = self._race - timedelta(days=1, hours=2)
-        action = auto_runner.decide_next_action(
-            status="sprint_qualifying_done", is_sprint=True, event=self._event, now=now
-        )
-        assert action.kind == auto_runner.ActionKind.SPRINT_RACE
-        assert action.ready is False
-        assert action.label == "Sprint Race"
-        assert action.steps is auto_runner._ACTION_JOBS[auto_runner.ActionKind.SPRINT_RACE]
-
-    def test_sprint_after_sprint_race_returns_main_qualifying(self):
-        # Session4DateUtc + 2h delay has passed
-        now = self._race - timedelta(days=1) + timedelta(hours=3)
-        action = auto_runner.decide_next_action(status="sprint_done", is_sprint=True, event=self._event, now=now)
-        assert action.kind == auto_runner.ActionKind.MAIN_QUALIFYING
-        assert action.ready is True
-        assert action.label == "Main Qualifying"
-        assert action.steps is auto_runner._ACTION_JOBS[auto_runner.ActionKind.MAIN_QUALIFYING]
-
-    def test_conventional_scheduled_returns_main_qualifying(self):
-        # Session4DateUtc + 2h delay has NOT passed yet
-        now = self._race - timedelta(days=1, hours=1)
-        action = auto_runner.decide_next_action(status="scheduled", is_sprint=False, event=self._event, now=now)
-        assert action.kind == auto_runner.ActionKind.MAIN_QUALIFYING
-        assert action.ready is False
-        assert action.label == "Main Qualifying"
-        assert action.steps is auto_runner._ACTION_JOBS[auto_runner.ActionKind.MAIN_QUALIFYING]
-
-    def test_qualifying_done_returns_main_race(self):
-        # Session5DateUtc + 3h delay has passed
-        now = self._race + timedelta(hours=4)
-        action = auto_runner.decide_next_action(status="qualifying_done", is_sprint=False, event=self._event, now=now)
-        assert action.kind == auto_runner.ActionKind.MAIN_RACE
-        assert action.ready is True
-        assert action.label == "Main Race"
-        assert action.steps is auto_runner._ACTION_JOBS[auto_runner.ActionKind.MAIN_RACE]
-
-    def test_unhandled_status_returns_none(self):
-        action = auto_runner.decide_next_action(
-            status="completed", is_sprint=False, event=self._event, now=self._race
-        )
-        assert action is None
-
-    def test_main_race_includes_race_events_ingestion_after_the_core_pipeline(self):
-        names = [step.name for step in auto_runner._ACTION_JOBS[auto_runner.ActionKind.MAIN_RACE]]
-        assert names == [
-            "ingest_race",
-            "compute_season_stats",
-            "compute_title_odds",
-            "ingest_race_control",
-            "ingest_overtakes",
-            "ingest_team_radio",
-            "ingest_stints",
-            "ingest_pit_stops",
-            "ingest_race_control_sprint",
-            "ingest_overtakes_sprint",
-            "ingest_team_radio_sprint",
-            "ingest_stints_sprint",
-            "ingest_pit_stops_sprint",
-        ]
-
-    def test_telemetry_runs_as_soon_as_its_qualifying_session_is_ingested(self):
-        last = {kind: auto_runner._ACTION_JOBS[kind][-1].name for kind in auto_runner.ActionKind}
-        assert last[auto_runner.ActionKind.MAIN_QUALIFYING] == "ingest_qualifying_telemetry"
-        assert last[auto_runner.ActionKind.SPRINT_QUALIFYING] == "ingest_sprint_qualifying_telemetry"
-
-
-class TestRunOpenF1Step:
-    def test_success_calls_through_with_year_and_round(self):
-        calls = []
-        ctx = auto_runner.RaceRunContext(race_id=1, year=2026, round_number=5)
-
-        auto_runner._run_openf1_step(lambda y, r: calls.append((y, r)), "ingest_race_control", ctx)
-
-        assert calls == [(2026, 5)]
-
-    def test_failure_is_swallowed_and_logged_rather_than_raised(self, monkeypatch):
-        logged = []
-        monkeypatch.setattr(
-            auto_runner, "log_job_failure",
-            lambda job, error, **context: logged.append((job, str(error), context)),
-        )
-        ctx = auto_runner.RaceRunContext(race_id=1, year=2026, round_number=5)
-
-        def _boom(y, r):
-            raise RuntimeError("OpenF1 429")
-
-        auto_runner._run_openf1_step(_boom, "ingest_team_radio", ctx)
-
-        assert logged == [("ingest_team_radio", "OpenF1 429", {"race_id": 1, "year": 2026, "round": 5})]
-
-    def test_race_events_failure_does_not_fail_the_main_race_sequence(self, monkeypatch):
-        monkeypatch.setattr(auto_runner.ingest_race, "run", lambda y, r: None)
-        monkeypatch.setattr(auto_runner.compute_season_stats, "run", lambda y: None)
-        monkeypatch.setattr(
-            auto_runner.ingest_race_control, "run",
-            lambda y, r, session_name="Race": (_ for _ in ()).throw(RuntimeError("boom"))
-        )
-        monkeypatch.setattr(auto_runner.ingest_overtakes, "run", lambda y, r, session_name="Race": None)
-        monkeypatch.setattr(auto_runner.ingest_team_radio, "run", lambda y, r, session_name="Race": None)
-
-        action = auto_runner.Action(
-            kind=auto_runner.ActionKind.MAIN_RACE,
-            ready=True,
-            label="Main Race",
-            steps=auto_runner._ACTION_JOBS[auto_runner.ActionKind.MAIN_RACE],
-        )
-        ctx = auto_runner.RaceRunContext(race_id=1, year=2026, round_number=5)
-
-        outcome = auto_runner._run_action_steps(action, ctx)
-
-        assert outcome.ok is True
-        assert outcome.last_committed_status == "completed"
-
-
 class TestRetryMissingRaceEvents:
     # A completed weekend with every table covered: tests flip only the flags they care about.
     _COVERED = {
@@ -363,21 +255,15 @@ class TestRetryMissingRaceEvents:
     def _patch_jobs(self, monkeypatch, fail=()):
         calls = []
 
-        def job(name, kw):
-            def run(y, r, **kwargs):
-                label = (name, kwargs.get(kw, "Race" if kw == "session_name" else "Q"))
-                calls.append(label)
+        def job(name):
+            def run(ctx):
+                calls.append(name)
                 if name in fail:
                     raise RuntimeError("boom")
             return run
 
-        for module in (auto_runner.ingest_race_control, auto_runner.ingest_overtakes, auto_runner.ingest_team_radio,
-                       auto_runner.ingest_stints, auto_runner.ingest_pit_stops, auto_runner.ingest_race_story):
-            name = module.__name__.rsplit(".", 1)[-1]
-            monkeypatch.setattr(module, "run", job(name, "session_name"))
-        monkeypatch.setattr(auto_runner.ingest_qualifying_telemetry, "run", job("telemetry", "session_type"))
-        monkeypatch.setattr(auto_runner.compute_season_stats, "run", lambda y: calls.append(("season_stats", y)))
-        monkeypatch.setattr(auto_runner.compute_title_odds, "run", lambda y: calls.append(("title_odds", y)))
+        for name in wp.JOBS:
+            monkeypatch.setitem(wp.JOBS, name, job(name))
         return calls
 
     def _retry(self, row, memo=None):
@@ -396,23 +282,23 @@ class TestRetryMissingRaceEvents:
     def test_race_events_wait_for_the_race_but_qualifying_telemetry_does_not(self, monkeypatch):
         calls = self._patch_jobs(monkeypatch)
         self._retry(self._row(status="qualifying_done", has_race_control=False, telemetry_complete=False))
-        assert calls == [("telemetry", "Q")]
+        assert calls == ["ingest_qualifying_telemetry"]
 
     def test_reruns_only_the_job_whose_table_is_empty(self, monkeypatch):
         calls = self._patch_jobs(monkeypatch)
         self._retry(self._row(has_pit_stops=False))
-        assert calls == [("ingest_pit_stops", "Race")]
+        assert calls == ["ingest_pit_stops"]
 
     def test_checks_the_sprint_session_on_a_sprint_weekend(self, monkeypatch):
         calls = self._patch_jobs(monkeypatch)
         sprint = datetime(2026, 3, 7, 15, 0, tzinfo=timezone.utc)
         self._retry(self._row(sprint_date=sprint, has_sprint_stints=False, sq_telemetry_complete=False))
-        assert calls == [("telemetry", "SQ"), ("ingest_stints", "Sprint")]
+        assert calls == ["ingest_sprint_qualifying_telemetry", "ingest_stints_sprint"]
 
     def test_recomputes_stale_standings_and_missing_title_odds(self, monkeypatch):
         calls = self._patch_jobs(monkeypatch)
         self._retry(self._row(stats_current=False, odds_current=False, has_story=False))
-        assert calls == [("ingest_race_story", "Race"), ("season_stats", 2026), ("title_odds", 2026)]
+        assert calls == ["ingest_race_story", "compute_season_stats", "compute_title_odds"]
 
     def test_a_job_that_finished_cleanly_is_settled_even_if_its_table_stays_empty(self, monkeypatch):
         calls = self._patch_jobs(monkeypatch)
@@ -421,7 +307,7 @@ class TestRetryMissingRaceEvents:
 
         assert self._retry(row, memo) is True
         assert self._retry(row, memo) is True
-        assert calls == [("ingest_overtakes", "Race")]
+        assert calls == ["ingest_overtakes"]
 
     def test_a_failed_job_stays_pending_and_does_not_stop_the_others(self, monkeypatch):
         calls = self._patch_jobs(monkeypatch, fail={"ingest_race_control"})
@@ -430,11 +316,11 @@ class TestRetryMissingRaceEvents:
 
         assert self._retry(row, memo) is False
         assert self._retry(row, memo) is False
-        assert calls == [("ingest_race_control", "Race"), ("ingest_overtakes", "Race"), ("ingest_race_control", "Race")]
+        assert calls == ["ingest_race_control", "ingest_overtakes", "ingest_race_control"]
 
     def test_telemetry_that_ran_out_of_budget_stays_pending(self, monkeypatch):
         self._patch_jobs(monkeypatch)
-        monkeypatch.setattr(auto_runner.ingest_qualifying_telemetry, "run", lambda y, r, session_type="Q": False)
+        _jobs(monkeypatch, ingest_qualifying_telemetry=lambda ctx: False)
         memo = auto_runner.WorkerMemo()
         assert self._retry(self._row(telemetry_complete=False), memo) is False
         assert memo.settled == set()
@@ -442,19 +328,16 @@ class TestRetryMissingRaceEvents:
 class TestRunActionSteps:
     def test_all_steps_succeed_returns_ok_and_last_committed_status(self, monkeypatch):
         calls = []
-        monkeypatch.setattr(auto_runner.ingest_sprint_qualifying, "run", lambda y, r: calls.append("ingest"))
-        monkeypatch.setattr(auto_runner.compute_sprint_features, "run", lambda rid: calls.append("features"))
-        monkeypatch.setattr(auto_runner.compute_sprint_predictions, "run", lambda rid: calls.append("predictions"))
-
-        action = auto_runner.Action(
-            kind=auto_runner.ActionKind.SPRINT_QUALIFYING,
-            ready=True,
-            label="Sprint Qualifying",
-            steps=auto_runner._ACTION_JOBS[auto_runner.ActionKind.SPRINT_QUALIFYING],
+        _jobs(
+            monkeypatch,
+            ingest_sprint_qualifying=lambda ctx: calls.append("ingest"),
+            compute_sprint_features=lambda ctx: calls.append("features"),
+            compute_sprint_predictions=lambda ctx: calls.append("predictions"),
+            compute_title_odds=lambda ctx: None,
+            ingest_sprint_qualifying_telemetry=lambda ctx: None,
         )
-        ctx = auto_runner.RaceRunContext(race_id=1, year=2026, round_number=5)
 
-        outcome = auto_runner._run_action_steps(action, ctx)
+        outcome = auto_runner._run_action_steps(_action(ActionKind.SPRINT_QUALIFYING), _CTX)
 
         assert outcome == auto_runner.StepOutcome(
             ok=True, last_committed_status="sprint_qualifying_done", failed_step=None, error=None
@@ -463,38 +346,46 @@ class TestRunActionSteps:
 
     def test_step_failure_returns_last_committed_status_and_failed_step(self, monkeypatch):
         boom = RuntimeError("boom")
-
-        def _raise(race_id):
-            raise boom
-
-        monkeypatch.setattr(auto_runner.ingest_sprint_qualifying, "run", lambda y, r: None)
-        monkeypatch.setattr(auto_runner.compute_sprint_features, "run", _raise)
-        monkeypatch.setattr(
-            auto_runner.compute_sprint_predictions,
-            "run",
-            lambda rid: pytest.fail("should not run, the sequence must stop at the failing step"),
+        _jobs(
+            monkeypatch,
+            ingest_sprint_qualifying=lambda ctx: None,
+            compute_sprint_features=_boom(boom),
+            compute_sprint_predictions=lambda ctx: pytest.fail("the sequence must stop at the failing step"),
         )
 
-        action = auto_runner.Action(
-            kind=auto_runner.ActionKind.SPRINT_QUALIFYING,
-            ready=True,
-            label="Sprint Qualifying",
-            steps=auto_runner._ACTION_JOBS[auto_runner.ActionKind.SPRINT_QUALIFYING],
-        )
-        ctx = auto_runner.RaceRunContext(race_id=1, year=2026, round_number=5)
-
-        outcome = auto_runner._run_action_steps(action, ctx)
+        outcome = auto_runner._run_action_steps(_action(ActionKind.SPRINT_QUALIFYING), _CTX)
 
         assert outcome.ok is False
         assert outcome.last_committed_status == "sprint_qualifying_done"
         assert outcome.failed_step == "compute_sprint_features"
         assert outcome.error is boom
 
+    def test_race_events_failure_does_not_fail_the_main_race_sequence(self, monkeypatch):
+        _jobs(monkeypatch, **{step.name: (lambda ctx: None) for step in wp.chain(ActionKind.MAIN_RACE)})
+        _jobs(monkeypatch, ingest_race_control=_boom(RuntimeError("boom")))
+
+        outcome = auto_runner._run_action_steps(_action(ActionKind.MAIN_RACE), _CTX)
+
+        assert outcome.ok is True
+        assert outcome.last_committed_status == "completed"
+
+    def test_a_title_odds_failure_does_not_fail_the_action(self, monkeypatch):
+        _jobs(
+            monkeypatch,
+            ingest_sprint=lambda ctx: None,
+            compute_season_stats=lambda ctx: None,
+            compute_title_odds=_boom(RuntimeError("boom")),
+        )
+
+        outcome = auto_runner._run_action_steps(_action(ActionKind.SPRINT_RACE), _CTX)
+
+        assert outcome.ok is True
+
 
 class TestRevertRaceStatus:
     def test_reverts_to_pre_sequence_status_when_nothing_committed(self):
         conn = FakeConnection([None])
-        ctx = auto_runner.RaceRunContext(race_id=7, year=2026, round_number=3)
+        ctx = wp.RaceRunContext(race_id=7, year=2026, round_number=3)
 
         auto_runner.revert_race_status(
             lambda: conn, ctx, None, "scheduled", RuntimeError("boom"), "ingest_sprint_qualifying"
@@ -507,7 +398,7 @@ class TestRevertRaceStatus:
 
     def test_reverts_to_last_committed_status_not_pre_sequence_status(self):
         conn = FakeConnection([None])
-        ctx = auto_runner.RaceRunContext(race_id=7, year=2026, round_number=3)
+        ctx = wp.RaceRunContext(race_id=7, year=2026, round_number=3)
 
         auto_runner.revert_race_status(
             lambda: conn,
@@ -531,7 +422,7 @@ class TestRevertRaceStatus:
             factory_calls.append(1)
             return conn
 
-        ctx = auto_runner.RaceRunContext(race_id=7, year=2026, round_number=3)
+        ctx = wp.RaceRunContext(race_id=7, year=2026, round_number=3)
 
         auto_runner.revert_race_status(conn_factory, ctx, None, "scheduled", RuntimeError("boom"), "ingest_race")
 
@@ -543,16 +434,11 @@ class TestRunCycleSequenceRetry:
         race = _utc(2026, 3, 8, 4, 0)
         now = race - timedelta(days=2) + timedelta(hours=6)  # Sprint Qualifying is ready
 
-        monkeypatch.setattr(auto_runner.ingest_sprint_qualifying, "run", lambda y, r: None)
-
-        def _raise(race_id):
-            raise ConnectionError("boom")
-
-        monkeypatch.setattr(auto_runner.compute_sprint_features, "run", _raise)
-        monkeypatch.setattr(
-            auto_runner.compute_sprint_predictions,
-            "run",
-            lambda rid: pytest.fail("should not run, compute_sprint_features already failed"),
+        _jobs(
+            monkeypatch,
+            ingest_sprint_qualifying=lambda ctx: None,
+            compute_sprint_features=_boom(ConnectionError("boom")),
+            compute_sprint_predictions=lambda ctx: pytest.fail("compute_sprint_features already failed"),
         )
 
         # First row answers the missing-race-events recheck (no race found -> no-op), second
@@ -575,10 +461,8 @@ class TestRunCycleSequenceRetry:
         # the next cycle's decision resumes past the already-completed step instead
         # of redoing it
         event = _schedule_with_race(1, race).iloc[0]
-        next_action = auto_runner.decide_next_action(
-            status="sprint_qualifying_done", is_sprint=True, event=event, now=now
-        )
-        assert next_action.kind == auto_runner.ActionKind.SPRINT_RACE
+        next_action = wp.plan(status="sprint_qualifying_done", is_sprint=True, event=event, now=now)
+        assert next_action.kind == ActionKind.SPRINT_RACE
 
 
 class TestQuietCyclesBetweenSessions:
@@ -610,7 +494,7 @@ class TestQuietCyclesBetweenSessions:
         assert spy.calls == 0
 
     def test_keeps_checking_while_fp2_coverage_is_below_the_gate(self, monkeypatch):
-        monkeypatch.setattr(auto_runner.ingest_fp2, "run", lambda year, round_number: None)
+        _jobs(monkeypatch, ingest_fp2=lambda ctx: None)
         race = _utc(2026, 3, 8, 4, 0)
         saturday_night = race - timedelta(hours=6)  # qualifying ingested, race not yet run
         memo = auto_runner.WorkerMemo()
@@ -660,7 +544,7 @@ class TestQuietCyclesBetweenSessions:
         assert spy.calls == 1
 
     def test_keeps_checking_while_the_windows_race_is_missing_race_events(self, monkeypatch):
-        monkeypatch.setattr(auto_runner, "_run_openf1_step", lambda job_run, step_name, ctx: None)
+        _jobs(monkeypatch, ingest_race_control=lambda ctx: False)
         race = _utc(2026, 3, 8, 4, 0)
         next_race = race + timedelta(days=14)
         schedule = pd.concat([_schedule_with_race(1, race), _schedule_with_race(2, next_race)], ignore_index=True)
@@ -705,46 +589,19 @@ class TestStepMemoryLog:
     def test_each_step_logs_the_process_peak_rss_for_render_free_headroom(self, monkeypatch, capsys):
         import json
 
-        monkeypatch.setattr(auto_runner.ingest_sprint, "run", lambda y, r: None)
-        monkeypatch.setattr(auto_runner.compute_season_stats, "run", lambda year: None)
-        monkeypatch.setattr(auto_runner.compute_title_odds, "run", lambda year: None)
-        action = auto_runner.Action(
-            kind=auto_runner.ActionKind.SPRINT_RACE,
-            ready=True,
-            label="Sprint Race",
-            steps=auto_runner._ACTION_JOBS[auto_runner.ActionKind.SPRINT_RACE],
+        _jobs(
+            monkeypatch,
+            ingest_sprint=lambda ctx: None,
+            compute_season_stats=lambda ctx: None,
+            compute_title_odds=lambda ctx: None,
         )
 
-        auto_runner._run_action_steps(action, auto_runner.RaceRunContext(race_id=1, year=2026, round_number=5))
+        auto_runner._run_action_steps(_action(ActionKind.SPRINT_RACE), _CTX)
 
         lines = [json.loads(line) for line in capsys.readouterr().out.splitlines() if line.startswith("{")]
         assert [line["job"] for line in lines] == ["ingest_sprint", "compute_season_stats", "compute_title_odds"]
         assert all(line["status"] == "ok" and isinstance(line["peak_rss_mb"], int) for line in lines)
 
-
-class TestTitleOddsSteps:
-    @pytest.mark.parametrize("kind", list(auto_runner.ActionKind))
-    def test_every_action_refreshes_title_odds_after_its_core_steps(self, kind):
-        names = [step.name for step in auto_runner._ACTION_JOBS[kind]]
-        core = [n for n in names if not n.startswith("ingest_") or n in ("ingest_race", "ingest_sprint", "ingest_qualifying", "ingest_sprint_qualifying", "ingest_fp2")]
-
-        assert "compute_title_odds" in names
-        assert names.index("compute_title_odds") > max(names.index(n) for n in core if n != "compute_title_odds")
-
-    def test_a_title_odds_failure_does_not_fail_the_action(self, monkeypatch):
-        monkeypatch.setattr(auto_runner.ingest_sprint, "run", lambda y, r: None)
-        monkeypatch.setattr(auto_runner.compute_season_stats, "run", lambda year: None)
-        monkeypatch.setattr(
-            auto_runner.compute_title_odds, "run", lambda year: (_ for _ in ()).throw(RuntimeError("boom"))
-        )
-        action = auto_runner.Action(
-            kind=auto_runner.ActionKind.SPRINT_RACE, ready=True, label="Sprint Race",
-            steps=auto_runner._ACTION_JOBS[auto_runner.ActionKind.SPRINT_RACE],
-        )
-
-        outcome = auto_runner._run_action_steps(action, auto_runner.RaceRunContext(race_id=1, year=2026, round_number=5))
-
-        assert outcome.ok is True
 
 class TestRunCycleCalendarDrift:
     def test_resyncs_the_schedule_instead_of_ingesting_when_the_round_is_now_a_different_race(self, monkeypatch):
@@ -754,10 +611,7 @@ class TestRunCycleCalendarDrift:
         schedule = _schedule_with_race(16, race).assign(EventName="Bahrain Grand Prix")
         synced = []
         monkeypatch.setattr(auto_runner.sync_schedule, "run", lambda year, schedule=None: synced.append((year, schedule)))
-        monkeypatch.setattr(
-            auto_runner.ingest_sprint_qualifying, "run",
-            lambda y, r: pytest.fail("must not ingest another event's session"),
-        )
+        _jobs(monkeypatch, ingest_sprint_qualifying=lambda ctx: pytest.fail("must not ingest another event's session"))
         conn = FakeConnection([None, _active_race_row(race_id=286, round_number=16, name="Singapore Grand Prix")])
 
         auto_runner.run_cycle(
