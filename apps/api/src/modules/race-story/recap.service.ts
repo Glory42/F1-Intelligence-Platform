@@ -1,33 +1,35 @@
 import { and, asc, desc, eq, isNotNull, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { Db } from '../../config/database';
-import { drivers, raceBattles, racePitStops, racePredictions, raceResults, teams } from '../../db/schema';
+import { drivers, raceBattles, racePitStops, teams } from '../../db/schema';
 import type { RaceRecap } from '../../common/types';
 import { toDriver } from '../../common/mappers';
+import { GP } from '../../common/session-kind';
 
 const leaderDrivers = alias(drivers, 'leader_drivers');
 const leaderTeams = alias(teams, 'leader_teams');
+const { results, predictions } = GP;
 
-// One cheap call for the home hub's "last race" card: no traces, no laps.
+// One cheap call for the home hub's "last race" card: no traces, no laps. A Recap is always the GP.
 export class RecapService {
   async findRecap(db: Db, raceId: number): Promise<RaceRecap> {
     const [winnerRows, predictionRows, stopRows, battleRows] = await Promise.all([
-      db.select({ driver: drivers, team: teams }).from(raceResults)
-        .innerJoin(drivers, eq(raceResults.driverId, drivers.id)).innerJoin(teams, eq(drivers.teamId, teams.id))
-        .where(and(eq(raceResults.raceId, raceId), eq(raceResults.finishPosition, 1))).limit(1),
-      db.select({ driver: drivers, team: teams }).from(racePredictions)
-        .innerJoin(drivers, eq(racePredictions.predictedWinnerId, drivers.id)).innerJoin(teams, eq(drivers.teamId, teams.id))
-        .where(eq(racePredictions.raceId, raceId)).limit(1),
+      db.select({ driver: drivers, team: teams }).from(results)
+        .innerJoin(drivers, eq(results.driverId, drivers.id)).innerJoin(teams, eq(drivers.teamId, teams.id))
+        .where(and(eq(results.raceId, raceId), eq(results.finishPosition, 1))).limit(1),
+      db.select({ driver: drivers, team: teams }).from(predictions)
+        .innerJoin(drivers, eq(predictions.predictedWinnerId, drivers.id)).innerJoin(teams, eq(drivers.teamId, teams.id))
+        .where(eq(predictions.raceId, raceId)).limit(1),
       db.select({ driver: drivers, team: teams, stationaryMs: racePitStops.stationaryMs }).from(racePitStops)
         .innerJoin(drivers, eq(racePitStops.driverId, drivers.id)).innerJoin(teams, eq(drivers.teamId, teams.id))
-        .where(and(eq(racePitStops.raceId, raceId), eq(racePitStops.sessionType, 'race'), isNotNull(racePitStops.stationaryMs)))
+        .where(and(eq(racePitStops.raceId, raceId), eq(racePitStops.sessionType, GP.session), isNotNull(racePitStops.stationaryMs)))
         .orderBy(asc(racePitStops.stationaryMs)).limit(1),
       db.select({ battle: raceBattles, chaser: drivers, chaserTeam: teams, leader: leaderDrivers, leaderTeam: leaderTeams })
         .from(raceBattles)
         .innerJoin(drivers, eq(raceBattles.chaserDriverId, drivers.id)).innerJoin(teams, eq(drivers.teamId, teams.id))
         .innerJoin(leaderDrivers, eq(raceBattles.leaderDriverId, leaderDrivers.id))
         .innerJoin(leaderTeams, eq(leaderDrivers.teamId, leaderTeams.id))
-        .where(and(eq(raceBattles.raceId, raceId), eq(raceBattles.sessionType, 'race')))
+        .where(and(eq(raceBattles.raceId, raceId), eq(raceBattles.sessionType, GP.session)))
         .orderBy(desc(sql`${raceBattles.lapEnd} - ${raceBattles.lapStart}`), asc(raceBattles.minGapMs)).limit(1),
     ]);
 

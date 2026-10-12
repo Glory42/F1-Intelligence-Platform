@@ -1,8 +1,10 @@
-import { eq, and, asc, gte, lte, isNotNull, sql } from 'drizzle-orm';
+import { eq, and, asc, gte, lte } from 'drizzle-orm';
 import type { Db } from '../../config/database';
-import { races, circuits, raceResults, qualifyingResults, lapTimes, drivers, teams, raceStatusEnum } from '../../db/schema';
-import type { Race, RaceDetailResponse, RaceResult, QualifyingResult, LapSummary } from '../../common/types';
-import { toDriver, toRace, toRaceResult, toQualifyingResult } from '../../common/mappers';
+import { races, circuits, raceResults, qualifyingResults, drivers, teams, raceStatusEnum } from '../../db/schema';
+import type { Race, RaceDetailResponse, RaceResult, QualifyingResult } from '../../common/types';
+import { toRace, toRaceResult, toQualifyingResult } from '../../common/mappers';
+import { GP } from '../../common/session-kind';
+import { findLapSummaries } from '../../common/session-reads';
 
 export class RacesService {
   async findAll(db: Db, year: number, status?: string): Promise<Race[]> {
@@ -31,7 +33,7 @@ export class RacesService {
     circuit: typeof circuits.$inferSelect,
   ): Promise<RaceDetailResponse> {
     const raceId = race.id;
-    const [resultsRows, qualifyingRows, lapRows] = await Promise.all([
+    const [resultsRows, qualifyingRows, laps] = await Promise.all([
       db
         .select()
         .from(raceResults)
@@ -48,32 +50,11 @@ export class RacesService {
         .where(eq(qualifyingResults.raceId, raceId))
         .orderBy(asc(qualifyingResults.gridPosition)),
 
-      db
-        .select({
-          driverId: lapTimes.driverId,
-          fastestLapMs: sql<number>`min(${lapTimes.lapTimeMs})`,
-          avgLapMs: sql<number>`round(avg(${lapTimes.lapTimeMs}))`,
-          totalLaps: sql<number>`count(*)`,
-        })
-        .from(lapTimes)
-        .where(and(eq(lapTimes.raceId, raceId), isNotNull(lapTimes.lapTimeMs), eq(lapTimes.isPitLap, false)))
-        .groupBy(lapTimes.driverId),
+      findLapSummaries(db, GP, raceId),
     ]);
-
-    const driverMap = new Map(resultsRows.map((r) => [r.drivers.id, toDriver(r.drivers, r.teams)]));
 
     const results: RaceResult[] = resultsRows.map(toRaceResult);
     const qualifying: QualifyingResult[] = qualifyingRows.map(toQualifyingResult);
-
-    const laps: LapSummary[] = lapRows
-      .map((r) => ({
-        driverId: r.driverId,
-        fastestLapMs: r.fastestLapMs,
-        avgLapMs: r.avgLapMs,
-        totalLaps: Number(r.totalLaps),
-        driver: driverMap.get(r.driverId)!,
-      }))
-      .filter((l) => l.driver);
 
     return { race: toRace(race, circuit), results, qualifying, laps };
   }

@@ -4,12 +4,14 @@ import { createDb } from '../../config/database';
 import { SprintService } from './sprint.service';
 import { cacheControlForStatus } from '../../common/cache';
 import { raceRoute } from '../../common/route';
+import { SPRINT } from '../../common/session-kind';
+import { findPrediction, findUpcomingPrediction } from '../../common/session-reads';
 
 const service = new SprintService();
 
 export const SprintController = {
   getUpcoming: async (c: Context<{ Bindings: Bindings }>) => {
-    const data = await service.findUpcoming(createDb(c.env.DATABASE_URL));
+    const data = await findUpcomingPrediction(createDb(c.env.DATABASE_URL), SPRINT);
     if (!data) {
       return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'No upcoming sprint prediction available' } }, 404);
     }
@@ -19,7 +21,7 @@ export const SprintController = {
 
   getByRaceId: raceRoute({
     param: 'raceId',
-    load: ({ db, race }) => service.findByRaceId(db, race.id),
+    load: ({ db, race, circuit }) => findPrediction(db, SPRINT, race, circuit),
     missing: (raceId) => `No sprint prediction for race ${raceId}`,
   }),
 

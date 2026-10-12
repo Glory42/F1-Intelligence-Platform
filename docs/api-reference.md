@@ -85,6 +85,10 @@ Returns all races for the year. Each race includes `eventFormat`, `hasSprint`, `
 
 Returns a single race with circuit, results (if completed), qualifying, and lap summaries.
 
+`laps` (the same rule for the sprint detail's `laps`): one `{ driverId, driver, fastestLapMs, avgLapMs,
+totalLaps }` per driver, fastest first. Pit in/out laps and laps without a time are left out of all
+three numbers, so `totalLaps` counts clean timed laps only. All three are integers.
+
 The `Race` object includes:
 - `eventFormat`: `conventional` | `sprint` | `sprint_qualifying` | `sprint_shootout`
 - `hasSprint`: boolean derived from eventFormat

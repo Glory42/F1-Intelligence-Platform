@@ -84,12 +84,13 @@ pytest, config in `pyproject.toml` (`pythonpath = ["."]`, `testpaths = ["tests"]
 ## API unit (`apps/api/tests/unit/`)
 
 `bun test`, no DB, no network. Mirrors `src/` by domain: the shared `src/common/` layer (`mappers`,
-`standings`, `prediction-response`, `cache`, `driver-identity`, `feature-manifest`) and each module's
+`standings`, `cache`, `driver-identity`, `feature-manifest`) and each module's
 pure `*.helpers.ts` (`circuits/` track outline, track profile, circuit era/stats; `drivers/`
 classification, qualifying gap; `history/` helpers, F1DB match; `predictions/` accuracy, prediction
 history, intel standings; `race-events/openf1.mappers`; `quality`). Fixtures are plain objects typed as
-`typeof <table>.$inferSelect`; see
-`prediction-response.test.ts` for the pattern.
+`typeof <table>.$inferSelect`; see `mappers.test.ts` for the pattern. The GP/sprint reads in
+`common/session-reads.ts` are DB-bound, so they are covered by integration tests instead
+(`integration/session-kind/`: the same assertions run once per kind).
 
 Anything pure that a service delegates to (row→DTO mapping, aggregation, normalisation) belongs
 here. If a service method is hard to unit-test, that's usually a sign the pure part should be

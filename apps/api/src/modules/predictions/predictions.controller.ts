@@ -6,6 +6,8 @@ import { FridayPaceService } from './friday-pace.service';
 import { TitleOddsService } from './title-odds.service';
 import { raceRoute, seasonRoute } from '../../common/route';
 import { CACHE_ACTIVE, CACHE_REFERENCE, cacheControlForStatus } from '../../common/cache';
+import { GP } from '../../common/session-kind';
+import { findPrediction, findUpcomingPrediction } from '../../common/session-reads';
 
 const service = new PredictionsService();
 const fridayPace = new FridayPaceService();
@@ -13,7 +15,7 @@ const titleOdds = new TitleOddsService();
 
 export const PredictionsController = {
   getUpcoming: async (c: Context<{ Bindings: Bindings }>) => {
-    const data = await service.findUpcoming(createDb(c.env.DATABASE_URL));
+    const data = await findUpcomingPrediction(createDb(c.env.DATABASE_URL), GP);
     if (!data) {
       return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'No upcoming prediction available' } }, 404);
     }
@@ -33,7 +35,7 @@ export const PredictionsController = {
 
   getByRaceId: raceRoute({
     param: 'raceId',
-    load: ({ db, race }) => service.findByRaceId(db, race.id),
+    load: ({ db, race, circuit }) => findPrediction(db, GP, race, circuit),
     missing: (raceId) => `No prediction for race ${raceId}`,
   }),
 
