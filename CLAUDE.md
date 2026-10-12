@@ -31,6 +31,9 @@ it's Python, and its jobs run once and exit rather than being a long-running dev
   even just to quote identifiers: so their tests monkeypatch `execute_batch` itself and assert on
   the params it receives, the same pattern `test_ingest_runner.py` already uses for its own
   `execute_batch` call, rather than extending `FakeCursor` to fake SQL rendering.
+  `weekend_pipeline` (Race Status → due jobs) and `enrichment_coverage` are tested pure; code that runs
+  chains is tested by swapping entries in `weekend_pipeline.JOBS`, never by patching each job module.
+  Both feature jobs are pinned end to end through `feature_runner` in `test_feature_runner.py`.
 - `apps/api/tests/unit/`: `bun test`, mirrors `src/` by domain (e.g. `tests/unit/common/mappers.test.ts`
   tests `src/common/mappers.ts`). Covers the shared `src/common/` mapper/aggregation layer.
 - `apps/api/tests/integration/`: `bun test`, real Hono `app.request()` calls against a **local** Postgres
@@ -42,7 +45,9 @@ it's Python, and its jobs run once and exit rather than being a long-running dev
 - `apps/web/tests/unit/`: Vitest. Pure logic (`compareStats.ts`, `lib/` lookups) runs under the default `node`
   environment. Hook/component tests (`useCompareController`, `useGlobalSearch`, `GlobalSearch`) opt into `jsdom`
   per-file via a `// @vitest-environment jsdom` docblock, use Testing Library, and mock `src/lib/api.ts`'s
-  endpoints with MSW (`tests/support/msw/`). `.astro` component rendering is still not covered.
+  endpoints with MSW (`tests/support/msw/`). Page-data loaders (`load*PageData`) run in the `node`
+  environment with MSW stubbing their routes (`tests/support/msw/routes.ts`). `.astro` component rendering
+  is still not covered.
 - `apps/e2e/tests/smoke/`: Playwright, drives a real browser against `astro dev` with a fixture API server
   (`apps/e2e/fixtures/`) standing in for `apps/api`. Covers the hub, races, circuits, drivers, teams,
   compare, predictions and History pages and the global search palette. Playwright reuses an already-running
@@ -299,6 +304,8 @@ All queries use Drizzle joins. Never fetch a list then loop-query for each item.
   Collapse state is a cookie so the server renders the right width.
 - Each page leads with one main view; secondary views are server-rendered `?tab=` link tabs
   (`PageTabs.astro` + `lib/pageTabs.ts`), and each tab fetches only its own data.
+- Pages with tabs or fallbacks load through a page-data loader (`features/<area>/load*PageData.ts`,
+  like `buildPredictionPageData`) called from frontmatter; the page itself only renders.
 
 ### Component rules
 - No chart libraries: use plain SVG for `LapChart.astro`
@@ -327,7 +334,8 @@ python -m src.main --job compute_features --race_id 42
 python -m src.main --job compute_predictions --race_id 42
 python -m src.main --job compute_season_stats --year 2025
 python -m src.main --job compute_title_odds --year 2025
-python scripts/backfill_openf1.py ingest_stints 2023 2026   # local only
+python -m src.main --job ingest_race_story --year 2026 --round 9 --session Sprint
+python scripts/backfill_openf1.py ingest_stints 2023 2026 [--refresh]   # local only: skips covered races
 python scripts/backfill_race_story.py 2018 2025             # local only
 python scripts/backfill_fastf1_enrichment.py 2018 2022 [--only stints,pits,race_control,telemetry] [--refresh]  # local only
 python scripts/backfill_title_odds.py 2018 2026             # local only: replays odds after every completed round
@@ -339,7 +347,9 @@ python scripts/backfill_results_from_f1db.py --from 1980 --to 2017 [--apply]  # 
 ### Schedule (Render worker)
 There are no Render cron jobs: `src/server.py` runs `auto_runner.run_cycle` in a loop (20 min inside a
 race-weekend window, 6 h outside it, which never touches the DB). Inside the window a `WorkerMemo`
-skips the DB until the next action is due. Typical action timing:
+skips the DB until the next action is due. `src/weekend_pipeline.py` is the only place that maps a Race
+Status to the jobs due next: the worker, the CLI auto-detect, Repair and `backfill_full.py` all read it.
+Typical action timing:
 
 **Conventional weekend:**
 - **Saturday 22:00 UTC**: `ingest_qualifying` → `compute_features` → `compute_predictions`
@@ -424,7 +434,7 @@ Full detail in `docs/prediction-model.md`.
 - `circuits.sc_probability`: **not static**: recomputed after every race ingest from `races.safety_car_laps`
   (`ingest_race._recompute_circuit_sc_probability`)
 - Softmax temperature T=0.3: `SOFTMAX_TEMPERATURE` in `data-engine/src/utils/feature_manifest.py`, imported by `prediction_runner.py`/`math_utils.py` (Python) and `apps/web/src/lib/f1/predictionMath.ts` (TS)
-- Model weights: `GP_FEATURES`/`SPRINT_FEATURES` in `feature_manifest.py`, re-exported as `WEIGHTS` by `compute_features.py`/`compute_sprint_features.py`; checked against `docs/feature-weights.json` and `apps/web`'s `FEATURE_META`/`SPRINT_FEATURE_META`
+- Model weights: `GP_FEATURES`/`SPRINT_FEATURES` in `feature_manifest.py`, re-exported as `WEIGHTS` by `compute_features.py`/`compute_sprint_features.py` (both `feature_runner` specs); checked against `docs/feature-weights.json` and `apps/web`'s `FEATURE_META`/`SPRINT_FEATURE_META`
 
 ### Softmax
 Temperature T=0.3. Lower = more decisive. Do not increase T.
