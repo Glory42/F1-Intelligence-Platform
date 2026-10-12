@@ -70,14 +70,21 @@ describe('drivers (integration)', () => {
     expect([data[0].stats.totalPoints, data[0].stats.sprintTotalPoints]).toEqual(['300.0', '24.0']);
   });
 
+  it('totals grand prix and sprint points into championship points', async () => {
+    const res = await apiRequest('/api/drivers/standings?year=2098');
+    const { data } = (await res.json()) as { data: Array<{ stats: { championshipPoints: string } }> };
+    expect(data.map((d) => d.stats.championshipPoints)).toEqual(['324.0', '120.0']);
+  });
+
   it('returns driver detail with season stats and recent results', async () => {
     const res = await apiRequest(`/api/drivers/${driverAId}?year=2098`);
     expect(res.status).toBe(200);
     const { data } = (await res.json()) as {
-      data: { driver: { code: string }; seasonStats: { wins: number }; recentResults: unknown[] };
+      data: { driver: { code: string }; seasonStats: { wins: number; championshipPoints: string }; recentResults: unknown[] };
     };
     expect(data.driver.code).toBe('AAA');
     expect(data.seasonStats.wins).toBe(5);
+    expect(data.seasonStats.championshipPoints).toBe('324.0');
     expect(data.recentResults).toHaveLength(1);
   });
 

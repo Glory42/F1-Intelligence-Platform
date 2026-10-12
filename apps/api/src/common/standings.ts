@@ -11,14 +11,20 @@ export async function resolveSeason(db: Db, year: number): Promise<Season | null
 
 type ChampionshipStats = {
   championshipPosition: number | null;
-  totalPoints: string;
+  championshipPoints: string;
 };
+
+// GP and sprint points are stored apart (numeric(6,1) each); the championship counts both. Kept
+// in the same one-decimal string form as the stored totals.
+export function championshipPoints(totalPoints: string, sprintTotalPoints: string): string {
+  return (Number(totalPoints) + Number(sprintTotalPoints)).toFixed(1);
+}
 
 export function sortByChampionshipStanding<T extends { stats: ChampionshipStats }>(a: T, b: T): number {
   const posA = a.stats.championshipPosition ?? 999;
   const posB = b.stats.championshipPosition ?? 999;
   if (posA !== posB) return posA - posB;
-  return Number(b.stats.totalPoints) - Number(a.stats.totalPoints);
+  return Number(b.stats.championshipPoints) - Number(a.stats.championshipPoints);
 }
 
 // The domain-constant half of a standings/career aggregation: how to key an entity

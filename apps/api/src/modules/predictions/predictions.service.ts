@@ -137,13 +137,14 @@ export class PredictionsService {
     const aggregated = aggregateSeasonFeatures(featureRows);
     const driverIds = aggregated.map((r) => r.driver.id);
 
-    const sprintStatsRows = driverIds.length > 0
+    const seasonTotalRows = driverIds.length > 0
       ? await db
           .select({
             driverId: driverSeasonStats.driverId,
             sprintWins: driverSeasonStats.sprintWins,
             sprintPodiums: driverSeasonStats.sprintPodiums,
             sprintTotalPoints: driverSeasonStats.sprintTotalPoints,
+            totalPoints: driverSeasonStats.totalPoints,
           })
           .from(driverSeasonStats)
           .where(and(
@@ -152,7 +153,7 @@ export class PredictionsService {
           ))
       : [];
 
-    return buildIntelStandingRows(aggregated, new Map(sprintStatsRows.map((s) => [s.driverId, s])));
+    return buildIntelStandingRows(aggregated, new Map(seasonTotalRows.map((s) => [s.driverId, s])));
   }
 
   async getModelInfo(db: Db): Promise<ModelInfo> {

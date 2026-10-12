@@ -84,6 +84,8 @@ export type IntelStandingRow = {
   sprintWins: number;
   sprintPodiums: number;
   sprintTotalPoints: string;
+  // The driver's GP + sprint season points (driver_season_stats), same convention as DriverSeasonStats.
+  championshipPoints: string;
 };
 
 export type FridayPaceRow = {

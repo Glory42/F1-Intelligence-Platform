@@ -1,25 +1,30 @@
 import { eq, and, inArray, desc, asc, isNotNull, sql } from 'drizzle-orm';
 import type { Db } from '../../config/database';
 import { teams, seasons, drivers, teamSeasonStats, racePitStops, races } from '../../db/schema';
-import type { Team, Driver, TeamDetailResponse, TeamStanding, TeamYearStats, PitCrewRanking, TeamPitStop } from '../../common/types';
+import type {
+  Team, Driver, TeamDetailResponse, TeamSeasonStats, TeamStanding, TeamYearStats, PitCrewRanking, TeamPitStop,
+} from '../../common/types';
 import { toTeam, toDriver } from '../../common/mappers';
-import { resolveSeason, buildStandings, buildCareerStats, type StatsAdapter } from '../../common/standings';
+import {
+  resolveSeason, buildStandings, buildCareerStats, championshipPoints, type StatsAdapter,
+} from '../../common/standings';
 import { constructorTeamKeys } from '../../common/identity';
 
-function toTeamStats(s: typeof teamSeasonStats.$inferSelect) {
+function toTeamStats(s: typeof teamSeasonStats.$inferSelect): TeamSeasonStats {
   return {
     racesCompleted: s.racesCompleted, wins: s.wins, podiums: s.podiums,
     totalPoints: s.totalPoints, championshipPosition: s.championshipPosition,
     avgFinishPosition: s.avgFinishPosition, carPerformanceScore: s.carPerformanceScore,
     dnfCount: s.dnfCount, reliabilityScore: s.reliabilityScore ?? null,
     sprintTotalPoints: s.sprintTotalPoints,
+    championshipPoints: championshipPoints(s.totalPoints, s.sprintTotalPoints),
   };
 }
 
-const emptyTeamStats = {
+const emptyTeamStats: TeamSeasonStats = {
   racesCompleted: 0, wins: 0, podiums: 0, totalPoints: '0',
   championshipPosition: null, avgFinishPosition: null, carPerformanceScore: null,
-  dnfCount: 0, reliabilityScore: null, sprintTotalPoints: '0',
+  dnfCount: 0, reliabilityScore: null, sprintTotalPoints: '0', championshipPoints: '0',
 };
 
 // Standings pass raw `teams` rows; career passes `{ teams, seasons }` entries: so the

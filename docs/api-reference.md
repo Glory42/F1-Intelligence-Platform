@@ -201,7 +201,13 @@ speed, braking zones, and corners: every lift or brake, classed by apex speed (l
 
 ### `GET /api/drivers/standings?year=N`
 
-Returns driver championship standings for the year, ordered by points.
+Returns driver championship standings for the year: `[{ driver, stats }]`, ordered by championship
+position, then `championshipPoints`.
+
+Every driver stats object (here, `/api/drivers/:id` `seasonStats`, and each `/career` entry) carries
+`totalPoints` (GP only), `sprintTotalPoints` (sprints only) and `championshipPoints` (their sum, what
+the championship counts). All three are one-decimal strings, e.g. `"300.0"`, `"24.0"`, `"324.0"`;
+`"0"` when the driver has no stats row yet. Team stats carry the same three fields.
 
 ### `GET /api/drivers/racecraft?year=N`
 
@@ -242,7 +248,8 @@ Returns all teams for the season.
 
 ### `GET /api/teams/standings?year=N`
 
-Returns constructor championship standings for the year, ordered by points.
+Returns constructor championship standings for the year: `[{ team, stats }]`, ordered by championship
+position, then `championshipPoints` (GP + sprint; see driver standings for the three points fields).
 
 ### `GET /api/teams/pit-stops?year=N`
 
@@ -415,7 +422,7 @@ is `null` when a bucket has zero races (e.g. `sprint` for a season with no sprin
 
 ### `GET /api/predictions/standings?year=N`
 
-Returns the "Intelligence Standings": driver rankings by average prediction score. Each row includes sprint aggregates (`sprintWins`, `sprintPodiums`, `sprintTotalPoints`).
+Returns the "Intelligence Standings": driver rankings by average prediction score. Each row includes sprint aggregates (`sprintWins`, `sprintPodiums`, `sprintTotalPoints`) and `championshipPoints` (GP + sprint season points).
 
 ---
 

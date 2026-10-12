@@ -3,7 +3,7 @@ import {
   aggregateSeasonFeatures,
   buildIntelStandingRows,
   type SeasonFeatureRow,
-  type SprintSeasonTotals,
+  type SeasonTotals,
 } from '../../../../src/modules/predictions/intel-standings.helpers';
 import type { drivers, teams, driverPredictionFeatures } from '../../../../src/db/schema';
 import { toDriver } from '../../../../src/common/mappers';
@@ -100,8 +100,8 @@ describe('buildIntelStandingRows', () => {
   });
 
   test('folds in sprint season totals, defaulting to zeroes when absent', () => {
-    const totals = new Map<number, SprintSeasonTotals>([
-      [10, { sprintWins: 2, sprintPodiums: 3, sprintTotalPoints: '17' }],
+    const totals = new Map<number, SeasonTotals>([
+      [10, { sprintWins: 2, sprintPodiums: 3, sprintTotalPoints: '17.0', totalPoints: '200.5' }],
     ]);
     const rows = buildIntelStandingRows(
       [
@@ -110,8 +110,8 @@ describe('buildIntelStandingRows', () => {
       ],
       totals,
     );
-    expect(rows[0]).toMatchObject({ sprintWins: 2, sprintPodiums: 3, sprintTotalPoints: '17' });
-    expect(rows[1]).toMatchObject({ sprintWins: 0, sprintPodiums: 0, sprintTotalPoints: '0' });
+    expect(rows[0]).toMatchObject({ sprintWins: 2, sprintPodiums: 3, sprintTotalPoints: '17.0', championshipPoints: '217.5' });
+    expect(rows[1]).toMatchObject({ sprintWins: 0, sprintPodiums: 0, sprintTotalPoints: '0', championshipPoints: '0' });
   });
 
   test('single driver does not divide by zero', () => {

@@ -20,7 +20,8 @@ describe('teams (integration)', () => {
     await createDriver(db, season.id, teamA.id, { driverNumber: 2, code: 'BBB' });
 
     await createTeamSeasonStats(db, season.id, teamA.id, { wins: 8, totalPoints: '500.0', sprintTotalPoints: '40.0', championshipPosition: 1 });
-    await createTeamSeasonStats(db, season.id, teamB.id, { wins: 1, totalPoints: '90.0', championshipPosition: 2 });
+    // Half points (a shortened race) must still add up exactly.
+    await createTeamSeasonStats(db, season.id, teamB.id, { wins: 1, totalPoints: '90.5', sprintTotalPoints: '0.5', championshipPosition: 2 });
 
     teamAId = teamA.id;
   });
@@ -49,14 +50,21 @@ describe('teams (integration)', () => {
     expect([data[0].stats.totalPoints, data[0].stats.sprintTotalPoints]).toEqual(['500.0', '40.0']);
   });
 
+  it('totals grand prix and sprint points into championship points', async () => {
+    const res = await apiRequest('/api/teams/standings?year=2097');
+    const { data } = (await res.json()) as { data: Array<{ stats: { championshipPoints: string } }> };
+    expect(data.map((t) => t.stats.championshipPoints)).toEqual(['540.0', '91.0']);
+  });
+
   it('returns team detail with season stats and its drivers', async () => {
     const res = await apiRequest(`/api/teams/${teamAId}?year=2097`);
     expect(res.status).toBe(200);
     const { data } = (await res.json()) as {
-      data: { team: { name: string }; seasonStats: { wins: number }; drivers: unknown[] };
+      data: { team: { name: string }; seasonStats: { wins: number; championshipPoints: string }; drivers: unknown[] };
     };
     expect(data.team.name).toBe('Teams Test Alpha');
     expect(data.seasonStats.wins).toBe(8);
+    expect(data.seasonStats.championshipPoints).toBe('540.0');
     expect(data.drivers).toHaveLength(2);
   });
 

@@ -1,12 +1,14 @@
 import { eq, and, desc, inArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../../config/database';
 import { drivers, teams, seasons, driverSeasonStats, raceResults, races } from '../../db/schema';
-import type { Driver, DriverDetailResponse, DriverStanding, DriverYearStats } from '../../common/types';
+import type { Driver, DriverDetailResponse, DriverSeasonStats, DriverStanding, DriverYearStats } from '../../common/types';
 import { toDriver } from '../../common/mappers';
-import { resolveSeason, buildStandings, buildCareerStats, type StatsAdapter } from '../../common/standings';
+import {
+  resolveSeason, buildStandings, buildCareerStats, championshipPoints, type StatsAdapter,
+} from '../../common/standings';
 import { isSamePerson } from '../../common/identity';
 
-function toDriverStats(s: typeof driverSeasonStats.$inferSelect) {
+function toDriverStats(s: typeof driverSeasonStats.$inferSelect): DriverSeasonStats {
   return {
     racesEntered: s.racesEntered, racesFinished: s.racesFinished,
     wins: s.wins, podiums: s.podiums, poles: s.poles,
@@ -17,15 +19,16 @@ function toDriverStats(s: typeof driverSeasonStats.$inferSelect) {
     avgSector3Ms: s.avgSector3Ms ?? null, topSpeedAvg: s.topSpeedAvg ?? null,
     teammateQualiDelta: s.teammateQualiDelta ?? null,
     sprintTotalPoints: s.sprintTotalPoints,
+    championshipPoints: championshipPoints(s.totalPoints, s.sprintTotalPoints),
   };
 }
 
-const emptyDriverStats = {
+const emptyDriverStats: DriverSeasonStats = {
   racesEntered: 0, racesFinished: 0, wins: 0, podiums: 0, poles: 0,
   totalPoints: '0', championshipPosition: null, avgFinishPosition: null,
   winRate: null, avgPositionGain: null, dnfCount: 0, dnfRate: null,
   avgSector1Ms: null, avgSector2Ms: null, avgSector3Ms: null,
-  topSpeedAvg: null, teammateQualiDelta: null, sprintTotalPoints: '0',
+  topSpeedAvg: null, teammateQualiDelta: null, sprintTotalPoints: '0', championshipPoints: '0',
 };
 
 const driverStatsAdapter: StatsAdapter<

@@ -3,11 +3,13 @@ import type { FeatureScores, IntelStandingRow } from '../../common/types';
 import { toDriver } from '../../common/mappers';
 import { GP_FEATURE_MANIFEST } from '../../common/feature-manifest';
 import { personKey } from '../../common/identity';
+import { championshipPoints } from '../../common/standings';
 
-export interface SprintSeasonTotals {
+export interface SeasonTotals {
   sprintWins: number;
   sprintPodiums: number;
   sprintTotalPoints: string;
+  totalPoints: string;
 }
 
 // A new feature column is a GP_FEATURE_MANIFEST entry, not a copy-pasted `if` line here.
@@ -81,10 +83,10 @@ export function aggregateSeasonFeatures(rows: SeasonFeatureRow[]): AggregatedFea
 }
 
 // Ranks drivers by their averaged weighted score, min-max normalises it to a
-// 0-100 headline number, and folds in each driver's season sprint totals.
+// 0-100 headline number, and folds in each driver's season sprint and championship totals.
 export function buildIntelStandingRows(
   aggregated: AggregatedFeatures[],
-  sprintTotals: Map<number, SprintSeasonTotals>,
+  seasonTotals: Map<number, SeasonTotals>,
 ): IntelStandingRow[] {
   const ranked = [...aggregated].sort((a, b) => b.avgRaw - a.avgRaw);
   const rawVals = ranked.map((r) => r.avgRaw);
@@ -92,7 +94,7 @@ export function buildIntelStandingRows(
   const range = Math.max(...rawVals) - minScore || 1;
 
   return ranked.map((r) => {
-    const sprint = sprintTotals.get(r.driver.id);
+    const totals = seasonTotals.get(r.driver.id);
     return {
       driver: r.driver,
       features: r.features,
@@ -100,9 +102,10 @@ export function buildIntelStandingRows(
       winProbability: r.winProbability,
       predictedPosition: null,
       overallScore: Math.round(((r.avgRaw - minScore) / range) * 100),
-      sprintWins: sprint?.sprintWins ?? 0,
-      sprintPodiums: sprint?.sprintPodiums ?? 0,
-      sprintTotalPoints: sprint?.sprintTotalPoints ?? '0',
+      sprintWins: totals?.sprintWins ?? 0,
+      sprintPodiums: totals?.sprintPodiums ?? 0,
+      sprintTotalPoints: totals?.sprintTotalPoints ?? '0',
+      championshipPoints: totals ? championshipPoints(totals.totalPoints, totals.sprintTotalPoints) : '0',
     };
   });
 }
