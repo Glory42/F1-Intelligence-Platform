@@ -1,6 +1,5 @@
 import { api } from '@/lib/api';
 import { resolveCareerYear, type YearLink } from '@/lib/careerYear';
-import { championshipPoints } from '@/lib/f1/championshipMath';
 import { resolveTab, seasonTabHref } from '@/lib/pageTabs';
 import { unwrapSettled } from '@/lib/utils';
 import type { HeadToHeadRow } from '@/components/data/headToHead';
@@ -96,7 +95,7 @@ function teammateHeadToHead(detail: TeamDetailResponse, standings: DriverStandin
     left: d1.driver,
     right: d2.driver,
     rows: [
-      { label: 'Points', v1: championshipPoints(d1.stats), v2: championshipPoints(d2.stats) },
+      { label: 'Points', v1: Number(d1.stats.championshipPoints), v2: Number(d2.stats.championshipPoints) },
       { label: 'Wins', v1: d1.stats.wins, v2: d2.stats.wins },
       { label: 'Podiums', v1: d1.stats.podiums, v2: d2.stats.podiums },
       { label: 'Poles', v1: d1.stats.poles, v2: d2.stats.poles },

@@ -8,7 +8,6 @@ import YearSelectLinks from '@/components/page/YearSelectLinks.astro';
 import PageTabs from '@/components/page/PageTabs.astro';
 import EmptyState from '@/components/page/EmptyState.astro';
 import { getTeamColor } from '@/lib/f1/teamColors';
-import { championshipPoints } from '@/lib/f1/championshipMath';
 import { getTeamLogo } from '@/lib/f1/teamLogos';
 import { TEAM_TABS, loadTeamPageData } from '@/features/teams/loadTeamPageData';
 
@@ -71,7 +70,7 @@ const team = data?.team;
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-px bg-white/[0.06]">
                 {[
                   ['Championship', data.seasonStats.championshipPosition ? `P${data.seasonStats.championshipPosition}` : '-'],
-                  ['Points', Math.round(championshipPoints(data.seasonStats))],
+                  ['Points', Math.round(Number(data.seasonStats.championshipPoints))],
                   ['Wins', data.seasonStats.wins],
                   ['Podiums', data.seasonStats.podiums],
                   ['Races', data.seasonStats.racesCompleted],

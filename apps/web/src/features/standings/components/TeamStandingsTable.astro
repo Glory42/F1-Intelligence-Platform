@@ -1,7 +1,6 @@
 ---
 import { Trophy } from 'lucide-react';
 import { getTeamColor } from '@/lib/f1/teamColors';
-import { championshipPoints } from '@/lib/f1/championshipMath';
 import { getTeamLogo } from '@/lib/f1/teamLogos';
 import type { TeamStanding } from '@/types';
 
@@ -68,7 +67,7 @@ const COLUMNS = [
           </div>
           </div>
         </div>
-        <div class="font-bold text-sm text-right">{Math.round(championshipPoints(s.stats))}</div>
+        <div class="font-bold text-sm text-right">{Math.round(Number(s.stats.championshipPoints))}</div>
         <div class="font-mono text-sm text-right hidden sm:block">{s.stats.wins}</div>
         <div class="font-mono text-sm text-right text-muted-foreground hidden sm:block">{s.stats.podiums}</div>
         <div class="font-mono text-sm text-right text-muted-foreground hidden md:block">{s.stats.racesCompleted}</div>

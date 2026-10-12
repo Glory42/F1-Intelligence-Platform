@@ -1,7 +1,6 @@
 ---
 import { Trophy } from 'lucide-react';
 import { getTeamColor } from '@/lib/f1/teamColors';
-import { championshipPoints } from '@/lib/f1/championshipMath';
 import { getTeamLogo } from '@/lib/f1/teamLogos';
 import { getNationalityFlag, getDriverFlagByCode, getDriverNationalityCode } from '@/lib/f1/countryFlags';
 import type { DriverStanding } from '@/types';
@@ -95,7 +94,7 @@ const COLUMNS = [
           <span class="font-mono text-[9px] text-muted-foreground truncate">{s.driver.team.name}</span>
         </div>
         <!-- Points -->
-        <div class="font-mono text-xs sm:text-sm font-bold text-right tabular-nums pt-1 sm:pt-0">{Math.round(championshipPoints(s.stats))}</div>
+        <div class="font-mono text-xs sm:text-sm font-bold text-right tabular-nums pt-1 sm:pt-0">{Math.round(Number(s.stats.championshipPoints))}</div>
         <!-- Wins -->
         <div class="font-mono text-sm text-right hidden sm:block">{s.stats.wins}</div>
         <!-- Podiums -->

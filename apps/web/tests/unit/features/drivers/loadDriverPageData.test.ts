@@ -14,7 +14,7 @@ const stats: DriverSeasonStats = {
   totalPoints: '180', championshipPosition: 2, avgFinishPosition: '3.4',
   winRate: '0.30', avgPositionGain: '0.5', dnfCount: 1, dnfRate: '0.10',
   avgSector1Ms: null, avgSector2Ms: null, avgSector3Ms: null,
-  topSpeedAvg: null, teammateQualiDelta: null, sprintTotalPoints: '12',
+  topSpeedAvg: null, teammateQualiDelta: null, sprintTotalPoints: '12', championshipPoints: '192.0',
 };
 
 function season(year: number, overrides: Partial<DriverYearStats> = {}): DriverYearStats {

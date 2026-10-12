@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { championshipPoints, formatTitleOdds, remainingSessions, titleContention } from '@/lib/f1/championshipMath';
+import { formatTitleOdds, remainingSessions, titleContention } from '@/lib/f1/championshipMath';
 
 // 2021, before Abu Dhabi: VER and HAM level on 369.5 with one GP (25 + fastest-lap point) left.
 const ABU_DHABI_2021 = [
@@ -42,16 +42,5 @@ describe('remainingSessions', () => {
 describe('formatTitleOdds', () => {
   it('rounds to whole percents, flags tiny non-zero odds and caps near-certainty at 100%', () => {
     expect([0.4213, 0.004, 0, 0.9971].map(formatTitleOdds)).toEqual(['42%', '<1%', '0%', '100%']);
-  });
-});
-
-describe('championshipPoints', () => {
-  it('adds sprint points to grand prix points, as the real championship does', () => {
-    // 2026 Antonelli: 276 GP + 26 sprint.
-    expect(championshipPoints({ totalPoints: '276.0', sprintTotalPoints: '26.0' })).toBe(302);
-  });
-
-  it('treats missing sprint points as zero', () => {
-    expect(championshipPoints({ totalPoints: '120.0' })).toBe(120);
   });
 });

@@ -3,9 +3,9 @@ import { seasonStatConfig } from '../../../../src/features/compare/driverCompare
 import type { DriverSeasonStats } from '../../../../src/types';
 
 describe('seasonStatConfig', () => {
-  test('championship points include sprint points, matching the standings', () => {
+  test('championship points come from the API, matching the standings', () => {
     const row = seasonStatConfig.find((r) => r.label === 'Championship Points')!;
-    const stats = { totalPoints: '309.0', sprintTotalPoints: '31.0' } as DriverSeasonStats;
-    expect(row.value(stats)).toBe(340);
+    const stats = { totalPoints: '309.0', sprintTotalPoints: '31.0', championshipPoints: '345.0' } as DriverSeasonStats;
+    expect(row.value(stats)).toBe(345);
   });
 });

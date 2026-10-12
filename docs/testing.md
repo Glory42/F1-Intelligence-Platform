@@ -133,7 +133,8 @@ Vitest, config in `vitest.config.ts` (include `tests/unit/**/*.test.{ts,tsx}`, `
 
 - **Default environment is `node`**: pure logic runs there: `lib/f1/predictionMath.ts` (all exports),
   `lib/f1/teamColors` / `lib/f1/teamLogos` / `features/history/f1dbCountries`, `features/compare/compareStats.ts`,
-  `features/history/historyView.ts`, `features/races/{raceView,calendar,loadRaceEvents}` (race page and
+  the compare stat rows (`features/compare/{driver,team}CompareConfig.ts`: Championship Points reads the API's
+  `championshipPoints`, never a client-side GP + sprint sum), `features/history/historyView.ts`, `features/races/{raceView,calendar,loadRaceEvents}` (race page and
   calendar view logic), `components/data/{chartScale,labelLayout}`, the hub/circuits/drivers/teams feature helpers,
   `features/predictions/{buildPredictionPageData,predictionCopy}` (API mocked with `vi.mock`, not MSW).
 - **Page-data loaders are tested through MSW**: `features/drivers/loadDriverPageData`,

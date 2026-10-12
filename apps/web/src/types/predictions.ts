@@ -33,7 +33,7 @@ export type SeasonAccuracy = { year: number; gp: AccuracyBucket; sprint: Accurac
 export type IntelStandingRow = {
   driver: Driver; features: FeatureScores; rawWeightedScore: string;
   winProbability: string; predictedPosition: number | null; overallScore: number;
-  sprintWins: number; sprintPodiums: number; sprintTotalPoints: string;
+  sprintWins: number; sprintPodiums: number; sprintTotalPoints: string; championshipPoints: string;
 };
 
 export type ModelInfo = { gpVersion: string; sprintVersion: string };

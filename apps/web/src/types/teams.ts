@@ -8,7 +8,8 @@ export type TeamSeasonStats = {
   racesCompleted: number; wins: number; podiums: number; totalPoints: string;
   championshipPosition: number | null; avgFinishPosition: string | null; carPerformanceScore: string | null;
   dnfCount: number; reliabilityScore: string | null;
-  sprintTotalPoints: string;
+  // GP and sprint points are stored separately; championshipPoints is their sum.
+  sprintTotalPoints: string; championshipPoints: string;
 };
 
 export type TeamDetailResponse = { team: Team; seasonStats: TeamSeasonStats; drivers: Driver[] };

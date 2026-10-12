@@ -13,7 +13,7 @@ const NOW = new Date('2025-06-01T12:00:00Z');
 const teamStats: TeamSeasonStats = {
   racesCompleted: 10, wins: 4, podiums: 9, totalPoints: '300', championshipPosition: 1,
   avgFinishPosition: '3.0', carPerformanceScore: '0.91000', dnfCount: 1, reliabilityScore: '0.95000',
-  sprintTotalPoints: '20',
+  sprintTotalPoints: '20', championshipPoints: '320.0',
 };
 
 const driverStats: DriverSeasonStats = {
@@ -21,7 +21,7 @@ const driverStats: DriverSeasonStats = {
   totalPoints: '180', championshipPosition: 1, avgFinishPosition: '2.6',
   winRate: '0.30', avgPositionGain: '0.5', dnfCount: 1, dnfRate: '0.10',
   avgSector1Ms: null, avgSector2Ms: null, avgSector3Ms: null,
-  topSpeedAvg: null, teammateQualiDelta: null, sprintTotalPoints: '8',
+  topSpeedAvg: null, teammateQualiDelta: null, sprintTotalPoints: '8', championshipPoints: '188.0',
 };
 
 const teammate = { ...driverB, id: 12, code: 'TSU', fullName: 'Yuki Tsunoda', team };
@@ -97,7 +97,7 @@ describe('loadTeamPageData: season tab', () => {
 
   test('pairs the team\'s two drivers from the standings into head-to-head rows', async () => {
     const tsuStats: DriverSeasonStats = {
-      ...driverStats, totalPoints: '40', sprintTotalPoints: '2', wins: 0, podiums: 1, poles: 0,
+      ...driverStats, totalPoints: '40', sprintTotalPoints: '2', championshipPoints: '42.0', wins: 0, podiums: 1, poles: 0,
       avgFinishPosition: null, dnfCount: 3, racesEntered: 10,
     };
     server.use(

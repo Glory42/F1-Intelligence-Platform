@@ -14,7 +14,8 @@ export type DriverSeasonStats = {
   dnfCount: number; dnfRate: string | null;
   avgSector1Ms: number | null; avgSector2Ms: number | null; avgSector3Ms: number | null;
   topSpeedAvg: string | null; teammateQualiDelta: string | null;
-  sprintTotalPoints: string;
+  // GP and sprint points are stored separately; championshipPoints is their sum.
+  sprintTotalPoints: string; championshipPoints: string;
 };
 
 export type DriverDetailResponse = {

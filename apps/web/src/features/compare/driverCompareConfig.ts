@@ -1,12 +1,11 @@
 import type { DriverSeasonStats } from '@/types';
-import { championshipPoints } from '@/lib/f1/championshipMath';
 import type { CareerTotals } from './compareStats';
 import type { StatRowConfig } from './components/ComparisonRow';
 
 export const seasonStatConfig: StatRowConfig<DriverSeasonStats>[] = [
   {
     label: 'Championship Points',
-    value: (s) => championshipPoints(s),
+    value: (s) => Number(s.championshipPoints),
     format: (v) => v.toString(),
   },
   { label: 'Grand Prix Wins', value: (s) => s.wins },

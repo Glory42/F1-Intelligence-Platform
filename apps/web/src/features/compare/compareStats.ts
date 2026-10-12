@@ -1,5 +1,3 @@
-import { championshipPoints } from '@/lib/f1/championshipMath';
-
 export const DEFAULT_COMPARE_YEAR = 2026;
 
 export interface CareerTotals {
@@ -15,7 +13,7 @@ export interface CareerTotals {
 interface CareerStatsLike {
   wins: number;
   podiums: number;
-  totalPoints: string;
+  championshipPoints: string;
   dnfCount: number;
   championshipPosition: number | null;
 }
@@ -34,7 +32,7 @@ export function aggregateCareerStats<S extends CareerStatsLike>(
     acc.wins += curr.stats.wins;
     acc.podiums += curr.stats.podiums;
     acc.poles += getPoles(curr.stats);
-    acc.points += championshipPoints(curr.stats);
+    acc.points += Number(curr.stats.championshipPoints);
     acc.dnfs += curr.stats.dnfCount;
     if (curr.stats.championshipPosition) {
       acc.bestFin = acc.bestFin ? Math.min(acc.bestFin, curr.stats.championshipPosition) : curr.stats.championshipPosition;

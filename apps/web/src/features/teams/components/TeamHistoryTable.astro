@@ -2,7 +2,6 @@
 import TabIntro from '@/components/page/TabIntro.astro';
 import F1dbCredit from '@/features/history/components/F1dbCredit.astro';
 import { mergeTeamHistory } from '../teamHistory';
-import { championshipPoints } from '@/lib/f1/championshipMath';
 import type { TeamHistory, TeamYearStats } from '@/types';
 
 interface Props {
@@ -68,7 +67,7 @@ const lead = c
           <div role="cell" class:list={['font-mono font-bold', r.year === year ? 'text-[#a855f7]' : 'text-muted-foreground']}>{r.year}</div>
           <div role="cell" class="truncate font-semibold">{r.chassis ?? '-'}</div>
           <div role="cell" class="hidden truncate font-mono text-[11px] text-muted-foreground lg:block">{r.engine ?? '-'}</div>
-          <div role="cell" class="text-right font-bold tabular-nums">{s ? Math.round(championshipPoints(s)) : '-'}</div>
+          <div role="cell" class="text-right font-bold tabular-nums">{s ? Math.round(Number(s.championshipPoints)) : '-'}</div>
           <div role="cell" class="text-right font-mono text-muted-foreground">{s?.championshipPosition ? `P${s.championshipPosition}` : '-'}</div>
           <div role="cell" class="hidden text-right font-mono text-muted-foreground sm:block">{s?.wins ?? '-'}</div>
           <div role="cell" class="hidden text-right font-mono text-muted-foreground sm:block">{s?.podiums ?? '-'}</div>
