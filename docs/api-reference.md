@@ -18,10 +18,20 @@ All responses follow this envelope:
 
 No authentication. All endpoints are read-only GET.
 
-**Caching:** race/prediction/sprint endpoints set `Cache-Control` based on whether the
-underlying race is `completed`: `public, max-age=86400, immutable` once a race is done
-(results and predictions for a finished race never change), otherwise `public, max-age=30`
-while the weekend is still in progress. See `apps/api/src/common/cache.ts`.
+**Caching:** every route's `Cache-Control` comes from the data it returns, never from a client
+parameter (`apps/api/src/common/route.ts`, rules in `common/cache.ts`):
+
+- **Race-scoped** routes (`/api/races/:id/*`, `/api/predictions/race/:raceId*`, `/api/sprint/race/:raceId*`):
+  `public, max-age=86400, immutable` once the race is `completed`, otherwise `public, max-age=30`.
+- **Season-scoped** routes (`?year=N` lists, and `/api/drivers/:id*` / `/api/teams/:id*`, whose ids belong
+  to one season): immutable for a past season, 30 s for the current one. For the `:id` routes the
+  season is the driver's/team's own: `?year=` never changes the lifetime. Careers use their newest season.
+- **Reference data** (`/api/seasons`, `/api/search`, `/api/races/circuits`, `/api/races/circuit/:key`,
+  `/api/predictions/model-info`): `public, max-age=3600`.
+- An empty answer (no rows yet, enrichment not backfilled) is always cached for 30 s only.
+
+A non-numeric `:id` / `:raceId` answers 400 `INVALID_ID`, a non-numeric `year` 400 `INVALID_YEAR`, an
+unknown `session` 400 `INVALID_SESSION`, and an unknown race, driver or team 404 `NOT_FOUND`.
 
 ---
 
@@ -203,7 +213,8 @@ counts races both drivers finished (`Finished`/`Lapped`/`+N Lap(s)`, ADR 0002); 
 points. `races` lists every shared race in round order: `{ raceId, roundNumber, raceName, qualiGapMs,
 driver, teammate }`, each side `{ qualiPosition, finishPosition, status, points }`. `qualiGapMs` compares
 lap times in the deepest session both reached (Q3, else Q2, else Q1); negative means the driver was
-faster. `medianQualiGapMs` is the median of those gaps. `year` only drives the cache header.
+faster. `medianQualiGapMs` is the median of those gaps. `year` is accepted but ignored: the
+driver's own season sets the cache lifetime.
 
 ### `GET /api/drivers/:id?year=N`
 
@@ -237,8 +248,8 @@ ignored. Long-cached for past seasons (`cacheControlForYear`).
 
 ### `GET /api/teams/:id/pit-stops?year=N`
 
-Every timed grand prix stop by one team's drivers (`:id` is season-scoped, so `year` only picks the
-cache lifetime): `[{ raceId, roundNumber, raceName, driver, lapNumber, stationaryMs }]` in round
+Every timed grand prix stop by one team's drivers (`:id` is season-scoped; `year` is accepted but
+ignored, the team's own season sets the cache lifetime): `[{ raceId, roundNumber, raceName, driver, lapNumber, stationaryMs }]` in round
 and lap order. Sprint stops and stops without a stationary time are left out.
 
 ### `GET /api/teams/:id?year=N`

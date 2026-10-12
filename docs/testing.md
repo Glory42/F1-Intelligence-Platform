@@ -120,7 +120,9 @@ suite never touches Neon.
 - **Covered**: `races` (incl. circuit outline + circuit telemetry), `race-events`, `race-story`,
   `strategy`, `telemetry`, `drivers` (incl. career, racecraft, teammate battle), `teams` (incl. pit
   stops), `seasons`, `search`, `predictions` (incl. Friday pace, title odds), `sprint`, `history`,
-  the home hub's on-this-day query, and the `edgeCache` middleware (`common/edge-cache.ts`). Not yet: `quality`.
+  the home hub's on-this-day query, the `edgeCache` middleware (`common/edge-cache.ts`), and the route
+  factories (`route/route.test.ts`: 400/404 answers and Cache-Control derived from the data's race
+  status or season, never from `?year=`). Not yet: `quality`.
 
 ## Web unit (`apps/web/tests/unit/`)
 

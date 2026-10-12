@@ -44,10 +44,9 @@ export default [
     rules: { 'max-lines': maxLines(50) },
   },
 
-  // no budget: the deliberately-single-file type barrel, mechanically-sized
-  // schema / seed data, and tests
+  // no budget: mechanically-sized schema / seed data, and tests
   {
-    files: ['src/common/types.ts', 'src/db/schema/**/*.ts', 'src/db/seed.ts', 'tests/**/*.ts'],
+    files: ['src/db/schema/**/*.ts', 'src/db/seed.ts', 'tests/**/*.ts'],
     rules: { 'max-lines': 'off' },
   },
 ];

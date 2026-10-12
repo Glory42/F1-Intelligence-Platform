@@ -1,69 +1,38 @@
-import type { Context } from 'hono';
-import type { Bindings } from '../../common/types';
-import { createDb } from '../../config/database';
 import { DriversService } from './drivers.service';
 import { TeammateBattleService } from './teammate-battle.service';
 import { RacecraftService } from './racecraft.service';
-import { cacheControlForYear, cacheIfData } from '../../common/cache';
+import { driverRoute, newestSeason, seasonRoute } from '../../common/route';
 
 const service = new DriversService();
 const teammateBattles = new TeammateBattleService();
 const racecraft = new RacecraftService();
 
 export const DriversController = {
-  getRacecraft: async (c: Context<{ Bindings: Bindings }>) => {
-    const year = Number(c.req.query('year') ?? new Date().getFullYear());
-    const data = await racecraft.findRacecraft(createDb(c.env.DATABASE_URL), year);
-    c.header('Cache-Control', cacheIfData(cacheControlForYear(year), data.length > 0));
-    return c.json({ data, error: null });
-  },
+  getRacecraft: seasonRoute({
+    load: ({ db, year }) => racecraft.findRacecraft(db, year),
+  }),
 
-  getTeammateBattle: async (c: Context<{ Bindings: Bindings }>) => {
-    const id = Number(c.req.param('id'));
-    if (isNaN(id)) {
-      return c.json({ data: null, error: { code: 'INVALID_ID', message: 'id must be a number' } }, 400);
-    }
-    const data = await teammateBattles.findBattle(createDb(c.env.DATABASE_URL), id);
-    if (!data) {
-      return c.json({ data: null, error: { code: 'NOT_FOUND', message: `Driver ${id} not found` } }, 404);
-    }
-    // Driver ids are season-scoped; the page passes that season's year so past seasons cache long.
-    c.header('Cache-Control', cacheControlForYear(Number(c.req.query('year') ?? new Date().getFullYear())));
-    return c.json({ data, error: null });
-  },
+  getTeammateBattle: driverRoute({
+    load: ({ db, driver }) => teammateBattles.findBattle(db, driver),
+  }),
 
-  getAll: async (c: Context<{ Bindings: Bindings }>) => {
-    const year = Number(c.req.query('year') ?? new Date().getFullYear());
-    const teamId = c.req.query('team_id') ? Number(c.req.query('team_id')) : undefined;
-    const data = await service.findAll(createDb(c.env.DATABASE_URL), year, teamId);
-    return c.json({ data, error: null });
-  },
+  getAll: seasonRoute({
+    load: ({ db, year, query }) => {
+      const teamId = query('team_id');
+      return service.findAll(db, year, teamId ? Number(teamId) : undefined);
+    },
+  }),
 
-  getStandings: async (c: Context<{ Bindings: Bindings }>) => {
-    const year = Number(c.req.query('year') ?? new Date().getFullYear());
-    const data = await service.findStandings(createDb(c.env.DATABASE_URL), year);
-    return c.json({ data, error: null });
-  },
+  getStandings: seasonRoute({
+    load: ({ db, year }) => service.findStandings(db, year),
+  }),
 
-  getCareerStats: async (c: Context<{ Bindings: Bindings }>) => {
-    const id = Number(c.req.param('id'));
-    if (isNaN(id)) {
-      return c.json({ data: null, error: { code: 'INVALID_ID', message: 'id must be a number' } }, 400);
-    }
-    const data = await service.findCareerStats(createDb(c.env.DATABASE_URL), id);
-    return c.json({ data, error: null });
-  },
+  getCareerStats: driverRoute({
+    load: ({ db, driver }) => service.findCareerStats(db, driver),
+    seasonOf: newestSeason,
+  }),
 
-  getById: async (c: Context<{ Bindings: Bindings }>) => {
-    const id = Number(c.req.param('id'));
-    const year = Number(c.req.query('year') ?? new Date().getFullYear());
-    if (isNaN(id)) {
-      return c.json({ data: null, error: { code: 'INVALID_ID', message: 'id must be a number' } }, 400);
-    }
-    const data = await service.findById(createDb(c.env.DATABASE_URL), id);
-    if (!data) {
-      return c.json({ data: null, error: { code: 'NOT_FOUND', message: `Driver ${id} not found for year ${year}` } }, 404);
-    }
-    return c.json({ data, error: null });
-  },
+  getById: driverRoute({
+    load: ({ db, driver, team }) => service.findDetail(db, driver, team),
+  }),
 };

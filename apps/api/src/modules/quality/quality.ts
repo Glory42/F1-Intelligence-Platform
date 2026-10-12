@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { desc, eq, and, isNull, sql } from 'drizzle-orm';
 import type { Bindings, QualityReport, QualityIssue, QualitySeverity } from '../../common/types';
-import { createDb, type Db } from '../../config/database';
+import type { Db } from '../../config/database';
 import { dataQualityRuns, dataQualityIssues } from '../../db/schema';
-import { cacheControlForYear } from '../../common/cache';
+import { seasonRoute } from '../../common/route';
 
 export function castSeverity(s: string): QualitySeverity {
   return s === 'high' || s === 'medium' || s === 'low' ? s : 'medium';
@@ -61,14 +61,9 @@ async function findLatestQualityReport(db: Db, year: number): Promise<QualityRep
 
 const qualityModule = new Hono<{ Bindings: Bindings }>();
 
-qualityModule.get('/', async (c) => {
-  const year = Number(c.req.query('year') ?? new Date().getFullYear());
-  const data = await findLatestQualityReport(createDb(c.env.DATABASE_URL), year);
-  if (!data) {
-    return c.json({ data: null, error: { code: 'NOT_FOUND', message: `No quality report for ${year}` } }, 404);
-  }
-  c.header('Cache-Control', cacheControlForYear(year));
-  return c.json({ data, error: null });
-});
+qualityModule.get('/', seasonRoute({
+  load: ({ db, year }) => findLatestQualityReport(db, year),
+  missing: (year) => `No quality report for ${year}`,
+}));
 
 export default qualityModule;

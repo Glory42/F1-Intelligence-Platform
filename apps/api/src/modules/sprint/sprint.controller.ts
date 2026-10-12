@@ -3,6 +3,7 @@ import type { Bindings } from '../../common/types';
 import { createDb } from '../../config/database';
 import { SprintService } from './sprint.service';
 import { cacheControlForStatus } from '../../common/cache';
+import { raceRoute } from '../../common/route';
 
 const service = new SprintService();
 
@@ -16,29 +17,15 @@ export const SprintController = {
     return c.json({ data, error: null });
   },
 
-  getByRaceId: async (c: Context<{ Bindings: Bindings }>) => {
-    const raceId = Number(c.req.param('raceId'));
-    if (isNaN(raceId)) {
-      return c.json({ data: null, error: { code: 'INVALID_ID', message: 'raceId must be a number' } }, 400);
-    }
-    const data = await service.findByRaceId(createDb(c.env.DATABASE_URL), raceId);
-    if (!data) {
-      return c.json({ data: null, error: { code: 'NOT_FOUND', message: `No sprint prediction for race ${raceId}` } }, 404);
-    }
-    c.header('Cache-Control', cacheControlForStatus(data.race.status));
-    return c.json({ data, error: null });
-  },
+  getByRaceId: raceRoute({
+    param: 'raceId',
+    load: ({ db, race }) => service.findByRaceId(db, race.id),
+    missing: (raceId) => `No sprint prediction for race ${raceId}`,
+  }),
 
-  getDetailByRaceId: async (c: Context<{ Bindings: Bindings }>) => {
-    const raceId = Number(c.req.param('raceId'));
-    if (isNaN(raceId)) {
-      return c.json({ data: null, error: { code: 'INVALID_ID', message: 'raceId must be a number' } }, 400);
-    }
-    const data = await service.findDetailByRaceId(createDb(c.env.DATABASE_URL), raceId);
-    if (!data) {
-      return c.json({ data: null, error: { code: 'NOT_FOUND', message: `No sprint data for race ${raceId}` } }, 404);
-    }
-    c.header('Cache-Control', cacheControlForStatus(data.race.status));
-    return c.json({ data, error: null });
-  },
+  getDetailByRaceId: raceRoute({
+    param: 'raceId',
+    load: ({ db, race, circuit }) => service.findDetail(db, race, circuit),
+    missing: (raceId) => `No sprint data for race ${raceId}`,
+  }),
 };

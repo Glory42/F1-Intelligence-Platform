@@ -26,17 +26,12 @@ export class SprintService {
     return this.buildPredictionResponse(db, raceId);
   }
 
-  async findDetailByRaceId(db: Db, raceId: number): Promise<SprintDetailResponse | null> {
-    const raceRows = await db
-      .select()
-      .from(races)
-      .innerJoin(circuits, eq(races.circuitId, circuits.id))
-      .where(eq(races.id, raceId))
-      .limit(1);
-
-    if (!raceRows[0]) return null;
-    const { races: race, circuits: circuit } = raceRows[0];
-
+  async findDetail(
+    db: Db,
+    race: typeof races.$inferSelect,
+    circuit: typeof circuits.$inferSelect,
+  ): Promise<SprintDetailResponse | null> {
+    const raceId = race.id;
     if (!(SPRINT_FORMATS as readonly string[]).includes(race.eventFormat)) return null;
 
     const [prediction, resultRows, lapRows] = await Promise.all([

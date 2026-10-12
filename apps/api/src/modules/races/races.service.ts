@@ -25,17 +25,12 @@ export class RacesService {
     return rows.map((r) => toRace(r.races, r.circuits));
   }
 
-  async findById(db: Db, raceId: number): Promise<RaceDetailResponse | null> {
-    const raceRows = await db
-      .select()
-      .from(races)
-      .innerJoin(circuits, eq(races.circuitId, circuits.id))
-      .where(eq(races.id, raceId))
-      .limit(1);
-
-    if (!raceRows[0]) return null;
-    const { races: race, circuits: circuit } = raceRows[0];
-
+  async findDetail(
+    db: Db,
+    race: typeof races.$inferSelect,
+    circuit: typeof circuits.$inferSelect,
+  ): Promise<RaceDetailResponse> {
+    const raceId = race.id;
     const [resultsRows, qualifyingRows, lapRows] = await Promise.all([
       db
         .select()

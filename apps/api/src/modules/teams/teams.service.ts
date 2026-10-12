@@ -73,11 +73,8 @@ export class TeamsService {
     );
   }
 
-  async findCareerStats(db: Db, teamId: number): Promise<TeamYearStats[]> {
-    const teamRow = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
-    if (!teamRow[0]) return [];
-
-    const key = teamRow[0].teamKey;
+  async findCareerStats(db: Db, self: typeof teams.$inferSelect): Promise<TeamYearStats[]> {
+    const key = self.teamKey;
 
     const allEntries = await db
       .select()
@@ -106,32 +103,25 @@ export class TeamsService {
     );
   }
 
-  // `teams` rows are season-scoped, so teamId alone already pins the season: no `year` param needed.
-  async findById(db: Db, teamId: number): Promise<TeamDetailResponse | null> {
-    const teamRows = await db
-      .select()
-      .from(teams)
-      .where(eq(teams.id, teamId))
-      .limit(1);
-
-    if (!teamRows[0]) return null;
-    const team = toTeam(teamRows[0]);
+  // `teams` rows are season-scoped, so the row alone already pins the season: no `year` param needed.
+  async findDetail(db: Db, row: typeof teams.$inferSelect): Promise<TeamDetailResponse> {
+    const team = toTeam(row);
 
     const [statsRows, driverRows] = await Promise.all([
       db
         .select()
         .from(teamSeasonStats)
-        .where(and(eq(teamSeasonStats.teamId, teamId), eq(teamSeasonStats.seasonId, teamRows[0].seasonId)))
+        .where(and(eq(teamSeasonStats.teamId, row.id), eq(teamSeasonStats.seasonId, row.seasonId)))
         .limit(1),
 
       db
         .select()
         .from(drivers)
-        .where(and(eq(drivers.teamId, teamId), eq(drivers.seasonId, teamRows[0].seasonId))),
+        .where(and(eq(drivers.teamId, row.id), eq(drivers.seasonId, row.seasonId))),
     ]);
 
     const stats = statsRows[0];
-    const teamDrivers: Driver[] = driverRows.map((d) => toDriver(d, teamRows[0]));
+    const teamDrivers: Driver[] = driverRows.map((d) => toDriver(d, row));
 
     return {
       team,
