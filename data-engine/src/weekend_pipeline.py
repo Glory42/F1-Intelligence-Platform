@@ -27,6 +27,7 @@ from src.jobs import (
     ingest_stints,
     ingest_team_radio,
 )
+from src.enrichment_coverage import SESSIONS, coverage_of, step_name
 from src.utils.logging_utils import log_job_failure
 
 SPRINT_FORMATS = frozenset({"sprint", "sprint_qualifying", "sprint_shootout"})
@@ -84,7 +85,8 @@ def _session_job(module: Any, session_name: str) -> Callable[[RaceRunContext], A
     return lambda ctx: module.run(ctx.year, ctx.round_number, session_name=session_name)
 
 
-_RACE_EVENT_JOBS = {
+# Race Events (OpenF1), each run once per session of a completed weekend.
+RACE_EVENT_JOBS = {
     "ingest_race_control": ingest_race_control,
     "ingest_overtakes": ingest_overtakes,
     "ingest_team_radio": ingest_team_radio,
@@ -108,12 +110,11 @@ JOBS: dict[str, Callable[[RaceRunContext], Any]] = {
     "compute_title_odds": lambda ctx: compute_title_odds.run(ctx.year),
     "ingest_qualifying_telemetry":
         lambda ctx: ingest_qualifying_telemetry.run(ctx.year, ctx.round_number, session_type="Q"),
-    "ingest_sprint_qualifying_telemetry":
+    "ingest_qualifying_telemetry_sprint":
         lambda ctx: ingest_qualifying_telemetry.run(ctx.year, ctx.round_number, session_type="SQ"),
-    **{name: _session_job(module, "Race") for name, module in _RACE_EVENT_JOBS.items()},
-    **{f"{name}_sprint": _session_job(module, "Sprint") for name, module in _RACE_EVENT_JOBS.items()},
-    "ingest_race_story": _session_job(ingest_race_story, "Race"),
-    "ingest_race_story_sprint": _session_job(ingest_race_story, "Sprint"),
+    **{step_name(name, session_type): _session_job(module, session)
+       for name, module in (*RACE_EVENT_JOBS.items(), ("ingest_race_story", ingest_race_story))
+       for session_type, session in SESSIONS.items()},
 }
 
 
@@ -146,7 +147,7 @@ _CHAINS: dict[ActionKind, tuple[JobStep, ...]] = {
         JobStep("compute_sprint_predictions"),
         _TITLE_ODDS,
         # Telemetry (~41 OpenF1 requests) outruns one cycle's budget; the coverage retry resumes it.
-        JobStep("ingest_sprint_qualifying_telemetry", optional=True),
+        JobStep("ingest_qualifying_telemetry_sprint", optional=True),
     ),
     ActionKind.SPRINT_RACE: (
         JobStep("ingest_sprint", commits_status="sprint_done"),
@@ -167,8 +168,8 @@ _CHAINS: dict[ActionKind, tuple[JobStep, ...]] = {
         _TITLE_ODDS,
         # Race Events self-skip inside OpenF1's live window and, for the sprint, on a weekend
         # without one: see run_openf1_job.
-        *(JobStep(name, optional=True) for name in _RACE_EVENT_JOBS),
-        *(JobStep(f"{name}_sprint", optional=True) for name in _RACE_EVENT_JOBS),
+        *(JobStep(step_name(name, session_type), optional=True)
+          for session_type in SESSIONS for name in RACE_EVENT_JOBS),
     ),
 }
 
@@ -189,9 +190,17 @@ def prediction_steps(is_sprint: bool) -> tuple[JobStep, ...]:
     return tuple(step for kind in kinds for step in followups(kind))
 
 
+def _chain_step(job: str) -> str:
+    """`job` itself if a chain runs it, else, for a coverage retry step, the ingest it waits on."""
+    if any(s.name == job for steps in _CHAINS.values() for s in steps):
+        return job
+    return coverage_of(job).due_after
+
+
 def stage_of(job: str) -> Stage:
-    """The stage of the first chain, in weekend order, that runs `job`."""
-    return STAGES[next(kind for kind, steps in _CHAINS.items() if any(s.name == job for s in steps))]
+    """The stage of the first chain, in weekend order, that runs `job` (or the ingest it waits on)."""
+    step = _chain_step(job)
+    return STAGES[next(kind for kind, steps in _CHAINS.items() if any(s.name == step for s in steps))]
 
 
 def _from(status: str) -> tuple[str, ...]:
@@ -207,6 +216,8 @@ def statuses_after(ingest: str) -> tuple[str, ...]:
 def due_statuses(job: str) -> tuple[str, ...]:
     """Race Statuses in which `job` has work: where its chain is planned, or, for a step after
     the chain's ingest, the status that ingest committed and every later one."""
+    if _chain_step(job) != job:
+        return statuses_after(_chain_step(job))
     due: set[str] = set()
     for kind, steps in _CHAINS.items():
         names = [s.name for s in steps]

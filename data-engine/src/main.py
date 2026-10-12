@@ -6,12 +6,13 @@ from datetime import date
 import src.config as _config  # triggers FastF1 cache setup
 from src import weekend_pipeline
 from src.db.client import get_conn
+from src.enrichment_coverage import step_name
 from src.utils.logging_utils import log_job_failure
 
 # Session ingests take --year/--round, or auto-detect the round whose status says they're due.
 _ROUND_JOBS = ("ingest_fp2", "ingest_qualifying", "ingest_sprint_qualifying", "ingest_sprint", "ingest_race")
-# OpenF1 enrichment jobs share one CLI shape: --year/--round (or latest completed race) + --session.
-_OPENF1_JOBS = ("ingest_race_control", "ingest_overtakes", "ingest_team_radio", "ingest_stints", "ingest_pit_stops")
+# Per-session enrichment: --year/--round (or the latest round it is due in) + --session.
+_SESSION_JOBS = (*weekend_pipeline.RACE_EVENT_JOBS, "ingest_race_story")
 
 
 def auto_detect_round(job: str, year: int | None) -> tuple[int, int]:
@@ -68,13 +69,12 @@ def _dispatch(job: str, args: argparse.Namespace) -> None:
         importlib.import_module(f"src.jobs.{job}").run(*_year_round(args, job))
 
     elif job == "ingest_qualifying_telemetry":
-        sprint = args.session == "Sprint"
         from src.jobs.ingest_qualifying_telemetry import run
-        run(*_year_round(args, "ingest_sprint_qualifying_telemetry" if sprint else job),
-            session_type="SQ" if sprint else "Q")
+        sprint = args.session == "Sprint"
+        run(*_year_round(args, step_name(job, "sprint" if sprint else "race")), session_type="SQ" if sprint else "Q")
 
-    elif job in _OPENF1_JOBS:
-        year, round_num = _year_round(args, f"{job}_sprint" if args.session == "Sprint" else job)
+    elif job in _SESSION_JOBS:
+        year, round_num = _year_round(args, step_name(job, "sprint" if args.session == "Sprint" else "race"))
         importlib.import_module(f"src.jobs.{job}").run(year, round_num, session_name=args.session)
 
     elif job == "compute_season_stats":
@@ -134,7 +134,7 @@ def main() -> None:
         "sync_schedule",
         "sync_season",
         *_ROUND_JOBS,
-        *_OPENF1_JOBS,
+        *_SESSION_JOBS,
         "ingest_qualifying_telemetry",
         "compute_season_stats",
         "compute_title_odds",
@@ -152,7 +152,7 @@ def main() -> None:
     parser.add_argument("--resolve_run", type=int, help="data_quality_repair: audit run id to act on")
     parser.add_argument(
         "--session", choices=["Race", "Sprint"], default="Race",
-        help="OpenF1 enrichment jobs (ingest_race_control, ingest_stints, ...): which session to pull",
+        help="Session enrichment jobs (ingest_race_control, ingest_race_story, ...): which session to pull",
     )
     args = parser.parse_args()
 

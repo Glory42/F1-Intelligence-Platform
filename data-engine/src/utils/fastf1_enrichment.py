@@ -6,6 +6,7 @@ from typing import Any, Optional
 
 import pandas as pd
 
+from src.enrichment_coverage import normalize_compound
 from src.utils.telemetry import LapWindow
 
 # A lane visit longer than this is a red-flag wait in the pit lane, not a pit stop.
@@ -14,16 +15,6 @@ MAX_PIT_LANE_MS = 120_000
 
 def _present(value: Any) -> bool:
     return value is not None and not (isinstance(value, float) and pd.isna(value)) and value is not pd.NaT
-
-
-# FastF1 writes a missing compound as text ('nan') or a placeholder rather than a null.
-_NO_COMPOUND = {"", "NAN", "NONE", "UNKNOWN", "TEST_UNKNOWN"}
-
-
-def _compound(value: Any) -> Optional[str]:
-    if not _present(value) or str(value).upper() in _NO_COMPOUND:
-        return None
-    return str(value)
 
 
 def _int_or_none(value: Any) -> Optional[int]:
@@ -69,7 +60,7 @@ def stint_rows(laps: list[dict], code_map: dict[str, int], race_id: int, session
             })
             row["lap_end"] = number
             if row["compound"] is None:
-                row["compound"] = _compound(lap.get("Compound"))
+                row["compound"] = normalize_compound(lap.get("Compound"))
             tyre_life = _int_or_none(lap.get("TyreLife"))
             if row["tyre_age_at_start"] is None and tyre_life is not None:
                 # TyreLife counts the current lap, so a fresh set reads 1 on its first lap.

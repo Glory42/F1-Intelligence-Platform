@@ -49,7 +49,9 @@ pytest, config in `pyproject.toml` (`pythonpath = ["."]`, `testpaths = ["tests"]
   `bayesian_win_rate`, …), pure `feature_helpers.py` helpers, the model `WEIGHTS` invariants
   (`test_weights.py`: sum-to-1 and positivity for both models), `rank_by_probability`,
   `race_weekend_window`, `weekend_pipeline` (`test_weekend_pipeline.py`: `plan`, the chains,
-  `due_statuses`, `repair_plan`, `prediction_steps`), and the FastF1 enrichment converters (`test_fastf1_enrichment.py`: stint,
+  `due_statuses`, `repair_plan`, `prediction_steps`), `enrichment_coverage` (`test_enrichment_coverage.py`:
+  `source_for`, `missing`, compound normalisation from either source; the coverage query through the
+  fake DB), and the FastF1 enrichment converters (`test_fastf1_enrichment.py`: stint,
   pit-stop and race-control rows over plain records, telemetry input reshaping).
 - **DB-touching functions are tested through a fake double**: `tests/support/fake_db.py` provides
   `FakeCursor` / `FakeConnection`, shaped like psycopg2's `RealDictCursor`. `FakeConnection` takes a
@@ -61,8 +63,9 @@ pytest, config in `pyproject.toml` (`pythonpath = ["."]`, `testpaths = ["tests"]
   `data_quality_repair.run` (issue grouping, repair plan per race, resolve bookkeeping),
   `main.auto_detect_round`, (with FastF1's schedule/session mocked) `sync_schedule`
   and `sync_season`, `compute_title_odds.run` (incl. replaying an earlier round without seeing later
-  results or predictions), and `auto_runner._retry_missing_race_events` (only the empty table's job
-  reruns, a cleanly finished job is settled in the memo, budget-limited telemetry stays pending).
+  results or predictions), `auto_runner._retry_missing_race_events` (only the missing coverage's job
+  reruns, a cleanly finished job is settled in the memo, budget-limited telemetry stays pending), and
+  the CLI's session-job dispatch (`test_main_cli.py`).
 - Anything that runs chain steps (`auto_runner`, `data_quality_repair`) is tested by swapping entries
   of the one job table, `weekend_pipeline.JOBS` (`monkeypatch.setitem`), never by patching job modules.
 - `conftest.py` sets a placeholder `DATABASE_URL` so importing a job module (which reads it at import

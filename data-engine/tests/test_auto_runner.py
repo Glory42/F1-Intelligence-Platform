@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 
 from src import auto_runner
+from src import enrichment_coverage as ec
 from src import weekend_pipeline as wp
 from src.utils.schedule_window import RaceWeekendWindow
 from src.weekend_pipeline import ActionKind
@@ -241,16 +242,12 @@ class TestPollIntervalForWindow:
 
 
 class TestRetryMissingRaceEvents:
-    # A completed weekend with every table covered: tests flip only the flags they care about.
-    _COVERED = {
-        "has_race_control": True, "has_overtakes": True, "has_stints": True, "has_pit_stops": True,
-        "has_story": True, "telemetry_complete": True, "stats_current": True, "odds_current": True,
-        "has_sprint_race_control": True, "has_sprint_overtakes": True, "has_sprint_stints": True,
-        "has_sprint_pit_stops": True, "has_sprint_story": True, "sq_telemetry_complete": True,
-    }
+    """Which coverage is due is enrichment_coverage.missing's job (test_enrichment_coverage.py);
+    these cover running it: only missing jobs rerun, and the memo settles finished ones."""
 
-    def _row(self, **overrides):
-        return {"id": 1, "status": "completed", "sprint_date": None, **self._COVERED, **overrides}
+    def _row(self, **gaps):
+        return {"id": 1, "status": "completed", "sprint_date": None,
+                **{c.flag: True for c in ec.COVERAGES}, **gaps}
 
     def _patch_jobs(self, monkeypatch, fail=()):
         calls = []
@@ -279,31 +276,15 @@ class TestRetryMissingRaceEvents:
         assert self._retry(self._row()) is True
         assert calls == []
 
-    def test_race_events_wait_for_the_race_but_qualifying_telemetry_does_not(self, monkeypatch):
+    def test_reruns_only_the_jobs_whose_coverage_is_missing(self, monkeypatch):
         calls = self._patch_jobs(monkeypatch)
-        self._retry(self._row(status="qualifying_done", has_race_control=False, telemetry_complete=False))
-        assert calls == ["ingest_qualifying_telemetry"]
-
-    def test_reruns_only_the_job_whose_table_is_empty(self, monkeypatch):
-        calls = self._patch_jobs(monkeypatch)
-        self._retry(self._row(has_pit_stops=False))
-        assert calls == ["ingest_pit_stops"]
-
-    def test_checks_the_sprint_session_on_a_sprint_weekend(self, monkeypatch):
-        calls = self._patch_jobs(monkeypatch)
-        sprint = datetime(2026, 3, 7, 15, 0, tzinfo=timezone.utc)
-        self._retry(self._row(sprint_date=sprint, has_sprint_stints=False, sq_telemetry_complete=False))
-        assert calls == ["ingest_sprint_qualifying_telemetry", "ingest_stints_sprint"]
-
-    def test_recomputes_stale_standings_and_missing_title_odds(self, monkeypatch):
-        calls = self._patch_jobs(monkeypatch)
-        self._retry(self._row(stats_current=False, odds_current=False, has_story=False))
-        assert calls == ["ingest_race_story", "compute_season_stats", "compute_title_odds"]
+        self._retry(self._row(ingest_pit_stops=False, compute_title_odds=False))
+        assert calls == ["ingest_pit_stops", "compute_title_odds"]
 
     def test_a_job_that_finished_cleanly_is_settled_even_if_its_table_stays_empty(self, monkeypatch):
         calls = self._patch_jobs(monkeypatch)
         memo = auto_runner.WorkerMemo()
-        row = self._row(has_overtakes=False)
+        row = self._row(ingest_overtakes=False)
 
         assert self._retry(row, memo) is True
         assert self._retry(row, memo) is True
@@ -312,7 +293,7 @@ class TestRetryMissingRaceEvents:
     def test_a_failed_job_stays_pending_and_does_not_stop_the_others(self, monkeypatch):
         calls = self._patch_jobs(monkeypatch, fail={"ingest_race_control"})
         memo = auto_runner.WorkerMemo()
-        row = self._row(has_race_control=False, has_overtakes=False)
+        row = self._row(ingest_race_control=False, ingest_overtakes=False)
 
         assert self._retry(row, memo) is False
         assert self._retry(row, memo) is False
@@ -322,8 +303,9 @@ class TestRetryMissingRaceEvents:
         self._patch_jobs(monkeypatch)
         _jobs(monkeypatch, ingest_qualifying_telemetry=lambda ctx: False)
         memo = auto_runner.WorkerMemo()
-        assert self._retry(self._row(telemetry_complete=False), memo) is False
+        assert self._retry(self._row(ingest_qualifying_telemetry=False), memo) is False
         assert memo.settled == set()
+
 
 class TestRunActionSteps:
     def test_all_steps_succeed_returns_ok_and_last_committed_status(self, monkeypatch):
@@ -334,7 +316,7 @@ class TestRunActionSteps:
             compute_sprint_features=lambda ctx: calls.append("features"),
             compute_sprint_predictions=lambda ctx: calls.append("predictions"),
             compute_title_odds=lambda ctx: None,
-            ingest_sprint_qualifying_telemetry=lambda ctx: None,
+            ingest_qualifying_telemetry_sprint=lambda ctx: None,
         )
 
         outcome = auto_runner._run_action_steps(_action(ActionKind.SPRINT_QUALIFYING), _CTX)
@@ -551,7 +533,7 @@ class TestQuietCyclesBetweenSessions:
         sunday_evening = race + timedelta(hours=8)
         memo = auto_runner.WorkerMemo()
         first = FakeConnection([
-            {"id": 1, "status": "completed", "sprint_date": None, "has_race_control": False},
+            {"id": 1, "status": "completed", "sprint_date": None, "ingest_race_control": False},
             _active_race_row(race_id=2, round_number=2, status="scheduled", event_format="conventional"),
         ])
 

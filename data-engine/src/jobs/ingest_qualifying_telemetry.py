@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from psycopg2.extras import Json
 
 from src.db.client import get_conn
+from src.enrichment_coverage import CONFLICT_KEYS
 from src.utils.driver_map import build_driver_number_map
 from src.utils.openf1_client import (
     OpenF1BudgetExceeded, fetch_car_data, fetch_laps, fetch_location, get_session_key,
@@ -98,7 +99,7 @@ def run(year: int, round_num: int, session_type: str = "Q") -> bool:
         return finished
     conn = get_conn()
     try:
-        upsert(conn, "qualifying_lap_telemetry", rows, ["race_id", "session_type", "driver_id"])
+        upsert(conn, "qualifying_lap_telemetry", rows, CONFLICT_KEYS["qualifying_lap_telemetry"])
         print(f"  Upserted {len(rows)} lap telemetry rows")
     finally:
         conn.close()

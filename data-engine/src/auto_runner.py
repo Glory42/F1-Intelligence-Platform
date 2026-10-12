@@ -6,12 +6,13 @@ import pandas as pd
 import fastf1
 from fastf1.core import DataNotLoadedError, InvalidSessionError, NoLapDataError
 from src.db.client import get_conn
+from src.enrichment_coverage import missing, read_coverage
 from src.jobs import sync_schedule
 from src.utils import openf1_client
 from src.utils.logging_utils import log_job_failure, log_job_ok
 from src.utils.schedule_window import race_weekend_window, RaceWeekendWindow
 from src.weekend_pipeline import (
-    JOBS, Action, ActionKind, JobStep, RaceRunContext, is_sprint_weekend, plan, statuses_after,
+    JOBS, Action, ActionKind, JobStep, RaceRunContext, is_sprint_weekend, plan,
 )
 
 
@@ -100,74 +101,23 @@ def _backfill_fp2(log_func, conn, ctx: RaceRunContext) -> bool:
         return False
 
 
-# One flag per (table, session) that a weekend should end up with. Team radio is left out on
-# purpose: F1 often publishes none, so an empty table there says nothing.
-_COVERAGE_SQL = """
-SELECT r.id, r.status, r.sprint_date,
-  EXISTS (SELECT 1 FROM race_control_messages t WHERE t.race_id = r.id AND t.session_type = 'race') AS has_race_control,
-  EXISTS (SELECT 1 FROM race_control_messages t WHERE t.race_id = r.id AND t.session_type = 'sprint') AS has_sprint_race_control,
-  EXISTS (SELECT 1 FROM race_overtakes t WHERE t.race_id = r.id AND t.session_type = 'race') AS has_overtakes,
-  EXISTS (SELECT 1 FROM race_overtakes t WHERE t.race_id = r.id AND t.session_type = 'sprint') AS has_sprint_overtakes,
-  EXISTS (SELECT 1 FROM race_stints t WHERE t.race_id = r.id AND t.session_type = 'race') AS has_stints,
-  EXISTS (SELECT 1 FROM race_stints t WHERE t.race_id = r.id AND t.session_type = 'sprint') AS has_sprint_stints,
-  EXISTS (SELECT 1 FROM race_pit_stops t WHERE t.race_id = r.id AND t.session_type = 'race') AS has_pit_stops,
-  EXISTS (SELECT 1 FROM race_pit_stops t WHERE t.race_id = r.id AND t.session_type = 'sprint') AS has_sprint_pit_stops,
-  EXISTS (SELECT 1 FROM race_lap_traces t WHERE t.race_id = r.id AND t.session_type = 'race') AS has_story,
-  EXISTS (SELECT 1 FROM race_lap_traces t WHERE t.race_id = r.id AND t.session_type = 'sprint') AS has_sprint_story,
-  (SELECT count(*) FROM qualifying_lap_telemetry t WHERE t.race_id = r.id AND t.session_type = 'Q')
-    >= (SELECT count(*) FROM qualifying_results q WHERE q.race_id = r.id) AS telemetry_complete,
-  (SELECT count(*) FROM qualifying_lap_telemetry t WHERE t.race_id = r.id AND t.session_type = 'SQ')
-    >= (SELECT count(*) FROM sprint_results q WHERE q.race_id = r.id AND q.sq1_time_ms IS NOT NULL) AS sq_telemetry_complete,
-  COALESCE((SELECT max(t.races_completed) FROM team_season_stats t WHERE t.season_id = r.season_id), 0)
-    >= (SELECT count(*) FROM races c WHERE c.season_id = r.season_id AND c.status = 'completed') AS stats_current,
-  EXISTS (SELECT 1 FROM title_odds_drivers t WHERE t.season_id = r.season_id AND t.after_round = r.round_number) AS odds_current
-FROM races r
-JOIN seasons s ON s.id = r.season_id
-WHERE s.year = %s AND r.round_number = %s
-"""
-
-
-def _weekend_checks(row: dict) -> list[tuple[str, str]]:
-    """(coverage flag, step name) for everything this weekend should have by now."""
-    status, sprint = row["status"], row["sprint_date"] is not None
-    checks: list[tuple[str, str]] = []
-    if status in statuses_after("ingest_qualifying"):
-        checks.append(("telemetry_complete", "ingest_qualifying_telemetry"))
-    if sprint and status in statuses_after("ingest_sprint_qualifying"):
-        checks.append(("sq_telemetry_complete", "ingest_sprint_qualifying_telemetry"))
-    if status not in statuses_after("ingest_race"):
-        return checks
-    sessions = (("", ""), ("sprint_", "_sprint")) if sprint else (("", ""),)
-    for prefix, suffix in sessions:
-        for table, job in (("race_control", "ingest_race_control"), ("overtakes", "ingest_overtakes"),
-                           ("stints", "ingest_stints"), ("pit_stops", "ingest_pit_stops"),
-                           ("story", "ingest_race_story")):
-            checks.append((f"has_{prefix}{table}", f"{job}{suffix}"))
-    checks.append(("stats_current", "compute_season_stats"))
-    checks.append(("odds_current", "compute_title_odds"))
-    return checks
-
-
 def _retry_missing_race_events(
     log_func: Callable[[str], None], conn: Any, round_number: int, year: int, memo: Optional["WorkerMemo"] = None,
 ) -> bool:
     """Safety net for the chains' optional steps (see JobStep.run), re-checked every
-    cycle inside the window's race-weekend window (up to 24h after the race). Each table is
-    checked on its own and only its job reruns. A job that has finished cleanly once is settled
+    cycle inside the window's race-weekend window (up to 24h after the race). Each coverage
+    (enrichment_coverage) is checked on its own and only its job reruns. A job that has finished cleanly once is settled
     in the memo even if it wrote nothing (a sprint with no stops, a feed with gaps), so a
     legitimately empty table never keeps the worker opening Neon every cycle.
 
     Returns False when anything still needs another pass, so the caller keeps re-checking."""
-    with conn.cursor() as cur:
-        cur.execute(_COVERAGE_SQL, (year, round_number))
-        row = cur.fetchone()
-    if row is None:
+    rows = read_coverage(conn, year, year, round_number)
+    if not rows:
         return True
 
-    ctx = RaceRunContext(race_id=row["id"], year=year, round_number=round_number)
+    ctx = RaceRunContext(race_id=rows[0]["id"], year=year, round_number=round_number)
     settled = memo.settled if memo is not None else set()
-    pending = [name for flag, name in _weekend_checks(row)
-               if not row.get(flag, True) and (ctx.race_id, name) not in settled]
+    pending = [c.job for c in missing(rows[0]) if (ctx.race_id, c.job) not in settled]
     for name in pending:
         log_func(f"[auto_runner] Race {ctx.race_id} is missing {name} data: retrying")
         if JobStep(name, optional=True).run(ctx):

@@ -93,7 +93,7 @@ class TestChain:
 
     def test_telemetry_runs_as_soon_as_its_qualifying_session_is_ingested(self):
         assert wp.chain(ActionKind.MAIN_QUALIFYING)[-1].name == "ingest_qualifying_telemetry"
-        assert wp.chain(ActionKind.SPRINT_QUALIFYING)[-1].name == "ingest_sprint_qualifying_telemetry"
+        assert wp.chain(ActionKind.SPRINT_QUALIFYING)[-1].name == "ingest_qualifying_telemetry_sprint"
 
     @pytest.mark.parametrize("kind", list(ActionKind))
     def test_every_chain_refreshes_title_odds_after_its_core_steps(self, kind):
@@ -155,13 +155,17 @@ class TestDueStatuses:
 
     def test_a_step_after_the_ingest_is_due_from_the_status_it_committed_onwards(self):
         assert wp.due_statuses("ingest_qualifying_telemetry") == ("qualifying_done", "completed")
-        assert wp.due_statuses("ingest_sprint_qualifying_telemetry") == (
+        assert wp.due_statuses("ingest_qualifying_telemetry_sprint") == (
             "sprint_qualifying_done", "sprint_done", "qualifying_done", "completed",
         )
         assert wp.due_statuses("ingest_stints_sprint") == ("completed",)
 
     def test_a_step_in_several_chains_is_due_wherever_any_of_them_ran(self):
         assert wp.due_statuses("compute_season_stats") == ("sprint_done", "qualifying_done", "completed")
+
+    def test_a_coverage_retry_step_is_due_once_its_ingest_has_run(self):
+        assert wp.due_statuses("ingest_race_story_sprint") == ("completed",)
+        assert wp.stage_of("ingest_race_story").races_date_sql == "r.race_date::date"
 
 
 class TestRepairSteps:

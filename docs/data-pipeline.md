@@ -68,14 +68,27 @@ core-only tier. `openf1_client` paces requests 2 s apart, retries 429/5xx, and t
 cycle at 25 requests (ADR 0004).
 
 Backfill any of them across a year range, locally (never on Render):
-`python scripts/backfill_openf1.py <job> <start> <end> [--session Sprint]`. It stops as soon as
-`storage_guard` leaves the allow-all tier.
+`python scripts/backfill_openf1.py <job> <start> <end> [--session Sprint] [--refresh]`. It only
+touches seasons OpenF1 serves, skips races whose coverage is already there unless `--refresh` (team
+radio has no coverage check, so it always reruns), and stops as soon as `storage_guard` leaves the
+allow-all tier.
+
+### Enrichment coverage (`src/enrichment_coverage.py`)
+
+One definition per enrichment (table, session): the pipeline step that fills it, the ingest it waits
+on, and the SQL that says a weekend has it. `read_coverage(conn, from, to, round)` returns one row per
+race with a flag per coverage; `missing(row)` is what the row should have by now but doesn't;
+`source_for(year)` says who fills a season (FastF1 2018–2022, OpenF1 2023+). It also owns each
+table's conflict key (`CONFLICT_KEYS`), compound normalisation (`normalize_compound`: one uppercase
+spelling, `None` for `nan`/`UNKNOWN`, whichever source) and the backfills' storage check
+(`backfill_allowed`). The worker's retries and both enrichment backfills read it.
 
 ### FastF1 enrichment (2018–2022)
 
 Stints, pit stops, race control and qualifying telemetry also exist for 2018–2022, filled locally from
 FastF1 by `python scripts/backfill_fastf1_enrichment.py 2018 2022 [--only stints,pits,race_control,telemetry] [--refresh]`
-(converters in `utils/fastf1_enrichment.py`). It skips any table a race already has rows for, so it
+(converters in `utils/fastf1_enrichment.py`). It only touches FastF1 seasons (`source_for`) and skips
+what a race's coverage already has (Q telemetry counts as covered once every qualifier has a lap), so it
 resumes after a stop and never overwrites OpenF1 data; `--refresh` rewrites the chosen parts. Pre-2023
 pit stops carry pit-lane time only (`stationary_ms` null: FastF1 has none) and lane visits over 120 s
 (red-flag waits) are dropped. 2018 stints keep Pirelli's named compounds (HYPERSOFT, ULTRASOFT, SUPERSOFT,
@@ -225,7 +238,7 @@ CLI's auto-detect, the worker's coverage retries, repair and the backfills all d
    - **If F1 data is delayed**, FastF1 throws a `DataNotLoadedError`. The script catches this, exits cleanly, and tries again next hour.
 5. Once ingestion succeeds, it automatically chains the downstream jobs (features, predictions, stats). If any job in the sequence fails, it sets the race `status` to whatever the sequence actually last committed (not blindly back to the pre-sequence value) so the next hour's retry resumes from where it left off instead of redoing already-completed steps.
 6. Qualifying telemetry rides the qualifying actions as a non-fatal step (Q at the end of `MAIN_QUALIFYING`, SQ at the end of `SPRINT_QUALIFYING`). After `MAIN_RACE`'s core steps (`ingest_race`, `compute_season_stats`) commit `completed`, it also runs the OpenF1 Race Events jobs (race control, overtakes, team radio, stints, pit stops) for both the Race and Sprint sessions. These are optional steps: a failure here is logged but never reverts `status` or fails the cycle, since Race Events are supplementary and safe to pick up on a later manual run if OpenF1 has a transient issue.
-7. Because that failure is swallowed rather than retried, and the race is already `completed` by the time it runs (so it drops out of step 1's query on the next poll), `run_cycle` also re-checks the *current* race-weekend window's race on every cycle it's still inside that window (`RaceWeekendWindow`'s 24h tail: see `_retry_missing_race_events`). `_COVERAGE_SQL` checks each table on its own and `_weekend_checks` decides what is due: race control, overtakes, stints, pit stops and race story per race/sprint session once `completed`; Q telemetry from `qualifying_done`; SQ telemetry on sprint weekends from `sprint_qualifying_done` (complete when it matches the `sprint_results` rows with an SQ1 time); season stats freshness (latest `team_season_stats.races_completed` vs completed races); and title odds for the race's round. Only the job whose table is empty reruns. Team radio is left out on purpose (F1 often publishes none). A job that finishes cleanly is recorded in `WorkerMemo.settled` as `(race_id, step)`, so a legitimately empty table (a sprint with no stops) doesn't keep the worker opening Neon; a job returning `False` (telemetry with the budget spent or still inside the live window) stays pending. Once nothing is pending and no session is due, later cycles skip the DB entirely (`WorkerMemo`). This is the safety net for the case where FastF1's and OpenF1's timing genuinely diverge: e.g. a red-flag-delayed race pushes the real session end past `OPENF1_LIVE_WINDOW_BUFFER`, so OpenF1 wasn't actually ready the first time.
+7. Because that failure is swallowed rather than retried, and the race is already `completed` by the time it runs (so it drops out of step 1's query on the next poll), `run_cycle` also re-checks the *current* race-weekend window's race on every cycle it's still inside that window (`RaceWeekendWindow`'s 24h tail: see `_retry_missing_race_events`). `enrichment_coverage.read_coverage` checks each table on its own and `missing` decides what is due: race control, overtakes, stints, pit stops and race story per race/sprint session once `completed`; Q telemetry from `qualifying_done`; SQ telemetry on sprint weekends from `sprint_qualifying_done` (complete when it matches the `sprint_results` rows with an SQ1 time); season stats freshness (latest `team_season_stats.races_completed` vs completed races); and title odds for the race's round. Only the job whose table is empty reruns. Team radio is left out on purpose (F1 often publishes none). A job that finishes cleanly is recorded in `WorkerMemo.settled` as `(race_id, step)`, so a legitimately empty table (a sprint with no stops) doesn't keep the worker opening Neon; a job returning `False` (telemetry with the budget spent or still inside the live window) stays pending. Once nothing is pending and no session is due, later cycles skip the DB entirely (`WorkerMemo`). This is the safety net for the case where FastF1's and OpenF1's timing genuinely diverge: e.g. a red-flag-delayed race pushes the real session end past `OPENF1_LIVE_WINDOW_BUFFER`, so OpenF1 wasn't actually ready the first time.
 
 ---
 
@@ -253,8 +266,9 @@ python -m src.main --job compute_sprint_features  --race_id 55
 python -m src.main --job compute_sprint_predictions --race_id 55
 python -m src.main --job ingest_sprint            --year 2026 --round 9
 
-# Race Events (OpenF1): --session defaults to Race; pass Sprint for the sprint session
+# Race Events (OpenF1) and race story: --session defaults to Race; pass Sprint for the sprint session
 python -m src.main --job ingest_race_control --year 2026 --round 9 --session Sprint
+python -m src.main --job ingest_race_story   --year 2026 --round 9 --session Sprint
 python -m src.main --job ingest_overtakes    --year 2026 --round 9 --session Sprint
 python -m src.main --job ingest_team_radio   --year 2026 --round 9 --session Sprint
 
