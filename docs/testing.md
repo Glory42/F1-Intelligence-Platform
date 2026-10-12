@@ -170,6 +170,9 @@ Playwright, its own `package.json` and `playwright.config.ts` (see
 - The fixture server sends CORS headers because `GlobalSearch` / `DriverCompareTool` /
   `TeamCompareTool` fetch client-side: a genuine cross-origin browser request. Every other route is
   only ever hit server-side.
+- Every fixture in `fixtures/data.ts` is typed with `apps/web/src/types`, which re-exports the API's
+  `common/types`: `bun run typecheck` (`tsc --noEmit`, also a CI step) fails when a fixture drifts from
+  the real response shape, e.g. a field the API added.
 - Smoke specs (`tests/smoke/`) cover the home hub, `/prediction`, `/prediction/sprint/[id]`,
   `/races/[id]` (+ sprint, race story, telemetry), `/circuits` + `/circuits/[key]`, `/drivers` +
   `/drivers/[id]`, `/teams` + `/teams/[id]`, both compare pages, `/history` (all four tabs, old-URL redirects),
@@ -188,7 +191,7 @@ Four jobs, on every push to `master` and every PR:
 | `data-engine` | `pip install -r requirements-dev.txt` → `pytest -v` |
 | `api` | `bun install` → `test:db:up` (docker compose + migrations) → `bun run test` → `bun run typecheck` → `bun run lint` |
 | `web` | `bun install` → `bun run build` → `bun run test` → `bun run typecheck` → `bun run lint` |
-| `e2e` | `bun install` (web + e2e) → `playwright install chromium` → `bun run test` |
+| `e2e` | `bun install` (web + e2e) → `bun run typecheck` (fixtures against the API's types) → `playwright install chromium` → `bun run test` |
 
 The `api` job runs the integration suite against the same `docker-compose.test.yml` stack: CI never
 spends Neon CU-hours, and no `TEST_DATABASE_URL` secret is needed any more.

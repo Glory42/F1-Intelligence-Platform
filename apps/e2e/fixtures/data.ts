@@ -9,6 +9,7 @@ import type {
   StrategyResponse, FridayPaceRow, PitCrewRanking, TeamStanding, TitleOddsResponse,
   RacecraftRow, TeammateBattle, RaceStoryResponse, TelemetryResponse, LapTelemetrySamples,
   HistoryRecords, HistoryMilestones, ConstructorLineage, DriverHistory, TeamHistory, RaceRecap, OnThisDay, TeamPitStop, CircuitTelemetry,
+  GlobalSearchResponse,
 } from '../../web/src/types';
 
 export const circuit: Circuit = {
@@ -229,7 +230,7 @@ export const driverStandingsResponse: DriverStanding[] = [
 
 export const driversListResponse: Driver[] = [driver, driverB];
 
-export const globalSearchResponse = { drivers: [driver, driverB], teams: [team, teamB], circuits: [circuit] };
+export const globalSearchResponse: GlobalSearchResponse = { drivers: [driver, driverB], teams: [team, teamB], circuits: [circuit] };
 
 export const circuitDetailResponse: CircuitDetailResponse = {
   outlinePath: 'M0,750L1000,750L1000,250L0,250Z',

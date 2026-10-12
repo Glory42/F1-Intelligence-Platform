@@ -1,1 +1,1 @@
-export type SeasonSummary = { year: number; raceCount: number };
+export type * from '../../../api/src/common/types/seasons';

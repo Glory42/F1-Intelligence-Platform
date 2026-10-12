@@ -57,6 +57,8 @@ jobs:
         working-directory: apps/web
       - run: bun install
         working-directory: apps/e2e
+      - run: bun run typecheck
+        working-directory: apps/e2e
       - run: bunx playwright install --with-deps chromium
         working-directory: apps/e2e
       - run: bun run test

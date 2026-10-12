@@ -107,7 +107,7 @@ src/
 ├── lib/                app plumbing: api client, utils, site, pageTabs, careerYear, sidebarState, legacyRedirects
 │   └── f1/             F1 reference data and maths shared by features: teamColors, teamLogos, countryFlags,
 │                       championshipMath, predictionMath, tyres
-├── types/            API response types, one file per domain (mirrors apps/api common/types/), index.ts barrel
+├── types/            API response types: each file re-exports apps/api common/types/ (type-only), index.ts barrel
 ├── content/config.ts   Astro content collection for docs/ (globs ../../docs, minus adr/)
 └── styles/globals.css  Tailwind base + CSS custom properties
 ```
@@ -197,10 +197,14 @@ rather than raising the limit. (`apps/api` has its own parallel budget: see the 
 ## Types
 
 `src/types/` holds the API response types, one file per domain behind an `index.ts` barrel (import
-from `@/types`). It is a hand-maintained mirror of `apps/api/src/common/types/`, file for file: the
-two can drift, so when an endpoint's response changes, update the matching file on both sides.
-Feature-only view models stay in that feature's `types.ts`. Same applies to `lib/f1/predictionMath.ts`, whose
-`GP_WEIGHTS` / `SPRINT_WEIGHTS` are hand-copied from the Python model.
+from `@/types`). Each file re-exports the matching `apps/api/src/common/types/` file by relative path,
+type-only (`export type * from '../../../api/src/common/types/…'`): the API owns the contract, so a
+response change is made once there and `astro check` (and the e2e fixtures' `tsc`) fail wherever the web
+or its fixtures disagree. No workspace or package is involved; type-only imports are erased at build.
+The one web-defined response type is `GlobalSearchResponse` (`types/search.ts`), because `/api/search`
+builds its shape inline. Feature-only view models stay in that feature's `types.ts`.
+`lib/f1/predictionMath.ts`'s `FEATURE_META` / `SPRINT_FEATURE_META` mirror the Python model's weights and
+labels, and `predictionMath.test.ts` checks both against `docs/feature-weights.json`.
 
 ## Local development
 
