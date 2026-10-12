@@ -9,6 +9,7 @@ import {
   type FastestLapRow,
 } from '../../../../src/modules/circuits/circuit-stats.helpers';
 import type { DriverWinEntry } from '../../../../src/modules/circuits/circuit-era.helpers';
+import { personKey } from '../../../../src/common/identity';
 import type { races, drivers, teams } from '../../../../src/db/schema';
 
 type RaceRow = typeof races.$inferSelect;
@@ -70,7 +71,7 @@ describe('buildCircuitHistory', () => {
   test('backfills a missing winner headshot from the all-era profile', () => {
     const winnerMap = new Map([[1, winnerRow(1, 1, driver({ headshotUrl: null }))]]);
     const allEra = new Map<string, DriverWinEntry>([
-      ['Lando Norris', { driver: driver({ headshotUrl: 'https://cdn/nor.png' }), team, wins: 3, bestIdx: 0 }],
+      [personKey(driver()), { driver: driver({ headshotUrl: 'https://cdn/nor.png' }), team, wins: 3, bestIdx: 0 }],
     ]);
     const [item] = buildCircuitHistory([race({ id: 1 })], winnerMap, allEra, 5);
     expect(item.winner?.headshotUrl).toBe('https://cdn/nor.png');
@@ -79,7 +80,7 @@ describe('buildCircuitHistory', () => {
   test('keeps the winner headshot when the row already has one', () => {
     const winnerMap = new Map([[1, winnerRow(1, 1, driver({ headshotUrl: 'https://cdn/original.png' }))]]);
     const allEra = new Map<string, DriverWinEntry>([
-      ['Lando Norris', { driver: driver({ headshotUrl: 'https://cdn/other.png' }), team, wins: 3, bestIdx: 0 }],
+      [personKey(driver()), { driver: driver({ headshotUrl: 'https://cdn/other.png' }), team, wins: 3, bestIdx: 0 }],
     ]);
     const [item] = buildCircuitHistory([race({ id: 1 })], winnerMap, allEra, 5);
     expect(item.winner?.headshotUrl).toBe('https://cdn/original.png');

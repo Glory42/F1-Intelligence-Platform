@@ -3,7 +3,7 @@ import type { CircuitHistoryItem, CircuitDetailResponse, Driver } from '../../co
 import { SPRINT_FORMATS } from '../../common/constants';
 import { toDriver } from '../../common/mappers';
 import type { DriverWinEntry } from './circuit-era.helpers';
-import { driverKeyFor } from './circuit-era.helpers';
+import { personKey } from '../../common/identity';
 
 type RaceRow = typeof races.$inferSelect;
 type TeamRow = typeof teams.$inferSelect;
@@ -35,7 +35,7 @@ export function buildCircuitHistory(
     let winner: Driver | null = null;
 
     if (winnerRow) {
-      const driverKey = driverKeyFor(winnerRow.drivers);
+      const driverKey = personKey(winnerRow.drivers);
       const latestProfile = driverWinsAllEra.get(driverKey);
       winner = toDriver(winnerRow.drivers, winnerRow.teams);
       if (!winner.headshotUrl && latestProfile?.driver.headshotUrl) {

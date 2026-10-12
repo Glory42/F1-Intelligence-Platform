@@ -227,7 +227,7 @@ Returns a single driver with their season stats for the given year.
 ### `GET /api/drivers/:id/career`
 
 Returns a driver's stats across all seasons they have data in. `drivers` rows are season-scoped and
-FastF1's names vary by season, so seasons are linked by person (`common/driver-identity.ts`): the same
+FastF1's names vary by season, so seasons are linked by person (`common/identity.ts`, golden cases in `docs/identity-cases.json`): the same
 name ignoring accents and case, or the same code with one name extending the other ("Andrea Kimi
 Antonelli" / "Kimi Antonelli"). "Jr." still counts, so a father and son stay separate. `/api/search`
 uses the same rule to list each person once, under their latest season.
@@ -262,7 +262,9 @@ Returns a single team with season stats for the given year.
 
 ### `GET /api/teams/:id/career`
 
-Returns a team's stats across all seasons they have data in.
+Returns a team's stats across all seasons they have data in, following the outfit through its
+rebrands (`constructorKey` in `common/identity.ts`): RB's career includes AlphaTauri and Toro Rosso,
+but never its sister team Red Bull. Each entry keeps its own season's `teamId`.
 
 ---
 

@@ -1,7 +1,5 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  normalizeTeamKey,
-  driverKeyFor,
   aggregateEraWins,
   buildDominanceByEra,
 } from '../../../../src/modules/circuits/circuit-era.helpers';
@@ -51,24 +49,6 @@ function winner(raceId: number, d: DriverRow, t: TeamRow): WinnerRow {
   };
 }
 
-describe('normalizeTeamKey', () => {
-  test('folds rebrand aliases onto one canonical key', () => {
-    expect(normalizeTeamKey('rb')).toBe('racing_bulls');
-    expect(normalizeTeamKey('alphatauri')).toBe('alpha_tauri');
-    expect(normalizeTeamKey('red_bull')).toBe('red_bull_racing');
-  });
-
-  test('passes an unknown key through unchanged', () => {
-    expect(normalizeTeamKey('ferrari')).toBe('ferrari');
-  });
-});
-
-describe('driverKeyFor', () => {
-  test('keys on full name', () => {
-    expect(driverKeyFor(driver({ firstName: 'Lewis', lastName: 'Hamilton' }))).toBe('Lewis Hamilton');
-  });
-});
-
 describe('aggregateEraWins', () => {
   const raceOrder = new Map([[1, 0], [2, 1], [3, 2]]);
 
@@ -85,9 +65,9 @@ describe('aggregateEraWins', () => {
     ];
     const { driverWinsByEra } = aggregateEraWins(rows, raceMap, raceOrder);
     expect(driverWinsByEra.all.size).toBe(3);
-    expect([...driverWinsByEra.modern.keys()]).toEqual(['A One']);
-    expect([...driverWinsByEra.legacy.keys()]).toEqual(['B Two']);
-    expect([...driverWinsByEra.nineties.keys()]).toEqual(['C Three']);
+    expect([...driverWinsByEra.modern.values()].map((e) => e.driver.id)).toEqual([1]);
+    expect([...driverWinsByEra.legacy.values()].map((e) => e.driver.id)).toEqual([2]);
+    expect([...driverWinsByEra.nineties.values()].map((e) => e.driver.id)).toEqual([3]);
   });
 
   test('merges wins across rebranded team keys and counts them together', () => {
@@ -97,8 +77,17 @@ describe('aggregateEraWins', () => {
       winner(2, driver(), team({ teamKey: 'red_bull_racing' })),
     ];
     const { teamWinsByEra } = aggregateEraWins(rows, raceMap, raceOrder);
-    expect(teamWinsByEra.all.size).toBe(1);
-    expect(teamWinsByEra.all.get('red_bull_racing')?.wins).toBe(2);
+    expect([...teamWinsByEra.all.values()].map((e) => e.wins)).toEqual([2]);
+  });
+
+  test("merges one driver's wins across seasons that spell the name differently", () => {
+    const raceMap = new Map([[1, race(1, '2024-05-01')], [2, race(2, '2024-06-01')]]);
+    const rows = [
+      winner(1, driver({ id: 1, code: 'HUL', firstName: 'Nico', lastName: 'Hülkenberg' }), team()),
+      winner(2, driver({ id: 2, code: 'HUL', firstName: 'Nico', lastName: 'Hulkenberg' }), team()),
+    ];
+    const { driverWinsByEra } = aggregateEraWins(rows, raceMap, raceOrder);
+    expect([...driverWinsByEra.all.values()].map((e) => e.wins)).toEqual([2]);
   });
 
   test('a win before 1990 lands only in "all"', () => {
@@ -119,7 +108,7 @@ describe('aggregateEraWins', () => {
       raceMap,
       order,
     );
-    const entry = driverWinsByEra.all.get('Max Verstappen');
+    const [entry] = driverWinsByEra.all.values();
     expect(entry?.wins).toBe(2);
     expect(entry?.driver.headshotUrl).toBe('https://cdn/late.png');
   });

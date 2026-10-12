@@ -4,7 +4,7 @@ import { drivers, teams, seasons, driverSeasonStats, raceResults, races } from '
 import type { Driver, DriverDetailResponse, DriverStanding, DriverYearStats } from '../../common/types';
 import { toDriver } from '../../common/mappers';
 import { resolveSeason, buildStandings, buildCareerStats, type StatsAdapter } from '../../common/standings';
-import { isSamePerson } from '../../common/driver-identity';
+import { isSamePerson } from '../../common/identity';
 
 function toDriverStats(s: typeof driverSeasonStats.$inferSelect) {
   return {

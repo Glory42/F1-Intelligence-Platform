@@ -4,6 +4,7 @@ import { teams, seasons, drivers, teamSeasonStats, racePitStops, races } from '.
 import type { Team, Driver, TeamDetailResponse, TeamStanding, TeamYearStats, PitCrewRanking, TeamPitStop } from '../../common/types';
 import { toTeam, toDriver } from '../../common/mappers';
 import { resolveSeason, buildStandings, buildCareerStats, type StatsAdapter } from '../../common/standings';
+import { constructorTeamKeys } from '../../common/identity';
 
 function toTeamStats(s: typeof teamSeasonStats.$inferSelect) {
   return {
@@ -73,14 +74,13 @@ export class TeamsService {
     );
   }
 
+  // Follows the outfit, not the exact key, so a rebrand (Toro Rosso -> AlphaTauri -> RB) keeps its history.
   async findCareerStats(db: Db, self: typeof teams.$inferSelect): Promise<TeamYearStats[]> {
-    const key = self.teamKey;
-
     const allEntries = await db
       .select()
       .from(teams)
       .innerJoin(seasons, eq(teams.seasonId, seasons.id))
-      .where(eq(teams.teamKey, key))
+      .where(inArray(teams.teamKey, constructorTeamKeys(self.teamKey)))
       .orderBy(desc(seasons.year));
 
     if (!allEntries.length) return [];

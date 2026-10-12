@@ -2,6 +2,7 @@ import type { drivers, teams, driverPredictionFeatures } from '../../db/schema';
 import type { FeatureScores, IntelStandingRow } from '../../common/types';
 import { toDriver } from '../../common/mappers';
 import { GP_FEATURE_MANIFEST } from '../../common/feature-manifest';
+import { personKey } from '../../common/identity';
 
 export interface SprintSeasonTotals {
   sprintWins: number;
@@ -35,7 +36,7 @@ function emptyColumnArrays(): Record<keyof FeatureScores, number[]> {
 }
 
 // Averages every feature score for a driver across all their GP feature rows in a
-// season, keyed by driver code so cross-team moves collapse into one row.
+// season, keyed by person (codes repeat within some seasons) so a team move collapses into one row.
 export function aggregateSeasonFeatures(rows: SeasonFeatureRow[]): AggregatedFeatures[] {
   type Bucket = {
     driver: ReturnType<typeof toDriver>;
@@ -43,14 +44,14 @@ export function aggregateSeasonFeatures(rows: SeasonFeatureRow[]): AggregatedFea
     winProb: number[];
     cols: Record<keyof FeatureScores, number[]>;
   };
-  const byCode = new Map<string, Bucket>();
+  const byPerson = new Map<string, Bucket>();
 
   for (const row of rows) {
     const f = row.driver_prediction_features;
-    let bucket = byCode.get(row.drivers.code);
+    let bucket = byPerson.get(personKey(row.drivers));
     if (!bucket) {
       bucket = { driver: toDriver(row.drivers, row.teams), raw: [], winProb: [], cols: emptyColumnArrays() };
-      byCode.set(row.drivers.code, bucket);
+      byPerson.set(personKey(row.drivers), bucket);
     }
     bucket.driver = toDriver(row.drivers, row.teams);
     bucket.raw.push(Number(f.rawWeightedScore));
@@ -62,7 +63,7 @@ export function aggregateSeasonFeatures(rows: SeasonFeatureRow[]): AggregatedFea
     }
   }
 
-  return Array.from(byCode.values()).map((bucket) => {
+  return Array.from(byPerson.values()).map((bucket) => {
     const features = {} as Record<keyof FeatureScores, string | null>;
     for (const c of FEATURE_COLUMNS) {
       const arr = bucket.cols[c.key];

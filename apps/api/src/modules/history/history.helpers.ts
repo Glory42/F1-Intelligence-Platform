@@ -1,5 +1,5 @@
 import type { ConstructorLineage, DriverRecordStat, LineageMember, RecordChase, RecordEntry } from '../../common/types';
-import { f1dbConstructorId, normalizePersonName } from './f1db-match.helpers';
+import { f1dbConstructorId, f1dbPersonKey } from '../../common/identity';
 
 export type CoreTeamRef = { id: number; teamKey: string };
 export type CoreLink = { id: number; active: boolean };
@@ -46,7 +46,7 @@ export function buildCoreLinks(driverRows: CoreDriverRow[], teamRows: CoreTeamRo
 
   const drivers = new Map<string, CoreLink>();
   for (const r of byYear(driverRows)) {
-    drivers.set(normalizePersonName(`${r.firstName} ${r.lastName}`), { id: r.id, active: r.year === activeYear });
+    drivers.set(f1dbPersonKey(`${r.firstName} ${r.lastName}`), { id: r.id, active: r.year === activeYear });
   }
 
   const keysByConstructor = new Map<string, Map<string, { latest: CoreTeamRow; seasons: number }>>();
