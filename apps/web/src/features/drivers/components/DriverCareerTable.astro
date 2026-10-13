@@ -1,7 +1,6 @@
 ---
 import { Trophy } from 'lucide-react';
 import { getTeamColor } from '@/lib/f1/teamColors';
-import { championshipPoints } from '@/lib/f1/championshipMath';
 import type { DriverYearStats } from '@/types';
 
 interface Props {
@@ -41,7 +40,7 @@ const thisYear = new Date().getFullYear();
             <Trophy size={11} color="#a855f7" className="shrink-0" />
           )}
         </div>
-        <div class="font-bold text-sm text-right">{y.stats ? Math.round(championshipPoints(y.stats)) : '-'}</div>
+        <div class="font-bold text-sm text-right">{y.stats ? Math.round(Number(y.stats.championshipPoints)) : '-'}</div>
         <div class="font-mono text-sm text-right text-muted-foreground">
           {y.stats?.championshipPosition ? `P${y.stats.championshipPosition}` : '-'}
         </div>

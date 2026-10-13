@@ -1,5 +1,6 @@
 from typing import Any
 
+from src.enrichment_coverage import CONFLICT_KEYS
 from src.utils.ingest_runner import OpenF1JobConfig, run_openf1_job
 from src.utils.openf1_client import fetch_team_radio
 
@@ -31,7 +32,7 @@ def run(year: int, round_num: int, session_name: str = "Race") -> None:
         OpenF1JobConfig(
             job_name="ingest_team_radio",
             table="team_radio_clips",
-            conflict_cols=["race_id", "driver_id", "date"],
+            conflict_cols=CONFLICT_KEYS["team_radio_clips"],
             row_label="team radio clips",
             fetch=fetch_team_radio,
             to_rows=_to_rows,

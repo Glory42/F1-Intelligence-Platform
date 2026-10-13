@@ -1,80 +1,57 @@
-"""Covers main.py's auto-detect helpers: they each run one lookup, exit(1) when no
-round matches, and otherwise return (year, round_number) coerced to int. Query params
-and the status filter each helper keys on are pinned so a schedule-flow change can't
-silently repoint them."""
+"""Covers main.auto_detect_round: one lookup per job, keyed on that job's session date and the
+Race Statuses weekend_pipeline says it is due in. Exits 1 when no round matches, otherwise
+returns (year, round_number) coerced to int, and always closes its connection."""
 from datetime import date
 from unittest.mock import patch
 
 import pytest
 
-from src.main import auto_detect_race, auto_detect_sprint, auto_detect_sprint_qualifying
+from src import main
 from tests.support.fake_db import FakeConnection
 
 
-class TestAutoDetectRace:
-    def test_returns_year_and_round_as_ints(self):
-        conn = FakeConnection([{"round_number": "14", "year": "2025"}])
-        assert auto_detect_race(2025, conn) == (2025, 14)
-
-    def test_exits_1_when_no_upcoming_race(self):
-        with pytest.raises(SystemExit) as exc:
-            auto_detect_race(2025, FakeConnection([None]))
-        assert exc.value.code == 1
-
-    def test_query_filters_on_today_and_year_and_skips_done_rounds(self):
-        conn = FakeConnection([{"round_number": 1, "year": 2025}])
-        auto_detect_race(2025, conn)
-        sql, params = conn.cursors[0].executed[0]
-        assert params == (date.today(), 2025, 2025)
-        assert "status NOT IN ('qualifying_done', 'completed')" in sql
-
-    def test_year_none_passes_through_as_null_filter(self):
-        conn = FakeConnection([{"round_number": 1, "year": 2025}])
-        auto_detect_race(None, conn)
-        _, params = conn.cursors[0].executed[0]
-        assert params == (date.today(), None, None)
+def _detect(job, year, rows):
+    conn = FakeConnection([rows])
+    with patch.object(main, "get_conn", return_value=conn):
+        result = main.auto_detect_round(job, year)
+    sql, params = conn.cursors[0].executed[0]
+    return result, sql, params, conn
 
 
-class TestAutoDetectSprintQualifying:
-    def test_returns_round_for_scheduled_sprint_weekend(self):
-        conn = FakeConnection([{"round_number": "6", "year": "2025"}])
-        with patch("src.db.client.get_conn", return_value=conn):
-            assert auto_detect_sprint_qualifying(2025) == (2025, 6)
-        assert conn.closed is True
+class TestAutoDetectRound:
+    def test_ingest_race_finds_the_round_whose_qualifying_is_done(self):
+        result, sql, params, _ = _detect("ingest_race", 2025, {"round_number": 14, "year": 2025})
+        assert result == (2025, 14)
+        assert "r.race_date::date <= %s" in sql
+        assert params == (date.today(), ["qualifying_done"], 2025, 2025)
 
-    def test_exits_1_when_no_sq_round(self):
-        conn = FakeConnection([None])
-        with patch("src.db.client.get_conn", return_value=conn), pytest.raises(SystemExit) as exc:
-            auto_detect_sprint_qualifying(2025)
-        assert exc.value.code == 1
+    def test_ingest_qualifying_keys_on_the_qualifying_day_before_it_is_ingested(self):
+        _, sql, params, _ = _detect("ingest_qualifying", 2025, {"round_number": 1, "year": 2025})
+        assert "COALESCE(r.qualifying_date::date, r.race_date::date - 1) <= %s" in sql
+        assert params[1] == ["scheduled", "sprint_done"]
 
-    def test_keys_on_scheduled_status_and_sprint_qualifying_date(self):
-        conn = FakeConnection([{"round_number": 6, "year": 2025}])
-        with patch("src.db.client.get_conn", return_value=conn):
-            auto_detect_sprint_qualifying(None)
-        sql, params = conn.cursors[0].executed[0]
-        assert "r.status = 'scheduled'" in sql
+    def test_sprint_qualifying_keys_on_its_own_day_and_a_scheduled_weekend(self):
+        _, sql, params, _ = _detect("ingest_sprint_qualifying", None, {"round_number": 6, "year": 2025})
         assert "r.sprint_qualifying_date::date <= %s" in sql
-        assert params == (date.today(), None, None)
+        assert params == (date.today(), ["scheduled"], None, None)
 
+    def test_the_sprint_waits_for_sprint_qualifying(self):
+        _, sql, params, _ = _detect("ingest_sprint", 2025, {"round_number": 6, "year": 2025})
+        assert "r.sprint_date::date <= %s" in sql
+        assert params[1] == ["sprint_qualifying_done"]
 
-class TestAutoDetectSprint:
-    def test_returns_round_for_sprint_qualifying_done_weekend(self):
-        conn = FakeConnection([{"round_number": "6", "year": "2025"}])
-        with patch("src.db.client.get_conn", return_value=conn):
-            assert auto_detect_sprint(2025) == (2025, 6)
+    def test_race_events_look_for_a_completed_race(self):
+        _, _, params, _ = _detect("ingest_stints_sprint", 2025, {"round_number": 6, "year": 2025})
+        assert params[1] == ["completed"]
+
+    def test_coerces_year_and_round_to_ints_and_closes_the_connection(self):
+        result, _, _, conn = _detect("ingest_race", 2025, {"round_number": "14", "year": "2025"})
+        assert result == (2025, 14)
         assert conn.closed is True
 
-    def test_exits_1_when_no_sprint_race_ready(self):
+    def test_exits_1_and_still_closes_the_connection_when_nothing_is_due(self):
         conn = FakeConnection([None])
-        with patch("src.db.client.get_conn", return_value=conn), pytest.raises(SystemExit) as exc:
-            auto_detect_sprint(2025)
+        with patch.object(main, "get_conn", return_value=conn), pytest.raises(SystemExit) as exc:
+            main.auto_detect_round("ingest_sprint", 2025)
         assert exc.value.code == 1
-
-    def test_keys_on_sprint_qualifying_done_status_and_sprint_date(self):
-        conn = FakeConnection([{"round_number": 6, "year": 2025}])
-        with patch("src.db.client.get_conn", return_value=conn):
-            auto_detect_sprint(2025)
-        sql, _ = conn.cursors[0].executed[0]
-        assert "r.status = 'sprint_qualifying_done'" in sql
-        assert "r.sprint_date::date <= %s" in sql
+        assert conn.closed is True

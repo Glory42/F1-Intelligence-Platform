@@ -2,14 +2,11 @@ import { eq, desc, asc, inArray, and } from 'drizzle-orm';
 import type { Db } from '../../config/database';
 import {
   races, circuits, racePredictions, driverPredictionFeatures,
-  drivers, teams, raceResults, seasons, driverSeasonStats,
-  sprintPredictions, sprintResults, driverSprintFeatures,
+  drivers, teams, seasons, driverSeasonStats, sprintPredictions,
 } from '../../db/schema';
-import type {
-  PredictionResponse,
-  PredictionHistoryItem, IntelStandingRow, ModelInfo, SeasonAccuracy,
-} from '../../common/types';
+import type { PredictionHistoryItem, IntelStandingRow, ModelInfo, SeasonAccuracy } from '../../common/types';
 import { resolveSeason } from '../../common/standings';
+import { GP, SPRINT, isDone, type AnySessionKind } from '../../common/session-kind';
 import { aggregateAccuracyBySeason } from './accuracy.helpers';
 import {
   buildHistoryItems,
@@ -21,63 +18,41 @@ import {
   type HistoryWinnerRow,
 } from './prediction-history.helpers';
 import { aggregateSeasonFeatures, buildIntelStandingRows } from './intel-standings.helpers';
-import { buildGpPredictionResponse } from './predictions.helpers';
-
-const GP_DONE = (status: string) => status === 'completed';
-const SPRINT_DONE = (status: string) =>
-  ['sprint_done', 'qualifying_done', 'completed'].includes(status);
-
-type WinnerTable = typeof raceResults | typeof sprintResults;
-type ProbTable = typeof driverPredictionFeatures | typeof driverSprintFeatures;
 
 export class PredictionsService {
-  async findUpcoming(db: Db): Promise<PredictionResponse | null> {
-    return buildGpPredictionResponse(db, 'upcoming');
-  }
-
-  async findByRaceId(db: Db, raceId: number): Promise<PredictionResponse | null> {
-    return buildGpPredictionResponse(db, raceId);
-  }
-
-  // `year` omitted returns every season: used by findAccuracyBySeason() to aggregate across all years.
+  // The Scorecard: GP and sprint predictions side by side. `year` omitted spans every season
+  // (findAccuracyBySeason aggregates over all of them).
   async findHistory(db: Db, year?: number): Promise<PredictionHistoryItem[]> {
     const yearFilter = year !== undefined ? eq(seasons.year, year) : undefined;
-    const [gpRows, sprintRows] = await Promise.all([
-      this.fetchPredictionRows(db, racePredictions, yearFilter),
-      this.fetchPredictionRows(db, sprintPredictions, yearFilter),
+    const [gpItems, sprintItems] = await Promise.all([
+      this.scorecardItems(db, GP, yearFilter),
+      this.scorecardItems(db, SPRINT, yearFilter),
     ]);
-
-    const gpIds = gpRows.map((r) => r.race.id);
-    const sprintIds = sprintRows.map((r) => r.race.id);
-    const gpDoneIds = gpRows.filter((r) => GP_DONE(r.race.status)).map((r) => r.race.id);
-    const sprintDoneIds = sprintRows.filter((r) => SPRINT_DONE(r.race.status)).map((r) => r.race.id);
-
-    const [gpWinners, sprintWinners, gpProbs, sprintProbs] = await Promise.all([
-      this.fetchWinners(db, raceResults, gpDoneIds),
-      this.fetchWinners(db, sprintResults, sprintDoneIds),
-      this.fetchProbs(db, driverPredictionFeatures, gpIds),
-      this.fetchProbs(db, driverSprintFeatures, sprintIds),
-    ]);
-
-    const gpItems = buildHistoryItems(gpRows, {
-      actualWinnerMap: buildWinnerMap(gpWinners),
-      ...buildProbPosMaps(gpProbs),
-      isDone: GP_DONE,
-      isSprint: false,
-    });
-    const sprintItems = buildHistoryItems(sprintRows, {
-      actualWinnerMap: buildWinnerMap(sprintWinners),
-      ...buildProbPosMaps(sprintProbs),
-      isDone: SPRINT_DONE,
-      isSprint: true,
-    });
-
     return mergeHistoryByDateDesc(gpItems, sprintItems);
+  }
+
+  private async scorecardItems(
+    db: Db,
+    kind: AnySessionKind,
+    yearFilter: ReturnType<typeof eq> | undefined,
+  ): Promise<PredictionHistoryItem[]> {
+    const rows = await this.fetchPredictionRows(db, kind.predictions, yearFilter);
+    const doneIds = rows.filter((r) => isDone(kind, r.race.status)).map((r) => r.race.id);
+    const [winners, probs] = await Promise.all([
+      this.fetchWinners(db, kind.results, doneIds),
+      this.fetchProbs(db, kind.features, rows.map((r) => r.race.id)),
+    ]);
+    return buildHistoryItems(rows, {
+      actualWinnerMap: buildWinnerMap(winners),
+      ...buildProbPosMaps(probs),
+      isDone: (status) => isDone(kind, status),
+      isSprint: kind.session === 'sprint',
+    });
   }
 
   private async fetchPredictionRows(
     db: Db,
-    table: typeof racePredictions | typeof sprintPredictions,
+    table: AnySessionKind['predictions'],
     yearFilter: ReturnType<typeof eq> | undefined,
   ): Promise<HistoryPredictionRow[]> {
     const rows = await db
@@ -101,7 +76,7 @@ export class PredictionsService {
 
   private async fetchWinners(
     db: Db,
-    table: WinnerTable,
+    table: AnySessionKind['results'],
     raceIds: number[],
   ): Promise<HistoryWinnerRow[]> {
     if (raceIds.length === 0) return [];
@@ -115,7 +90,7 @@ export class PredictionsService {
 
   private async fetchProbs(
     db: Db,
-    table: ProbTable,
+    table: AnySessionKind['features'],
     raceIds: number[],
   ): Promise<HistoryProbRow[]> {
     if (raceIds.length === 0) return [];
@@ -162,13 +137,14 @@ export class PredictionsService {
     const aggregated = aggregateSeasonFeatures(featureRows);
     const driverIds = aggregated.map((r) => r.driver.id);
 
-    const sprintStatsRows = driverIds.length > 0
+    const seasonTotalRows = driverIds.length > 0
       ? await db
           .select({
             driverId: driverSeasonStats.driverId,
             sprintWins: driverSeasonStats.sprintWins,
             sprintPodiums: driverSeasonStats.sprintPodiums,
             sprintTotalPoints: driverSeasonStats.sprintTotalPoints,
+            totalPoints: driverSeasonStats.totalPoints,
           })
           .from(driverSeasonStats)
           .where(and(
@@ -177,7 +153,7 @@ export class PredictionsService {
           ))
       : [];
 
-    return buildIntelStandingRows(aggregated, new Map(sprintStatsRows.map((s) => [s.driverId, s])));
+    return buildIntelStandingRows(aggregated, new Map(seasonTotalRows.map((s) => [s.driverId, s])));
   }
 
   async getModelInfo(db: Db): Promise<ModelInfo> {

@@ -4,7 +4,7 @@ import { aggregateCareerStats } from '../../../../src/features/compare/compareSt
 type Stats = {
   wins: number;
   podiums: number;
-  totalPoints: string;
+  championshipPoints: string;
   dnfCount: number;
   championshipPosition: number | null;
 };
@@ -18,31 +18,31 @@ describe('aggregateCareerStats', () => {
 
   test('sums wins, podiums, points, and dnfs across years', () => {
     const career = [
-      year({ wins: 2, podiums: 5, totalPoints: '150.5', dnfCount: 1, championshipPosition: 4 }),
-      year({ wins: 1, podiums: 3, totalPoints: '90', dnfCount: 2, championshipPosition: 6 }),
+      year({ wins: 2, podiums: 5, championshipPoints: '150.5', dnfCount: 1, championshipPosition: 4 }),
+      year({ wins: 1, podiums: 3, championshipPoints: '90', dnfCount: 2, championshipPosition: 6 }),
     ];
     const result = aggregateCareerStats(career, () => 0);
     expect(result).toEqual(expect.objectContaining({ wins: 3, podiums: 8, points: 240.5, dnfs: 3 }));
   });
 
   test('skips years with null stats', () => {
-    const career = [year({ wins: 1, podiums: 1, totalPoints: '25', dnfCount: 0, championshipPosition: 1 }), year(null)];
+    const career = [year({ wins: 1, podiums: 1, championshipPoints: '25', dnfCount: 0, championshipPosition: 1 }), year(null)];
     const result = aggregateCareerStats(career, () => 0);
     expect(result?.wins).toBe(1);
   });
 
   test('bestFin tracks the minimum championship position seen', () => {
     const career = [
-      year({ wins: 0, podiums: 0, totalPoints: '0', dnfCount: 0, championshipPosition: 5 }),
-      year({ wins: 0, podiums: 0, totalPoints: '0', dnfCount: 0, championshipPosition: 2 }),
-      year({ wins: 0, podiums: 0, totalPoints: '0', dnfCount: 0, championshipPosition: null }),
+      year({ wins: 0, podiums: 0, championshipPoints: '0', dnfCount: 0, championshipPosition: 5 }),
+      year({ wins: 0, podiums: 0, championshipPoints: '0', dnfCount: 0, championshipPosition: 2 }),
+      year({ wins: 0, podiums: 0, championshipPoints: '0', dnfCount: 0, championshipPosition: null }),
     ];
     const result = aggregateCareerStats(career, () => 0);
     expect(result?.bestFin).toBe(2);
   });
 
   test('uses getEntries and getPoles to extract entity-specific fields', () => {
-    const career = [year({ wins: 0, podiums: 0, totalPoints: '0', dnfCount: 0, championshipPosition: null })];
+    const career = [year({ wins: 0, podiums: 0, championshipPoints: '0', dnfCount: 0, championshipPosition: null })];
     const result = aggregateCareerStats(
       career,
       () => 22,

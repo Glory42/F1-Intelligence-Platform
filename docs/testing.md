@@ -47,8 +47,12 @@ pytest, config in `pyproject.toml` (`pythonpath = ["."]`, `testpaths = ["tests"]
 
 - **Pure functions are tested directly**: `math_utils.py` (`normalize_minmax`, `softmax`,
   `bayesian_win_rate`, …), pure `feature_helpers.py` helpers, the model `WEIGHTS` invariants
-  (`test_weights.py`: sum-to-1 and positivity for both models), `rank_by_probability`,
-  `race_weekend_window`, and the FastF1 enrichment converters (`test_fastf1_enrichment.py`: stint,
+  (`test_weights.py`: sum-to-1 and positivity for both models, plus weights, labels and softmax
+  temperature against `docs/feature-weights.json`), `rank_by_probability`,
+  `race_weekend_window`, `weekend_pipeline` (`test_weekend_pipeline.py`: `plan`, the chains,
+  `due_statuses`, `repair_plan`, `prediction_steps`), `enrichment_coverage` (`test_enrichment_coverage.py`:
+  `source_for`, `missing`, compound normalisation from either source; the coverage query through the
+  fake DB), and the FastF1 enrichment converters (`test_fastf1_enrichment.py`: stint,
   pit-stop and race-control rows over plain records, telemetry input reshaping).
 - **DB-touching functions are tested through a fake double**: `tests/support/fake_db.py` provides
   `FakeCursor` / `FakeConnection`, shaped like psycopg2's `RealDictCursor`. `FakeConnection` takes a
@@ -57,11 +61,14 @@ pytest, config in `pyproject.toml` (`pythonpath = ["."]`, `testpaths = ["tests"]
   `ingest_runner.py`'s two shared runners (`run_ingest_job`, `run_qualifying_ingest_job`): the latter via
   monkeypatched per-job callables and FastF1 helpers, no real session data needed. The same double
   covers `data_quality_audit._audit_race` (per-status gate/threshold branching),
-  `data_quality_repair.run` (issue grouping + resolve/rollback, with the owning jobs mocked),
-  `main.py`'s `auto_detect_*` helpers, (with FastF1's schedule/session mocked) `sync_schedule`
+  `data_quality_repair.run` (issue grouping, repair plan per race, resolve bookkeeping),
+  `main.auto_detect_round`, (with FastF1's schedule/session mocked) `sync_schedule`
   and `sync_season`, `compute_title_odds.run` (incl. replaying an earlier round without seeing later
-  results or predictions), and `auto_runner._retry_missing_race_events` (only the empty table's job
-  reruns, a cleanly finished job is settled in the memo, budget-limited telemetry stays pending).
+  results or predictions), `auto_runner._retry_missing_race_events` (only the missing coverage's job
+  reruns, a cleanly finished job is settled in the memo, budget-limited telemetry stays pending), and
+  the CLI's session-job dispatch (`test_main_cli.py`).
+- Anything that runs chain steps (`auto_runner`, `data_quality_repair`) is tested by swapping entries
+  of the one job table, `weekend_pipeline.JOBS` (`monkeypatch.setitem`), never by patching job modules.
 - `conftest.py` sets a placeholder `DATABASE_URL` so importing a job module (which reads it at import
   time) works with or without a local `.env`. Tests never open a real connection.
 - `upsert.py` and `prediction_runner.py` write via `psycopg2.extras.execute_batch`, which renders SQL
@@ -69,16 +76,25 @@ pytest, config in `pyproject.toml` (`pythonpath = ["."]`, `testpaths = ["tests"]
   (`test_upsert.py`, `test_prediction_runner.py`) monkeypatch `execute_batch` itself and assert on the
   params it receives, the same pattern `test_ingest_runner.py` already uses for its own `execute_batch`
   call, rather than extending `FakeCursor` to fake SQL rendering.
+- `test_feature_runner.py` runs both feature jobs (`compute_features`, `compute_sprint_features`, each a
+  `feature_runner.FeatureJobSpec`) end to end and pins every written score to the rows weighted-v3 /
+  sprint-v2 produced before the runner existed. Its fake connection routes each read by a marker in its
+  SQL rather than call order (the reads are independent), and it reads the written rows back from
+  `execute_batch`'s params, naming columns from the composed INSERT.
 
 ## API unit (`apps/api/tests/unit/`)
 
 `bun test`, no DB, no network. Mirrors `src/` by domain: the shared `src/common/` layer (`mappers`,
-`standings`, `prediction-response`, `cache`, `driver-identity`, `feature-manifest`) and each module's
+`standings`, `cache`, `identity`, `feature-manifest`) and each module's
 pure `*.helpers.ts` (`circuits/` track outline, track profile, circuit era/stats; `drivers/`
-classification, qualifying gap; `history/` helpers, F1DB match; `predictions/` accuracy, prediction
-history, intel standings; `race-events/openf1.mappers`; `quality`). Fixtures are plain objects typed as
-`typeof <table>.$inferSelect`; see
-`prediction-response.test.ts` for the pattern.
+classification, qualifying gap; `history/` helpers; `predictions/` accuracy, prediction
+history, intel standings; `race-events/openf1.mappers`; `quality`). `feature-manifest.test.ts` checks the
+manifest's labels against `docs/feature-weights.json`, the same file the Python and web drift tests read. Fixtures are plain objects typed as
+`typeof <table>.$inferSelect`; see `mappers.test.ts` for the pattern. `identity.test.ts` reads its
+cases from `docs/identity-cases.json`, the same file `data-engine/tests/test_f1db.py` checks
+`normalize_person_name` against, so the two languages can't drift on the F1DB join key. The GP/sprint reads in
+`common/session-reads.ts` are DB-bound, so they are covered by integration tests instead
+(`integration/session-kind/`: the same assertions run once per kind).
 
 Anything pure that a service delegates to (row→DTO mapping, aggregation, normalisation) belongs
 here. If a service method is hard to unit-test, that's usually a sign the pure part should be
@@ -109,24 +125,37 @@ suite never touches Neon.
 - **Covered**: `races` (incl. circuit outline + circuit telemetry), `race-events`, `race-story`,
   `strategy`, `telemetry`, `drivers` (incl. career, racecraft, teammate battle), `teams` (incl. pit
   stops), `seasons`, `search`, `predictions` (incl. Friday pace, title odds), `sprint`, `history`,
-  the home hub's on-this-day query, and the `edgeCache` middleware (`common/edge-cache.ts`). Not yet: `quality`.
+  the home hub's on-this-day query, the `edgeCache` middleware (`common/edge-cache.ts`), and the route
+  factories (`route/route.test.ts`: 400/404 answers and Cache-Control derived from the data's race
+  status or season, never from `?year=`). Not yet: `quality`.
 
 ## Web unit (`apps/web/tests/unit/`)
 
 Vitest, config in `vitest.config.ts` (include `tests/unit/**/*.test.{ts,tsx}`, `@` alias, setup file).
 
-- **Default environment is `node`**: pure logic runs there: `lib/f1/predictionMath.ts` (all exports),
+- **Default environment is `node`**: pure logic runs there: `lib/f1/predictionMath.ts` (all exports; `FEATURE_META`
+  weights + labels and `SOFTMAX_TEMPERATURE` checked against `docs/feature-weights.json`),
   `lib/f1/teamColors` / `lib/f1/teamLogos` / `features/history/f1dbCountries`, `features/compare/compareStats.ts`,
-  `features/history/historyView.ts`, `features/races/{raceView,calendar,loadRaceEvents}` (race page and
+  the compare stat rows (`features/compare/{driver,team}CompareConfig.ts`: Championship Points reads the API's
+  `championshipPoints`, never a client-side GP + sprint sum), `features/history/historyView.ts`, `features/races/{raceView,calendar,loadRaceEvents}` (race page and
   calendar view logic), `components/data/{chartScale,labelLayout}`, the hub/circuits/drivers/teams feature helpers,
   `features/predictions/{buildPredictionPageData,predictionCopy}` (API mocked with `vi.mock`, not MSW).
+- **Page-data loaders are tested through MSW**: `features/drivers/loadDriverPageData`,
+  `features/teams/loadTeamPageData`, `features/races/loadRacePageData` (GP and sprint) and
+  `features/history/loadHistoryPageData`. Each test stubs the API routes the page hits with
+  `apiOk`/`apiError` (`tests/support/msw/routes.ts`), calls the loader with a URL and a pinned `now`, and
+  asserts on the returned view model; `recordApiRequests()` captures which endpoints were requested, so
+  "only the open tab is fetched" is asserted directly. Career-year resolution is covered for all three
+  fallbacks (requested → current → latest season).
 - **jsdom is opt-in per file** via a `// @vitest-environment jsdom` docblock on line 1: used for
   hook/component tests (`useCompareController`, `useGlobalSearch`, `GlobalSearch`) with Testing
   Library.
 - **`tests/support/setup.ts`**: jest-dom matchers, a `ResizeObserver` stub (cmdk needs it), and the
   MSW server lifecycle (`onUnhandledRequest: 'error'`, reset between tests).
 - **`tests/support/msw/`**: `handlers.ts` + `fixtures.ts` mock the `src/lib/api.ts` endpoints at
-  `http://localhost:8787`. Client-side fetches in the components under test hit these.
+  `http://localhost:8787`. Client-side fetches in the components under test hit these. `routes.ts` adds
+  per-test overrides (`apiOk`, `apiError`) and `recordApiRequests()`; `setup.ts` resets handlers and
+  request listeners after each test.
 - Not covered: `.astro` component rendering.
 
 ## Web e2e (`apps/e2e/`)
@@ -144,6 +173,9 @@ Playwright, its own `package.json` and `playwright.config.ts` (see
 - The fixture server sends CORS headers because `GlobalSearch` / `DriverCompareTool` /
   `TeamCompareTool` fetch client-side: a genuine cross-origin browser request. Every other route is
   only ever hit server-side.
+- Every fixture in `fixtures/data.ts` is typed with `apps/web/src/types`, which re-exports the API's
+  `common/types`: `bun run typecheck` (`tsc --noEmit`, also a CI step) fails when a fixture drifts from
+  the real response shape, e.g. a field the API added.
 - Smoke specs (`tests/smoke/`) cover the home hub, `/prediction`, `/prediction/sprint/[id]`,
   `/races/[id]` (+ sprint, race story, telemetry), `/circuits` + `/circuits/[key]`, `/drivers` +
   `/drivers/[id]`, `/teams` + `/teams/[id]`, both compare pages, `/history` (all four tabs, old-URL redirects),
@@ -162,7 +194,7 @@ Four jobs, on every push to `master` and every PR:
 | `data-engine` | `pip install -r requirements-dev.txt` → `pytest -v` |
 | `api` | `bun install` → `test:db:up` (docker compose + migrations) → `bun run test` → `bun run typecheck` → `bun run lint` |
 | `web` | `bun install` → `bun run build` → `bun run test` → `bun run typecheck` → `bun run lint` |
-| `e2e` | `bun install` (web + e2e) → `playwright install chromium` → `bun run test` |
+| `e2e` | `bun install` (web + e2e) → `bun run typecheck` (fixtures against the API's types) → `playwright install chromium` → `bun run test` |
 
 The `api` job runs the integration suite against the same `docker-compose.test.yml` stack: CI never
 spends Neon CU-hours, and no `TEST_DATABASE_URL` secret is needed any more.
@@ -173,6 +205,8 @@ spends Neon CU-hours, and no `TEST_DATABASE_URL` secret is needed any more.
   part over testing a DB-bound method.
 - **New API endpoint / query** → an integration file under `tests/integration/<domain>/`; add a
   factory if a table has none; `truncateAll` in `beforeAll`/`afterAll`.
+- **New page logic (tabs, fallbacks, shaping)** → put it in a page-data loader under `features/<area>/` and
+  test the loader with MSW (`node` environment), mirroring `tests/unit/features/<area>/`.
 - **New interactive web island** → a `jsdom` Vitest file; add MSW handlers for any endpoint it
   calls; consider an e2e smoke spec + a fixture route if it's a whole page.
 - **New ETL scoring function** → pytest; pure if possible, otherwise script `FakeConnection` with

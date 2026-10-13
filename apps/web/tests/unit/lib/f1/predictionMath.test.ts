@@ -17,17 +17,24 @@ import {
   FEATURE_META,
   SPRINT_WEIGHTS,
   SPRINT_FEATURE_META,
+  SOFTMAX_TEMPERATURE,
 } from '../../../../src/lib/f1/predictionMath';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const featureWeightsFixture = JSON.parse(
+type FeatureManifestFixture = {
+  softmax_temperature: number;
+  gp: Record<string, { weight: number; label: string }>;
+  sprint: Record<string, { weight: number; label: string }>;
+};
+
+const featureWeightsFixture: FeatureManifestFixture = JSON.parse(
   readFileSync(join(__dirname, '../../../../../../docs/feature-weights.json'), 'utf-8'),
 );
 
-// The shared fixture is snake_case (Python-native); GP_WEIGHTS/SPRINT_WEIGHTS are camelCase.
-function toSnakeCaseWeights(weights: Record<string, number>): Record<string, number> {
+// The shared fixture is snake_case (Python-native); FEATURE_META/SPRINT_FEATURE_META are camelCase.
+function toSnakeCaseKeys<T>(record: Record<string, T>): Record<string, T> {
   return Object.fromEntries(
-    Object.entries(weights).map(([key, value]) => [
+    Object.entries(record).map(([key, value]) => [
       key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`),
       value,
     ]),
@@ -123,12 +130,16 @@ describe('SPRINT_WEIGHTS / SPRINT_FEATURE_META', () => {
 });
 
 describe('docs/feature-weights.json (cross-language drift check)', () => {
-  test('GP_WEIGHTS matches the shared fixture', () => {
-    expect(toSnakeCaseWeights(GP_WEIGHTS)).toEqual(featureWeightsFixture.gp);
+  test('FEATURE_META weights and labels match the shared fixture', () => {
+    expect(toSnakeCaseKeys(FEATURE_META)).toEqual(featureWeightsFixture.gp);
   });
 
-  test('SPRINT_WEIGHTS matches the shared fixture', () => {
-    expect(toSnakeCaseWeights(SPRINT_WEIGHTS)).toEqual(featureWeightsFixture.sprint);
+  test('SPRINT_FEATURE_META weights and labels match the shared fixture', () => {
+    expect(toSnakeCaseKeys(SPRINT_FEATURE_META)).toEqual(featureWeightsFixture.sprint);
+  });
+
+  test('SOFTMAX_TEMPERATURE matches the shared fixture', () => {
+    expect(SOFTMAX_TEMPERATURE).toBe(featureWeightsFixture.softmax_temperature);
   });
 });
 

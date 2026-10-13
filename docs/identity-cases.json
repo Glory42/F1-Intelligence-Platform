@@ -1,0 +1,51 @@
+{
+  "_about": "Golden identity cases, read by apps/api/tests/unit/common/identity.test.ts and data-engine/tests/test_f1db.py. personKey keeps Jr./Sr. (core drivers: ADR-0009, one person per first+last name per season); f1dbPersonKey drops the suffix to match F1DB's spelling (data-engine normalize_person_name).",
+  "people": [
+    { "firstName": "Sergio", "lastName": "Pérez", "personKey": "sergio perez", "f1dbPersonKey": "sergio perez" },
+    { "firstName": "Nico", "lastName": "Hülkenberg", "personKey": "nico hulkenberg", "f1dbPersonKey": "nico hulkenberg" },
+    { "firstName": "Kimi", "lastName": "Räikkönen", "personKey": "kimi raikkonen", "f1dbPersonKey": "kimi raikkonen" },
+    { "firstName": "Carlos", "lastName": "Sainz Jr.", "personKey": "carlos sainz jr.", "f1dbPersonKey": "carlos sainz" },
+    { "firstName": "Nelson", "lastName": "Piquet Jr.", "personKey": "nelson piquet jr.", "f1dbPersonKey": "nelson piquet" },
+    { "firstName": "Nelson", "lastName": "Piquet", "personKey": "nelson piquet", "f1dbPersonKey": "nelson piquet" },
+    { "firstName": "  Max ", "lastName": "  Verstappen ", "personKey": "max verstappen", "f1dbPersonKey": "max verstappen" }
+  ],
+  "samePerson": [
+    { "a": ["HUL", "Nico", "Hülkenberg"], "b": ["HUL", "Nico", "Hulkenberg"], "same": true },
+    { "a": ["PER", "Sergio", "Pérez"], "b": ["PER", "Sergio", "Perez"], "same": true },
+    { "a": ["ANT", "Andrea", "Kimi Antonelli"], "b": ["ANT", "Kimi", "Antonelli"], "same": true },
+    { "a": ["XYZ", "Andrea", "Kimi Antonelli"], "b": ["ANT", "Kimi", "Antonelli"], "same": false },
+    { "a": ["PIQ", "Nelson", "Piquet"], "b": ["PIQ", "Nelson", "Piquet Jr."], "same": false },
+    { "a": ["MSC", "Michael", "Schumacher"], "b": ["MSC", "Mick", "Schumacher"], "same": false },
+    { "a": ["BER", "Éric", "Bernard"], "b": ["BER", "Gerhard", "Berger"], "same": false }
+  ],
+  "sameConstructor": [
+    ["minardi", "toro_rosso", "alphatauri", "alpha_tauri", "rb", "racing_bulls"],
+    ["stewart", "jaguar", "red_bull", "red_bull_racing"],
+    ["jordan", "midland", "mf1", "spyker", "force_india", "racing_point", "aston_martin"],
+    ["sauber", "bmw_sauber", "alfa_romeo_racing", "alfa_romeo", "kick_sauber"],
+    ["toleman", "benetton", "renault", "lotus_f1", "alpine"],
+    ["bar", "honda", "brawn", "mercedes"],
+    ["virgin", "marussia", "manor_marussia", "manor"],
+    ["haas", "haas_f1_team"]
+  ],
+  "distinctConstructors": [
+    ["red_bull", "rb"],
+    ["red_bull_racing", "racing_bulls"],
+    ["lotus_f1", "team_lotus"],
+    ["ferrari", "mclaren"]
+  ],
+  "f1dbConstructorIds": {
+    "ferrari": "ferrari",
+    "aston_martin": "aston-martin",
+    "red_bull": "red-bull",
+    "red_bull_racing": "red-bull",
+    "toro_rosso": "toro-rosso",
+    "alphatauri": "alphatauri",
+    "alpha_tauri": "alphatauri",
+    "rb": "rb",
+    "haas_f1_team": "haas",
+    "alfa_romeo_racing": "alfa-romeo",
+    "manor_marussia": "manor",
+    "team_lotus": "lotus"
+  }
+}

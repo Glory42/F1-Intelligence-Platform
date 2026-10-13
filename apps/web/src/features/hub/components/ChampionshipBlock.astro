@@ -1,6 +1,6 @@
 ---
 import HomeBlock from './HomeBlock.astro';
-import { championshipPoints, formatTitleOdds } from '@/lib/f1/championshipMath';
+import { formatTitleOdds } from '@/lib/f1/championshipMath';
 import { getTeamColor } from '@/lib/f1/teamColors';
 import type { DriverStanding, TeamStanding, TitleOddsResponse } from '@/types';
 
@@ -21,11 +21,11 @@ const teamOdds = new Map(titleOdds?.teams.map((t) => [t.team.id, t.titleProbabil
 
 const topDrivers: Row[] = drivers.slice(0, TOP).map((s) => ({
   key: s.driver.id, href: `/drivers/${s.driver.id}`, code: s.driver.code, name: s.driver.fullName,
-  color: getTeamColor(s.driver.team.teamKey), points: championshipPoints(s.stats), odds: driverOdds.get(s.driver.id) ?? null,
+  color: getTeamColor(s.driver.team.teamKey), points: Number(s.stats.championshipPoints), odds: driverOdds.get(s.driver.id) ?? null,
 }));
 const topTeams: Row[] = teams.slice(0, TOP).map((s) => ({
   key: s.team.id, href: `/teams/${s.team.id}`, code: '', name: s.team.name,
-  color: getTeamColor(s.team.teamKey), points: championshipPoints(s.stats), odds: teamOdds.get(s.team.id) ?? null,
+  color: getTeamColor(s.team.teamKey), points: Number(s.stats.championshipPoints), odds: teamOdds.get(s.team.id) ?? null,
 }));
 const tables = [
   { label: 'Drivers', rows: topDrivers },

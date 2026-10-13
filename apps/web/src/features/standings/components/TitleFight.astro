@@ -7,7 +7,7 @@ import DriverIdentity from '@/components/identity/DriverIdentity.astro';
 import RankCell from '@/components/data/RankCell.astro';
 import ShareBar from '@/features/standings/components/ShareBar.astro';
 import { getTeamColor } from '@/lib/f1/teamColors';
-import { championshipPoints, formatTitleOdds, titleContention, remainingSessions } from '@/lib/f1/championshipMath';
+import { formatTitleOdds, titleContention, remainingSessions } from '@/lib/f1/championshipMath';
 import type { DriverStanding, Race, TitleOddsResponse } from '@/types';
 
 interface Props {
@@ -22,10 +22,10 @@ const CHART_DRIVERS = 4;
 const COLUMNS = 'grid-cols-[40px_1fr_60px_140px] md:grid-cols-[40px_1fr_70px_200px_110px]';
 
 const contention = titleContention(
-  standings.map((s) => ({ id: s.driver.id, points: championshipPoints(s.stats) })),
+  standings.map((s) => ({ id: s.driver.id, points: Number(s.stats.championshipPoints) })),
   { year, ...remainingSessions(races) },
 );
-const pointsById = new Map(standings.map((s) => [s.driver.id, championshipPoints(s.stats)]));
+const pointsById = new Map(standings.map((s) => [s.driver.id, Number(s.stats.championshipPoints)]));
 
 // One round of odds is a single point per driver: nothing to chart until a second round exists.
 const roundsComputed = new Set(odds.history.map((h) => h.afterRound)).size;

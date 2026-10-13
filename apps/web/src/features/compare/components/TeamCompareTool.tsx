@@ -1,13 +1,13 @@
 import { useMemo } from 'react';
 import { api } from '@/lib/api';
-import type { Team, TeamDetailResponse, TeamSeasonStats, TeamYearStats, SeasonSummary } from '@/types';
+import type { Team, TeamDetailResponse, TeamYearStats, SeasonSummary } from '@/types';
 import { getTeamColor } from '@/lib/f1/teamColors';
 import { getTeamLogo } from '@/lib/f1/teamLogos';
-import { championshipPoints } from '@/lib/f1/championshipMath';
-import { aggregateCareerStats, DEFAULT_COMPARE_YEAR, type CareerTotals } from '../compareStats';
+import { aggregateCareerStats, DEFAULT_COMPARE_YEAR } from '../compareStats';
+import { seasonStatConfig, careerStatConfig } from '../teamCompareConfig';
 import { useCompareController } from '../useCompareController';
 import { SearchSelect } from '@/components/ui/search-select';
-import { ComparisonRow, type StatRowConfig } from './ComparisonRow';
+import { ComparisonRow } from './ComparisonRow';
 import { CompareStatus } from './CompareStatus';
 import { CompareEntityCard } from './CompareEntityCard';
 import { CompareLayout } from './CompareLayout';
@@ -21,47 +21,6 @@ interface Props {
 const teamSubtitle = (
   <span className="text-[11px] text-muted-foreground block mt-1">Constructor</span>
 );
-
-const seasonStatConfig: StatRowConfig<TeamSeasonStats>[] = [
-  {
-    label: 'Championship Points',
-    value: (s) => championshipPoints(s),
-    format: (v) => v.toString(),
-  },
-  { label: 'Grand Prix Wins', value: (s) => s.wins },
-  { label: 'Podiums Secured', value: (s) => s.podiums },
-  {
-    label: 'Car Performance Score',
-    value: (s) => parseFloat(s.carPerformanceScore || '0'),
-    format: (v) => v.toFixed(1),
-  },
-  {
-    label: 'Reliability Score',
-    value: (s) => parseFloat(s.reliabilityScore || '0') * 100,
-    format: (v) => `${Math.round(v)}%`,
-  },
-  { label: 'Constructor DNFs', value: (s) => s.dnfCount, lowerBetter: true },
-  {
-    label: 'Avg Finish Position',
-    value: (s) => parseFloat(s.avgFinishPosition || '20'),
-    format: (v) => `P${v.toFixed(1)}`,
-    lowerBetter: true,
-  },
-];
-
-const careerStatConfig: StatRowConfig<CareerTotals>[] = [
-  {
-    label: 'Best Championship Finish',
-    value: (c) => c.bestFin || 10,
-    format: (v) => (v === 10 ? '-' : `P${v}`),
-    lowerBetter: true,
-  },
-  { label: 'Total Points', value: (c) => c.points, format: (v) => v.toFixed(1) },
-  { label: 'Career Wins', value: (c) => c.wins },
-  { label: 'Career Podiums', value: (c) => c.podiums },
-  { label: 'Races Completed', value: (c) => c.entries },
-  { label: 'Total DNFs', value: (c) => c.dnfs, lowerBetter: true },
-];
 
 export function TeamCompareTool({ allSeasons, initialTeams, allTeams }: Props) {
   const years = useMemo(() => allSeasons.map((s) => s.year).sort((a, b) => b - a), [allSeasons]);

@@ -44,6 +44,26 @@ if (historyResult.status === 'fulfilled') history = historyResult.value;
 ---
 ```
 
+### Page-data loaders
+
+Pages with tabs, fallbacks or shaping keep that logic out of frontmatter: a loader in
+`features/<area>/` takes the request URL (and `now`, so tests can pin the date) and returns a typed
+view model; the page destructures it and only renders. The loader is still called from frontmatter,
+so fetching stays server-side.
+
+| Loader | Page | Owns |
+|---|---|---|
+| `drivers/loadDriverPageData` | `/drivers/[id]` | career-year resolution, active-tab fetch (teammate / career / model), headshot/titles/flag, season links |
+| `teams/loadTeamPageData` | `/teams/[id]` | career-year resolution, active-tab fetch (standings / pit crew / history), teammate head-to-head rows, season links |
+| `races/loadRacePageData(kind)` | `/races/[id]` + `/races/[id]/sprint` | status badge, visible tabs, prediction verdict, hero data; GP vs sprint differences live in one descriptor (`races/raceSessionBehaviour.ts`) |
+| `history/loadHistoryPageData` | `/history` | per-tab fetch, leaderboard rows, headline tiles, on-this-day date, lineage start year |
+| `predictions/buildPredictionPageData(kind)` | `/prediction/[id]` + `/prediction/sprint/[id]` | prediction + detail fetch, winner, breakdown |
+
+Each loader degrades optional data to typed empties (`null` / `[]`) and reports a missing main
+resource as `error`, never a throw. Career-year resolution (requested season if they raced in it,
+else this season, else their last) is `lib/careerYear.ts`; season links keep the open tab through
+`seasonTabHref` in `lib/pageTabs.ts`.
+
 ### The three sanctioned client-fetch exceptions
 
 Client-side fetching is allowed **only** for UI whose data depends on arbitrary user input at view
@@ -83,11 +103,11 @@ src/
 ├── features/           domain UI, grouped by area (one per sidebar section, plus docs and search)
 │   └── <area>/
 │       ├── components/ the area's .astro / .tsx pieces
-│       └── *.ts        pure logic + hooks (compareStats, useCompareController, raceTabs, nextSession, …)
-├── lib/                app plumbing: api client, utils, site, pageTabs, sidebarState, legacyRedirects
+│       └── *.ts        pure logic, hooks and page-data loaders (compareStats, useCompareController, loadRacePageData, …)
+├── lib/                app plumbing: api client, utils, site, pageTabs, careerYear, sidebarState, legacyRedirects
 │   └── f1/             F1 reference data and maths shared by features: teamColors, teamLogos, countryFlags,
 │                       championshipMath, predictionMath, tyres
-├── types/            API response types, one file per domain (mirrors apps/api common/types/), index.ts barrel
+├── types/            API response types: each file re-exports apps/api common/types/ (type-only), index.ts barrel
 ├── content/config.ts   Astro content collection for docs/ (globs ../../docs, minus adr/)
 └── styles/globals.css  Tailwind base + CSS custom properties
 ```
@@ -112,6 +132,8 @@ second unrelated feature needs it.
   the two pickers, season/career controls and both entity cards (A/B badges match the stat columns, so
   team-mates with the same colour stay tellable apart). Stacks panel-first below `lg`.
 - **Season picker**: `YearSelect` in `PageHeader`'s `aside` slot, `?year=` in the URL, default current season.
+  Tabbed pages pass `hrefFor` built with `seasonTabHref`, so switching season keeps the open tab and the default
+  tab keeps the plain URL.
 - **Retired URLs**: `/prediction/recap[/year]` 301s to the Predictions Scorecard tab (`src/middleware.ts`).
 
 ## Routes
@@ -175,10 +197,14 @@ rather than raising the limit. (`apps/api` has its own parallel budget: see the 
 ## Types
 
 `src/types/` holds the API response types, one file per domain behind an `index.ts` barrel (import
-from `@/types`). It is a hand-maintained mirror of `apps/api/src/common/types/`, file for file: the
-two can drift, so when an endpoint's response changes, update the matching file on both sides.
-Feature-only view models stay in that feature's `types.ts`. Same applies to `lib/f1/predictionMath.ts`, whose
-`GP_WEIGHTS` / `SPRINT_WEIGHTS` are hand-copied from the Python model.
+from `@/types`). Each file re-exports the matching `apps/api/src/common/types/` file by relative path,
+type-only (`export type * from '../../../api/src/common/types/…'`): the API owns the contract, so a
+response change is made once there and `astro check` (and the e2e fixtures' `tsc`) fail wherever the web
+or its fixtures disagree. No workspace or package is involved; type-only imports are erased at build.
+The one web-defined response type is `GlobalSearchResponse` (`types/search.ts`), because `/api/search`
+builds its shape inline. Feature-only view models stay in that feature's `types.ts`.
+`lib/f1/predictionMath.ts`'s `FEATURE_META` / `SPRINT_FEATURE_META` mirror the Python model's weights and
+labels, and `predictionMath.test.ts` checks both against `docs/feature-weights.json`.
 
 ## Local development
 

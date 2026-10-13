@@ -11,3 +11,4 @@ export type * from './predictions';
 export type * from './sprint';
 export type * from './history';
 export type * from './quality';
+export type * from './search';

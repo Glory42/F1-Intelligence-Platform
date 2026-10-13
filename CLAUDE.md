@@ -31,6 +31,9 @@ it's Python, and its jobs run once and exit rather than being a long-running dev
   even just to quote identifiers: so their tests monkeypatch `execute_batch` itself and assert on
   the params it receives, the same pattern `test_ingest_runner.py` already uses for its own
   `execute_batch` call, rather than extending `FakeCursor` to fake SQL rendering.
+  `weekend_pipeline` (Race Status → due jobs) and `enrichment_coverage` are tested pure; code that runs
+  chains is tested by swapping entries in `weekend_pipeline.JOBS`, never by patching each job module.
+  Both feature jobs are pinned end to end through `feature_runner` in `test_feature_runner.py`.
 - `apps/api/tests/unit/`: `bun test`, mirrors `src/` by domain (e.g. `tests/unit/common/mappers.test.ts`
   tests `src/common/mappers.ts`). Covers the shared `src/common/` mapper/aggregation layer.
 - `apps/api/tests/integration/`: `bun test`, real Hono `app.request()` calls against a **local** Postgres
@@ -38,16 +41,21 @@ it's Python, and its jobs run once and exit rather than being a long-running dev
   `apps/api/.env.test`). Never against Neon: the test setup refuses `*.neon.tech` hosts. Seeds its own
   fixtures per file via `tests/support/factories/` and truncates after (`tests/support/db/test-db.ts`).
   Covers every module except `quality` (dev-only): `races`, race events/story/strategy/telemetry, `drivers`, `teams`,
-  `seasons`, `search`, `predictions`, `sprint`, `history`: plus the `edgeCache` middleware.
-- `apps/web/tests/unit/`: Vitest. Pure logic (`compareStats.ts`, `lib/` lookups) runs under the default `node`
+  `seasons`, `search`, `predictions`, `sprint`, `history`: plus the `edgeCache` middleware, the route factories
+  (`integration/route/`) and per-kind GP/sprint reads (`integration/session-kind/`).
+- `apps/web/tests/unit/`: Vitest. Pure logic (`compareStats.ts`, compare configs, `lib/` lookups) runs under the default `node`
   environment. Hook/component tests (`useCompareController`, `useGlobalSearch`, `GlobalSearch`) opt into `jsdom`
   per-file via a `// @vitest-environment jsdom` docblock, use Testing Library, and mock `src/lib/api.ts`'s
-  endpoints with MSW (`tests/support/msw/`). `.astro` component rendering is still not covered.
+  endpoints with MSW (`tests/support/msw/`). Page-data loaders (`load*PageData`) run in the `node`
+  environment with MSW stubbing their routes (`tests/support/msw/routes.ts`). `.astro` component rendering
+  is still not covered.
 - `apps/e2e/tests/smoke/`: Playwright, drives a real browser against `astro dev` with a fixture API server
   (`apps/e2e/fixtures/`) standing in for `apps/api`. Covers the hub, races, circuits, drivers, teams,
   compare, predictions and History pages and the global search palette. Playwright reuses an already-running
   `astro dev` on :4321 (your real-data dev server), set `E2E_WEB_PORT`/`E2E_API_PORT` to run against fixtures
-  while dev servers are up. The fixture server sends CORS
+  while dev servers are up. Fixtures in `apps/e2e/fixtures/data.ts` are typed against the API's response types
+  (`apps/web/src/types` re-exports `apps/api/src/common/types` type-only) and CI runs `bun run typecheck` on them,
+  so an API response change that the fixtures don't follow fails the build. The fixture server sends CORS
   headers because `GlobalSearch`/`DriverCompareTool`/`TeamCompareTool` fetch client-side (see the data-fetching
   exception below): that's a real cross-origin browser request, unlike every other route which is only ever
   hit server-side from Astro frontmatter.
@@ -170,8 +178,8 @@ sprint weekend:
 apps/api/src/
 ├── common/                            # only what several modules share
 │   ├── types/                         # response types, one file per domain behind an index.ts barrel
-│   ├── mappers.ts, standings.ts, prediction-response.ts, feature-manifest.ts, driver-identity.ts
-│   └── cache.ts, edge-cache.ts, race-status.ts, session.ts, constants.ts
+│   ├── mappers.ts, standings.ts, feature-manifest.ts, identity.ts, session-kind.ts, session-reads.ts
+│   └── route.ts, cache.ts, edge-cache.ts, session.ts, constants.ts
 ├── config/database.ts                 # createDb(): Neon HTTP driver
 ├── db/schema/                         # Drizzle table definitions
 ├── modules/<domain>/
@@ -184,9 +192,12 @@ apps/api/src/
 ```
 
 - **service**: DB queries (Drizzle, no Hono context)
-- **controller**: parses Hono context, calls service, returns JSON
+- **controller**: declares handlers with `raceRoute`/`seasonRoute`/`driverRoute`/`teamRoute` (`common/route.ts`),
+  which own id/year/session validation, the 404, Cache-Control and the response envelope
 - **module**: Hono sub-router that wires controller handlers to routes
 - **helpers**: pure functions; code moves to `common/` only once a second module needs it
+- GP vs Sprint differences are data in `common/session-kind.ts` (`GP`/`SPRINT`), read through `session-reads.ts`;
+  "same driver / same team" is only ever decided by `common/identity.ts` (golden cases: `docs/identity-cases.json`)
 - A module with one route and a handful of query lines (`seasons`, `search`, `quality`) skips
   the split: one file holding the router + query is more readable than three near-empty ones.
 - File names are kebab-case. Sub-resources keep their public URL even when they get their own
@@ -299,6 +310,8 @@ All queries use Drizzle joins. Never fetch a list then loop-query for each item.
   Collapse state is a cookie so the server renders the right width.
 - Each page leads with one main view; secondary views are server-rendered `?tab=` link tabs
   (`PageTabs.astro` + `lib/pageTabs.ts`), and each tab fetches only its own data.
+- Pages with tabs or fallbacks load through a page-data loader (`features/<area>/load*PageData.ts`,
+  like `buildPredictionPageData`) called from frontmatter; the page itself only renders.
 
 ### Component rules
 - No chart libraries: use plain SVG for `LapChart.astro`
@@ -327,7 +340,8 @@ python -m src.main --job compute_features --race_id 42
 python -m src.main --job compute_predictions --race_id 42
 python -m src.main --job compute_season_stats --year 2025
 python -m src.main --job compute_title_odds --year 2025
-python scripts/backfill_openf1.py ingest_stints 2023 2026   # local only
+python -m src.main --job ingest_race_story --year 2026 --round 9 --session Sprint
+python scripts/backfill_openf1.py ingest_stints 2023 2026 [--refresh]   # local only: skips covered races
 python scripts/backfill_race_story.py 2018 2025             # local only
 python scripts/backfill_fastf1_enrichment.py 2018 2022 [--only stints,pits,race_control,telemetry] [--refresh]  # local only
 python scripts/backfill_title_odds.py 2018 2026             # local only: replays odds after every completed round
@@ -339,7 +353,9 @@ python scripts/backfill_results_from_f1db.py --from 1980 --to 2017 [--apply]  # 
 ### Schedule (Render worker)
 There are no Render cron jobs: `src/server.py` runs `auto_runner.run_cycle` in a loop (20 min inside a
 race-weekend window, 6 h outside it, which never touches the DB). Inside the window a `WorkerMemo`
-skips the DB until the next action is due. Typical action timing:
+skips the DB until the next action is due. `src/weekend_pipeline.py` is the only place that maps a Race
+Status to the jobs due next: the worker, the CLI auto-detect, Repair and `backfill_full.py` all read it.
+Typical action timing:
 
 **Conventional weekend:**
 - **Saturday 22:00 UTC**: `ingest_qualifying` → `compute_features` → `compute_predictions`
@@ -424,7 +440,7 @@ Full detail in `docs/prediction-model.md`.
 - `circuits.sc_probability`: **not static**: recomputed after every race ingest from `races.safety_car_laps`
   (`ingest_race._recompute_circuit_sc_probability`)
 - Softmax temperature T=0.3: `SOFTMAX_TEMPERATURE` in `data-engine/src/utils/feature_manifest.py`, imported by `prediction_runner.py`/`math_utils.py` (Python) and `apps/web/src/lib/f1/predictionMath.ts` (TS)
-- Model weights: `GP_FEATURES`/`SPRINT_FEATURES` in `feature_manifest.py`, re-exported as `WEIGHTS` by `compute_features.py`/`compute_sprint_features.py`; checked against `docs/feature-weights.json` and `apps/web`'s `FEATURE_META`/`SPRINT_FEATURE_META`
+- Model weights: `GP_FEATURES`/`SPRINT_FEATURES` in `feature_manifest.py`, re-exported as `WEIGHTS` by `compute_features.py`/`compute_sprint_features.py` (both `feature_runner` specs); weights, labels and the softmax temperature are checked against `docs/feature-weights.json` by `test_weights.py`, `apps/web`'s `predictionMath.test.ts` and the API's `feature-manifest.test.ts` (labels)
 
 ### Softmax
 Temperature T=0.3. Lower = more decisive. Do not increase T.

@@ -1,80 +1,20 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
-import { api } from '@/lib/api';
-import type { TeamYearStats, DriverStanding, PitCrewRanking, TeamHistory, TeamPitStop } from '@/types';
 import TeamPitCrew from '@/features/teams/components/TeamPitCrew.astro';
-import HeadToHead, { type HeadToHeadRow } from '@/components/data/HeadToHead.astro';
+import HeadToHead from '@/components/data/HeadToHead.astro';
 import TeamHistoryTable from '@/features/teams/components/TeamHistoryTable.astro';
 import { Info } from 'lucide-react';
 import YearSelectLinks from '@/components/page/YearSelectLinks.astro';
 import PageTabs from '@/components/page/PageTabs.astro';
 import EmptyState from '@/components/page/EmptyState.astro';
-import { resolveTab, TAB_PARAM } from '@/lib/pageTabs';
 import { getTeamColor } from '@/lib/f1/teamColors';
-import { championshipPoints } from '@/lib/f1/championshipMath';
 import { getTeamLogo } from '@/lib/f1/teamLogos';
+import { TEAM_TABS, loadTeamPageData } from '@/features/teams/loadTeamPageData';
 
-const TABS = [
-  { id: 'season', label: 'This season' },
-  { id: 'pit-crew', label: 'Pit crew' },
-  { id: 'history', label: 'History' },
-] as const;
-
-const { id } = Astro.params;
-const tab = resolveTab(Astro.url, TABS);
-const tabSuffix = tab === TABS[0].id ? '' : `&${TAB_PARAM}=${tab}`;
-let year = Number(Astro.url.searchParams.get('year') ?? new Date().getFullYear());
-
-let data = null;
-let career: TeamYearStats[] = [];
-let driverStandings: DriverStanding[] = [];
-let pitCrewRankings: PitCrewRanking[] = [];
-let teamPitStops: TeamPitStop[] = [];
-let teamHistory: TeamHistory | null = null;
-let error = null;
-
-try {
-  career = await api.getTeamCareer(Number(id));
-  const activeYears = career.map((y) => y.year);
-  
-  if (activeYears.length > 0) {
-    const requestedYear = Astro.url.searchParams.get('year') ? Number(Astro.url.searchParams.get('year')) : null;
-    const targetYear = (requestedYear && activeYears.includes(requestedYear))
-      ? requestedYear
-      : (activeYears.includes(new Date().getFullYear()) ? new Date().getFullYear() : Math.max(...activeYears));
-    
-    year = targetYear;
-    const seasonTeamId = career.find((y) => y.year === targetYear)?.teamId ?? Number(id);
-    [data, driverStandings, pitCrewRankings, teamPitStops, teamHistory] = await Promise.all([
-      api.getTeamById(Number(id), targetYear),
-      tab === 'season' ? api.getDriverStandings(targetYear) : [],
-      tab === 'pit-crew' ? api.getPitCrewRankings(targetYear).catch(() => []) : [],
-      tab === 'pit-crew' ? api.getTeamPitStops(seasonTeamId, targetYear).catch(() => []) : [],
-      tab === 'history' ? api.getTeamHistory(Number(id)).catch(() => null) : null,
-    ]);
-  } else {
-    error = 'Team has no career records';
-  }
-} catch (e) {
-  error = e instanceof Error ? e.message : 'Failed to load team';
-}
-
+const {
+  tab, year, yearLinks, error, career, detail: data, headToHead, pitCrewRankings, teamPitStops, hasPitCrewData, teamHistory,
+} = await loadTeamPageData(Astro.url, Number(Astro.params.id));
 const team = data?.team;
-const careerWithStats = career;
-
-const driverIds = new Set(data?.drivers.map((d) => d.id) ?? []);
-const teamStandings = driverStandings.filter((s) => driverIds.has(s.driver.id));
-const [d1, d2] = teamStandings;
-
-const compareRows: HeadToHeadRow[] = d1 && d2 ? [
-  { label: 'Points',      v1: championshipPoints(d1.stats),           v2: championshipPoints(d2.stats) },
-  { label: 'Wins',        v1: d1.stats.wins,                          v2: d2.stats.wins },
-  { label: 'Podiums',     v1: d1.stats.podiums,                       v2: d2.stats.podiums },
-  { label: 'Poles',       v1: d1.stats.poles,                         v2: d2.stats.poles },
-  { label: 'Avg Finish',  v1: Number(d1.stats.avgFinishPosition ?? 20), v2: Number(d2.stats.avgFinishPosition ?? 20), lowerBetter: true, fmt: (v) => `P${Math.round(v)}` },
-  { label: 'DNFs',        v1: d1.stats.dnfCount,                      v2: d2.stats.dnfCount, lowerBetter: true },
-  { label: 'Races',       v1: d1.stats.racesEntered,                  v2: d2.stats.racesEntered },
-] : [];
 ---
 
 <BaseLayout title={team?.name ?? 'Team'}>
@@ -83,12 +23,9 @@ const compareRows: HeadToHeadRow[] = d1 && d2 ? [
       <a href={`/teams?year=${year}`} class="font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground hover:text-foreground transition-colors duration-150">
         ← all teams
       </a>
-      {careerWithStats.length > 1 && (
+      {yearLinks.length > 1 && (
         <div class="ml-auto">
-          <YearSelectLinks
-            items={careerWithStats.map((y) => ({ year: y.year, href: `/teams/${y.teamId}?year=${y.year}${tabSuffix}` }))}
-            currentYear={year}
-          />
+          <YearSelectLinks items={yearLinks} currentYear={year} />
         </div>
       )}
     </div>
@@ -120,7 +57,7 @@ const compareRows: HeadToHeadRow[] = d1 && d2 ? [
           </p>
         </div>
 
-        <PageTabs tabs={TABS} active={tab} label="Team views" />
+        <PageTabs tabs={TEAM_TABS} active={tab} label="Team views" />
 
         {tab === 'season' ? (
           <div class="space-y-8">
@@ -133,7 +70,7 @@ const compareRows: HeadToHeadRow[] = d1 && d2 ? [
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-px bg-white/[0.06]">
                 {[
                   ['Championship', data.seasonStats.championshipPosition ? `P${data.seasonStats.championshipPosition}` : '-'],
-                  ['Points', Math.round(championshipPoints(data.seasonStats))],
+                  ['Points', Math.round(Number(data.seasonStats.championshipPoints))],
                   ['Wins', data.seasonStats.wins],
                   ['Podiums', data.seasonStats.podiums],
                   ['Races', data.seasonStats.racesCompleted],
@@ -172,8 +109,8 @@ const compareRows: HeadToHeadRow[] = d1 && d2 ? [
                   <div class="h-px flex-1 bg-white/[0.05]" />
                 </div>
 
-                {d1 && d2 && compareRows.length > 0 ? (
-                  <HeadToHead left={d1.driver} right={d2.driver} color={getTeamColor(team.teamKey)} rows={compareRows} year={year} />
+                {headToHead ? (
+                  <HeadToHead left={headToHead.left} right={headToHead.right} color={getTeamColor(team.teamKey)} rows={headToHead.rows} year={year} />
                 ) : (
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-px bg-white/[0.06]">
                     {data.drivers.map((d) => (
@@ -201,11 +138,11 @@ const compareRows: HeadToHeadRow[] = d1 && d2 ? [
             )}
           </div>
         ) : tab === 'pit-crew' ? (
-          pitCrewRankings.some((r) => r.team.id === team.id)
+          hasPitCrewData
             ? <TeamPitCrew team={team} rankings={pitCrewRankings} stops={teamPitStops} year={year} />
             : <EmptyState message={`No pit stop data for ${team.name} in ${year}.`} />
         ) : (
-          <TeamHistoryTable career={careerWithStats} history={teamHistory} year={year} teamName={team.name} />
+          <TeamHistoryTable career={career} history={teamHistory} year={year} teamName={team.name} />
         )}
 
       </div>

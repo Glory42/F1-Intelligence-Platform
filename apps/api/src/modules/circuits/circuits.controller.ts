@@ -2,13 +2,15 @@ import type { Context } from 'hono';
 import type { Bindings } from '../../common/types';
 import { createDb } from '../../config/database';
 import { CircuitsService } from './circuits.service';
-import { cacheControlForYear, cacheIfData } from '../../common/cache';
+import { CACHE_REFERENCE, cacheControlForYear, cacheIfData } from '../../common/cache';
 
 const service = new CircuitsService();
 
+// Keyed by circuit key, not a race or season id, so these stay outside common/route.ts.
 export const CircuitsController = {
   getAll: async (c: Context<{ Bindings: Bindings }>) => {
     const data = await service.findAllCircuits(createDb(c.env.DATABASE_URL));
+    c.header('Cache-Control', CACHE_REFERENCE);
     return c.json({ data, error: null });
   },
 
@@ -18,6 +20,7 @@ export const CircuitsController = {
     if (!data) {
       return c.json({ data: null, error: { code: 'NOT_FOUND', message: `Circuit ${circuitKey} not found` } }, 404);
     }
+    c.header('Cache-Control', CACHE_REFERENCE);
     return c.json({ data, error: null });
   },
 

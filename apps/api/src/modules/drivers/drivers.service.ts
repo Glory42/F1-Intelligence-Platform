@@ -1,12 +1,14 @@
 import { eq, and, desc, inArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../../config/database';
 import { drivers, teams, seasons, driverSeasonStats, raceResults, races } from '../../db/schema';
-import type { Driver, DriverDetailResponse, DriverStanding, DriverYearStats } from '../../common/types';
+import type { Driver, DriverDetailResponse, DriverSeasonStats, DriverStanding, DriverYearStats } from '../../common/types';
 import { toDriver } from '../../common/mappers';
-import { resolveSeason, buildStandings, buildCareerStats, type StatsAdapter } from '../../common/standings';
-import { isSamePerson } from '../../common/driver-identity';
+import {
+  resolveSeason, buildStandings, buildCareerStats, championshipPoints, type StatsAdapter,
+} from '../../common/standings';
+import { isSamePerson } from '../../common/identity';
 
-function toDriverStats(s: typeof driverSeasonStats.$inferSelect) {
+function toDriverStats(s: typeof driverSeasonStats.$inferSelect): DriverSeasonStats {
   return {
     racesEntered: s.racesEntered, racesFinished: s.racesFinished,
     wins: s.wins, podiums: s.podiums, poles: s.poles,
@@ -17,15 +19,16 @@ function toDriverStats(s: typeof driverSeasonStats.$inferSelect) {
     avgSector3Ms: s.avgSector3Ms ?? null, topSpeedAvg: s.topSpeedAvg ?? null,
     teammateQualiDelta: s.teammateQualiDelta ?? null,
     sprintTotalPoints: s.sprintTotalPoints,
+    championshipPoints: championshipPoints(s.totalPoints, s.sprintTotalPoints),
   };
 }
 
-const emptyDriverStats = {
+const emptyDriverStats: DriverSeasonStats = {
   racesEntered: 0, racesFinished: 0, wins: 0, podiums: 0, poles: 0,
   totalPoints: '0', championshipPosition: null, avgFinishPosition: null,
   winRate: null, avgPositionGain: null, dnfCount: 0, dnfRate: null,
   avgSector1Ms: null, avgSector2Ms: null, avgSector3Ms: null,
-  topSpeedAvg: null, teammateQualiDelta: null, sprintTotalPoints: '0',
+  topSpeedAvg: null, teammateQualiDelta: null, sprintTotalPoints: '0', championshipPoints: '0',
 };
 
 const driverStatsAdapter: StatsAdapter<
@@ -86,12 +89,7 @@ export class DriversService {
     );
   }
 
-  async findCareerStats(db: Db, driverId: number): Promise<DriverYearStats[]> {
-    const driverRow = await db.select().from(drivers).where(eq(drivers.id, driverId)).limit(1);
-    if (!driverRow[0]) return [];
-
-    const self = driverRow[0];
-
+  async findCareerStats(db: Db, self: typeof drivers.$inferSelect): Promise<DriverYearStats[]> {
     // Candidates share the code or surname; isSamePerson then decides, since FastF1's names vary by season.
     const candidates = await db
       .select()
@@ -125,23 +123,20 @@ export class DriversService {
     );
   }
 
-  // `drivers` rows are season-scoped, so driverId alone already pins the season: no `year` param needed.
-  async findById(db: Db, driverId: number): Promise<DriverDetailResponse | null> {
-    const driverRows = await db
-      .select()
-      .from(drivers)
-      .innerJoin(teams, eq(drivers.teamId, teams.id))
-      .where(eq(drivers.id, driverId))
-      .limit(1);
-
-    if (!driverRows[0]) return null;
-    const driver = toDriver(driverRows[0].drivers, driverRows[0].teams);
+  // `drivers` rows are season-scoped, so the row alone already pins the season: no `year` param needed.
+  async findDetail(
+    db: Db,
+    row: typeof drivers.$inferSelect,
+    team: typeof teams.$inferSelect,
+  ): Promise<DriverDetailResponse> {
+    const driverId = row.id;
+    const driver = toDriver(row, team);
 
     const [statsRows, recentRows] = await Promise.all([
       db
         .select()
         .from(driverSeasonStats)
-        .where(and(eq(driverSeasonStats.driverId, driverId), eq(driverSeasonStats.seasonId, driverRows[0].drivers.seasonId)))
+        .where(and(eq(driverSeasonStats.driverId, driverId), eq(driverSeasonStats.seasonId, row.seasonId)))
         .limit(1),
 
       db

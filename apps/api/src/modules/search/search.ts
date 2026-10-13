@@ -4,7 +4,8 @@ import type { Bindings, Driver } from '../../common/types';
 import { createDb, type Db } from '../../config/database';
 import { drivers, teams, circuits, seasons } from '../../db/schema';
 import { toDriver, toTeam, toCircuit } from '../../common/mappers';
-import { isSamePerson, personKey } from '../../common/driver-identity';
+import { CACHE_REFERENCE } from '../../common/cache';
+import { isSamePerson, personKey } from '../../common/identity';
 
 type DriverRow = typeof drivers.$inferSelect;
 
@@ -54,6 +55,7 @@ const searchModule = new Hono<{ Bindings: Bindings }>();
 
 searchModule.get('/', async (c) => {
   const data = await getGlobalSearchData(createDb(c.env.DATABASE_URL));
+  c.header('Cache-Control', CACHE_REFERENCE);
   return c.json({ data, error: null });
 });
 

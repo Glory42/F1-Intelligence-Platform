@@ -10,7 +10,8 @@ import { GP_ACCENT, SPRINT_ACCENT } from '@/features/predictions/types';
 import UpcomingPredictionPanel from '@/features/predictions/components/UpcomingPredictionPanel.astro';
 import ModelRatingsTable from '@/features/predictions/components/ModelRatingsTable.astro';
 import Scorecard from '@/features/predictions/components/Scorecard.astro';
-import { resolveTab, TAB_PARAM } from '@/lib/pageTabs';
+import { resolveTab, seasonTabHref } from '@/lib/pageTabs';
+import { unwrapSettled } from '@/lib/utils';
 
 const TABS = [
   { id: 'upcoming', label: 'Upcoming' },
@@ -19,9 +20,6 @@ const TABS = [
 
 const year = Number(Astro.url.searchParams.get('year') ?? new Date().getFullYear());
 const tab = resolveTab(Astro.url, TABS);
-
-const settled = <T,>(result: PromiseSettledResult<T>, fallback: T): T =>
-  result.status === 'fulfilled' ? result.value : fallback;
 
 let upcoming: PredictionResponse | null = null;
 let upcomingSprint: SprintPredictionResponse | null = null;
@@ -37,9 +35,9 @@ if (tab === 'upcoming') {
     api.getIntelStandings(year),
     api.getModelInfo(),
   ]);
-  upcoming = settled(upcomingResult, null);
-  standings = settled(standingsResult, []);
-  modelInfo = settled(modelInfoResult, null);
+  upcoming = unwrapSettled(upcomingResult, null);
+  standings = unwrapSettled(standingsResult, []);
+  modelInfo = unwrapSettled(modelInfoResult, null);
 
   if (upcoming?.race.hasSprint) {
     try { upcomingSprint = await api.getSprintByRaceId(upcoming.race.id); } catch {}
@@ -53,9 +51,9 @@ if (tab === 'upcoming') {
     api.getSeasons(),
     api.getPredictionAccuracy(),
   ]);
-  history = settled(historyResult, []);
-  seasons = settled(seasonsResult, []);
-  seasonAccuracy = settled(accuracyResult, []);
+  history = unwrapSettled(historyResult, []);
+  seasons = unwrapSettled(seasonsResult, []);
+  seasonAccuracy = unwrapSettled(accuracyResult, []);
 }
 
 const gpVersion = upcoming?.modelVersion ?? modelInfo?.gpVersion ?? 'weighted-v3';
@@ -69,7 +67,7 @@ const gpVersion = upcoming?.modelVersion ?? modelInfo?.gpVersion ?? 'weighted-v3
       subtitle={tab === 'scorecard' ? 'how the model did, race by race' : `model ${gpVersion}`}
     >
       {tab === 'scorecard' && (
-        <YearSelect slot="aside" years={seasons} currentYear={year} basePath="/prediction" extraParams={`&${TAB_PARAM}=${tab}`} />
+        <YearSelect slot="aside" years={seasons} currentYear={year} hrefFor={(y: number) => seasonTabHref(Astro.url, TABS, tab, y)} />
       )}
     </PageHeader>
 

@@ -51,8 +51,3 @@ export function formatTitleOdds(p: number): string {
   if (p > 0 && p < 0.01) return '<1%';
   return `${Math.round(p * 100)}%`;
 }
-
-// Stored separately (total_points is GP-only because the model reads it); the championship is the sum.
-export function championshipPoints(stats: { totalPoints: string; sprintTotalPoints?: string | null }): number {
-  return Number(stats.totalPoints) + Number(stats.sprintTotalPoints ?? 0);
-}

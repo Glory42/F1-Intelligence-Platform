@@ -18,8 +18,9 @@ export type TeamSeasonStats = {
   carPerformanceScore: string | null;
   dnfCount: number;
   reliabilityScore: string | null;
-  // GP and sprint points are stored separately; the championship total is their sum.
+  // GP and sprint points are stored separately; championshipPoints is their sum.
   sprintTotalPoints: string;
+  championshipPoints: string;
 };
 
 export type TeamDetailResponse = {

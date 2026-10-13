@@ -20,3 +20,13 @@ export function tabHref<T extends string>(url: URL, tabs: readonly PageTab<T>[],
   const query = params.toString();
   return query ? `${url.pathname}?${query}` : url.pathname;
 }
+
+// The same open tab in another season, optionally on another path (season-scoped driver/team ids).
+export function seasonTabHref<T extends string>(
+  url: URL, tabs: readonly PageTab<T>[], id: T, year: number, pathname = url.pathname,
+): string {
+  const target = new URL(url);
+  target.pathname = pathname;
+  target.searchParams.set('year', String(year));
+  return tabHref(target, tabs, id);
+}

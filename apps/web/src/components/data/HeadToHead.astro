@@ -1,14 +1,7 @@
 ---
 // Driver-vs-driver bars, first built for the teams page; reused by the driver page's team-mate battle.
 import type { Driver } from '@/types';
-
-export interface HeadToHeadRow {
-  label: string;
-  v1: number;
-  v2: number;
-  lowerBetter?: boolean;
-  fmt?: (value: number) => string;
-}
+import type { HeadToHeadRow } from './headToHead';
 
 interface Props {
   left: Driver;

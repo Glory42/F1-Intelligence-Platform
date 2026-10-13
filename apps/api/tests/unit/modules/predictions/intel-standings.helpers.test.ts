@@ -3,7 +3,7 @@ import {
   aggregateSeasonFeatures,
   buildIntelStandingRows,
   type SeasonFeatureRow,
-  type SprintSeasonTotals,
+  type SeasonTotals,
 } from '../../../../src/modules/predictions/intel-standings.helpers';
 import type { drivers, teams, driverPredictionFeatures } from '../../../../src/db/schema';
 import { toDriver } from '../../../../src/common/mappers';
@@ -67,12 +67,19 @@ describe('aggregateSeasonFeatures', () => {
     expect(someValues.features.trackOvertake).toBe('0.5');
   });
 
-  test('groups rows by driver code so a mid-season team move collapses to one entry', () => {
+  test('groups rows by person so a mid-season team move collapses to one entry', () => {
     const verRedBull = driver(10, 'VER');
-    const verOther = { ...driver(99, 'VER'), teamId: 2 };
+    const verOther = { ...driver(10, 'VER'), id: 99, teamId: 2 };
     const result = aggregateSeasonFeatures([featureRow(verRedBull, '1.0'), featureRow(verOther, '3.0')]);
     expect(result).toHaveLength(1);
     expect(result[0].avgRaw).toBe(2.0);
+  });
+
+  test('keeps two people who share a code apart (codes are labels, not keys)', () => {
+    const bernard = { ...driver(1, 'BER'), firstName: 'Éric', lastName: 'Bernard' };
+    const berger = { ...driver(2, 'BER'), firstName: 'Gerhard', lastName: 'Berger' };
+    const result = aggregateSeasonFeatures([featureRow(bernard, '1.0'), featureRow(berger, '3.0')]);
+    expect(result.map((r) => r.driver.lastName)).toEqual(['Bernard', 'Berger']);
   });
 });
 
@@ -93,8 +100,8 @@ describe('buildIntelStandingRows', () => {
   });
 
   test('folds in sprint season totals, defaulting to zeroes when absent', () => {
-    const totals = new Map<number, SprintSeasonTotals>([
-      [10, { sprintWins: 2, sprintPodiums: 3, sprintTotalPoints: '17' }],
+    const totals = new Map<number, SeasonTotals>([
+      [10, { sprintWins: 2, sprintPodiums: 3, sprintTotalPoints: '17.0', totalPoints: '200.5' }],
     ]);
     const rows = buildIntelStandingRows(
       [
@@ -103,8 +110,8 @@ describe('buildIntelStandingRows', () => {
       ],
       totals,
     );
-    expect(rows[0]).toMatchObject({ sprintWins: 2, sprintPodiums: 3, sprintTotalPoints: '17' });
-    expect(rows[1]).toMatchObject({ sprintWins: 0, sprintPodiums: 0, sprintTotalPoints: '0' });
+    expect(rows[0]).toMatchObject({ sprintWins: 2, sprintPodiums: 3, sprintTotalPoints: '17.0', championshipPoints: '217.5' });
+    expect(rows[1]).toMatchObject({ sprintWins: 0, sprintPodiums: 0, sprintTotalPoints: '0', championshipPoints: '0' });
   });
 
   test('single driver does not divide by zero', () => {

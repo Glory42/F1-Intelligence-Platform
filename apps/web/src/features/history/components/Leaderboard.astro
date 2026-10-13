@@ -2,16 +2,7 @@
 import { f1dbCountryFlag, f1dbCountryName } from '@/features/history/f1dbCountries';
 import { RANK_COLORS, barPercent } from '../historyView';
 import ActiveBadge from './ActiveBadge.astro';
-
-export interface LeaderboardEntry {
-  name: string;
-  value: number;
-  display?: string;
-  detail?: string;
-  nationality?: string | null;
-  href?: string;
-  active?: boolean;
-}
+import type { LeaderboardEntry } from '../types';
 
 interface Props {
   title: string;

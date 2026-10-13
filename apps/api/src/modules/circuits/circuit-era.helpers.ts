@@ -1,6 +1,7 @@
 import type { drivers, teams, races } from '../../db/schema';
 import type { CircuitDetailResponse } from '../../common/types';
 import { toDriver, toTeam } from '../../common/mappers';
+import { constructorKey, personKey } from '../../common/identity';
 import type { WinnerRow } from './circuit-stats.helpers';
 
 type RaceRow = typeof races.$inferSelect;
@@ -30,30 +31,12 @@ export interface EraWinAggregates {
   driverWinsByEra: EraMap<Map<string, DriverWinEntry>>;
 }
 
-// Team identities rebrand across seasons (Alpha Tauri -> RB -> Racing Bulls, etc.):
-// without this, one constructor's wins would split across team_key variants.
-const TEAM_KEY_ALIASES: Record<string, string> = {
-  red_bull: 'red_bull_racing',
-  rb: 'racing_bulls',
-  alphatauri: 'alpha_tauri',
-  alfa_romeo: 'alfa_romeo_racing',
-  lotus_f1: 'lotus',
-};
-
-export function normalizeTeamKey(rawKey: string): string {
-  return TEAM_KEY_ALIASES[rawKey] ?? rawKey;
-}
-
 function erasForYear(year: number): Era[] {
   const applicableEras: Era[] = ['all'];
   if (year >= 2018) applicableEras.push('modern');
   else if (year >= 2000) applicableEras.push('legacy');
   else if (year >= 1990) applicableEras.push('nineties');
   return applicableEras;
-}
-
-export function driverKeyFor(driver: DriverRow): string {
-  return `${driver.firstName} ${driver.lastName}`;
 }
 
 function emptyEraMap<T>(factory: () => T): EraMap<T> {
@@ -72,8 +55,9 @@ export function aggregateEraWins(
     const currentIdx = raceOrder.get(winner.race_results.raceId) ?? 999;
     const race = raceMap.get(winner.race_results.raceId);
     const year = race ? new Date(race.raceDate).getFullYear() : 2000;
-    const teamKey = normalizeTeamKey(winner.teams.teamKey);
-    const driverKey = driverKeyFor(winner.drivers);
+    // Keyed by outfit and person, so a rebrand or a respelt name doesn't split one entry's wins.
+    const teamKey = constructorKey(winner.teams.teamKey);
+    const driverKey = personKey(winner.drivers);
 
     for (const era of erasForYear(year)) {
       const teamWins = teamWinsByEra[era];

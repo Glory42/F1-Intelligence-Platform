@@ -33,8 +33,9 @@ export type DriverSeasonStats = {
   avgSector3Ms: number | null;
   topSpeedAvg: string | null;
   teammateQualiDelta: string | null;
-  // GP and sprint points are stored separately; the championship total is their sum.
+  // GP and sprint points are stored separately; championshipPoints is their sum.
   sprintTotalPoints: string;
+  championshipPoints: string;
 };
 
 export type DriverDetailResponse = {

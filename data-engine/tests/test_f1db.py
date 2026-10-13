@@ -1,16 +1,21 @@
+import json
+from pathlib import Path
+
+import pytest
+
 from src.utils.f1db import (
     Milestones, career_milestones, constructor_row, constructor_seasons, driver_row, normalize_person_name,
 )
 from tests.support.f1db_fixtures import load_f1db_fixture
 
+# Shared with apps/api's identity.test.ts, so both sides agree on the core-driver -> F1DB join key.
+IDENTITY_CASES = json.loads((Path(__file__).parents[2] / "docs" / "identity-cases.json").read_text())
+
 
 class TestNormalizePersonName:
-    def test_matches_core_and_f1db_spellings_of_the_same_driver(self):
-        assert normalize_person_name("Sergio Pérez") == "sergio perez"
-        assert normalize_person_name("Nico Hülkenberg") == "nico hulkenberg"
-        assert normalize_person_name("Kimi Räikkönen") == "kimi raikkonen"
-        assert normalize_person_name("Carlos Sainz Jr.") == "carlos sainz"
-        assert normalize_person_name("  Max   Verstappen ") == "max verstappen"
+    @pytest.mark.parametrize("case", IDENTITY_CASES["people"], ids=lambda c: f"{c['firstName']} {c['lastName']}".strip())
+    def test_matches_the_shared_f1db_person_key(self, case):
+        assert normalize_person_name(f"{case['firstName']} {case['lastName']}") == case["f1dbPersonKey"]
 
 
 class TestCareerMilestones:

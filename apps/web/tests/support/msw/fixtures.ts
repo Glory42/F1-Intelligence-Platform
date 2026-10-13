@@ -1,4 +1,4 @@
-import type { Driver, Team, Circuit } from '@/types';
+import type { Driver, Team, Circuit, GlobalSearchResponse } from '@/types';
 
 export const team: Team = {
   id: 1, seasonId: 2025, teamKey: 'red-bull', name: 'Red Bull Racing', nationality: 'Austrian',
@@ -26,4 +26,4 @@ export const circuit: Circuit = {
   numberOfCorners: 11, drsZones: 2, scProbability: '0.300', imageUrl: null,
 };
 
-export const globalSearchResponse = { drivers: [driver], teams: [teamB], circuits: [circuit] };
+export const globalSearchResponse: GlobalSearchResponse = { drivers: [driver], teams: [teamB], circuits: [circuit] };

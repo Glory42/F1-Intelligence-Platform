@@ -7,7 +7,7 @@ import type {
   QualityReport, RaceSession, StrategyResponse, PitCrewRanking, FridayPaceRow,
   TitleOddsResponse, TeammateBattle, RacecraftRow, RaceStoryResponse, TelemetryResponse, QualifyingSession,
   HistoryRecords, HistoryMilestones, ConstructorLineage, DriverHistory, TeamHistory, RaceRecap, OnThisDay,
- TeamPitStop, CircuitTelemetry } from '@/types';
+ TeamPitStop, CircuitTelemetry, GlobalSearchResponse } from '@/types';
 
 const API_URL = import.meta.env.PUBLIC_API_URL ?? 'http://localhost:8787';
 
@@ -89,7 +89,7 @@ export const api = {
   getSeasons: () => get<SeasonSummary[]>('/api/seasons'),
 
   // Search
-  getGlobalSearch: () => get<{ drivers: Driver[]; teams: Team[]; circuits: Circuit[] }>('/api/search'),
+  getGlobalSearch: () => get<GlobalSearchResponse>('/api/search'),
 
   // Teams
   getTeams: (year: number) => get<Team[]>(`/api/teams?year=${year}`),

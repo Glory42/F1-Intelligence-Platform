@@ -12,5 +12,8 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  server.events.removeAllListeners();
+});
 afterAll(() => server.close());

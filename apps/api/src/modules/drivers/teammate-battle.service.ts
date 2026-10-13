@@ -49,10 +49,7 @@ function score(mine: Map<number, Outing>, theirs: Map<number, Outing>) {
 }
 
 export class TeammateBattleService {
-  async findBattle(db: Db, driverId: number): Promise<TeammateBattle | null> {
-    const [self] = await db.select().from(drivers).where(eq(drivers.id, driverId)).limit(1);
-    if (!self) return null;
-
+  async findBattle(db: Db, self: typeof drivers.$inferSelect): Promise<TeammateBattle> {
     const teammates = await db
       .select({ driver: drivers, team: teams })
       .from(drivers)

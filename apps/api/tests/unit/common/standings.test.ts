@@ -3,11 +3,11 @@ import { sortByChampionshipStanding, buildStandings, buildCareerStats } from '..
 
 type Entity = { id: number; name: string };
 type StatsRow = { entityId: number; points: string; position: number | null };
-type Stats = { championshipPosition: number | null; totalPoints: string };
+type Stats = { championshipPosition: number | null; championshipPoints: string };
 type Out = { name: string; stats: Stats };
 
-const toStats = (row: StatsRow): Stats => ({ championshipPosition: row.position, totalPoints: row.points });
-const emptyStats: Stats = { championshipPosition: null, totalPoints: '0' };
+const toStats = (row: StatsRow): Stats => ({ championshipPosition: row.position, championshipPoints: row.points });
+const emptyStats: Stats = { championshipPosition: null, championshipPoints: '0' };
 const toOutput = (entity: Entity, stats: Stats): Out => ({ name: entity.name, stats });
 
 const adapter = {
@@ -17,24 +17,24 @@ const adapter = {
   emptyStats,
 };
 
-type Standing = { stats: { championshipPosition: number | null; totalPoints: string } };
+type Standing = { stats: { championshipPosition: number | null; championshipPoints: string } };
 
 describe('sortByChampionshipStanding', () => {
   test('orders by championship position ascending', () => {
-    const a: Standing = { stats: { championshipPosition: 2, totalPoints: '100' } };
-    const b: Standing = { stats: { championshipPosition: 1, totalPoints: '50' } };
+    const a: Standing = { stats: { championshipPosition: 2, championshipPoints: '100' } };
+    const b: Standing = { stats: { championshipPosition: 1, championshipPoints: '50' } };
     expect(sortByChampionshipStanding(a, b)).toBeGreaterThan(0);
   });
 
   test('missing position (null) sorts after a ranked entry', () => {
-    const a: Standing = { stats: { championshipPosition: null, totalPoints: '999' } };
-    const b: Standing = { stats: { championshipPosition: 1, totalPoints: '1' } };
+    const a: Standing = { stats: { championshipPosition: null, championshipPoints: '999' } };
+    const b: Standing = { stats: { championshipPosition: 1, championshipPoints: '1' } };
     expect(sortByChampionshipStanding(a, b)).toBeGreaterThan(0);
   });
 
-  test('falls back to points when both positions are null', () => {
-    const a: Standing = { stats: { championshipPosition: null, totalPoints: '10' } };
-    const b: Standing = { stats: { championshipPosition: null, totalPoints: '20' } };
+  test('falls back to championship points (GP + sprint) when both positions are null', () => {
+    const a: Standing = { stats: { championshipPosition: null, championshipPoints: '10' } };
+    const b: Standing = { stats: { championshipPosition: null, championshipPoints: '20' } };
     expect(sortByChampionshipStanding(a, b)).toBeGreaterThan(0);
   });
 });

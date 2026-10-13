@@ -1,18 +1,12 @@
 ---
 import { f1dbCountryFlag, f1dbCountryName } from '@/features/history/f1dbCountries';
 import ActiveBadge from './ActiveBadge.astro';
-
-interface Holder {
-  name: string;
-  nationality: string | null;
-  href?: string;
-  active?: boolean;
-}
+import type { RecordHolder } from '../types';
 
 interface Props {
   label: string;
   value: string;
-  holders: Holder[];
+  holders: RecordHolder[];
   detail?: string;
   accent?: string;
 }

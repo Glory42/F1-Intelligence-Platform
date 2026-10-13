@@ -5,7 +5,7 @@ import pytest
 
 from src.jobs.compute_features import WEIGHTS as GP_WEIGHTS
 from src.jobs.compute_sprint_features import WEIGHTS as SPRINT_WEIGHTS
-from src.utils.feature_manifest import GP_FEATURES, SPRINT_FEATURES, assemble_scores
+from src.utils.feature_manifest import GP_FEATURES, SOFTMAX_TEMPERATURE, SPRINT_FEATURES, assemble_scores
 
 # Guards against an edit silently breaking the sum-to-1 invariant the softmax pipeline assumes.
 
@@ -52,11 +52,15 @@ def test_assemble_scores_raises_when_a_sprint_feature_is_missing():
         assemble_scores(values, SPRINT_FEATURES)
 
 
-def test_gp_weights_match_shared_json_fixture():
-    fixture = json.loads(FEATURE_WEIGHTS_JSON.read_text())
-    assert {k: round(v * 100) for k, v in GP_WEIGHTS.items()} == fixture["gp"]
+def _manifest_fixture() -> dict:
+    return json.loads(FEATURE_WEIGHTS_JSON.read_text())
 
 
-def test_sprint_weights_match_shared_json_fixture():
-    fixture = json.loads(FEATURE_WEIGHTS_JSON.read_text())
-    assert {k: round(v * 100) for k, v in SPRINT_WEIGHTS.items()} == fixture["sprint"]
+@pytest.mark.parametrize("model, features", [("gp", GP_FEATURES), ("sprint", SPRINT_FEATURES)], ids=["gp", "sprint"])
+def test_weights_and_labels_match_shared_json_fixture(model, features):
+    expected = {f.name: {"weight": round(f.weight * 100), "label": f.label} for f in features}
+    assert expected == _manifest_fixture()[model]
+
+
+def test_softmax_temperature_matches_shared_json_fixture():
+    assert SOFTMAX_TEMPERATURE == _manifest_fixture()["softmax_temperature"]

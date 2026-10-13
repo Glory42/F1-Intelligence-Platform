@@ -1,4 +1,5 @@
 import type { Driver } from './drivers';
+import type { DriverPredictionOf, PredictionOf } from './predictions';
 import type { LapSummary, Race } from './races';
 
 export type SprintResult = {
@@ -33,20 +34,9 @@ export type SprintFeatureScores = {
   sqQualifyingDelta: string | null;
 };
 
-export type DriverSprintPrediction = {
-  driver: Driver;
-  winProbability: string;
-  predictedPosition: number | null;
-  features: SprintFeatureScores;
-};
+export type DriverSprintPrediction = DriverPredictionOf<SprintFeatureScores>;
 
-export type SprintPredictionResponse = {
-  race: Race;
-  predictedWinner: Driver;
-  computedAt: string;
-  modelVersion: string;
-  drivers: DriverSprintPrediction[];
-};
+export type SprintPredictionResponse = PredictionOf<SprintFeatureScores>;
 
 export type SprintDetailResponse = {
   race: Race;

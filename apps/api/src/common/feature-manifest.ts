@@ -24,7 +24,7 @@ export const GP_FEATURE_MANIFEST: FeatureManifestEntry<typeof driverPredictionFe
   { key: 'qualifyingDelta', column: 'qualifyingDeltaScore', label: 'Qualifying Delta', nullable: true },
   { key: 'sectorStrength', column: 'sectorStrengthScore', label: 'Sector Strength', nullable: true },
   { key: 'tyreDeg', column: 'tyreDegScore', label: 'Tyre Degradation', nullable: true },
-  { key: 'circuitAdjStartPos', column: 'circuitAdjStartPosScore', label: 'Circuit-Adj. Start Position', nullable: true },
+  { key: 'circuitAdjStartPos', column: 'circuitAdjStartPosScore', label: 'Circuit-Adj. Starting Position', nullable: true },
   { key: 'circuitAdjPositionGain', column: 'circuitAdjPositionGainScore', label: 'Circuit-Adj. Position Gain', nullable: true },
 ];
 
@@ -34,7 +34,7 @@ export const SPRINT_FEATURE_MANIFEST: FeatureManifestEntry<typeof driverSprintFe
   { key: 'driverRating', column: 'driverRatingScore', label: 'Driver Rating', nullable: false },
   { key: 'trackOvertake', column: 'trackOvertakeScore', label: 'Track Overtake', nullable: true },
   { key: 'shortRunPace', column: 'shortRunPaceScore', label: 'Short Run Pace', nullable: false },
-  { key: 'circuitAdjStartPos', column: 'circuitAdjStartPosScore', label: 'Circuit-Adj. Start Position', nullable: true },
+  { key: 'circuitAdjStartPos', column: 'circuitAdjStartPosScore', label: 'Circuit-Adj. Starting Position', nullable: true },
   { key: 'sqQualifyingDelta', column: 'sqQualifyingDeltaScore', label: 'SQ vs Teammate', nullable: true },
   { key: 'weatherImpact', column: 'weatherImpactScore', label: 'Weather Impact', nullable: false },
   { key: 'winRate', column: 'winRateScore', label: 'Win Rate', nullable: false },

@@ -10,72 +10,15 @@ import RaceTabs from '@/features/races/components/RaceTabs.astro';
 import RaceTabPanel from '@/features/races/components/RaceTabPanel.astro';
 import RaceEventPanels from '@/features/races/components/RaceEventPanels.astro';
 import CircuitStatsGrid from '@/features/races/components/CircuitStatsGrid.astro';
-import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
-import { gridDrops } from '@/features/races/gridPenalties';
-import { NO_RACE_EVENTS, loadRaceEvents, raceEventTabs } from '@/features/races/loadRaceEvents';
-import { circuitYearItems, conditionsOf, driverMapOf, fastestLapOf, predictedPodium, winnerOf } from '@/features/races/raceView';
-import type { PredictionResponse, CircuitHistoryItem, RaceDetailResponse } from '@/types';
+import { loadRacePageData } from '@/features/races/loadRacePageData';
 import { GP_ACCENT } from '@/features/predictions/types';
 
-// OpenF1 notes F1 releases far fewer radio clips from 2026 on, so an empty list there is expected.
-const RADIO_SPARSE_FROM_YEAR = 2026;
-
-const { id } = Astro.params;
-
-let raceData: RaceDetailResponse | null = null;
-let error = null;
-try {
-  raceData = await api.getRaceById(Number(id));
-} catch (e) {
-  error = e instanceof Error ? e.message : 'Failed to load race';
-}
-
-const race = raceData?.race;
-let prediction: PredictionResponse | null = null;
-let circuitHistory: CircuitHistoryItem[] = [];
-let events = NO_RACE_EVENTS;
-if (race) {
-  const [predResult, circuitResult, eventsResult] = await Promise.allSettled([
-    api.getPredictionByRace(race.id),
-    api.getCircuitDetails(race.circuit.circuitKey),
-    loadRaceEvents(race.id, 'race'),
-  ]);
-  if (predResult.status === 'fulfilled') prediction = predResult.value;
-  if (circuitResult.status === 'fulfilled') circuitHistory = circuitResult.value.history;
-  if (eventsResult.status === 'fulfilled') events = eventsResult.value;
-}
-
-const results = raceData?.results ?? [];
-const qualifying = raceData?.qualifying ?? [];
-const laps = raceData?.laps ?? [];
-const isCompleted = race?.status === 'completed';
-const isQualiDone = race?.status === 'qualifying_done';
-const isSprintish = race?.status === 'sprint_done' || race?.status === 'sprint_qualifying_done';
-const raceYear = race ? new Date(race.raceDate).getFullYear() : new Date().getFullYear();
-
-const eventTabs = isCompleted ? raceEventTabs(events, raceYear >= RADIO_SPARSE_FROM_YEAR) : [];
-const tabs = [
-  ...(isCompleted && results.length > 0 ? [{ id: 'results', label: 'Results' }] : []),
-  ...(qualifying.length > 0 ? [{ id: 'qualifying', label: 'Qualifying' }] : []),
-  ...(isCompleted && laps.length > 0 ? [{ id: 'laps', label: 'Lap Chart' }] : []),
-  ...eventTabs,
-  { id: 'circuit', label: 'Circuit' },
-];
-const defaultTab = tabs[0].id;
-
-const drops = gridDrops(results, qualifying);
-const podium = predictedPodium(prediction?.drivers ?? []);
-const actualWinner = winnerOf(results);
-const predCorrect = prediction && actualWinner ? prediction.predictedWinner.id === actualWinner.driver.id : null;
-
-const statusToneClass = isCompleted
-  ? 'border-[rgba(168,85,247,0.3)] text-[rgba(168,85,247,0.7)]'
-  : isQualiDone
-  ? 'border-yellow-500/30 text-yellow-400/70'
-  : isSprintish
-  ? 'border-orange-500/30 text-orange-400/70'
-  : 'border-white/[0.08] text-muted-foreground';
+const {
+  error, race, results, qualifying, laps, drops, driverMap, events, eventTabs, raceYear, prediction, podium, confidence,
+  predCorrect, actualWinnerName, isDone, status, sessionDate, countdownTo, conditions, fastestLap, yearItems, links,
+  tabs, defaultTab,
+} = await loadRacePageData('gp', Number(Astro.params.id));
 ---
 
 <BaseLayout title={race?.name ?? 'Race'}>
@@ -92,27 +35,27 @@ const statusToneClass = isCompleted
       <div class="border border-destructive/40 bg-destructive/10 p-8 text-center">
         <p class="font-mono text-[10px] text-destructive tracking-widest uppercase">Race not found</p>
       </div>
-    ) : raceData && race ? (
+    ) : race ? (
       <>
         {/* ── HERO ── */}
         <div class="panel">
           <div class="grid lg:grid-cols-[1fr_320px]">
             <RaceHeroInfo
               kicker={`./round-${race.roundNumber.toString().padStart(2, '0')}`}
-              statusIcon={isCompleted ? 'check' : (isQualiDone || isSprintish) ? 'zap' : 'timer'}
-              statusLabel={race.status.replace(/_/g, ' ')}
-              statusToneClass={statusToneClass}
+              statusIcon={status.icon}
+              statusLabel={status.label}
+              statusToneClass={status.toneClass}
               raceName={race.name}
               circuit={race.circuit}
-              dateStr={formatDate(race.raceDate)}
+              dateStr={formatDate(sessionDate ?? race.raceDate)}
               lapsLabel={`${race.circuit.lapCount} laps`}
               lengthKm={race.circuit.trackLengthKm}
               weather={race.weather}
-              conditions={conditionsOf(race)}
-              fastestLap={fastestLapOf(results, laps)}
+              conditions={conditions}
+              fastestLap={fastestLap}
               accent={GP_ACCENT}
-              countdown={!isCompleted ? { id: 'race-countdown', date: race.raceDateUtc || race.raceDate, borderClass: 'border-white/[0.08]', digitClass: 'countdown-d' } : null}
-              yearItems={circuitYearItems(circuitHistory, 'race')}
+              countdown={countdownTo ? { id: 'race-countdown', date: countdownTo, borderClass: 'border-white/[0.08]', digitClass: 'countdown-d' } : null}
+              yearItems={yearItems}
               currentYear={raceYear}
             />
 
@@ -123,25 +66,22 @@ const statusToneClass = isCompleted
               hasPrediction={!!prediction}
               predictedWinnerName={prediction?.predictedWinner.fullName}
               winnerLabel="predicted winner"
-              confidence={Math.round(Number(podium[0]?.winProbability ?? 0) * 100)}
+              confidence={confidence}
               podium={podium}
-              showAccuracy={isCompleted}
+              showAccuracy={isDone}
               predCorrect={predCorrect}
-              actualWinnerName={isCompleted && actualWinner && actualWinner.driver.id !== prediction?.predictedWinner.id ? actualWinner.driver.fullName : null}
+              actualWinnerName={actualWinnerName}
               actualLabel="actual winner"
-              emptyText={isCompleted ? 'No prediction data' : 'Available after qualifying'}
+              emptyText={isDone ? 'No prediction data' : 'Available after qualifying'}
             />
           </div>
         </div>
 
         {/* ── TABS ── */}
         <div>
-          <RaceTabs tabs={tabs} defaultTab={defaultTab} accent={GP_ACCENT} links={isCompleted ? [
-            { href: `/races/${race.id}/race-story`, label: 'Race story' },
-            { href: `/races/${race.id}/telemetry`, label: 'Telemetry' },
-          ] : []} />
+          <RaceTabs tabs={tabs} defaultTab={defaultTab} accent={GP_ACCENT} links={links} />
 
-          {isCompleted && results.length > 0 && (
+          {isDone && results.length > 0 && (
             <RaceTabPanel id="results" defaultTab={defaultTab}>
               <div class="border border-white/[0.06] overflow-hidden">
                 <RaceResultsTable results={results} year={raceYear} laps={laps} />
@@ -166,7 +106,7 @@ const statusToneClass = isCompleted
             </RaceTabPanel>
           )}
 
-          {isCompleted && laps.length > 0 && (
+          {isDone && laps.length > 0 && (
             <RaceTabPanel id="laps" defaultTab={defaultTab}>
               <div class="border border-white/[0.06] overflow-hidden">
                 <LapChart laps={laps} />
@@ -174,7 +114,7 @@ const statusToneClass = isCompleted
             </RaceTabPanel>
           )}
 
-          <RaceEventPanels events={events} tabs={eventTabs} defaultTab={defaultTab} driverMap={driverMapOf(results)} year={raceYear} />
+          <RaceEventPanels events={events} tabs={eventTabs} defaultTab={defaultTab} driverMap={driverMap} year={raceYear} />
 
           <RaceTabPanel id="circuit" defaultTab={defaultTab}>
             <CircuitStatsGrid circuit={race.circuit} session="race" />

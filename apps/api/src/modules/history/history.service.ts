@@ -9,7 +9,7 @@ import type {
   ConstructorLineage, DriverHistory, HistoryMilestones, HistoryRecords, MilestoneEntry, OnThisDay, RecordEntry,
   TeamHistory,
 } from '../../common/types';
-import { f1dbConstructorId, normalizePersonName } from './f1db-match.helpers';
+import { f1dbConstructorId, f1dbPersonKey } from '../../common/identity';
 import { toDriver } from '../../common/mappers';
 import { buildChases, buildCoreLinks, groupLineages, nearestMonthDay, type CoreLink, type CoreLinks } from './history.helpers';
 
@@ -137,7 +137,7 @@ export class HistoryService {
       .from(drivers).where(eq(drivers.id, coreDriverId)).limit(1);
     if (!core) return null;
     const [row] = await db.select().from(historyDrivers)
-      .where(eq(historyDrivers.matchKey, normalizePersonName(`${core.firstName} ${core.lastName}`))).limit(1);
+      .where(eq(historyDrivers.matchKey, f1dbPersonKey(`${core.firstName} ${core.lastName}`))).limit(1);
     if (!row) return null;
     return {
       f1dbId: row.f1dbId, name: row.name, dateOfBirth: row.dateOfBirth, nationality: row.nationality,

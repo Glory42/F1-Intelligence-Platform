@@ -10,61 +10,16 @@ import RaceTabs from '@/features/races/components/RaceTabs.astro';
 import RaceTabPanel from '@/features/races/components/RaceTabPanel.astro';
 import RaceEventPanels from '@/features/races/components/RaceEventPanels.astro';
 import CircuitStatsGrid from '@/features/races/components/CircuitStatsGrid.astro';
-import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
-import { NO_RACE_EVENTS, loadRaceEvents, raceEventTabs } from '@/features/races/loadRaceEvents';
-import {
-  circuitYearItems, conditionsOf, driverMapOf, fastestLapOf, predictedPodium, sprintQualifyingGrid, winnerOf,
-} from '@/features/races/raceView';
-import type { SprintDetailResponse, RaceResult, CircuitHistoryItem } from '@/types';
+import { loadRacePageData } from '@/features/races/loadRacePageData';
 import { Zap } from 'lucide-react';
 import { SPRINT_ACCENT } from '@/features/predictions/types';
 
-const { id } = Astro.params;
-
-const [sprintResult, eventsResult] = await Promise.allSettled([
-  api.getSprintDetail(Number(id)),
-  loadRaceEvents(Number(id), 'sprint'),
-]);
-const sprintData: SprintDetailResponse | null = sprintResult.status === 'fulfilled' ? sprintResult.value : null;
-const error = sprintResult.status === 'rejected'
-  ? (sprintResult.reason instanceof Error ? sprintResult.reason.message : 'Failed to load sprint data')
-  : null;
-const events = eventsResult.status === 'fulfilled' ? eventsResult.value : NO_RACE_EVENTS;
-
-const race = sprintData?.race ?? null;
-let circuitHistory: CircuitHistoryItem[] = [];
-if (race) circuitHistory = await api.getCircuitDetails(race.circuit.circuitKey).then((d) => d.history, () => []);
-
-const prediction = sprintData?.prediction ?? null;
-const rawResults = sprintData?.results ?? [];
-const results = rawResults.filter((r) => r.status !== 'grid_set');
-const laps = sprintData?.laps ?? [];
-const sqGrid = sprintQualifyingGrid(rawResults);
-
-const isSprintDone = race != null && ['sprint_done', 'qualifying_done', 'completed'].includes(race.status);
-const isUpcoming = race != null && !isSprintDone;
-const raceYear = race ? new Date(race.raceDate).getFullYear() : new Date().getFullYear();
-
-const eventTabs = isSprintDone ? raceEventTabs(events) : [];
-const tabs = [
-  ...(isSprintDone && results.length > 0 ? [{ id: 'results', label: 'Results' }] : []),
-  ...(sqGrid.length > 0 ? [{ id: 'qualifying', label: 'Sprint Quali' }] : []),
-  ...(isSprintDone && laps.length > 0 ? [{ id: 'laps', label: 'Lap Chart' }] : []),
-  ...eventTabs,
-  { id: 'circuit', label: 'Circuit' },
-];
-const defaultTab = tabs[0].id;
-
-const podium = predictedPodium(prediction?.drivers ?? []);
-const sprintWinner = winnerOf(results);
-const predCorrect = prediction && sprintWinner ? prediction.predictedWinner.id === sprintWinner.driver.id : null;
-const conditions = race
-  ? conditionsOf({
-      safetyCarLaps: race.sprintSafetyCarLaps, vscLaps: race.sprintVscLaps, airTempAvg: race.sprintAirTempAvg,
-      trackTempAvg: race.sprintTrackTempAvg, humidityAvg: race.sprintHumidityAvg,
-    })
-  : [];
+const {
+  error, race, results, qualifying: sqGrid, laps, driverMap, events, eventTabs, raceYear, prediction, podium, confidence,
+  predCorrect, actualWinnerName, isDone: isSprintDone, status, sessionDate, countdownTo, conditions, fastestLap,
+  yearItems, links, tabs, defaultTab,
+} = await loadRacePageData('sprint', Number(Astro.params.id));
 ---
 
 <BaseLayout title={race ? `Sprint · ${race.name}` : 'Sprint Race'}>
@@ -81,27 +36,27 @@ const conditions = race
       <div class="border border-destructive/40 bg-destructive/10 p-8 text-center">
         <p class="font-mono text-[10px] text-destructive tracking-widest uppercase">Sprint data not found</p>
       </div>
-    ) : sprintData && race ? (
+    ) : race ? (
       <>
         {/* ── HERO ── */}
         <div class="panel">
           <div class="grid lg:grid-cols-[1fr_320px]">
             <RaceHeroInfo
               kicker={`./round-${race.roundNumber.toString().padStart(2, '0')} · sprint`}
-              statusIcon={isSprintDone ? 'check' : 'timer'}
-              statusLabel={isSprintDone ? 'sprint done' : 'sprint upcoming'}
-              statusToneClass={isSprintDone ? 'border-orange-500/30 text-orange-400/70' : 'border-white/[0.08] text-muted-foreground'}
+              statusIcon={status.icon}
+              statusLabel={status.label}
+              statusToneClass={status.toneClass}
               raceName={race.name}
               circuit={race.circuit}
-              dateStr={formatDate(race.sprintDate ?? race.raceDate)}
+              dateStr={formatDate(sessionDate ?? race.raceDate)}
               lapsLabel="~17 laps"
               lengthKm={race.circuit.trackLengthKm}
               weather={race.weather}
               conditions={conditions}
-              fastestLap={fastestLapOf(results, laps)}
+              fastestLap={fastestLap}
               accent={SPRINT_ACCENT}
-              countdown={isUpcoming ? { id: 'sprint-countdown', date: race.sprintDate ?? race.raceDate, borderClass: 'border-orange-500/20', digitClass: 'sprint-cd' } : null}
-              yearItems={circuitYearItems(circuitHistory, 'sprint')}
+              countdown={countdownTo ? { id: 'sprint-countdown', date: countdownTo, borderClass: 'border-orange-500/20', digitClass: 'sprint-cd' } : null}
+              yearItems={yearItems}
               currentYear={raceYear}
               yearVariant="orange"
             />
@@ -109,15 +64,15 @@ const conditions = race
             <RacePredictionPanel
               accent={SPRINT_ACCENT}
               heading="./sprint prediction"
-              fullHref={`/prediction/sprint/${id}`}
+              fullHref={`/prediction/sprint/${race.id}`}
               hasPrediction={prediction != null}
               predictedWinnerName={prediction?.predictedWinner.fullName}
               winnerLabel="predicted sprint winner"
-              confidence={Math.round(Number(podium[0]?.winProbability ?? 0) * 100)}
+              confidence={confidence}
               podium={podium}
               showAccuracy={isSprintDone}
               predCorrect={predCorrect}
-              actualWinnerName={isSprintDone && sprintWinner && sprintWinner.driver.id !== prediction?.predictedWinner.id ? sprintWinner.driver.fullName : null}
+              actualWinnerName={actualWinnerName}
               actualLabel="actual sprint winner"
               emptyText={isSprintDone ? 'No prediction data' : 'Available after sprint qualifying'}
             />
@@ -126,15 +81,12 @@ const conditions = race
 
         {/* ── TABS ── */}
         <div>
-          <RaceTabs tabs={tabs} defaultTab={defaultTab} accent={SPRINT_ACCENT} namespace="sprint-" links={isSprintDone && race ? [
-            { href: `/races/${race.id}/race-story?session=sprint`, label: 'Race story' },
-            { href: `/races/${race.id}/telemetry?session=SQ`, label: 'Telemetry' },
-          ] : []} />
+          <RaceTabs tabs={tabs} defaultTab={defaultTab} accent={SPRINT_ACCENT} namespace="sprint-" links={links} />
 
           {isSprintDone && results.length > 0 && (
             <RaceTabPanel id="results" defaultTab={defaultTab} namespace="sprint-">
               <div class="border border-white/[0.06] overflow-hidden">
-                <RaceResultsTable results={results as unknown as RaceResult[]} year={raceYear} laps={laps} flColor="#fb923c" />
+                <RaceResultsTable results={results} year={raceYear} laps={laps} flColor="#fb923c" />
               </div>
             </RaceTabPanel>
           )}
@@ -155,7 +107,7 @@ const conditions = race
             </RaceTabPanel>
           )}
 
-          <RaceEventPanels events={events} tabs={eventTabs} defaultTab={defaultTab} namespace="sprint-" driverMap={driverMapOf(results)} year={raceYear} />
+          <RaceEventPanels events={events} tabs={eventTabs} defaultTab={defaultTab} namespace="sprint-" driverMap={driverMap} year={raceYear} />
 
           <RaceTabPanel id="circuit" defaultTab={defaultTab} namespace="sprint-">
             <CircuitStatsGrid circuit={race.circuit} session="sprint" />

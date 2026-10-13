@@ -18,10 +18,20 @@ All responses follow this envelope:
 
 No authentication. All endpoints are read-only GET.
 
-**Caching:** race/prediction/sprint endpoints set `Cache-Control` based on whether the
-underlying race is `completed`: `public, max-age=86400, immutable` once a race is done
-(results and predictions for a finished race never change), otherwise `public, max-age=30`
-while the weekend is still in progress. See `apps/api/src/common/cache.ts`.
+**Caching:** every route's `Cache-Control` comes from the data it returns, never from a client
+parameter (`apps/api/src/common/route.ts`, rules in `common/cache.ts`):
+
+- **Race-scoped** routes (`/api/races/:id/*`, `/api/predictions/race/:raceId*`, `/api/sprint/race/:raceId*`):
+  `public, max-age=86400, immutable` once the race is `completed`, otherwise `public, max-age=30`.
+- **Season-scoped** routes (`?year=N` lists, and `/api/drivers/:id*` / `/api/teams/:id*`, whose ids belong
+  to one season): immutable for a past season, 30 s for the current one. For the `:id` routes the
+  season is the driver's/team's own: `?year=` never changes the lifetime. Careers use their newest season.
+- **Reference data** (`/api/seasons`, `/api/search`, `/api/races/circuits`, `/api/races/circuit/:key`,
+  `/api/predictions/model-info`): `public, max-age=3600`.
+- An empty answer (no rows yet, enrichment not backfilled) is always cached for 30 s only.
+
+A non-numeric `:id` / `:raceId` answers 400 `INVALID_ID`, a non-numeric `year` 400 `INVALID_YEAR`, an
+unknown `session` 400 `INVALID_SESSION`, and an unknown race, driver or team 404 `NOT_FOUND`.
 
 ---
 
@@ -74,6 +84,10 @@ Returns all races for the year. Each race includes `eventFormat`, `hasSprint`, `
 ### `GET /api/races/:id`
 
 Returns a single race with circuit, results (if completed), qualifying, and lap summaries.
+
+`laps` (the same rule for the sprint detail's `laps`): one `{ driverId, driver, fastestLapMs, avgLapMs,
+totalLaps }` per driver, fastest first. Pit in/out laps and laps without a time are left out of all
+three numbers, so `totalLaps` counts clean timed laps only. All three are integers.
 
 The `Race` object includes:
 - `eventFormat`: `conventional` | `sprint` | `sprint_qualifying` | `sprint_shootout`
@@ -187,7 +201,13 @@ speed, braking zones, and corners: every lift or brake, classed by apex speed (l
 
 ### `GET /api/drivers/standings?year=N`
 
-Returns driver championship standings for the year, ordered by points.
+Returns driver championship standings for the year: `[{ driver, stats }]`, ordered by championship
+position, then `championshipPoints`.
+
+Every driver stats object (here, `/api/drivers/:id` `seasonStats`, and each `/career` entry) carries
+`totalPoints` (GP only), `sprintTotalPoints` (sprints only) and `championshipPoints` (their sum, what
+the championship counts). All three are one-decimal strings, e.g. `"300.0"`, `"24.0"`, `"324.0"`;
+`"0"` when the driver has no stats row yet. Team stats carry the same three fields.
 
 ### `GET /api/drivers/racecraft?year=N`
 
@@ -203,7 +223,8 @@ counts races both drivers finished (`Finished`/`Lapped`/`+N Lap(s)`, ADR 0002); 
 points. `races` lists every shared race in round order: `{ raceId, roundNumber, raceName, qualiGapMs,
 driver, teammate }`, each side `{ qualiPosition, finishPosition, status, points }`. `qualiGapMs` compares
 lap times in the deepest session both reached (Q3, else Q2, else Q1); negative means the driver was
-faster. `medianQualiGapMs` is the median of those gaps. `year` only drives the cache header.
+faster. `medianQualiGapMs` is the median of those gaps. `year` is accepted but ignored: the
+driver's own season sets the cache lifetime.
 
 ### `GET /api/drivers/:id?year=N`
 
@@ -212,7 +233,7 @@ Returns a single driver with their season stats for the given year.
 ### `GET /api/drivers/:id/career`
 
 Returns a driver's stats across all seasons they have data in. `drivers` rows are season-scoped and
-FastF1's names vary by season, so seasons are linked by person (`common/driver-identity.ts`): the same
+FastF1's names vary by season, so seasons are linked by person (`common/identity.ts`, golden cases in `docs/identity-cases.json`): the same
 name ignoring accents and case, or the same code with one name extending the other ("Andrea Kimi
 Antonelli" / "Kimi Antonelli"). "Jr." still counts, so a father and son stay separate. `/api/search`
 uses the same rule to list each person once, under their latest season.
@@ -227,7 +248,8 @@ Returns all teams for the season.
 
 ### `GET /api/teams/standings?year=N`
 
-Returns constructor championship standings for the year, ordered by points.
+Returns constructor championship standings for the year: `[{ team, stats }]`, ordered by championship
+position, then `championshipPoints` (GP + sprint; see driver standings for the three points fields).
 
 ### `GET /api/teams/pit-stops?year=N`
 
@@ -237,8 +259,8 @@ ignored. Long-cached for past seasons (`cacheControlForYear`).
 
 ### `GET /api/teams/:id/pit-stops?year=N`
 
-Every timed grand prix stop by one team's drivers (`:id` is season-scoped, so `year` only picks the
-cache lifetime): `[{ raceId, roundNumber, raceName, driver, lapNumber, stationaryMs }]` in round
+Every timed grand prix stop by one team's drivers (`:id` is season-scoped; `year` is accepted but
+ignored, the team's own season sets the cache lifetime): `[{ raceId, roundNumber, raceName, driver, lapNumber, stationaryMs }]` in round
 and lap order. Sprint stops and stops without a stationary time are left out.
 
 ### `GET /api/teams/:id?year=N`
@@ -247,7 +269,9 @@ Returns a single team with season stats for the given year.
 
 ### `GET /api/teams/:id/career`
 
-Returns a team's stats across all seasons they have data in.
+Returns a team's stats across all seasons they have data in, following the outfit through its
+rebrands (`constructorKey` in `common/identity.ts`): RB's career includes AlphaTauri and Toro Rosso,
+but never its sister team Red Bull. Each entry keeps its own season's `teamId`.
 
 ---
 
@@ -398,7 +422,7 @@ is `null` when a bucket has zero races (e.g. `sprint` for a season with no sprin
 
 ### `GET /api/predictions/standings?year=N`
 
-Returns the "Intelligence Standings": driver rankings by average prediction score. Each row includes sprint aggregates (`sprintWins`, `sprintPodiums`, `sprintTotalPoints`).
+Returns the "Intelligence Standings": driver rankings by average prediction score. Each row includes sprint aggregates (`sprintWins`, `sprintPodiums`, `sprintTotalPoints`) and `championshipPoints` (GP + sprint season points).
 
 ---
 

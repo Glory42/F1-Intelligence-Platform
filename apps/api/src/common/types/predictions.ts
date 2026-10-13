@@ -26,20 +26,25 @@ export type FeatureScores = {
   circuitAdjPositionGain: string | null;
 };
 
-export type DriverPrediction = {
+// GP and sprint predictions share one shape and differ only in their feature scores.
+export type DriverPredictionOf<TFeatures> = {
   driver: Driver;
   winProbability: string;
   predictedPosition: number | null;
-  features: FeatureScores;
+  features: TFeatures;
 };
 
-export type PredictionResponse = {
+export type PredictionOf<TFeatures> = {
   race: Race;
   predictedWinner: Driver;
   computedAt: string;
   modelVersion: string;
-  drivers: DriverPrediction[];
+  drivers: DriverPredictionOf<TFeatures>[];
 };
+
+export type DriverPrediction = DriverPredictionOf<FeatureScores>;
+
+export type PredictionResponse = PredictionOf<FeatureScores>;
 
 export type PredictionHistoryItem = {
   raceId: number;
@@ -79,6 +84,8 @@ export type IntelStandingRow = {
   sprintWins: number;
   sprintPodiums: number;
   sprintTotalPoints: string;
+  // The driver's GP + sprint season points (driver_season_stats), same convention as DriverSeasonStats.
+  championshipPoints: string;
 };
 
 export type FridayPaceRow = {

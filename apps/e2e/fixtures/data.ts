@@ -9,6 +9,7 @@ import type {
   StrategyResponse, FridayPaceRow, PitCrewRanking, TeamStanding, TitleOddsResponse,
   RacecraftRow, TeammateBattle, RaceStoryResponse, TelemetryResponse, LapTelemetrySamples,
   HistoryRecords, HistoryMilestones, ConstructorLineage, DriverHistory, TeamHistory, RaceRecap, OnThisDay, TeamPitStop, CircuitTelemetry,
+  GlobalSearchResponse,
 } from '../../web/src/types';
 
 export const circuit: Circuit = {
@@ -134,12 +135,12 @@ export const intelStandings: IntelStandingRow[] = [
   {
     driver, features: featureScores, rawWeightedScore: '0.680000',
     winProbability: '0.62000', predictedPosition: 1, overallScore: 0.68,
-    sprintWins: 0, sprintPodiums: 0, sprintTotalPoints: '0',
+    sprintWins: 0, sprintPodiums: 0, sprintTotalPoints: '0', championshipPoints: '350.0',
   },
   {
     driver: driverB, features: featureScores, rawWeightedScore: '0.520000',
     winProbability: '0.38000', predictedPosition: 2, overallScore: 0.52,
-    sprintWins: 0, sprintPodiums: 0, sprintTotalPoints: '0',
+    sprintWins: 0, sprintPodiums: 0, sprintTotalPoints: '0', championshipPoints: '210.0',
   },
 ];
 
@@ -154,11 +155,12 @@ const driverSeasonStats: DriverSeasonStats = {
   racesEntered: 16, racesFinished: 15, wins: 8, podiums: 12, poles: 6,
   totalPoints: '350', championshipPosition: 1, avgFinishPosition: '2.1',
   winRate: '0.500', avgPositionGain: '1.2', dnfCount: 1, dnfRate: '0.06',
-  avgSector1Ms: null, avgSector2Ms: null, avgSector3Ms: null, topSpeedAvg: null, teammateQualiDelta: null, sprintTotalPoints: '0',
+  avgSector1Ms: null, avgSector2Ms: null, avgSector3Ms: null, topSpeedAvg: null, teammateQualiDelta: null,
+  sprintTotalPoints: '0', championshipPoints: '350.0',
 };
 
 const driverBSeasonStats: DriverSeasonStats = {
-  ...driverSeasonStats, wins: 3, podiums: 9, poles: 2, totalPoints: '210', championshipPosition: 2,
+  ...driverSeasonStats, wins: 3, podiums: 9, poles: 2, totalPoints: '210', championshipPoints: '210.0', championshipPosition: 2,
 };
 
 export const driverCareer: DriverYearStats[] = [
@@ -188,7 +190,7 @@ export const driverBDetailResponse: DriverDetailResponse = {
 const teamSeasonStats: TeamSeasonStats = {
   racesCompleted: 16, wins: 8, podiums: 15, totalPoints: '600',
   championshipPosition: 1, avgFinishPosition: '3.5', carPerformanceScore: '0.85',
-  dnfCount: 2, reliabilityScore: '0.90', sprintTotalPoints: '0',
+  dnfCount: 2, reliabilityScore: '0.90', sprintTotalPoints: '0', championshipPoints: '600.0',
 };
 
 export const teamCareer: TeamYearStats[] = [
@@ -207,7 +209,7 @@ export const teamDetailResponse: TeamDetailResponse = {
 };
 
 const teamBSeasonStats: TeamSeasonStats = {
-  ...teamSeasonStats, wins: 4, podiums: 10, totalPoints: '410', championshipPosition: 2,
+  ...teamSeasonStats, wins: 4, podiums: 10, totalPoints: '410', championshipPoints: '410.0', championshipPosition: 2,
   avgFinishPosition: '4.8', carPerformanceScore: '0.78', reliabilityScore: '0.86',
 };
 
@@ -228,7 +230,7 @@ export const driverStandingsResponse: DriverStanding[] = [
 
 export const driversListResponse: Driver[] = [driver, driverB];
 
-export const globalSearchResponse = { drivers: [driver, driverB], teams: [team, teamB], circuits: [circuit] };
+export const globalSearchResponse: GlobalSearchResponse = { drivers: [driver, driverB], teams: [team, teamB], circuits: [circuit] };
 
 export const circuitDetailResponse: CircuitDetailResponse = {
   outlinePath: 'M0,750L1000,750L1000,250L0,250Z',

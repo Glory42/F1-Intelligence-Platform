@@ -9,7 +9,7 @@ import YearSelect from '@/components/page/YearSelect.astro';
 import DriverStandingsTable from '@/features/standings/components/DriverStandingsTable.astro';
 import TitleFight from '@/features/standings/components/TitleFight.astro';
 import RacecraftTable from '@/features/standings/components/RacecraftTable.astro';
-import { resolveTab, TAB_PARAM } from '@/lib/pageTabs';
+import { resolveTab, seasonTabHref } from '@/lib/pageTabs';
 
 const TABS = [
   { id: 'standings', label: 'Standings' },
@@ -42,7 +42,7 @@ try {
 <BaseLayout title={`${year} Driver Standings`}>
   <div class="space-y-6">
     <PageHeader kicker="./drivers" title={`${year} Drivers`} subtitle={`${year} championship`}>
-      <YearSelect slot="aside" years={seasons} currentYear={year} basePath="/drivers" extraParams={tab === TABS[0].id ? '' : `&${TAB_PARAM}=${tab}`} />
+      <YearSelect slot="aside" years={seasons} currentYear={year} hrefFor={(y: number) => seasonTabHref(Astro.url, TABS, tab, y)} />
     </PageHeader>
 
     <PageTabs tabs={TABS} active={tab} label="Drivers views" />

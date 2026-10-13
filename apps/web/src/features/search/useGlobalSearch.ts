@@ -1,19 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import type { Driver, Team, Circuit } from "@/types";
+import type { GlobalSearchResponse } from "@/types";
 
-interface GlobalSearchResults {
-  drivers: Driver[];
-  teams: Team[];
-  circuits: Circuit[];
-}
-
-const EMPTY_RESULTS: GlobalSearchResults = { drivers: [], teams: [], circuits: [] };
+const EMPTY_RESULTS: GlobalSearchResponse = { drivers: [], teams: [], circuits: [] };
 
 export function useGlobalSearch() {
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
-  const [results, setResults] = useState<GlobalSearchResults>(EMPTY_RESULTS);
+  const [results, setResults] = useState<GlobalSearchResponse>(EMPTY_RESULTS);
   const [loading, setLoading] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
   const openRef = useRef(open);

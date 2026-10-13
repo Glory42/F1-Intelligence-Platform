@@ -1,24 +1,30 @@
 import { eq, and, inArray, desc, asc, isNotNull, sql } from 'drizzle-orm';
 import type { Db } from '../../config/database';
 import { teams, seasons, drivers, teamSeasonStats, racePitStops, races } from '../../db/schema';
-import type { Team, Driver, TeamDetailResponse, TeamStanding, TeamYearStats, PitCrewRanking, TeamPitStop } from '../../common/types';
+import type {
+  Team, Driver, TeamDetailResponse, TeamSeasonStats, TeamStanding, TeamYearStats, PitCrewRanking, TeamPitStop,
+} from '../../common/types';
 import { toTeam, toDriver } from '../../common/mappers';
-import { resolveSeason, buildStandings, buildCareerStats, type StatsAdapter } from '../../common/standings';
+import {
+  resolveSeason, buildStandings, buildCareerStats, championshipPoints, type StatsAdapter,
+} from '../../common/standings';
+import { constructorTeamKeys } from '../../common/identity';
 
-function toTeamStats(s: typeof teamSeasonStats.$inferSelect) {
+function toTeamStats(s: typeof teamSeasonStats.$inferSelect): TeamSeasonStats {
   return {
     racesCompleted: s.racesCompleted, wins: s.wins, podiums: s.podiums,
     totalPoints: s.totalPoints, championshipPosition: s.championshipPosition,
     avgFinishPosition: s.avgFinishPosition, carPerformanceScore: s.carPerformanceScore,
     dnfCount: s.dnfCount, reliabilityScore: s.reliabilityScore ?? null,
     sprintTotalPoints: s.sprintTotalPoints,
+    championshipPoints: championshipPoints(s.totalPoints, s.sprintTotalPoints),
   };
 }
 
-const emptyTeamStats = {
+const emptyTeamStats: TeamSeasonStats = {
   racesCompleted: 0, wins: 0, podiums: 0, totalPoints: '0',
   championshipPosition: null, avgFinishPosition: null, carPerformanceScore: null,
-  dnfCount: 0, reliabilityScore: null, sprintTotalPoints: '0',
+  dnfCount: 0, reliabilityScore: null, sprintTotalPoints: '0', championshipPoints: '0',
 };
 
 // Standings pass raw `teams` rows; career passes `{ teams, seasons }` entries: so the
@@ -73,17 +79,13 @@ export class TeamsService {
     );
   }
 
-  async findCareerStats(db: Db, teamId: number): Promise<TeamYearStats[]> {
-    const teamRow = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
-    if (!teamRow[0]) return [];
-
-    const key = teamRow[0].teamKey;
-
+  // Follows the outfit, not the exact key, so a rebrand (Toro Rosso -> AlphaTauri -> RB) keeps its history.
+  async findCareerStats(db: Db, self: typeof teams.$inferSelect): Promise<TeamYearStats[]> {
     const allEntries = await db
       .select()
       .from(teams)
       .innerJoin(seasons, eq(teams.seasonId, seasons.id))
-      .where(eq(teams.teamKey, key))
+      .where(inArray(teams.teamKey, constructorTeamKeys(self.teamKey)))
       .orderBy(desc(seasons.year));
 
     if (!allEntries.length) return [];
@@ -106,32 +108,25 @@ export class TeamsService {
     );
   }
 
-  // `teams` rows are season-scoped, so teamId alone already pins the season: no `year` param needed.
-  async findById(db: Db, teamId: number): Promise<TeamDetailResponse | null> {
-    const teamRows = await db
-      .select()
-      .from(teams)
-      .where(eq(teams.id, teamId))
-      .limit(1);
-
-    if (!teamRows[0]) return null;
-    const team = toTeam(teamRows[0]);
+  // `teams` rows are season-scoped, so the row alone already pins the season: no `year` param needed.
+  async findDetail(db: Db, row: typeof teams.$inferSelect): Promise<TeamDetailResponse> {
+    const team = toTeam(row);
 
     const [statsRows, driverRows] = await Promise.all([
       db
         .select()
         .from(teamSeasonStats)
-        .where(and(eq(teamSeasonStats.teamId, teamId), eq(teamSeasonStats.seasonId, teamRows[0].seasonId)))
+        .where(and(eq(teamSeasonStats.teamId, row.id), eq(teamSeasonStats.seasonId, row.seasonId)))
         .limit(1),
 
       db
         .select()
         .from(drivers)
-        .where(and(eq(drivers.teamId, teamId), eq(drivers.seasonId, teamRows[0].seasonId))),
+        .where(and(eq(drivers.teamId, row.id), eq(drivers.seasonId, row.seasonId))),
     ]);
 
     const stats = statsRows[0];
-    const teamDrivers: Driver[] = driverRows.map((d) => toDriver(d, teamRows[0]));
+    const teamDrivers: Driver[] = driverRows.map((d) => toDriver(d, row));
 
     return {
       team,
