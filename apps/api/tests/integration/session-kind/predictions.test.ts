@@ -10,13 +10,18 @@ import { createRacePrediction } from '../../support/factories/prediction.factory
 import { createSprintPrediction } from '../../support/factories/sprintPrediction.factory';
 import { createDriverPredictionFeatures } from '../../support/factories/driverPredictionFeatures.factory';
 import { createDriverSprintFeatures } from '../../support/factories/driverSprintFeatures.factory';
+import { createQualifyingResult } from '../../support/factories/qualifying.factory';
+import { createSprintResult } from '../../support/factories/sprintResult.factory';
 
 type PredictionBody = {
   data: {
     race: { id: number };
     predictedWinner: { code: string };
     modelVersion: string;
-    drivers: Array<{ driver: { code: string }; winProbability: string; predictedPosition: number | null; features: Record<string, string | null> }>;
+    drivers: Array<{
+      driver: { code: string }; winProbability: string; predictedPosition: number | null; gridPosition: number | null;
+      features: Record<string, unknown>;
+    }>;
   };
 };
 
@@ -44,6 +49,10 @@ describe('a prediction for a GP and a sprint (integration)', () => {
     await createDriverPredictionFeatures(db, race.id, winner.id, { winProbability: '0.60000', predictedPosition: 1 });
     await createDriverSprintFeatures(db, race.id, runnerUp.id, { winProbability: '0.30000', predictedPosition: 2 });
     await createDriverSprintFeatures(db, race.id, winner.id, { winProbability: '0.60000', predictedPosition: 1 });
+    // Each session's grid comes from its own sheet: the winner starts the GP 3rd but the sprint 1st.
+    await createQualifyingResult(db, race.id, winner.id, { gridPosition: 3 });
+    await createQualifyingResult(db, race.id, runnerUp.id, { gridPosition: 1 });
+    await createSprintResult(db, race.id, winner.id, { gridPosition: 1 });
   });
 
   afterAll(async () => {
@@ -51,19 +60,23 @@ describe('a prediction for a GP and a sprint (integration)', () => {
   });
 
   it.each([
-    ['grand prix', '/api/predictions', 'weighted-v3', 'longRunPace'],
-    ['sprint', '/api/sprint', 'sprint-v2', 'shortRunPace'],
-  ])('assembles the %s prediction: winner, model, ranked drivers and their feature scores', async (_kind, base, model, kindFeature) => {
-    const res = await apiRequest(`${base}/race/${raceId}`);
-    const { data } = (await res.json()) as PredictionBody;
+    ['grand prix', '/api/predictions', 'weighted-v4', [3, 1], 'teamRacePace', { value: -0.15, contribution: 0.35 }],
+    ['sprint', '/api/sprint', 'sprint-v2', [1, null], 'shortRunPace', '0.65000'],
+  ])(
+    'assembles the %s prediction: winner, model, ranked drivers, their grid and features',
+    async (_kind, base, model, grid, feature, expected) => {
+      const res = await apiRequest(`${base}/race/${raceId}`);
+      const { data } = (await res.json()) as PredictionBody;
 
-    expect([data.predictedWinner.code, data.modelVersion]).toEqual(['WIN', model]);
-    expect(data.drivers.map((d) => [d.driver.code, d.winProbability, d.predictedPosition])).toEqual([
-      ['WIN', '0.60000', 1],
-      ['RUN', '0.30000', 2],
-    ]);
-    expect([data.drivers[0].features.carPerformance, data.drivers[0].features[kindFeature]]).toEqual(['0.80000', '0.65000']);
-  });
+      expect([data.predictedWinner.code, data.modelVersion]).toEqual(['WIN', model]);
+      expect(data.drivers.map((d) => [d.driver.code, d.winProbability, d.predictedPosition])).toEqual([
+        ['WIN', '0.60000', 1],
+        ['RUN', '0.30000', 2],
+      ]);
+      expect(data.drivers.map((d) => d.gridPosition)).toEqual(grid);
+      expect(data.drivers[0].features[feature]).toEqual(expected);
+    },
+  );
 
   it.each([['grand prix', '/api/predictions'], ['sprint', '/api/sprint']])(
     'offers the %s prediction as upcoming while its session is ahead',

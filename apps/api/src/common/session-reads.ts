@@ -3,7 +3,6 @@ import type { Db } from '../config/database';
 import { circuits, drivers, races, teams } from '../db/schema';
 import type { LapSummary, PredictionOf } from './types';
 import { toDriver, toRace } from './mappers';
-import { mapFeatureRow } from './feature-manifest';
 import type { AnySessionKind, SessionKind } from './session-kind';
 
 type RaceRow = typeof races.$inferSelect;
@@ -48,11 +47,13 @@ async function assemblePrediction<TF extends FeatureTable, TS>(
 ): Promise<PredictionOf<TS> | null> {
   // Drizzle can't infer rows from a generic table, so query the union and narrow back to TF's row.
   const table: FeatureTable = kind.features;
+  const { grid } = kind;
   const rows = await db
-    .select({ feature: table, driver: drivers, team: teams })
+    .select({ feature: table, driver: drivers, team: teams, gridPosition: grid.gridPosition })
     .from(table)
     .innerJoin(drivers, eq(table.driverId, drivers.id))
     .innerJoin(teams, eq(drivers.teamId, teams.id))
+    .leftJoin(grid, and(eq(grid.raceId, table.raceId), eq(grid.driverId, table.driverId)))
     .where(eq(table.raceId, race.id))
     .orderBy(asc(table.predictedPosition));
 
@@ -67,7 +68,8 @@ async function assemblePrediction<TF extends FeatureTable, TS>(
       driver: toDriver(r.driver, r.team),
       winProbability: r.feature.winProbability,
       predictedPosition: r.feature.predictedPosition,
-      features: mapFeatureRow<TF['$inferSelect'], TS>(r.feature as TF['$inferSelect'], kind.manifest),
+      gridPosition: r.gridPosition,
+      features: kind.mapFeatures(r.feature as TF['$inferSelect']),
     })),
   };
 }

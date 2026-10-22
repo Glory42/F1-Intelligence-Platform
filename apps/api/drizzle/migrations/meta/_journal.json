@@ -204,6 +204,20 @@
       "when": 1791711276970,
       "tag": "0028_drivers_unique_per_person",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792681545537,
+      "tag": "0029_drop_v3_feature_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1792681548579,
+      "tag": "0030_gp_features_jsonb",
+      "breakpoints": true
     }
   ]
 }

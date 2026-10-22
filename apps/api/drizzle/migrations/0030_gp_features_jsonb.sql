@@ -1,0 +1,1 @@
+ALTER TABLE "driver_prediction_features" ADD COLUMN "features" jsonb NOT NULL;

@@ -3,7 +3,13 @@ from typing import Any, Optional
 from src.utils.feature_context import FeatureContext
 from src.utils.feature_helpers import compute_rolling_teammate_delta
 from src.utils.feature_manifest import SPRINT_FEATURES, SPRINT_WEIGHTS as WEIGHTS  # noqa: F401 (re-exported)
-from src.utils.feature_runner import DriverScorer, FeatureJobSpec, ModelScores, run_feature_job
+from src.utils.feature_runner import (
+    DriverScorer,
+    FeatureJobSpec,
+    ModelScores,
+    run_feature_job,
+    weather_unknown_before_session,
+)
 from src.utils.math_utils import bayesian_win_rate, clamp, normalize_minmax
 
 SPRINT_FORMATS = ("sprint", "sprint_qualifying", "sprint_shootout")
@@ -65,7 +71,7 @@ SPEC = FeatureJobSpec(
     features=SPRINT_FEATURES,
     grid_table="sprint_results",
     grid_missing="No sprint results (grid) for race {race_id}: run ingest_sprint first",
-    weather=lambda ctx: ctx.sprint_weather or ctx.weather or "dry",
+    weather=weather_unknown_before_session,
     score_drivers=_score_drivers,
     validate_race=_validate_sprint_weekend,
 )

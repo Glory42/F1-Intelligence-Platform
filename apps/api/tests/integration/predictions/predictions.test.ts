@@ -54,14 +54,16 @@ describe('predictions (integration)', () => {
     const res = await apiRequest('/api/predictions/upcoming');
     expect(res.status).toBe(200);
     const { data } = (await res.json()) as {
-      data: { predictedWinner: { code: string }; modelVersion: string; race: { status: string }; drivers: Array<{ features: Record<string, unknown> }> };
+      data: {
+        predictedWinner: { code: string }; modelVersion: string; race: { status: string };
+        drivers: Array<{ features: Record<string, { value: number; contribution: number }> }>;
+      };
     };
     expect(data.predictedWinner.code).toBe('AAA');
-    expect(data.modelVersion).toBe('weighted-v3');
+    expect(data.modelVersion).toBe('weighted-v4');
     expect(data.race.status).toBe('qualifying_done');
     expect(data.drivers).toHaveLength(2);
-    expect(data.drivers[0].features).toHaveProperty('carPerformance');
-    expect(data.drivers[0].features).toHaveProperty('circuitAdjStartPos');
+    expect(data.drivers[0].features.teamRacePace).toEqual({ value: -0.15, contribution: 0.35 });
   });
 
   it('returns a prediction by race id', async () => {
@@ -108,12 +110,12 @@ describe('predictions (integration)', () => {
     const res = await apiRequest('/api/predictions/standings?year=2099');
     expect(res.status).toBe(200);
     const { data } = (await res.json()) as {
-      data: Array<{ driver: { code: string }; overallScore: number; features: Record<string, unknown> }>;
+      data: Array<{ driver: { code: string }; overallScore: number; winProbability: string }>;
     };
     expect(data).toHaveLength(2);
     const ace = data.find((r) => r.driver.code === 'AAA')!;
     expect(typeof ace.overallScore).toBe('number');
-    expect(ace.features).toHaveProperty('carPerformance');
+    expect(Number(ace.winProbability)).toBeCloseTo(0.575);
   });
 
   it('reports per-season accuracy buckets', async () => {
@@ -131,7 +133,7 @@ describe('predictions (integration)', () => {
     const res = await apiRequest('/api/predictions/model-info');
     expect(res.status).toBe(200);
     const { data } = (await res.json()) as { data: { gpVersion: string; sprintVersion: string } };
-    expect(data.gpVersion).toBe('weighted-v3');
+    expect(data.gpVersion).toBe('weighted-v4');
     expect(data.sprintVersion).toBe('sprint-v2');
   });
 });

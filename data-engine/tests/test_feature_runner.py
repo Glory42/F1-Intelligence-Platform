@@ -1,9 +1,9 @@
-"""Covers the feature jobs end to end against a fake DB: compute_features / compute_sprint_features
-read a scripted race and write one row per driver. Reads are routed by a marker in their SQL (they
-are independent, so their order is the runner's business); upsert's execute_batch is patched (it
-needs a real connection to render SQL) and the written rows are read back from its params. The
-expected scores are the rows weighted-v3 / sprint-v2 wrote before the jobs became feature_runner
-specs: a refactor must not move a single one."""
+"""Covers the sprint feature job end to end against a fake DB: compute_sprint_features reads a scripted
+race and writes one row per driver through feature_runner (weighted-v4, the GP model, has its own job).
+Reads are routed by a marker in their SQL (they are independent, so their order is the runner's
+business); upsert's execute_batch is patched (it needs a real connection to render SQL) and the written
+rows are read back from its params. The expected scores are the rows sprint-v2 wrote before it became a
+feature_runner spec: a refactor must not move a single one."""
 from datetime import date
 
 import pytest
@@ -56,35 +56,42 @@ class _RoutedConnection:
         self.closed = True
 
 
-def _stats(driver_id, team_id, races, wins, points, gain, dnf, sprint_races, sprint_wins, sprint_points):
+def _race_agg(driver_id, team_id, races, wins, points, gain, dnf_count):
     return {
         "driver_id": driver_id, "team_id": team_id, "races_entered": races, "wins": wins, "total_points": points,
-        "avg_position_gain": gain, "dnf_rate": dnf, "teammate_quali_delta": None,
-        "sprint_races_entered": sprint_races, "sprint_wins": sprint_wins, "sprint_total_points": sprint_points,
+        "avg_gain": gain, "dnf_count": dnf_count,
     }
 
 
-def _season(event_format, weather="wet", sprint_weather=None):
+def _sprint_agg(driver_id, races, wins, points):
+    return {"driver_id": driver_id, "sprint_races_entered": races, "sprint_wins": wins, "sprint_total_points": points}
+
+
+def _team_agg(team_id, median_finish, entries, dnf_count):
+    return {"team_id": team_id, "median_finish": median_finish, "avg_grid": median_finish,
+            "total_entries": entries, "dnf_count": dnf_count}
+
+
+def _season(event_format):
     """Three drivers: two team-mates in a fast car, one in a slower one, at a street circuit."""
     d1, d0 = date(2026, 4, 19), date(2026, 4, 5)
     return {
         "FROM races r JOIN circuits c": {
-            "id": 50, "season_id": 3, "weather": weather, "sprint_weather": sprint_weather, "circuit_id": 7,
+            "id": 50, "season_id": 3, "race_date": RACE_DAY, "circuit_id": 7,
             "event_format": event_format, "overtake_rate": 0.4, "sc_probability": 0.5, "track_category": "street",
         },
         "g.grid_position FROM": [
             {"driver_id": 1, "grid_position": 1}, {"driver_id": 2, "grid_position": 8},
             {"driver_id": 3, "grid_position": 15},
         ],
-        "FROM driver_season_stats": [
-            _stats(1, 100, 10, 4, 200, 1.5, 0.1, 4, 2, 25),
-            _stats(2, 100, 10, 1, 120, -0.5, 0.2, 4, 0, 14),
-            _stats(3, 200, 8, 0, 30, 3.0, None, 2, 0, 3),
+        "AS avg_gain": [
+            _race_agg(1, 100, 10, 4, 200, 1.5, 1),
+            _race_agg(2, 100, 10, 1, 120, -0.5, 2),
+            _race_agg(3, 200, 8, 0, 30, 3.0, 1),
         ],
-        "FROM team_season_stats": [
-            {"team_id": 100, "car_performance_score": 0.9, "reliability_score": 0.8},
-            {"team_id": 200, "car_performance_score": 0.4, "reliability_score": 0.6},
-        ],
+        "sprint_avg_finish": [_sprint_agg(1, 4, 2, 25), _sprint_agg(2, 4, 0, 14), _sprint_agg(3, 2, 0, 3)],
+        # A third, slower team sets the field minimum so the two teams score car 0.9 / 0.4, reliability 0.8 / 0.6.
+        "median_finish": [_team_agg(100, 4.8, 10, 2), _team_agg(200, 12.4, 10, 4), _team_agg(300, 262 / 15, 10, 0)],
         "SELECT race_date FROM races WHERE id": {"race_date": RACE_DAY},
         "rr.grid_position, rr.finish_position": [
             {"driver_id": 1, "grid_position": 1, "finish_position": 1},
@@ -108,33 +115,9 @@ def _season(event_format, weather="wet", sprint_weather=None):
     }
 
 
-def _gp_routes():
-    return {
-        **_season("conventional"),
-        "fp2_long_run_times": [
-            {"driver_id": 1, "best_median_ms": 90000}, {"driver_id": 2, "best_median_ms": 90500},
-            {"driver_id": 3, "best_median_ms": 91500},
-        ],
-        "sector1_ms, sector2_ms, sector3_ms": [
-            {"driver_id": 1, "sector1_ms": 25000, "sector2_ms": 30000, "sector3_ms": 25000},
-            {"driver_id": 2, "sector1_ms": 25100, "sector2_ms": 29900, "sector3_ms": 25200},
-            {"driver_id": 3, "sector1_ms": 25500, "sector2_ms": 30500, "sector3_ms": 25300},
-        ],
-        "SELECT id FROM races": [{"id": 40}, {"id": 30}],
-        "REGR_SLOPE": [
-            {"driver_id": 1, "soft_slope": 50.0, "soft_n": 10, "med_slope": 30.0, "med_n": 20,
-             "hard_slope": None, "hard_n": 0},
-            {"driver_id": 2, "soft_slope": None, "soft_n": 0, "med_slope": None, "med_n": 0,
-             "hard_slope": 40.0, "hard_n": 12},
-            {"driver_id": 3, "soft_slope": 80.0, "soft_n": 5, "med_slope": 60.0, "med_n": 4,
-             "hard_slope": None, "hard_n": 2},
-        ],
-    }
-
-
 def _sprint_routes():
     return {
-        **_season("sprint_qualifying", weather="wet", sprint_weather="dry"),
+        **_season("sprint_qualifying"),
         "SELECT sr.driver_id": [
             {"driver_id": 1, "best_ms": 88000}, {"driver_id": 2, "best_ms": 88400}, {"driver_id": 3, "best_ms": None},
         ],
@@ -166,24 +149,6 @@ def _row(driver_id, **scores):
             "win_probability": 0.0, "predicted_position": None, **scores}
 
 
-GP_ROWS = [
-    _row(1, car_performance_score=0.9175, long_run_pace_score=1.0, tyre_deg_score=1.0, reliability_score=1.0,
-         qualifying_delta_score=1.0, driver_rating_score=0.8, win_rate_score=0.375, luck_factor_score=0.44828,
-         sector_strength_score=0.94444, circuit_adj_start_pos_score=1.0, circuit_adj_position_gain_score=0.22,
-         weather_impact_score=1.0, starting_position_score=1.0, position_gain_score=0.55, long_run_used_fp=True,
-         raw_weighted_score=0.852146),
-    _row(2, car_performance_score=0.82125, long_run_pace_score=0.66667, tyre_deg_score=0.90323,
-         reliability_score=0.78571, qualifying_delta_score=0.0, driver_rating_score=0.48, win_rate_score=0.125,
-         luck_factor_score=0.0, sector_strength_score=0.71111, circuit_adj_start_pos_score=0.884,
-         circuit_adj_position_gain_score=0.19333, weather_impact_score=0.0, starting_position_score=0.65,
-         position_gain_score=0.48333, long_run_used_fp=True, raw_weighted_score=0.558112),
-    _row(3, car_performance_score=0.4, long_run_pace_score=0.0, tyre_deg_score=0.0, reliability_score=0.0,
-         qualifying_delta_score=0.50138, driver_rating_score=0.15, win_rate_score=0.05, luck_factor_score=1.0,
-         sector_strength_score=0.0, circuit_adj_start_pos_score=0.408, circuit_adj_position_gain_score=0.24,
-         weather_impact_score=0.5, starting_position_score=0.3, position_gain_score=0.6, long_run_used_fp=True,
-         raw_weighted_score=0.251871),
-]
-
 SPRINT_ROWS = [
     _row(1, car_performance_score=0.9175, circuit_adj_start_pos_score=1.0, short_run_pace_score=1.0,
          driver_rating_score=0.78125, weather_impact_score=0.5, win_rate_score=0.41667, luck_factor_score=0.44828,
@@ -199,22 +164,13 @@ SPRINT_ROWS = [
 
 
 class TestFeatureJobs:
-    def test_gp_features_write_weighted_v3_scores(self, monkeypatch):
-        from src.jobs import compute_features
-
-        batches, conn = _written(monkeypatch, compute_features, _gp_routes())
-
-        assert batches == [("driver_prediction_features", GP_ROWS)]
-        assert conn.commits == 1
-        assert conn.closed is True
-
     def test_sprint_features_write_sprint_v2_scores(self, monkeypatch):
         from src.jobs import compute_sprint_features
 
         batches, conn = _written(monkeypatch, compute_sprint_features, _sprint_routes())
 
         assert batches == [("driver_sprint_features", SPRINT_ROWS)]
-        assert "wet_avg" not in conn.queries  # a dry sprint scores weather neutrally, unread
+        assert "wet_avg" not in conn.queries
         assert conn.closed is True
 
 

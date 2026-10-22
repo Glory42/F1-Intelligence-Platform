@@ -1,6 +1,14 @@
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from src.utils.season_aggregates import (
+    driver_feature_stats,
+    driver_race_aggregates,
+    driver_sprint_aggregates,
+    team_race_aggregates,
+    team_scores,
+)
+
 
 @dataclass
 class FeatureContext:
@@ -10,8 +18,6 @@ class FeatureContext:
     race_id: int
     season_id: int
     circuit_id: int
-    weather: str | None
-    sprint_weather: str | None
     event_format: str | None
     overtake_rate: float
     sc_probability: float
@@ -36,7 +42,7 @@ def build_feature_context(
     runs before the grid lookup so its error outranks a "no grid rows" error."""
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT r.id, r.season_id, r.weather, r.sprint_weather, r.circuit_id, r.event_format, "
+            "SELECT r.id, r.season_id, r.race_date, r.circuit_id, r.event_format, "
             "       c.overtake_rate, c.sc_probability, c.track_category "
             "FROM races r JOIN circuits c ON r.circuit_id = c.id "
             "WHERE r.id = %s",
@@ -67,33 +73,14 @@ def build_feature_context(
     grid_map = {r["driver_id"]: r["grid_position"] for r in grid_rows}
     start_pos_map = {d: (21 - grid_map.get(d, 20)) / 20.0 for d in driver_ids}
 
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT dss.driver_id, dss.races_entered, dss.wins, dss.total_points, "
-            "       dss.avg_position_gain, dss.dnf_rate, dss.teammate_quali_delta, "
-            "       dss.sprint_races_entered, dss.sprint_wins, dss.sprint_total_points, "
-            "       d.team_id "
-            "FROM driver_season_stats dss "
-            "JOIN drivers d ON dss.driver_id = d.id "
-            "WHERE dss.season_id = %s AND dss.driver_id = ANY(%s)",
-            (season_id, driver_ids),
-        )
-        stats_rows = {r["driver_id"]: r for r in cur.fetchall()}
-
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT t.id AS team_id, tss.car_performance_score, tss.reliability_score "
-            "FROM team_season_stats tss JOIN teams t ON tss.team_id = t.id "
-            "WHERE tss.season_id = %s",
-            (season_id,),
-        )
-        team_data = {
-            r["team_id"]: {
-                "car_perf": float(r["car_performance_score"]) if r["car_performance_score"] else 0.5,
-                "reliability": float(r["reliability_score"]) if r["reliability_score"] else 0.5,
-            }
-            for r in cur.fetchall()
-        }
+    # As of the race date, not the stored season rows: a recomputed past race must not see its own result.
+    before = race["race_date"]
+    season_stats = driver_feature_stats(
+        driver_race_aggregates(conn, season_id, before),
+        driver_sprint_aggregates(conn, season_id, before),
+    )
+    stats_rows = {d: season_stats[d] for d in driver_ids if d in season_stats}
+    team_data = team_scores(team_race_aggregates(conn, season_id, before))
 
     team_perf = {tid: v["car_perf"] for tid, v in team_data.items()}
 
@@ -101,8 +88,6 @@ def build_feature_context(
         race_id=race_id,
         season_id=season_id,
         circuit_id=race["circuit_id"],
-        weather=race["weather"],
-        sprint_weather=race["sprint_weather"],
         event_format=race["event_format"],
         overtake_rate=overtake_rate,
         sc_probability=sc_probability,

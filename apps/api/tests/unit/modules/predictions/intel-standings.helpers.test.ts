@@ -1,12 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  aggregateSeasonFeatures,
+  aggregateSeasonScores,
   buildIntelStandingRows,
   type SeasonFeatureRow,
   type SeasonTotals,
 } from '../../../../src/modules/predictions/intel-standings.helpers';
 import type { drivers, teams, driverPredictionFeatures } from '../../../../src/db/schema';
 import { toDriver } from '../../../../src/common/mappers';
+import { storedGpFeatures } from '../../../support/factories/driverPredictionFeatures.factory';
 
 const team: typeof teams.$inferSelect = {
   id: 1, seasonId: 2025, teamKey: 'red_bull', name: 'Red Bull Racing', nationality: 'Austrian',
@@ -29,48 +30,30 @@ function featureRow(
   overrides: Partial<typeof driverPredictionFeatures.$inferSelect> = {},
 ): SeasonFeatureRow {
   const f: typeof driverPredictionFeatures.$inferSelect = {
-    id: 1, raceId: 1, driverId: d.id,
-    carPerformanceScore: '0.50000', driverRatingScore: '0.50000', startingPositionScore: '0.50000',
-    winRateScore: '0.50000', luckFactorScore: '0.50000', weatherImpactScore: '0.50000',
-    trackOvertakeScore: null, positionGainScore: '0.50000', longRunPaceScore: null,
-    reliabilityScore: null, qualifyingDeltaScore: null, sectorStrengthScore: null,
-    tyreDegScore: null, circuitAdjStartPosScore: null, circuitAdjPositionGainScore: null,
-    rawWeightedScore: raw, winProbability: '0.20000', predictedPosition: 1, longRunUsedFp: null,
+    id: 1, raceId: 1, driverId: d.id, features: storedGpFeatures(),
+    rawWeightedScore: raw, winProbability: '0.20000', predictedPosition: 1,
     computedAt: new Date('2025-01-01T00:00:00Z'),
     ...overrides,
   };
   return { driver_prediction_features: f, drivers: d, teams: team };
 }
 
-describe('aggregateSeasonFeatures', () => {
-  test('averages a non-nullable feature across a driver\'s rows', () => {
+describe('aggregateSeasonScores', () => {
+  test('averages the model score and win probability across a driver\'s rows', () => {
     const ver = driver(10, 'VER');
-    const [agg] = aggregateSeasonFeatures([
-      featureRow(ver, '1.0', { carPerformanceScore: '0.80000' }),
-      featureRow(ver, '2.0', { carPerformanceScore: '0.60000' }),
+    const [agg] = aggregateSeasonScores([
+      featureRow(ver, '1.0', { winProbability: '0.60000' }),
+      featureRow(ver, '2.0', { winProbability: '0.20000' }),
     ]);
-    expect(agg.features.carPerformance).toBe('0.7');
     expect(agg.avgRaw).toBe(1.5);
     expect(agg.rawWeightedScore).toBe('1.5');
-  });
-
-  test('nullable feature stays null until at least one row supplies it, then averages only present values', () => {
-    const ver = driver(10, 'VER');
-    const [allNull] = aggregateSeasonFeatures([featureRow(ver, '1.0')]);
-    expect(allNull.features.trackOvertake).toBeNull();
-
-    const [someValues] = aggregateSeasonFeatures([
-      featureRow(ver, '1.0', { trackOvertakeScore: '0.40000' }),
-      featureRow(ver, '1.0'),
-      featureRow(ver, '1.0', { trackOvertakeScore: '0.60000' }),
-    ]);
-    expect(someValues.features.trackOvertake).toBe('0.5');
+    expect(Number(agg.winProbability)).toBeCloseTo(0.4);
   });
 
   test('groups rows by person so a mid-season team move collapses to one entry', () => {
     const verRedBull = driver(10, 'VER');
     const verOther = { ...driver(10, 'VER'), id: 99, teamId: 2 };
-    const result = aggregateSeasonFeatures([featureRow(verRedBull, '1.0'), featureRow(verOther, '3.0')]);
+    const result = aggregateSeasonScores([featureRow(verRedBull, '1.0'), featureRow(verOther, '3.0')]);
     expect(result).toHaveLength(1);
     expect(result[0].avgRaw).toBe(2.0);
   });
@@ -78,7 +61,7 @@ describe('aggregateSeasonFeatures', () => {
   test('keeps two people who share a code apart (codes are labels, not keys)', () => {
     const bernard = { ...driver(1, 'BER'), firstName: 'Éric', lastName: 'Bernard' };
     const berger = { ...driver(2, 'BER'), firstName: 'Gerhard', lastName: 'Berger' };
-    const result = aggregateSeasonFeatures([featureRow(bernard, '1.0'), featureRow(berger, '3.0')]);
+    const result = aggregateSeasonScores([featureRow(bernard, '1.0'), featureRow(berger, '3.0')]);
     expect(result.map((r) => r.driver.lastName)).toEqual(['Bernard', 'Berger']);
   });
 });
@@ -87,9 +70,9 @@ describe('buildIntelStandingRows', () => {
   test('ranks by avgRaw desc and min-max normalises to overallScore 0..100', () => {
     const rows = buildIntelStandingRows(
       [
-        { driver: mapped(10, 'VER'), features: {} as never, rawWeightedScore: '1', winProbability: '0.2', avgRaw: 1 },
-        { driver: mapped(11, 'HAM'), features: {} as never, rawWeightedScore: '3', winProbability: '0.5', avgRaw: 3 },
-        { driver: mapped(12, 'NOR'), features: {} as never, rawWeightedScore: '2', winProbability: '0.3', avgRaw: 2 },
+        { driver: mapped(10, 'VER'), rawWeightedScore: '1', winProbability: '0.2', avgRaw: 1 },
+        { driver: mapped(11, 'HAM'), rawWeightedScore: '3', winProbability: '0.5', avgRaw: 3 },
+        { driver: mapped(12, 'NOR'), rawWeightedScore: '2', winProbability: '0.3', avgRaw: 2 },
       ],
       new Map(),
     );
@@ -105,8 +88,8 @@ describe('buildIntelStandingRows', () => {
     ]);
     const rows = buildIntelStandingRows(
       [
-        { driver: mapped(10, 'VER'), features: {} as never, rawWeightedScore: '2', winProbability: '0.4', avgRaw: 2 },
-        { driver: mapped(11, 'HAM'), features: {} as never, rawWeightedScore: '1', winProbability: '0.2', avgRaw: 1 },
+        { driver: mapped(10, 'VER'), rawWeightedScore: '2', winProbability: '0.4', avgRaw: 2 },
+        { driver: mapped(11, 'HAM'), rawWeightedScore: '1', winProbability: '0.2', avgRaw: 1 },
       ],
       totals,
     );
@@ -116,7 +99,7 @@ describe('buildIntelStandingRows', () => {
 
   test('single driver does not divide by zero', () => {
     const [row] = buildIntelStandingRows(
-      [{ driver: mapped(10, 'VER'), features: {} as never, rawWeightedScore: '2', winProbability: '0.4', avgRaw: 2 }],
+      [{ driver: mapped(10, 'VER'), rawWeightedScore: '2', winProbability: '0.4', avgRaw: 2 }],
       new Map(),
     );
     expect(row.overallScore).toBe(0);

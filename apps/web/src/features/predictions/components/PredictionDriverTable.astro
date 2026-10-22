@@ -10,6 +10,7 @@ interface Props {
   raceYear: number;
   accent: PredictionAccent;
   gridColLabel: string;
+  paceColLabel: string;
   actualWinnerLabel: string;
 }
 
@@ -21,6 +22,7 @@ const {
   raceYear,
   accent,
   gridColLabel,
+  paceColLabel,
   actualWinnerLabel,
 } = Astro.props;
 
@@ -40,7 +42,7 @@ const cols = hasResults
       <div class="text-[11px] text-muted-foreground">Pos</div>
       <div class="text-[11px] text-muted-foreground">Driver</div>
       <div class="text-[11px] text-muted-foreground text-right">Win %</div>
-      <div class="text-[11px] text-muted-foreground hidden sm:block text-center">Car</div>
+      <div class="text-[11px] text-muted-foreground hidden sm:block text-center">{paceColLabel}</div>
       <div class="text-[11px] text-muted-foreground hidden sm:block text-center">{gridColLabel}</div>
       {hasResults && (
         <div class="text-[11px] text-muted-foreground hidden sm:block text-right">Actual Pos</div>
@@ -52,8 +54,7 @@ const cols = hasResults
       const isPredWinner = predictedWinnerId === d.driver.id;
       const actualResult = results?.find((r) => r.driver.id === d.driver.id);
       const actualPosText = actualResult?.finishPosition ? `P${actualResult.finishPosition}` : (actualResult?.status ?? '-');
-      const gridPos = Math.round((1 - Number(d.features.startingPosition ?? 0)) * 19) + 1;
-      const carPct = Math.round(Number(d.features.carPerformance ?? 0) * 100);
+      const grid = d.gridPosition ? `P${d.gridPosition}` : '-';
       return (
         <div class={`row grid grid-cols-[32px_1fr_80px] ${cols} gap-0 items-start sm:items-center px-4 py-3 ${i !== 0 ? 'border-t border-white/[0.04]' : ''} ${isPredWinner ? 'is-winner' : ''}`} style={`border-left: 2px solid ${getTeamColor(d.driver.team.teamKey)};`}>
           <div class={`pos font-mono text-sm font-bold pt-1 sm:pt-0 ${isPredWinner ? '' : 'text-muted-foreground'}`}>
@@ -65,9 +66,9 @@ const cols = hasResults
               <a href={`/drivers/${d.driver.id}?year=${raceYear}`} class="drv-name font-medium text-sm leading-none block transition-colors duration-150 truncate">{d.driver.fullName}</a>
               {isActualWinner && <span class="font-mono text-[8px] text-green-400 block mt-1">✓ {actualWinnerLabel}</span>}
               <div class="flex items-center gap-2 mt-1 sm:hidden font-mono text-[8px] text-muted-foreground">
-                <span>Car {carPct}</span>
+                <span>{paceColLabel} {d.pace}</span>
                 <span class="text-white/20">·</span>
-                <span>P{gridPos}</span>
+                <span>{grid}</span>
               </div>
             </div>
           </div>
@@ -77,8 +78,8 @@ const cols = hasResults
               <div class="h-full bar-fill" style={`width:${pct}%;background:${accent.hex}`} />
             </div>
           </div>
-          <div class="font-mono text-[9px] text-muted-foreground text-center hidden sm:block">{carPct}</div>
-          <div class="font-mono text-[9px] text-muted-foreground text-center hidden sm:block">P{gridPos}</div>
+          <div class="font-mono text-[9px] text-muted-foreground text-center hidden sm:block">{d.pace}</div>
+          <div class="font-mono text-[9px] text-muted-foreground text-center hidden sm:block">{grid}</div>
           {hasResults && (
             <div class="font-mono text-[9px] text-muted-foreground text-right hidden sm:block">
               {actualResult?.finishPosition === i + 1 ? (

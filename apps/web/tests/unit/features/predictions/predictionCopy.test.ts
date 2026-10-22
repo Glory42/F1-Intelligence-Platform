@@ -13,8 +13,8 @@ describe('PREDICTION_COPY', () => {
     expect(c.actualWinnerLabel).toBe('actual winner');
     expect(c.gridColLabel).toBe('Qual Pos');
     expect(c.weightsHeading).toBe('./model weights');
-    expect(c.weightsNote).toBeUndefined();
-    expect(c.sliderMax).toBe(30);
+    expect(c.weightsNote).toContain('Fitted to every Grand Prix since 2010');
+    expect(c.sliderMax).toBe(40);
   });
 
   test('sprint wording', () => {

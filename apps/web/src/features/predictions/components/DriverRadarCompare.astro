@@ -14,7 +14,7 @@ const options = drivers.map((d) => ({
   lastName: d.driver.lastName,
   fullName: d.driver.fullName,
   winProbability: d.winProbability,
-  features: d.features,
+  radar: d.radar,
 }));
 const payload = JSON.stringify({ options, features, accent }).replace(/</g, '\\u003c');
 ---
@@ -117,13 +117,13 @@ const payload = JSON.stringify({ options, features, accent }).replace(/</g, '\\u
         const drawPolygon = (d: any, color: string) => {
           let points = '';
           for (let i = 0; i < N; i++) {
-            const val = Number(d.features[features[i][1]] ?? 0);
+            const val = Number(d.radar[features[i][1]] ?? 0);
             const theta = (i * 2 * Math.PI) / N - Math.PI / 2;
             points += `${cx + val * R * Math.cos(theta)},${cy + val * R * Math.sin(theta)} `;
           }
           svg += `<polygon points="${points}" fill="${color}" fill-opacity="0.2" stroke="${color}" stroke-width="2"/>`;
           for (let i = 0; i < N; i++) {
-            const val = Number(d.features[features[i][1]] ?? 0);
+            const val = Number(d.radar[features[i][1]] ?? 0);
             const theta = (i * 2 * Math.PI) / N - Math.PI / 2;
             svg += `<circle cx="${cx + val * R * Math.cos(theta)}" cy="${cy + val * R * Math.sin(theta)}" r="3" fill="#000" stroke="${color}" stroke-width="1.5"/>`;
           }

@@ -1,7 +1,6 @@
 import type { drivers, teams, driverPredictionFeatures } from '../../db/schema';
-import type { FeatureScores, IntelStandingRow } from '../../common/types';
+import type { IntelStandingRow } from '../../common/types';
 import { toDriver } from '../../common/mappers';
-import { GP_FEATURE_MANIFEST } from '../../common/feature-manifest';
 import { personKey } from '../../common/identity';
 import { championshipPoints } from '../../common/standings';
 
@@ -12,18 +11,14 @@ export interface SeasonTotals {
   totalPoints: string;
 }
 
-// A new feature column is a GP_FEATURE_MANIFEST entry, not a copy-pasted `if` line here.
-const FEATURE_COLUMNS = GP_FEATURE_MANIFEST;
-
 export interface SeasonFeatureRow {
   driver_prediction_features: typeof driverPredictionFeatures.$inferSelect;
   drivers: typeof drivers.$inferSelect;
   teams: typeof teams.$inferSelect;
 }
 
-export interface AggregatedFeatures {
+export interface AggregatedScores {
   driver: ReturnType<typeof toDriver>;
-  features: FeatureScores;
   rawWeightedScore: string;
   winProbability: string;
   avgRaw: number;
@@ -31,20 +26,13 @@ export interface AggregatedFeatures {
 
 const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
 
-function emptyColumnArrays(): Record<keyof FeatureScores, number[]> {
-  const out = {} as Record<keyof FeatureScores, number[]>;
-  for (const c of FEATURE_COLUMNS) out[c.key] = [];
-  return out;
-}
-
-// Averages every feature score for a driver across all their GP feature rows in a
+// Averages a driver's model score and win probability across all their GP feature rows in a
 // season, keyed by person (codes repeat within some seasons) so a team move collapses into one row.
-export function aggregateSeasonFeatures(rows: SeasonFeatureRow[]): AggregatedFeatures[] {
+export function aggregateSeasonScores(rows: SeasonFeatureRow[]): AggregatedScores[] {
   type Bucket = {
     driver: ReturnType<typeof toDriver>;
     raw: number[];
     winProb: number[];
-    cols: Record<keyof FeatureScores, number[]>;
   };
   const byPerson = new Map<string, Bucket>();
 
@@ -52,40 +40,26 @@ export function aggregateSeasonFeatures(rows: SeasonFeatureRow[]): AggregatedFea
     const f = row.driver_prediction_features;
     let bucket = byPerson.get(personKey(row.drivers));
     if (!bucket) {
-      bucket = { driver: toDriver(row.drivers, row.teams), raw: [], winProb: [], cols: emptyColumnArrays() };
+      bucket = { driver: toDriver(row.drivers, row.teams), raw: [], winProb: [] };
       byPerson.set(personKey(row.drivers), bucket);
     }
     bucket.driver = toDriver(row.drivers, row.teams);
     bucket.raw.push(Number(f.rawWeightedScore));
     bucket.winProb.push(Number(f.winProbability));
-    for (const c of FEATURE_COLUMNS) {
-      const value = f[c.column];
-      if (c.nullable && value == null) continue;
-      bucket.cols[c.key].push(Number(value));
-    }
   }
 
-  return Array.from(byPerson.values()).map((bucket) => {
-    const features = {} as Record<keyof FeatureScores, string | null>;
-    for (const c of FEATURE_COLUMNS) {
-      const arr = bucket.cols[c.key];
-      features[c.key] = c.nullable ? (arr.length ? String(avg(arr)) : null) : String(avg(arr));
-    }
-
-    return {
-      driver: bucket.driver,
-      features: features as FeatureScores,
-      rawWeightedScore: String(avg(bucket.raw)),
-      winProbability: String(avg(bucket.winProb)),
-      avgRaw: avg(bucket.raw),
-    };
-  });
+  return Array.from(byPerson.values()).map((bucket) => ({
+    driver: bucket.driver,
+    rawWeightedScore: String(avg(bucket.raw)),
+    winProbability: String(avg(bucket.winProb)),
+    avgRaw: avg(bucket.raw),
+  }));
 }
 
 // Ranks drivers by their averaged weighted score, min-max normalises it to a
 // 0-100 headline number, and folds in each driver's season sprint and championship totals.
 export function buildIntelStandingRows(
-  aggregated: AggregatedFeatures[],
+  aggregated: AggregatedScores[],
   seasonTotals: Map<number, SeasonTotals>,
 ): IntelStandingRow[] {
   const ranked = [...aggregated].sort((a, b) => b.avgRaw - a.avgRaw);
@@ -97,7 +71,6 @@ export function buildIntelStandingRows(
     const totals = seasonTotals.get(r.driver.id);
     return {
       driver: r.driver,
-      features: r.features,
       rawWeightedScore: r.rawWeightedScore,
       winProbability: r.winProbability,
       predictedPosition: null,

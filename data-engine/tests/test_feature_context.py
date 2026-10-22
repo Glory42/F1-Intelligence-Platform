@@ -1,3 +1,5 @@
+from datetime import date
+
 import pytest
 
 from src.utils.driver_map import build_driver_code_map, build_driver_number_map
@@ -5,12 +7,14 @@ from src.utils.feature_context import build_feature_context
 from tests.support.fake_db import FakeConnection
 
 
+RACE_DAY = date(2025, 5, 4)
+
+
 def _race_row(**overrides):
     row = {
         "id": 1,
         "season_id": 2025,
-        "weather": "dry",
-        "sprint_weather": None,
+        "race_date": RACE_DAY,
         "circuit_id": 5,
         "event_format": "conventional",
         "overtake_rate": "0.850",
@@ -20,23 +24,32 @@ def _race_row(**overrides):
     return row
 
 
+def _context_conn():
+    return FakeConnection([
+        _race_row(),
+        [
+            {"driver_id": 10, "grid_position": 1},
+            {"driver_id": 11, "grid_position": 3},
+        ],
+        [  # GP aggregates; driver 99 raced earlier but isn't on this grid
+            {"driver_id": 10, "team_id": 1, "races_entered": 5, "wins": 1, "total_points": "80",
+             "avg_gain": 0.456, "dnf_count": 1},
+            {"driver_id": 11, "team_id": 2, "races_entered": 5, "wins": 0, "total_points": "20",
+             "avg_gain": None, "dnf_count": 0},
+            {"driver_id": 99, "team_id": 2, "races_entered": 1, "wins": 0, "total_points": "0",
+             "avg_gain": None, "dnf_count": 0},
+        ],
+        [{"driver_id": 10, "sprint_races_entered": 1, "sprint_wins": 1, "sprint_total_points": "8"}],
+        [
+            {"team_id": 1, "median_finish": 2.0, "avg_grid": 2.0, "total_entries": 10, "dnf_count": 1},
+            {"team_id": 2, "median_finish": 12.0, "avg_grid": 12.0, "total_entries": 10, "dnf_count": 3},
+        ],
+    ])
+
+
 class TestBuildFeatureContext:
-    def test_assembles_context_from_race_grid_and_stats_rows(self):
-        conn = FakeConnection([
-            _race_row(),
-            [
-                {"driver_id": 10, "grid_position": 1},
-                {"driver_id": 11, "grid_position": 3},
-            ],
-            [
-                {"driver_id": 10, "team_id": 1, "races_entered": 5, "wins": 1},
-                {"driver_id": 11, "team_id": 2, "races_entered": 5, "wins": 0},
-            ],
-            [
-                {"team_id": 1, "car_performance_score": "0.80", "reliability_score": "0.90"},
-                {"team_id": 2, "car_performance_score": None, "reliability_score": None},
-            ],
-        ])
+    def test_assembles_context_from_race_grid_and_aggregates(self):
+        conn = _context_conn()
 
         ctx = build_feature_context(
             conn, race_id=1, grid_table="qualifying_results", grid_not_found_message="no grid"
@@ -51,7 +64,26 @@ class TestBuildFeatureContext:
         assert ctx.grid_map == {10: 1, 11: 3}
         assert ctx.start_pos_map[10] == pytest.approx(1.0)
         assert ctx.start_pos_map[11] == pytest.approx(0.9)
-        assert ctx.team_perf == {1: 0.80, 2: 0.5}  # missing score defaults to neutral
+        assert set(ctx.stats_rows) == {10, 11}
+        assert ctx.stats_rows[10] == {
+            "driver_id": 10, "team_id": 1, "races_entered": 5, "wins": 1, "total_points": 80.0,
+            "avg_position_gain": 0.46, "dnf_rate": 0.2,
+            "sprint_races_entered": 1, "sprint_wins": 1, "sprint_total_points": 8.0,
+        }
+        assert ctx.stats_rows[11]["sprint_races_entered"] == 0
+        assert ctx.team_data[2]["reliability"] == 0.7
+        assert ctx.team_perf[1] > ctx.team_perf[2]
+
+    def test_season_aggregates_only_count_races_before_this_one(self):
+        conn = _context_conn()
+
+        build_feature_context(conn, race_id=1, grid_table="qualifying_results", grid_not_found_message="no grid")
+
+        aggregate_queries = [cur.executed[0] for cur in conn.cursors[2:]]
+        assert len(aggregate_queries) == 3
+        for query, params in aggregate_queries:
+            assert "r.race_date < %s" in query
+            assert params == (2025, RACE_DAY)
 
     def test_race_not_found_raises(self):
         conn = FakeConnection([None])

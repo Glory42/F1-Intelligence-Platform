@@ -69,8 +69,9 @@ const pipeline = [
           <h2 class="text-sm font-semibold">What is this?</h2>
           <p class="text-sm text-muted-foreground leading-relaxed">
             F1 Intelligence is a Formula 1 race winner prediction platform. It ingests real session
-            data from every grand prix weekend using the FastF1 library, computes a 12-feature weighted
-            score for each driver, and applies a softmax function to produce win probabilities.
+            data from every grand prix weekend using the FastF1 library, scores each driver on seven
+            features with weights fitted to every grand prix since 2010, and applies a softmax to produce
+            win probabilities.
           </p>
           <p class="text-sm text-muted-foreground leading-relaxed">
             Sprint weekends run a separate 8-feature model tuned for the shorter format: heavier
@@ -126,8 +127,8 @@ const pipeline = [
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {[
           ['After qualifying', 'FastF1 pulls Q1/Q2/Q3 lap times, sector splits, and grid positions. FP2 long-run stint data is also ingested for race pace estimation.'],
-          ['Feature computation', 'compute_features scores each driver across 12 dimensions: car pace, tyre deg, reliability, qualifying delta vs teammate, win rate, luck factor, sector strength, and more.'],
-          ['Prediction', 'Scores are passed through softmax at temperature T=0.3. Lower temperature = more decisive: small score gaps produce clear probability differences.'],
+          ['Feature computation', 'compute_features scores each driver on seven features: grid slot (and how hard the track is to pass on), qualifying pace, team qualifying and race pace, recent form and the gap to their team-mate.'],
+          ['Prediction', 'Each feature is weighted by a model fitted to past winners, and a softmax turns the scores into win probabilities. Only races before each one count, so the scorecard is out-of-sample.'],
           ['After the race', 'compute_season_stats re-aggregates driver and team season totals. DNF counts, win rates, and car performance scores update for the next prediction.'],
           ['Sprint weekends', 'Run an extra ingest + prediction cycle on Friday for the sprint session. The sprint model uses SQ qualifying times and grid position as the dominant signals.'],
           ['Historical accuracy', 'Past predictions are stored alongside actual race results so you can see how the model performed over the season.'],

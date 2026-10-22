@@ -1,7 +1,5 @@
 import numpy as np
 
-from src.utils.feature_manifest import SOFTMAX_TEMPERATURE
-
 
 def normalize_minmax(values: list[float], default: float = 0.5) -> list[float]:
     arr = np.array(values, dtype=float)
@@ -11,7 +9,7 @@ def normalize_minmax(values: list[float], default: float = 0.5) -> list[float]:
     return ((arr - mn) / (mx - mn)).tolist()
 
 
-def softmax(scores: list[float], temperature: float = SOFTMAX_TEMPERATURE) -> list[float]:
+def softmax(scores: list[float], temperature: float = 1.0) -> list[float]:
     arr = np.array(scores, dtype=float)
     shifted = arr - arr.max()
     exp_s = np.exp(shifted / temperature)

@@ -80,19 +80,18 @@ def _fp2_coverage(conn, race_id: int) -> float:
 
 def _backfill_fp2(log_func, conn, ctx: RaceRunContext) -> bool:
     """ingest_fp2 only runs once (at MAIN_QUALIFYING); if data wasn't ready it was never
-    retried, so retry here each wait-cycle while coverage is below the 0.7 fallback gate.
+    retried, so retry here each wait-cycle while coverage is below 0.7. FP2 now only feeds the
+    Friday-pace table (weighted-v4 doesn't read it), so predictions aren't recomputed after it.
     Returns whether coverage has reached the gate."""
     before = _fp2_coverage(conn, ctx.race_id)
     if before >= 0.7:
         return True
-    log_func(f"[auto_runner] FP2 coverage {before:.0%}, retrying FP2 + recompute while waiting for race")
+    log_func(f"[auto_runner] FP2 coverage {before:.0%}, retrying FP2 while waiting for race")
     try:
         JOBS["ingest_fp2"](ctx)
         after = _fp2_coverage(conn, ctx.race_id)
         if after > before:
-            JOBS["compute_features"](ctx)
-            JOBS["compute_predictions"](ctx)
-            log_func(f"[auto_runner] FP2 backfilled ({before:.0%} -> {after:.0%}); features/predictions refreshed")
+            log_func(f"[auto_runner] FP2 backfilled ({before:.0%} -> {after:.0%})")
         else:
             log_func(f"[auto_runner] FP2 still not available ({after:.0%}); will retry next cycle")
         return after >= 0.7

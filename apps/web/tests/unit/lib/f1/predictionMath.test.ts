@@ -3,9 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import {
-  weightedScore,
   softmax,
-  contributions,
   confidenceTier,
   brierScore,
   calibrationBuckets,
@@ -17,13 +15,13 @@ import {
   FEATURE_META,
   SPRINT_WEIGHTS,
   SPRINT_FEATURE_META,
-  SOFTMAX_TEMPERATURE,
+  SPRINT_SOFTMAX_TEMPERATURE,
 } from '../../../../src/lib/f1/predictionMath';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 type FeatureManifestFixture = {
-  softmax_temperature: number;
-  gp: Record<string, { weight: number; label: string }>;
+  sprint_softmax_temperature: number;
+  gp: Record<string, { importance: number; label: string }>;
   sprint: Record<string, { weight: number; label: string }>;
 };
 
@@ -41,40 +39,6 @@ function toSnakeCaseKeys<T>(record: Record<string, T>): Record<string, T> {
   );
 }
 
-describe('weightedScore', () => {
-  test('sums weight times feature score over the weighted keys', () => {
-    const score = weightedScore(
-      { carPerformance: 0.5, longRunPace: 0.2 },
-      { carPerformance: 20, longRunPace: 15 },
-    );
-    expect(score).toBe(13);
-  });
-
-  test('ignores feature keys that carry no weight', () => {
-    const score = weightedScore(
-      { carPerformance: 0.5, sectorStrength: 0.9 },
-      { carPerformance: 20 },
-    );
-    expect(score).toBe(10);
-  });
-
-  test('treats a null or missing feature score as zero', () => {
-    const score = weightedScore(
-      { carPerformance: null },
-      { carPerformance: 10, longRunPace: 8 },
-    );
-    expect(score).toBe(0);
-  });
-
-  test('accepts string feature scores as they arrive from the API', () => {
-    const score = weightedScore(
-      { carPerformance: '0.4', longRunPace: '0.5' },
-      { carPerformance: 10, longRunPace: 10 },
-    );
-    expect(score).toBe(9);
-  });
-});
-
 describe('softmax', () => {
   test('produces a probability distribution that sums to 1', () => {
     const probs = softmax([2, 5, 1, 3]);
@@ -91,27 +55,21 @@ describe('softmax', () => {
     expect(high).toBeGreaterThan(low);
   });
 
-  test('matches the logistic sigmoid for a two-way split at the default T=0.3', () => {
-    const [, high] = softmax([0, 0.3]);
+  test('is a plain softmax by default: log-odds 1 vs 0 gives the logistic sigmoid', () => {
+    const [, high] = softmax([0, 1]);
     expect(high).toBeCloseTo(0.7310585786, 9);
   });
 
-  test('defaults the temperature to 0.3', () => {
-    expect(softmax([0, 1])).toEqual(softmax([0, 1], 0.3));
+  test('a temperature divides the scores first', () => {
+    expect(softmax([0, 0.3], 0.3)).toEqual(softmax([0, 1]));
   });
 });
 
 describe('GP_WEIGHTS / FEATURE_META', () => {
-  test('the GP model has 12 weighted features that sum to 100', () => {
+  test('the GP model shows 7 fitted feature importances that sum to 100', () => {
     const values = Object.values(GP_WEIGHTS);
-    expect(values).toHaveLength(12);
+    expect(values).toHaveLength(7);
     expect(values.reduce((a, b) => a + b, 0)).toBe(100);
-  });
-
-  test('every weighted feature has display metadata', () => {
-    for (const key of Object.keys(GP_WEIGHTS)) {
-      expect(FEATURE_META[key]?.label).toBeTruthy();
-    }
   });
 });
 
@@ -130,55 +88,19 @@ describe('SPRINT_WEIGHTS / SPRINT_FEATURE_META', () => {
 });
 
 describe('docs/feature-weights.json (cross-language drift check)', () => {
-  test('FEATURE_META weights and labels match the shared fixture', () => {
-    expect(toSnakeCaseKeys(FEATURE_META)).toEqual(featureWeightsFixture.gp);
+  test('FEATURE_META importances, labels and order match the shared fixture', () => {
+    const asFixture = Object.entries(toSnakeCaseKeys(FEATURE_META)).map(([key, m]) => [key, m.weight, m.label]);
+    expect(asFixture).toEqual(
+      Object.entries(featureWeightsFixture.gp).map(([key, m]) => [key, m.importance, m.label]),
+    );
   });
 
   test('SPRINT_FEATURE_META weights and labels match the shared fixture', () => {
     expect(toSnakeCaseKeys(SPRINT_FEATURE_META)).toEqual(featureWeightsFixture.sprint);
   });
 
-  test('SOFTMAX_TEMPERATURE matches the shared fixture', () => {
-    expect(SOFTMAX_TEMPERATURE).toBe(featureWeightsFixture.softmax_temperature);
-  });
-});
-
-describe('contributions', () => {
-  test('returns weight times score per feature, sorted by contribution descending', () => {
-    const result = contributions(
-      { carPerformance: 0.2, longRunPace: 0.6 },
-      { carPerformance: 20, longRunPace: 15 },
-    );
-    expect(result.map((c) => c.key)).toEqual(['longRunPace', 'carPerformance']);
-    expect(result[0].contribution).toBeCloseTo(9, 10);
-    expect(result[1].contribution).toBeCloseTo(4, 10);
-  });
-
-  test('shares are each feature contribution divided by the total, summing to 1', () => {
-    const result = contributions(
-      { carPerformance: 0.5, longRunPace: 0.2 },
-      { carPerformance: 20, longRunPace: 15 },
-    );
-    const byKey = Object.fromEntries(result.map((c) => [c.key, c.share]));
-    expect(byKey.carPerformance).toBeCloseTo(10 / 13, 10);
-    expect(byKey.longRunPace).toBeCloseTo(3 / 13, 10);
-    expect(result.reduce((a, c) => a + c.share, 0)).toBeCloseTo(1, 10);
-  });
-
-  test('only weighted keys appear in the breakdown', () => {
-    const result = contributions(
-      { carPerformance: 0.5, sectorStrength: 0.9 },
-      { carPerformance: 20 },
-    );
-    expect(result.map((c) => c.key)).toEqual(['carPerformance']);
-  });
-
-  test('reports zero shares instead of dividing by zero when nothing contributes', () => {
-    const result = contributions(
-      { carPerformance: 0, longRunPace: 0 },
-      { carPerformance: 20, longRunPace: 15 },
-    );
-    expect(result.every((c) => c.share === 0)).toBe(true);
+  test('SPRINT_SOFTMAX_TEMPERATURE matches the shared fixture', () => {
+    expect(SPRINT_SOFTMAX_TEMPERATURE).toBe(featureWeightsFixture.sprint_softmax_temperature);
   });
 });
 

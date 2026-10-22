@@ -18,7 +18,7 @@ const whatIf: WhatIfPayload = {
     code: d.driver.code,
     fullName: d.driver.fullName,
     winProbability: d.winProbability,
-    features: d.features,
+    terms: d.terms,
   })),
   weights,
 };
@@ -60,7 +60,7 @@ const payload = JSON.stringify(whatIf).replace(/</g, '\\u003c');
 </style>
 
 <script>
-  import { softmax, weightedScore } from '@/lib/f1/predictionMath';
+  import { whatIfProbabilities } from '@/lib/f1/predictionTerms';
   import type { WhatIfPayload } from '../types';
 
   function escapeHtml(str: string) {
@@ -89,7 +89,7 @@ const payload = JSON.stringify(whatIf).replace(/</g, '\\u003c');
         const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
         if (totalEl) totalEl.textContent = String(totalWeight);
 
-        const probs = softmax(drivers.map((d) => (totalWeight > 0 ? weightedScore(d.features, weights) / totalWeight : 0)));
+        const probs = whatIfProbabilities(drivers.map((d) => d.terms), modelWeights, weights);
         const scored = drivers.map((d, i) => ({ d, prob: probs[i] })).sort((a, b) => b.prob - a.prob);
 
         resultsEl!.innerHTML = scored.map((s, newRank) => {

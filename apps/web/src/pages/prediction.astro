@@ -56,7 +56,7 @@ if (tab === 'upcoming') {
   seasonAccuracy = unwrapSettled(accuracyResult, []);
 }
 
-const gpVersion = upcoming?.modelVersion ?? modelInfo?.gpVersion ?? 'weighted-v3';
+const gpVersion = upcoming?.modelVersion ?? modelInfo?.gpVersion ?? 'weighted-v4';
 ---
 
 <BaseLayout title={tab === 'scorecard' ? `${year} Prediction Scorecard` : 'Predictions'}>
