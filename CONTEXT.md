@@ -1,6 +1,6 @@
 # F1 Intelligence Platform
 
-Follows, predicts and explores Formula 1 (current-season race weekends, championship standings and all-time history) with race and sprint winner predictions (a weighted feature-scoring model, not a trained ML model) as one lens among several.
+Follows, predicts and explores Formula 1 (current-season race weekends, championship standings and all-time history) with race and sprint winner predictions (weighted feature models: the GP's weights fitted to past winners, the sprint's hand-picked) as one lens among several.
 
 ## Language
 
@@ -39,7 +39,7 @@ Any Grand Prix classification other than finishing on the lead lap or within a l
 _Avoid_: Treating DSQ/DNS as excluded from "DNF", in this codebase they are not distinct categories for reliability purposes.
 
 **Stint**:
-A continuous run of laps on a single tyre Compound between pit stops. Long Run Pace (GP model) and Short Run Pace (Sprint model) are both derived from stint-level lap data: "long" vs "short" describes the session the stint came from (FP2/FP1 practice vs. Sprint Qualifying), not the stint's length.
+A continuous run of laps on a single tyre Compound between pit stops. Long Run Pace (the Friday pace table) and Short Run Pace (Sprint model) are both derived from stint-level lap data: "long" vs "short" describes the session the stint came from (FP2/FP1 practice vs. Sprint Qualifying), not the stint's length.
 
 **Race Event**:
 A timestamped, race-scoped happening sourced from OpenF1 rather than FastF1: race-control messages (flags/SC/VSC), Overtakes, and Team Radio clips. Matches the `apps/api/src/modules/race-events/` module name; all three are ingested only once a Race is `completed` and past OpenF1's live-data window (2023+ only: OpenF1 has no earlier coverage).
@@ -52,24 +52,24 @@ _Avoid_: "Recap" for a Season-level view of the model's performance, that is the
 ### Prediction Model
 
 **RuleBased (model)**:
-The `weighted-v3`/`sprint-v2` approach: hand-weighted feature scores combined by a fixed formula and softmax, as opposed to a trained ML model that learns its own weights from data. Kept as a distinct term because a future ML-based predictor is a live possibility this project wants to be able to name and compare against: not merely a synonym for "the prediction model."
+The `sprint-v2` approach (and the retired GP model `weighted-v3`): hand-weighted feature scores combined by a fixed formula and softmax, as opposed to a model that learns its weights from data, like the GP's `weighted-v4` (a fitted conditional logit, [ADR-0010](docs/adr/0010-gp-model-is-a-fitted-conditional-logit.md)). Not a synonym for "the prediction model."
 
 **Feature Score**:
-One of the 12 (GP) or 8 (Sprint) normalized 0.00000–1.00000 inputs to a Prediction (e.g. "Car Performance score," "Luck Factor score"). Combined by fixed weights into `raw_weighted_score`, then softmax'd into `win_probability`.
+One of the 8 Sprint normalized 0.00000–1.00000 inputs to a Prediction (e.g. "Car Performance score," "Luck Factor score"). Combined by fixed weights into `raw_weighted_score`, then softmax'd into `win_probability`. The GP model's 7 features are in real units instead (e.g. Grid Slot, Driver Form): each is stored with its value and its contribution (fitted weight × standardized value), and the contributions sum to `raw_weighted_score`.
 _Avoid_: Bare "score", always qualify with the feature name, or use "Health Score" if data quality is meant.
 
 **Starting Position**:
-The raw, unadjusted grid-position score. Shown for transparency but does not feed the weighted model directly.
+The raw, unadjusted Sprint grid-position score. Shown for transparency but does not feed the weighted model directly.
 
 **Circuit-Adjusted Starting Position**:
-Starting Position scaled by the Circuit's overtake rate and safety-car probability. This is the actual GP/Sprint model feature. The same raw-vs-adjusted pairing applies to Position Gain / Circuit-Adjusted Position Gain.
+Starting Position scaled by the Circuit's overtake rate and safety-car probability. This is the actual Sprint model feature. `weighted-v4` uses Grid Slot and Grid × Hard-to-Pass Track instead.
 _Avoid_: "Starting Position" when the circuit-adjusted (weighted) version is meant, they are numerically different scores.
 
 **Model Version**:
-A string (`weighted-v3`, `sprint-v2`, ...) identifying exactly which weight/formula revision produced a given Prediction. GP and Sprint models version independently and intentionally: they iterate on separate schedules and are never expected to share a version number or ship together.
+A string (`weighted-v4`, `sprint-v2`, ...) identifying exactly which weight/formula revision produced a given Prediction. GP and Sprint models version independently and intentionally: they iterate on separate schedules and are never expected to share a version number or ship together.
 
 **Prediction**:
-The full, race-scoped ranked list of drivers with win probabilities and feature breakdowns: assembled from `race_predictions` (predicted winner + model version) joined with `driver_prediction_features` (per-driver scores). Not just the predicted winner.
+The full, race-scoped ranked list of drivers with win probabilities and feature breakdowns: assembled from `race_predictions` (predicted winner + model version) joined with `driver_prediction_features` (per-driver features). Not just the predicted winner.
 _Avoid_: Equating "Prediction" with the `race_predictions` row alone, that table only holds the winner-pointer half of it.
 
 **Scorecard**:

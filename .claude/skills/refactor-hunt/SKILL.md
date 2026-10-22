@@ -19,13 +19,12 @@ If the user says "hunt in the sprint pipeline" or names a module, scope to that.
 
 ### 1. GP/sprint pipeline drift (data-engine/)
 
-This codebase runs two parallel model pipelines, GP (`weighted-v3`) and sprint (`sprint-v2`), that mirror each other structurally:
-- `compute_features.py` / `compute_sprint_features.py`
-- `compute_predictions.py` / `compute_sprint_predictions.py`
+This codebase runs two model pipelines, GP (`weighted-v4`) and sprint (`sprint-v2`). The feature jobs differ on purpose: `compute_features.py` applies the fitted conditional logit (`src/models/gp_v4.json`) to `gp_features_v4` over an in-memory `race_history`, while `compute_sprint_features.py` is a `feature_runner` spec over season aggregates. Do not flag those two as duplicates. The rest still mirror each other structurally:
+- `compute_predictions.py` / `compute_sprint_predictions.py` (both through `prediction_runner.py`)
 - `ingest_qualifying.py` / `ingest_sprint_qualifying.py`
 - `ingest_race.py` / `ingest_sprint.py`
 
-Diff the shared logic between each pair (query shape, normalization calls, softmax call, upsert call). Where both files repeat the exact same computation with only the input table changed (e.g. both call `normalize_minmax()` → `clamp()` → `softmax(..., 0.3)` the same way), flag it as a candidate for a shared helper in `data-engine/src/utils/`. Do **not** flag the weight tables (`WEIGHTS` dicts) themselves, since those are intentionally distinct per CLAUDE.md's model spec. Only flag the surrounding mechanical logic (grid fetch, DB row assembly, upsert call shape).
+Diff the shared logic between each pair (query shape, normalization calls, softmax call, upsert call). Where both files repeat the exact same computation with only the input table changed (e.g. both call `normalize_minmax()` → `clamp()` → `softmax()` the same way), flag it as a candidate for a shared helper in `data-engine/src/utils/`. Do **not** flag the weights themselves (sprint `SPRINT_FEATURES` in `feature_manifest.py`, GP `src/models/gp_v4.json`), since those are intentionally distinct per CLAUDE.md's model spec. Only flag the surrounding mechanical logic (grid fetch, DB row assembly, upsert call shape).
 
 Also check `math_utils.py`: if a new normalization/scoring formula is added to one job, check whether the equivalent already exists there under a different name before it gets reimplemented inline.
 

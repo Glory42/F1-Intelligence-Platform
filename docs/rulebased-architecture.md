@@ -1,15 +1,19 @@
 ---
 title: "RuleBased Architecture, Feature Inventory"
-description: "Every feature in the weighted-v3 RuleBased predictor: source, computation, weight, usage"
+description: "The hand-weighted (RuleBased) predictors: sprint-v2 today, and the retired GP model weighted-v3"
 order: 4.5
 ---
 
-# RuleBased Architecture: Current Feature Inventory
+# RuleBased Architecture: Feature Inventory
 
-This is the **operational baseline**: the `weighted-v3` RuleBased model that is in
-production (RuleBased Top-1 = **58.28%** on the frozen 163-race canonical benchmark).
-If we improve this, it has to change `WEIGHTS` + `compute_features.py` and require a DB
-backfill. Read this before proposing any change.
+RuleBased means hand-picked weights. The only RuleBased model still in production is the
+sprint model `sprint-v2`. The GP model is `weighted-v4`, a conditional logit whose weights are
+fitted to past winners (ADR 0010; features and scores in `prediction-model.md` § Backtest).
+
+The GP sections below are the record of the retired `weighted-v3`, kept because `sprint-v2`
+still shares six of its features (car performance, circuit-adjusted start, driver rating, win rate,
+luck, weather). Replayed
+honestly, v3 picked 43.2% of winners over 190 races (2018–2026).
 
 ---
 
@@ -20,27 +24,29 @@ FastF1 sessions ──► ingest jobs ──► raw tables
                                         │
 compute_season_stats (after each race)  ──► driver_season_stats / team_season_stats
                                         │
-compute_features (after qualifying)     ──► driver_prediction_features  (12 scored features)
+compute_sprint_features (after SQ)      ──► driver_sprint_features  (8 scored features)
                                         │
-compute_predictions (after qualifying)  ──► softmax(raw_weighted_score, T=0.3)
-                                             ──► race_predictions.predicted_winner_id
+compute_sprint_predictions (after SQ)   ──► softmax(raw_weighted_score, T=0.3)
+                                             ──► sprint_predictions.predicted_winner_id
 ```
 
 - **`compute_season_stats.py`**: running season aggregates after each completed race.
-- **`compute_features.py`**: per-driver, per-GP feature scores (all 0–1) + weighted sum.
-- **`compute_predictions.py`**: softmax over `raw_weighted_score` (T=0.3) → winner.
+- **`compute_sprint_features.py`**: a `feature_runner` spec, per-driver feature scores (all 0–1)
+  + weighted sum, reading season aggregates as of the race date (`utils/season_aggregates.py`).
+- **`compute_sprint_predictions.py`**: softmax over `raw_weighted_score` (T=0.3) → winner.
 
-The **sprint pipeline** mirrors this with 8 features in `compute_sprint_features.py` /
-`compute_sprint_predictions.py` (not the focus here; GP model below).
+The **GP pipeline** (`compute_features.py` / `compute_predictions.py`) runs `weighted-v4`: 7 fitted
+features stored as `features` JSONB, softmax at T=1. It is not RuleBased, so not covered here.
 
 ---
 
-## The 12 weighted features (GP model)
+## The 12 weighted features (retired GP model weighted-v3)
 
-Each feature is a `NUMERIC(6,5)` **0–1 score** per (race × driver). The raw score is the
-weighted sum; classification uses softmax over the field.
+Each feature was a `NUMERIC(6,5)` **0–1 score** per (race × driver). The raw score was the
+weighted sum; classification used softmax over the field. Migration `0029_drop_v3_feature_columns`
+dropped these columns. Sprint-v2's own weights are in `feature_manifest.py` `SPRINT_FEATURES`.
 
-### Belags (hardcoded in `compute_features.py`)
+### Weights (were hardcoded in `compute_features.py`)
 
 | Feature | Weight | Blended at |
 |---|---|---|
@@ -64,13 +70,16 @@ per circuit, never changes.
 
 ## Feature-by-feature: source, computation, usage
 
+As in weighted-v3. Long Run Pace, Tyre Degradation, Reliability, Qualifying Delta, Sector
+Strength and Position Gain no longer exist in code; the others live on in sprint-v2.
+
 ### 1. GP: Car Performance 0.20
 - **Table:** `team_season_stats.car_performance_score`, 1 per team per season.
 - **Computed in:** `compute_season_stats._compute_team_stats`, blend of the team's
   **median** finish position (robust: one DNF no longer drags a dominant car down)
   and its **average grid position** (raw one-lap car speed): `0.6·minmax(21−median) +
   0.4·minmax(21−avg_grid)`, min-max normalized across the field.
-- **Usage:** `compute_features.run` pulls the driver's team score, then **blends it
+- **Usage:** `feature_runner._car_performance` pulls the driver's team score, then **blends it
   with a circuit-category-specific score** (`compute_team_circuit_perf` via
   `blend_car_perf`): at race time the season score is nudged toward the driver's
   historical performance at this circuit's **track_category** (`circuits.track_category`),
@@ -78,7 +87,7 @@ per circuit, never changes.
   strong on a layout type (e.g. McLaren on high-downforce tracks) without inflating the
   season average.
 
-### Sprint model note: `compute_sprint_features` applies the same `blend_car_perf`
+### Sprint model note: `compute_sprint_features` still applies this `blend_car_perf`
 ### circuit-category blend to its car_performance feature (0.25 weight).
 
 ### 2. Long Run Pace: 0.15
@@ -150,7 +159,7 @@ per circuit, never changes.
 
 ## How it becomes a prediction
 
-`compute_predictions.py`:
+weighted-v3 (now sprint-v2 in `compute_sprint_predictions.py`):
 ```
 raw = Σ (feature_score_i × weight_i)          -- per driver
 win_probability = softmax(raw, temperature=0.3)   -- softmax across field, one winner
@@ -159,8 +168,10 @@ predicted_winner = argmax(win_probability)
 
 ## What the data is NOT yet capturing (candidate gaps for improving Rule)
 
-From the 3 sprint post-mortems (Sprint 13/19/20 all converge to ~61%; within-gate
-selection is the bottleneck), the concrete signal gaps are:
+Written against weighted-v3. For the GP, new ideas are now tried as a `Candidate` in
+`scripts/backtest.py`; the ones already tried and left out are listed in `prediction-model.md`
+§ Backtest. From the 3 sprint post-mortems (Sprint 13/19/20 all converge to ~61%; within-gate
+selection is the bottleneck), the concrete signal gaps were:
 
 1. **Car×circuit matrix (biggest).** `car_performance_score` is season-level and
    circuit-agnostic. **Now partially addressed:** season score is blended at feature time
@@ -179,14 +190,13 @@ selection is the bottleneck), the concrete signal gaps are:
 
 ## Reproduce / regenerate
 
-- Rule feature computation: `data-engine/src/jobs/compute_features.py`
-- Backfill driver invoked via `src/main.py` (jobs: `compute_features`, `compute_season_stats`).
-- Benchmark eval: `data-engine/scripts/benchmark_car_perf.py`, replays predictions against completed
-  races under an old vs. new formula, reports Top-1 accuracy, then restores DB state.
+- Rule feature computation: `data-engine/src/jobs/compute_sprint_features.py` via `src/utils/feature_runner.py`
+- Backfill driver invoked via `src/main.py` (jobs: `compute_sprint_features`, `compute_season_stats`);
+  every stored prediction is regenerated by `scripts/backfill_all_predictions.py`.
+- Benchmark eval: `data-engine/scripts/backtest.py`, a walk-forward replay of every completed GP from a
+  local snapshot (never Neon), scored on log loss, Brier, top-1/top-3 and calibration. See
+  `prediction-model.md` § Backtest.
 
-Note: earlier revisions of this doc referenced `experiments/sprint{13,16,19,20,21}/` report
-folders and a specific 58.28% / 163-race benchmark figure. That `experiments/` directory has
-never existed in this repo's git history: those were local, untracked run reports. Treat the
-"RuleBased Top-1" figure and the sprint post-mortem numbers below as historical/unverified
-until a new benchmark run (via `benchmark_car_perf.py` or a successor script) reproduces them
-and the result is committed somewhere in this repo.
+Note: earlier revisions of this doc quoted a 58.28% / 163-race "RuleBased Top-1" figure from
+local, untracked `experiments/` reports. The leak-free backtest replaced it: weighted-v3 scored
+43.2% top-1 over 190 races. Treat the sprint post-mortem numbers above as historical/unverified.

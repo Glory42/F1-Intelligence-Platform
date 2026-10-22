@@ -46,9 +46,14 @@ pytest, config in `pyproject.toml` (`pythonpath = ["."]`, `testpaths = ["tests"]
 `requirements-dev.txt` (= `requirements.txt` + `pytest`).
 
 - **Pure functions are tested directly**: `math_utils.py` (`normalize_minmax`, `softmax`,
-  `bayesian_win_rate`, …), pure `feature_helpers.py` helpers, the model `WEIGHTS` invariants
-  (`test_weights.py`: sum-to-1 and positivity for both models, plus weights, labels and softmax
-  temperature against `docs/feature-weights.json`), `rank_by_probability`,
+  `bayesian_win_rate`, …), pure `feature_helpers.py` helpers, the model weight invariants
+  (`test_weights.py`: sprint-v2's sum-to-1, positivity, weights, labels and softmax temperature against
+  `docs/feature-weights.json`; the committed `src/models/gp_v4.json` scores exactly the computed GP
+  features and its importances match the JSON), weighted-v4's pieces (`test_conditional_logit.py`: the fit
+  recovers known weights; `test_gp_features_v4.py`, over the in-memory history in
+  `tests/support/race_history.py`; `test_gp_model_v4.py`: save/load, importances, training set;
+  `test_identity.py`, against `docs/identity-cases.json`), the backtest scoring (`test_backtest.py`:
+  metrics, calibration, `GridWinRates`), `rank_by_probability`,
   `race_weekend_window`, `weekend_pipeline` (`test_weekend_pipeline.py`: `plan`, the chains,
   `due_statuses`, `repair_plan`, `prediction_steps`), `enrichment_coverage` (`test_enrichment_coverage.py`:
   `source_for`, `missing`, compound normalisation from either source; the coverage query through the
@@ -76,11 +81,14 @@ pytest, config in `pyproject.toml` (`pythonpath = ["."]`, `testpaths = ["tests"]
   (`test_upsert.py`, `test_prediction_runner.py`) monkeypatch `execute_batch` itself and assert on the
   params it receives, the same pattern `test_ingest_runner.py` already uses for its own `execute_batch`
   call, rather than extending `FakeCursor` to fake SQL rendering.
-- `test_feature_runner.py` runs both feature jobs (`compute_features`, `compute_sprint_features`, each a
-  `feature_runner.FeatureJobSpec`) end to end and pins every written score to the rows weighted-v3 /
-  sprint-v2 produced before the runner existed. Its fake connection routes each read by a marker in its
+- `test_feature_runner.py` runs the sprint feature job (`compute_sprint_features`, a
+  `feature_runner.FeatureJobSpec`) end to end and pins every written score to the rows sprint-v2
+  produced before the runner existed. Its fake connection routes each read by a marker in its
   SQL rather than call order (the reads are independent), and it reads the written rows back from
   `execute_batch`'s params, naming columns from the composed INSERT.
+- `test_compute_features.py` covers the weighted-v4 GP job: each feature's value and contribution land in
+  the `features` JSONB, a plain softmax of `raw_weighted_score` is the model's win probability, and `run`
+  loads three seasons of history before the race and writes one row per driver.
 
 ## API unit (`apps/api/tests/unit/`)
 
@@ -134,7 +142,8 @@ suite never touches Neon.
 Vitest, config in `vitest.config.ts` (include `tests/unit/**/*.test.{ts,tsx}`, `@` alias, setup file).
 
 - **Default environment is `node`**: pure logic runs there: `lib/f1/predictionMath.ts` (all exports; `FEATURE_META`
-  weights + labels and `SOFTMAX_TEMPERATURE` checked against `docs/feature-weights.json`),
+  importances + labels, `SPRINT_FEATURE_META` and `SPRINT_SOFTMAX_TEMPERATURE` checked against
+  `docs/feature-weights.json`), `lib/f1/predictionTerms.ts` (GP/sprint terms, edge over the field, What-If Lab),
   `lib/f1/teamColors` / `lib/f1/teamLogos` / `features/history/f1dbCountries`, `features/compare/compareStats.ts`,
   the compare stat rows (`features/compare/{driver,team}CompareConfig.ts`: Championship Points reads the API's
   `championshipPoints`, never a client-side GP + sprint sum), `features/history/historyView.ts`, `features/races/{raceView,calendar,loadRaceEvents}` (race page and
