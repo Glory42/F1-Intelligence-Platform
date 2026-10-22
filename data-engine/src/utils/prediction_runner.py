@@ -2,7 +2,6 @@ from datetime import datetime, timezone
 from psycopg2 import sql
 from psycopg2.extras import execute_batch
 from src.db.client import get_conn
-from src.utils.feature_manifest import SOFTMAX_TEMPERATURE
 from src.utils.math_utils import softmax
 
 
@@ -25,7 +24,10 @@ def run_prediction_job(
     model_version: str,
     not_found_error: str,
     winner_label: str,
+    temperature: float,
 ) -> None:
+    """`temperature` divides the stored raw scores: a fitted model (weighted-v4) has its scale in its
+    weights already and passes 1.0; the hand-weighted sprint model passes SPRINT_SOFTMAX_TEMPERATURE."""
     print(f"[{job_name}] race_id={race_id}")
 
     conn = get_conn()
@@ -46,7 +48,7 @@ def run_prediction_job(
         driver_ids = [r["driver_id"] for r in feature_rows]
         raw_scores = [float(r["raw_weighted_score"]) for r in feature_rows]
 
-        probabilities = softmax(raw_scores, temperature=SOFTMAX_TEMPERATURE)
+        probabilities = softmax(raw_scores, temperature=temperature)
         assert abs(sum(probabilities) - 1.0) < 1e-4, "Probabilities do not sum to 1"
 
         # Rank: position 1 = highest probability

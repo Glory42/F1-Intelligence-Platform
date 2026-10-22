@@ -3,47 +3,36 @@ from pathlib import Path
 
 import pytest
 
-from src.jobs.compute_features import WEIGHTS as GP_WEIGHTS
 from src.jobs.compute_sprint_features import WEIGHTS as SPRINT_WEIGHTS
-from src.utils.feature_manifest import GP_FEATURES, SOFTMAX_TEMPERATURE, SPRINT_FEATURES, assemble_scores
+from src.utils.feature_manifest import SPRINT_FEATURES, SPRINT_SOFTMAX_TEMPERATURE, assemble_scores
+from src.utils.gp_features_v4 import GP_V4_FEATURES
+from src.utils.gp_model_v4 import importance_percentages, load_model
 
-# Guards against an edit silently breaking the sum-to-1 invariant the softmax pipeline assumes.
+# The sprint model's hand weights must sum to 1 (the softmax pipeline assumes it); weighted-v4's
+# fitted weights live in src/models/gp_v4.json and reach the site as importances in the shared JSON.
 
 FEATURE_WEIGHTS_JSON = Path(__file__).resolve().parents[2] / "docs" / "feature-weights.json"
 
 
-@pytest.mark.parametrize("weights", [GP_WEIGHTS, SPRINT_WEIGHTS], ids=["gp", "sprint"])
-def test_weights_sum_to_one(weights):
-    assert sum(weights.values()) == pytest.approx(1.0, abs=1e-9)
+def _shared() -> dict:
+    return json.loads(FEATURE_WEIGHTS_JSON.read_text())
 
 
-@pytest.mark.parametrize("weights", [GP_WEIGHTS, SPRINT_WEIGHTS], ids=["gp", "sprint"])
-def test_all_weights_positive(weights):
-    assert all(w > 0 for w in weights.values())
+def test_sprint_weights_sum_to_one():
+    assert sum(SPRINT_WEIGHTS.values()) == pytest.approx(1.0, abs=1e-9)
 
 
-def test_gp_weights_has_twelve_features():
-    assert len(GP_WEIGHTS) == 12
+def test_all_sprint_weights_positive():
+    assert all(w > 0 for w in SPRINT_WEIGHTS.values())
 
 
 def test_sprint_weights_has_eight_features():
     assert len(SPRINT_WEIGHTS) == 8
 
 
-def test_assemble_scores_matches_gp_manifest_keys():
-    values = {f.name: 0.5 for f in GP_FEATURES}
-    assert set(assemble_scores(values, GP_FEATURES).keys()) == set(GP_WEIGHTS.keys())
-
-
 def test_assemble_scores_matches_sprint_manifest_keys():
     values = {f.name: 0.5 for f in SPRINT_FEATURES}
     assert set(assemble_scores(values, SPRINT_FEATURES).keys()) == set(SPRINT_WEIGHTS.keys())
-
-
-def test_assemble_scores_raises_when_a_gp_feature_is_missing():
-    values = {f.name: 0.5 for f in GP_FEATURES if f.name != "car_performance"}
-    with pytest.raises(KeyError):
-        assemble_scores(values, GP_FEATURES)
 
 
 def test_assemble_scores_raises_when_a_sprint_feature_is_missing():
@@ -52,15 +41,24 @@ def test_assemble_scores_raises_when_a_sprint_feature_is_missing():
         assemble_scores(values, SPRINT_FEATURES)
 
 
-def _manifest_fixture() -> dict:
-    return json.loads(FEATURE_WEIGHTS_JSON.read_text())
+def test_sprint_weights_and_labels_match_shared_json_fixture():
+    expected = {f.name: {"weight": round(f.weight * 100), "label": f.label} for f in SPRINT_FEATURES}
+    assert expected == _shared()["sprint"]
 
 
-@pytest.mark.parametrize("model, features", [("gp", GP_FEATURES), ("sprint", SPRINT_FEATURES)], ids=["gp", "sprint"])
-def test_weights_and_labels_match_shared_json_fixture(model, features):
-    expected = {f.name: {"weight": round(f.weight * 100), "label": f.label} for f in features}
-    assert expected == _manifest_fixture()[model]
+def test_sprint_softmax_temperature_matches_shared_json_fixture():
+    assert SPRINT_SOFTMAX_TEMPERATURE == _shared()["sprint_softmax_temperature"]
 
 
-def test_softmax_temperature_matches_shared_json_fixture():
-    assert SOFTMAX_TEMPERATURE == _manifest_fixture()["softmax_temperature"]
+def test_the_committed_gp_model_scores_exactly_the_computed_features():
+    assert load_model().features == GP_V4_FEATURES
+
+
+def test_gp_features_in_the_shared_json_follow_the_model():
+    assert tuple(_shared()["gp"]) == GP_V4_FEATURES
+
+
+def test_gp_importances_in_the_shared_json_match_the_committed_fit():
+    # Fails after a refit until fit_model_v4.py's JSON update is committed with it.
+    shared = _shared()["gp"]
+    assert {f: shared[f]["importance"] for f in GP_V4_FEATURES} == importance_percentages(load_model())

@@ -367,7 +367,7 @@ One row per lap per driver: 2018+ only.
 | `tyre_life` | integer | Laps on current tyre |
 | `fresh_tyre` | boolean | |
 | `is_pit_lap` | boolean | Excluded from pace calculations |
-| `stint_number` | integer | Stint index within the race: used for tyre degradation slope |
+| `stint_number` | integer | Stint index within the race |
 | UNIQUE | `(race_id, driver_id, lap_number)` | |
 
 ---
@@ -465,7 +465,7 @@ Aggregated after each race via `compute_season_stats`. Includes sprint-specific 
 ---
 
 ### `team_season_stats`
-Aggregated after each race. Drives `car_performance_score` in predictions.
+Aggregated after each race. Drives `car_performance_score` in sprint predictions.
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -501,32 +501,19 @@ full per-round history.
 ---
 
 ### `driver_prediction_features`
-One row per driver per grand prix race. Written by `compute_features`, updated by `compute_predictions`.
+One row per driver per grand prix race (`weighted-v4`). Written by `compute_features`, updated by `compute_predictions`.
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `race_id` | FK → races | |
 | `driver_id` | FK → drivers | |
-| `car_performance_score` | numeric(6,5) | 0–1 |
-| `driver_rating_score` | numeric(6,5) | |
-| `starting_position_score` | numeric(6,5) | |
-| `win_rate_score` | numeric(6,5) | |
-| `luck_factor_score` | numeric(6,5) | |
-| `weather_impact_score` | numeric(6,5) | |
-| `track_overtake_score` | numeric(6,5) | **Deprecated**: always NULL in weighted-v3; value baked into circuit-adjusted scores |
-| `position_gain_score` | numeric(6,5) | Raw avg position gain (kept for display only) |
-| `long_run_pace_score` | numeric(6,5) | Practice (FP2/FP1) primary, historical fallback |
-| `reliability_score` | numeric(6,5) | |
-| `qualifying_delta_score` | numeric(6,5) | Rolling 5-race weighted teammate delta |
-| `sector_strength_score` | numeric(6,5) | |
-| `tyre_deg_score` | numeric(6,5) | REGR_SLOPE-derived degradation score: lower slope = higher score |
-| `circuit_adj_start_pos_score` | numeric(6,5) | Starting position scaled by overtake_rate × sc_probability |
-| `circuit_adj_position_gain_score` | numeric(6,5) | Position gain scaled by overtake_rate |
-| `raw_weighted_score` | numeric(8,6) | Weighted sum before softmax |
-| `long_run_used_fp` | boolean | Whether `long_run_pace_score` came from a practice session (FP2 or FP1 fallback; true) or the historical circuit fallback (false/null) |
-| `win_probability` | numeric(6,5) | After softmax: sums to 1.0 per race |
+| `features` | jsonb | Feature → `{value, contribution}` for the 7 fitted features (`grid`, `quali_pace`, `team_quali_pace`, `driver_points`, `teammate_edge`, `grid_processional`, `team_race_pace`). A refit with other features needs no migration |
+| `raw_weighted_score` | numeric(8,6) | Sum of the contributions: the driver's log-odds score |
+| `win_probability` | numeric(6,5) | Softmax (T = 1) over the field: sums to 1.0 per race |
 | `predicted_position` | integer | 1 = predicted winner |
 | UNIQUE | `(race_id, driver_id)` | |
+
+The weighted-v3 score columns and `long_run_used_fp` were dropped by migrations `0029`/`0030`.
 
 ---
 
@@ -538,7 +525,7 @@ One row per grand prix: the single predicted winner.
 | `race_id` | FK → races UNIQUE | |
 | `predicted_winner_id` | FK → drivers | |
 | `computed_at` | timestamptz | |
-| `model_version` | varchar(20) | `weighted-v3` |
+| `model_version` | varchar(20) | `weighted-v4` (default) |
 
 ---
 

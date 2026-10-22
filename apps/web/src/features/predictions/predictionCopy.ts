@@ -11,6 +11,7 @@ export interface PredictionCopy {
   actualLabel: string;
   actualWinnerLabel: string;
   gridColLabel: string;
+  paceColLabel: string;
   weightsHeading: string;
   weightsNote?: string;
   sliderMax: number;
@@ -27,8 +28,11 @@ export const PREDICTION_COPY: Record<PredictionPageKind, PredictionCopy> = {
     actualLabel: 'actual winner',
     actualWinnerLabel: 'actual winner',
     gridColLabel: 'Qual Pos',
+    paceColLabel: 'Race Pace',
     weightsHeading: './model weights',
-    sliderMax: 30,
+    weightsNote:
+      'Fitted to every Grand Prix since 2010: each feature\'s share of how far a typical difference in it moves the prediction.',
+    sliderMax: 40,
     whatIfBlurb:
       'Drag the weights to see how the predicted order shifts. Recomputed live in your browser: the model itself is unchanged.',
   },
@@ -41,6 +45,7 @@ export const PREDICTION_COPY: Record<PredictionPageKind, PredictionCopy> = {
     actualLabel: 'actual sprint winner',
     actualWinnerLabel: 'sprint winner',
     gridColLabel: 'Grid',
+    paceColLabel: 'Car',
     weightsHeading: './sprint weights',
     weightsNote: 'Grid position weighted higher, since a ~17 lap sprint has no pit stop strategy.',
     sliderMax: 35,

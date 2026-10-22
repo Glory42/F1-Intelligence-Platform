@@ -1,35 +1,37 @@
 ---
-import type { FeatureContribution } from '@/lib/f1/predictionMath';
+import type { FeatureEdge } from '@/lib/f1/predictionTerms';
 import type { FeatureMeta, PredictionAccent } from '../types';
 
 interface Props {
   driverCode: string;
-  breakdown: FeatureContribution[];
+  breakdown: FeatureEdge[];
   featureMeta: FeatureMeta;
   accent: PredictionAccent;
 }
 
 const { driverCode, breakdown, featureMeta, accent } = Astro.props;
 const labelFor = (key: string) => featureMeta[key]?.label ?? key;
+// Only what puts the driver ahead of the field average is drawn: those shares add up to 100%.
+const ahead = breakdown.filter((b) => b.share > 0);
 ---
 
 <div class="border border-white/[0.06] p-5">
   <div class="flex items-center gap-3 mb-4">
     <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style={`color: rgba(${accent.rgb},0.55)`}>./why {driverCode}</span>
     <div class="h-px flex-1 bg-white/[0.05]" />
-    <span class="text-[11px] text-muted-foreground">share of weighted score</span>
+    <span class="text-[11px] text-muted-foreground">share of their edge over the field</span>
   </div>
   <div class="flex h-7 w-full overflow-hidden border border-white/[0.06]">
-    {breakdown.map((b, idx) => (
+    {ahead.map((b, idx) => (
       <div
         class="h-full"
-        style={`width:${b.share * 100}%;background:${accent.hex};opacity:${(0.95 - (idx / breakdown.length) * 0.68).toFixed(3)}`}
+        style={`width:${b.share * 100}%;background:${accent.hex};opacity:${(0.95 - (idx / ahead.length) * 0.68).toFixed(3)}`}
         title={`${labelFor(b.key)}: ${Math.round(b.share * 100)}%`}
       />
     ))}
   </div>
   <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
-    {breakdown.map((b) => (
+    {ahead.map((b) => (
       <div class="flex items-center justify-between gap-2 border border-white/[0.06] px-3 py-2">
         <span class="font-mono text-[9px] text-muted-foreground truncate">{labelFor(b.key)}</span>
         <span class="font-mono text-[9px] font-bold shrink-0" style={`color:${accent.hex}`}>{Math.round(b.share * 100)}%</span>

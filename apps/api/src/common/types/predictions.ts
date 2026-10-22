@@ -8,29 +8,30 @@ export type ModelInfo = {
   sprintVersion: string;
 };
 
-export type FeatureScores = {
-  carPerformance: string;
-  driverRating: string;
-  startingPosition: string;
-  winRate: string;
-  luckFactor: string;
-  weatherImpact: string;
-  trackOvertake: string | null;
-  positionGain: string;
-  longRunPace: string | null;
-  reliability: string | null;
-  qualifyingDelta: string | null;
-  sectorStrength: string | null;
-  tyreDeg: string | null;
-  circuitAdjStartPos: string | null;
-  circuitAdjPositionGain: string | null;
-};
+// weighted-v4's features as stored by data-engine's compute_features (snake_case keys, the Python names).
+// value: the feature in its own units; contribution: its term in the driver's log-odds score.
+export type StoredGpFeatureTerm = { value: number; contribution: number };
+export type StoredGpFeatures = Record<string, StoredGpFeatureTerm>;
 
-// GP and sprint predictions share one shape and differ only in their feature scores.
+export type GpFeatureKey =
+  | 'grid'
+  | 'qualiPace'
+  | 'teamQualiPace'
+  | 'driverPoints'
+  | 'teammateEdge'
+  | 'gridProcessional'
+  | 'teamRacePace';
+
+// A driver's win probability is softmax over the field of the summed contributions (T = 1).
+export type GpFeatures = Record<GpFeatureKey, StoredGpFeatureTerm>;
+
+// GP and sprint predictions share one shape and differ only in their features.
 export type DriverPredictionOf<TFeatures> = {
   driver: Driver;
   winProbability: string;
   predictedPosition: number | null;
+  // From the session's qualifying (GP) or sprint qualifying (sprint) sheet.
+  gridPosition: number | null;
   features: TFeatures;
 };
 
@@ -42,9 +43,9 @@ export type PredictionOf<TFeatures> = {
   drivers: DriverPredictionOf<TFeatures>[];
 };
 
-export type DriverPrediction = DriverPredictionOf<FeatureScores>;
+export type DriverPrediction = DriverPredictionOf<GpFeatures>;
 
-export type PredictionResponse = PredictionOf<FeatureScores>;
+export type PredictionResponse = PredictionOf<GpFeatures>;
 
 export type PredictionHistoryItem = {
   raceId: number;
@@ -76,7 +77,6 @@ export type SeasonAccuracy = {
 
 export type IntelStandingRow = {
   driver: Driver;
-  features: FeatureScores;
   rawWeightedScore: string;
   winProbability: string;
   predictedPosition: number | null;

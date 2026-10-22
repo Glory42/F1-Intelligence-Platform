@@ -1,6 +1,12 @@
 from src.db.client import get_conn
-from src.utils.feature_helpers import compute_compressed_car_perf
-from src.utils.math_utils import bayesian_win_rate, normalize_minmax
+from src.utils.math_utils import bayesian_win_rate
+from src.utils.season_aggregates import (
+    dnf_rate,
+    driver_race_aggregates,
+    driver_sprint_aggregates,
+    team_race_aggregates,
+    team_scores,
+)
 from src.utils.upsert import upsert
 
 
@@ -24,32 +30,9 @@ def run(year: int) -> None:
 
 
 def _compute_driver_stats(conn, season_id: int) -> None:
-    # DNF filter excludes lead-lap finishes ('Finished'), FastF1 lapped finishes ('Lapped'),
-    # and Ergast lapped finishes ('+%').
+    driver_aggs = driver_race_aggregates(conn, season_id)
+
     with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT
-                d.id AS driver_id,
-                COUNT(rr.id) AS races_entered,
-                COUNT(rr.id) FILTER (WHERE rr.finish_position IS NOT NULL) AS races_finished,
-                COUNT(rr.id) FILTER (WHERE rr.finish_position = 1) AS wins,
-                COUNT(rr.id) FILTER (WHERE rr.finish_position <= 3) AS podiums,
-                COUNT(rr.id) FILTER (WHERE rr.status NOT IN ('Finished', 'Lapped') AND rr.status NOT LIKE '+%%') AS dnf_count,
-                COALESCE(SUM(rr.points::numeric), 0) AS total_points,
-                AVG(rr.finish_position) FILTER (WHERE rr.finish_position IS NOT NULL) AS avg_finish,
-                AVG(rr.grid_position - rr.finish_position) FILTER (WHERE rr.finish_position IS NOT NULL) AS avg_gain
-            FROM drivers d
-            JOIN races r ON r.season_id = d.season_id
-            JOIN race_results rr ON rr.race_id = r.id AND rr.driver_id = d.id
-            WHERE d.season_id = %s AND r.status = 'completed'
-            GROUP BY d.id
-            """,
-            (season_id,),
-        )
-        driver_aggs = cur.fetchall()
-
-
         cur.execute(
             """
             SELECT qr.driver_id, COUNT(*) AS poles
@@ -62,29 +45,7 @@ def _compute_driver_stats(conn, season_id: int) -> None:
         )
         poles_map = {row["driver_id"]: int(row["poles"]) for row in cur.fetchall()}
 
-    # ── Sprint race aggregates ────────────────────────────────────────────────
-    # Only counts rows where the sprint actually ran (status != 'grid_set')
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT
-                d.id AS driver_id,
-                COUNT(sr.id) AS sprint_races_entered,
-                COUNT(sr.id) FILTER (WHERE sr.finish_position = 1) AS sprint_wins,
-                COUNT(sr.id) FILTER (WHERE sr.finish_position <= 3) AS sprint_podiums,
-                COALESCE(SUM(sr.points::numeric), 0) AS sprint_total_points,
-                AVG(sr.finish_position) FILTER (WHERE sr.finish_position IS NOT NULL) AS sprint_avg_finish
-            FROM drivers d
-            JOIN races r ON r.season_id = d.season_id
-            JOIN sprint_results sr ON sr.race_id = r.id AND sr.driver_id = d.id
-            WHERE d.season_id = %s
-              AND r.status IN ('sprint_done', 'qualifying_done', 'completed')
-              AND sr.status != 'grid_set'
-            GROUP BY d.id
-            """,
-            (season_id,),
-        )
-        sprint_aggs = {r["driver_id"]: r for r in cur.fetchall()}
+    sprint_aggs = driver_sprint_aggregates(conn, season_id)
 
     # The championship counts sprint points too; total_points stays GP-only (the model reads it).
     def _championship_points(row) -> float:
@@ -135,7 +96,6 @@ def _compute_driver_stats(conn, season_id: int) -> None:
         wins = int(d["wins"])
         dnf_count = int(d["dnf_count"])
         win_rate = bayesian_win_rate(wins, races_entered) if races_entered > 0 else 0.25
-        dnf_rate = round(dnf_count / races_entered, 3) if races_entered > 0 else None
 
         sprint = sprint_aggs.get(driver_id)
         sprint_races = int(sprint["sprint_races_entered"]) if sprint else 0
@@ -161,7 +121,7 @@ def _compute_driver_stats(conn, season_id: int) -> None:
             "win_rate": round(win_rate, 4),
             "avg_position_gain": round(float(d["avg_gain"]), 2) if d["avg_gain"] is not None else None,
             "dnf_count": dnf_count,
-            "dnf_rate": dnf_rate,
+            "dnf_rate": dnf_rate(races_entered, dnf_count),
             "avg_sector1_ms": sectors.get("avg_sector1_ms"),
             "avg_sector2_ms": sectors.get("avg_sector2_ms"),
             "avg_sector3_ms": sectors.get("avg_sector3_ms"),
@@ -234,32 +194,7 @@ def _compute_teammate_quali_deltas(conn, season_id: int) -> dict[int, float | No
 
 
 def _compute_team_stats(conn, season_id: int) -> None:
-    # DNF filter excludes lead-lap finishes ('Finished'), FastF1 lapped finishes ('Lapped'),
-    # and Ergast lapped finishes ('+%').
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT
-                t.id AS team_id,
-                COUNT(DISTINCT r.id) AS races_completed,
-                COUNT(rr.id) FILTER (WHERE rr.finish_position = 1) AS wins,
-                COUNT(rr.id) FILTER (WHERE rr.finish_position <= 3) AS podiums,
-                COUNT(rr.id) FILTER (WHERE rr.status NOT IN ('Finished', 'Lapped') AND rr.status NOT LIKE '+%%') AS dnf_count,
-                COUNT(rr.id) AS total_entries,
-                COALESCE(SUM(rr.points::numeric), 0) AS total_points,
-                AVG(rr.finish_position) FILTER (WHERE rr.finish_position IS NOT NULL) AS avg_finish,
-                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY rr.finish_position) AS median_finish,
-                AVG(rr.grid_position) FILTER (WHERE rr.grid_position IS NOT NULL) AS avg_grid
-            FROM teams t
-            JOIN drivers d ON d.team_id = t.id AND d.season_id = t.season_id
-            JOIN races r ON r.season_id = t.season_id AND r.status = 'completed'
-            JOIN race_results rr ON rr.race_id = r.id AND rr.driver_id = d.id
-            WHERE t.season_id = %s
-            GROUP BY t.id
-            """,
-            (season_id,),
-        )
-        team_aggs = cur.fetchall()
+    team_aggs = team_race_aggregates(conn, season_id)
 
     if not team_aggs:
         return
@@ -292,22 +227,12 @@ def _compute_team_stats(conn, season_id: int) -> None:
     sorted_teams = sorted(team_aggs, key=_team_championship_points, reverse=True)
     position_map = {row["team_id"]: i + 1 for i, row in enumerate(sorted_teams)}
 
-    # Blends median-finish pace (outlier-robust) with grid pace (raw speed); scoring is
-    # 50% relative min-max + 50% absolute to avoid runaway gaps between top constructors.
-    fmt_median = lambda t: float(t["median_finish"]) if t["median_finish"] is not None else 21.0
-    pace_signal = [21.0 - fmt_median(t) for t in team_aggs]
-    grid_signal = [
-        21.0 - (float(t["avg_grid"]) if t["avg_grid"] is not None else 21.0)
-        for t in team_aggs
-    ]
-    car_perf_blend = compute_compressed_car_perf(pace_signal, grid_signal)
+    scores = team_scores(team_aggs)
 
     rows_to_upsert = []
-    for i, t in enumerate(team_aggs):
+    for t in team_aggs:
         team_id = t["team_id"]
-        total_entries = int(t["total_entries"])
         dnf_count = int(t["dnf_count"])
-        reliability = 1.0 - (dnf_count / max(total_entries, 1))
 
         sprint = sprint_team_aggs.get(team_id)
         rows_to_upsert.append({
@@ -319,9 +244,9 @@ def _compute_team_stats(conn, season_id: int) -> None:
             "total_points": float(t["total_points"]),
             "championship_position": position_map.get(team_id),
             "avg_finish_position": round(float(t["avg_finish"]), 2) if t["avg_finish"] is not None else None,
-            "car_performance_score": round(car_perf_blend[i], 5),
+            "car_performance_score": scores[team_id]["car_perf"],
             "dnf_count": dnf_count,
-            "reliability_score": round(reliability, 5),
+            "reliability_score": scores[team_id]["reliability"],
             "sprint_wins": int(sprint["sprint_wins"]) if sprint else 0,
             "sprint_podiums": int(sprint["sprint_podiums"]) if sprint else 0,
             "sprint_total_points": float(sprint["sprint_total_points"]) if sprint else 0.0,

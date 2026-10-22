@@ -2,7 +2,7 @@
 
 ![F1 Prediction Platform](./preview/Preview-homePage.webp)
 
-F1 race analysis and winner prediction built on FastF1, OpenF1 and F1DB. A weighted 12-feature model (8 for sprints) with softmax gives every driver a win probability after qualifying, and a Monte Carlo simulation turns those into championship odds after each round.
+F1 race analysis and winner prediction built on FastF1, OpenF1 and F1DB. A conditional logit with 7 fitted features (a hand-weighted 8-feature model for sprints) gives every driver a win probability after qualifying, and a Monte Carlo simulation turns those into championship odds after each round.
 
 - **Races:** results, qualifying, lap chart, tyre strategy, race control, overtakes and team radio, plus a race story (gap to leader, positions, battles, weather) and a two-lap qualifying telemetry comparison, all from 2018 on
 - **Championship:** driver and constructor standings, title odds by round, racecraft and pit crew rankings
@@ -121,22 +121,20 @@ See [docs/data-pipeline.md](./docs/data-pipeline.md) for every job and script.
 
 ## Prediction Model
 
-12 features, softmax with temperature T=0.3:
+GP model `weighted-v4`: a conditional logit (softmax, T=1) over 7 features, with weights fitted to every
+GP since 2010 by `scripts/fit_model_v4.py`. Importance is each feature's share of the fitted weight per SD:
 
-| Feature | Weight |
-|---------|--------|
-| Car Performance | 20% |
-| Long Run Pace | 15% |
-| Tyre Degradation | 8% |
-| Reliability | 8% |
-| Qualifying Delta | 8% |
-| Driver Rating | 8% |
-| Win Rate | 8% |
-| Luck Factor | 7% |
-| Circuit-Adj. Starting Position | 7% |
-| Sector Strength | 6% |
-| Circuit-Adj. Position Gain | 3% |
-| Weather Impact | 2% |
+| Feature | Importance |
+|---------|------------|
+| Grid Slot | 20% |
+| Driver Form | 18% |
+| Team Race Pace | 18% |
+| Grid × Hard-to-Pass Track | 17% |
+| Team Qualifying Pace | 12% |
+| Qualifying Pace | 11% |
+| Teammate Edge | 4% |
+
+The sprint model (`sprint-v2`) keeps 8 hand-picked weights and softmax T=0.3.
 
 See [docs/prediction-model.md](./docs/prediction-model.md) for full details.
 

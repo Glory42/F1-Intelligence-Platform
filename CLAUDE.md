@@ -33,7 +33,9 @@ it's Python, and its jobs run once and exit rather than being a long-running dev
   `execute_batch` call, rather than extending `FakeCursor` to fake SQL rendering.
   `weekend_pipeline` (Race Status → due jobs) and `enrichment_coverage` are tested pure; code that runs
   chains is tested by swapping entries in `weekend_pipeline.JOBS`, never by patching each job module.
-  Both feature jobs are pinned end to end through `feature_runner` in `test_feature_runner.py`.
+  The sprint feature job is pinned end to end through `feature_runner` in `test_feature_runner.py`; the GP job
+  (`compute_features`, weighted-v4) and its pure features run against an in-memory `RaceHistory`
+  (`tests/support/race_history.py`) in `test_compute_features.py` / `test_gp_features_v4.py`.
 - `apps/api/tests/unit/`: `bun test`, mirrors `src/` by domain (e.g. `tests/unit/common/mappers.test.ts`
   tests `src/common/mappers.ts`). Covers the shared `src/common/` mapper/aggregation layer.
 - `apps/api/tests/integration/`: `bun test`, real Hono `app.request()` calls against a **local** Postgres
@@ -153,7 +155,7 @@ Full rules and numbers: `docs/plans/intelligence-platform-roadmap.md` §1–§2.
 - `qualifying_lap_telemetry`: each driver's fastest Q/SQ lap (2018+: OpenF1 from 2023, FastF1 before), resampled every 10 m into one JSONB row (~11 KB)
 - `history_drivers` / `history_constructors` / `history_constructor_seasons` / `history_constructor_lineage` / `f1db_imports`: all-time history from F1DB (CC-BY-4.0, credit it wherever shown); joined to core drivers by `match_key` (`normalize_person_name`) and to teams via `f1dbConstructorId(team_key)`
 - `driver_season_stats` / `team_season_stats`: aggregated after each race (includes sprint aggregates)
-- `driver_prediction_features`: 12 normalized feature scores per driver per GP
+- `driver_prediction_features`: weighted-v4 features per driver per GP (`features` JSONB: value + contribution)
 - `race_predictions`: one predicted GP winner per race
 - `driver_sprint_features`: 8 sprint-specific feature scores per driver per sprint weekend
 - `sprint_predictions`: one predicted sprint winner per sprint weekend
@@ -345,6 +347,10 @@ python scripts/backfill_openf1.py ingest_stints 2023 2026 [--refresh]   # local 
 python scripts/backfill_race_story.py 2018 2025             # local only
 python scripts/backfill_fastf1_enrichment.py 2018 2022 [--only stints,pits,race_control,telemetry] [--refresh]  # local only
 python scripts/backfill_title_odds.py 2018 2026             # local only: replays odds after every completed round
+python scripts/backtest_snapshot.py                         # local only: one read-only Neon dump into docker-compose.backtest.yml
+python scripts/backtest.py [--from 2018] [--to 2026] [--reference NAME] [--json]  # local snapshot only: walk-forward GP model vs baselines
+python scripts/fit_model_v4.py                              # local snapshot only: refit src/models/gp_v4.json after a validated change
+python scripts/backfill_all_predictions.py [--from 2018]    # local only, writes Neon: regenerate predictions (GP fitted per season, out-of-sample)
 python scripts/import_f1db.py [--version vYYYY.RR.M]         # weekly GitHub Action (f1db-import.yml) or local: download, verify sha256, import
 python scripts/audit_results_vs_f1db.py [--modern-plan]      # local only: read-only results check vs F1DB
 python scripts/backfill_results_from_f1db.py --from 1980 --to 2017 [--apply]  # local only: ADR 0009
@@ -397,31 +403,40 @@ bun run db:migrate    # apply via migration files (prod)
 - All tables use `SERIAL` primary keys
 - All timestamps are `TIMESTAMPTZ` with `DEFAULT now()`
 - Lap times stored as `INTEGER` milliseconds (never float)
-- Feature scores stored as `NUMERIC(6,5)` (0.00000 to 1.00000)
+- Sprint feature scores stored as `NUMERIC(6,5)` (0.00000 to 1.00000); GP features as one `features` JSONB
 - Unique constraints on all natural keys (e.g. `UNIQUE(race_id, driver_id)`)
 
 ---
 
 ## Prediction Model
 
-Two models: **GP model** (`weighted-v3`, 12 features) and **Sprint model** (`sprint-v2`, 8 features).
-Full detail in `docs/prediction-model.md`.
+Two models: **GP model** (`weighted-v4`, fitted, 7 features) and **Sprint model** (`sprint-v2`, hand
+weights, 8 features). Full detail and backtest numbers in `docs/prediction-model.md`; why: ADR 0010.
 
-### GP Weights (weighted-v3)
-| Feature | Weight | Origin |
-|---------|--------|--------|
-| Car Performance | 20% | FastF1 race results → `team_season_stats.car_performance_score` |
-| Long Run Pace | 15% | FastF1 FP2 (`fp2_long_run_times`) → fallback: `lap_times` |
-| Tyre Degradation | 8% | FastF1 `lap_times.tyre_life`: regression slope at circuit |
-| Reliability | 8% | FastF1 status → `team_season_stats.reliability_score` + driver DNF rate |
-| Qualifying Delta | 8% | FastF1 Q1/Q2/Q3 times → weighted teammate gap, last 5 races |
-| Driver Rating | 8% | FastF1 race points → `driver_season_stats.total_points / races / 25` |
-| Win Rate | 8% | FastF1 race results → Bayesian: `(wins + 0.5) / (races + 2)` |
-| Luck Factor | 7% | FastF1 finish position vs expected (car rank + grid), last 5 races |
-| Circuit-Adj. Starting Position | 7% | FastF1 grid position × static circuit overtake rate + SC probability |
-| Sector Strength | 6% | FastF1 qualifying sector times (S1/S2/S3 best vs field) |
-| Circuit-Adj. Position Gain | 3% | FastF1 avg position gain × static circuit overtake rate |
-| Weather Impact | 2% | FastF1 weather flag → historical wet-race finish avg; neutral if dry |
+### GP model (weighted-v4)
+A conditional logit: P(win) = softmax over the field of Σ weight × standardized feature, with the weights
+fitted to every GP since 2010 (`utils/conditional_logit.py`). Features (`utils/gp_features_v4.py`) are in
+real units and only use races before the one predicted:
+
+| Feature | Importance | Origin |
+|---------|-----------|--------|
+| Grid Slot | 20% | `qualifying_results.grid_position`, as −log(grid) |
+| Driver Form | 18% | decayed points per race, last 12 races across seasons (by person) |
+| Team Race Pace | 18% | decayed gap to the fastest clean race-lap median (`lap_times`, 2018+) |
+| Grid × Hard-to-Pass Track | 17% | grid × (1 − `circuits.overtake_rate`) |
+| Team Qualifying Pace | 12% | decayed best qualifying gap to pole (by outfit) |
+| Qualifying Pace | 11% | this weekend's gap to the fastest time in the deepest session reached |
+| Teammate Edge | 4% | decayed qualifying gap to the team-mate |
+
+- Fitted weights live in `data-engine/src/models/gp_v4.json`, written by `scripts/fit_model_v4.py` from the
+  local backtest snapshot and committed. Refit only after `scripts/backtest.py` validates the change.
+- The importances above are each feature's share of |weight per SD|; `fit_model_v4.py` writes them to
+  `docs/feature-weights.json`, then mirror them into `apps/web` `predictionMath.ts` `FEATURE_META`.
+  `test_weights.py`, `predictionMath.test.ts` and the API's `feature-manifest.test.ts` check every copy.
+- Each row stores `features` JSONB (feature → value + contribution); `raw_weighted_score` is the summed
+  contributions and `compute_predictions` applies a plain softmax (T = 1). There is no hand-set temperature.
+- Every feature must be computable from races before the predicted one: the backtest replays history and
+  a feature that peeks ahead makes it lie (the v3 numbers did, see ADR 0010).
 
 ### Sprint Weights (sprint-v2)
 | Feature | Weight | Origin |
@@ -439,15 +454,12 @@ Full detail in `docs/prediction-model.md`.
 - `circuits.overtake_rate`: seeded once per circuit, never changes
 - `circuits.sc_probability`: **not static**: recomputed after every race ingest from `races.safety_car_laps`
   (`ingest_race._recompute_circuit_sc_probability`)
-- Softmax temperature T=0.3: `SOFTMAX_TEMPERATURE` in `data-engine/src/utils/feature_manifest.py`, imported by `prediction_runner.py`/`math_utils.py` (Python) and `apps/web/src/lib/f1/predictionMath.ts` (TS)
-- Model weights: `GP_FEATURES`/`SPRINT_FEATURES` in `feature_manifest.py`, re-exported as `WEIGHTS` by `compute_features.py`/`compute_sprint_features.py` (both `feature_runner` specs); weights, labels and the softmax temperature are checked against `docs/feature-weights.json` by `test_weights.py`, `apps/web`'s `predictionMath.test.ts` and the API's `feature-manifest.test.ts` (labels)
-
-### Softmax
-Temperature T=0.3. Lower = more decisive. Do not increase T.
-```python
-exp_s = np.exp(scores / 0.3)
-win_probabilities = exp_s / exp_s.sum()
-```
+- Sprint softmax temperature T=0.3: `SPRINT_SOFTMAX_TEMPERATURE` in `data-engine/src/utils/feature_manifest.py`
+  (passed by `compute_sprint_predictions.py`) and `apps/web/src/lib/f1/predictionMath.ts`. It applies to the
+  hand-weighted sprint model only.
+- Sprint weights: `SPRINT_FEATURES` in `feature_manifest.py`, re-exported as `WEIGHTS` by
+  `compute_sprint_features.py` (a `feature_runner` spec); weights, labels and the temperature are checked
+  against `docs/feature-weights.json` by the same three tests.
 
 ---
 

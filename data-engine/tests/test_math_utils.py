@@ -2,7 +2,6 @@ import math
 
 import pytest
 
-from src.jobs.compute_features import WEIGHTS as GP_WEIGHTS
 from src.jobs.compute_sprint_features import WEIGHTS as SPRINT_WEIGHTS
 from src.utils.math_utils import bayesian_win_rate, clamp, normalize_minmax, softmax, weighted_sum
 
@@ -49,10 +48,9 @@ class TestSoftmax:
         assert all(math.isfinite(p) for p in probs)
         assert sum(probs) == pytest.approx(1.0, abs=1e-9)
 
-    def test_default_temperature_matches_model_spec(self):
-        # Model docs specify T=0.3 as the hardcoded temperature: this pins that default.
-        scores = [0.9, 0.6]
-        assert softmax(scores) == pytest.approx(softmax(scores, temperature=0.3))
+    def test_default_is_a_plain_softmax(self):
+        # weighted-v4's fitted scores are already on the log-odds scale, so they need no temperature.
+        assert softmax([math.log(3.0), 0.0]) == pytest.approx([0.75, 0.25])
 
 
 class TestBayesianWinRate:
@@ -98,12 +96,8 @@ class TestWeightedSum:
         with pytest.raises(KeyError):
             weighted_sum(scores, weights)
 
-    def test_gp_weights_applied_to_all_max_scores_sums_to_one(self):
+    def test_sprint_weights_applied_to_all_max_scores_sums_to_one(self):
         # If every feature scores a perfect 1.0, the weighted sum must equal the
         # weight total (1.0): this is what a bug in weight application would break.
-        scores = {feature: 1.0 for feature in GP_WEIGHTS}
-        assert weighted_sum(scores, GP_WEIGHTS) == pytest.approx(1.0)
-
-    def test_sprint_weights_applied_to_all_max_scores_sums_to_one(self):
         scores = {feature: 1.0 for feature in SPRINT_WEIGHTS}
         assert weighted_sum(scores, SPRINT_WEIGHTS) == pytest.approx(1.0)

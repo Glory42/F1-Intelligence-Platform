@@ -284,7 +284,7 @@ Returns the most recently computed model versions for GP and sprint predictions.
 ```json
 {
   "data": {
-    "gpVersion": "weighted-v3",
+    "gpVersion": "weighted-v4",
     "sprintVersion": "sprint-v2"
   }
 }
@@ -301,31 +301,32 @@ Returns the prediction for the next `qualifying_done` race with `race_date >= to
   "data": {
     "race": { "id": 200, "name": "Monaco Grand Prix", "raceDate": "2026-06-07", "hasSprint": false, ... },
     "predictedWinner": { "id": 42, "fullName": "Max Verstappen", ... },
-    "modelVersion": "weighted-v3",
+    "modelVersion": "weighted-v4",
     "drivers": [
       {
         "predictedPosition": 1,
-        "winProbability": "0.28500",
+        "winProbability": "0.61200",
+        "gridPosition": 1,
         "driver": { "id": 42, "code": "VER", "fullName": "Max Verstappen", "team": { ... } },
         "features": {
-          "carPerformance": "0.91200",
-          "longRunPace": "0.81000",
-          "tyreDeg": "0.85000",
-          "reliability": "0.90000",
-          "qualifyingDelta": "0.68000",
-          "driverRating": "0.88000",
-          "winRate": "0.77000",
-          "luckFactor": "0.62000",
-          "circuitAdjStartPos": "0.95000",
-          "sectorStrength": "0.74000",
-          "circuitAdjPositionGain": "0.55000",
-          "weatherImpact": "0.50000"
+          "grid": { "value": 0, "contribution": 1.70805 },
+          "qualiPace": { "value": 0, "contribution": 0.48767 },
+          "teamQualiPace": { "value": -0.2, "contribution": 0.48772 },
+          "driverPoints": { "value": 18, "contribution": 1.34037 },
+          "teammateEdge": { "value": 0.15, "contribution": 0.05717 },
+          "gridProcessional": { "value": 0, "contribution": 0.93347 },
+          "teamRacePace": { "value": -0.1, "contribution": 0.38514 }
         }
       }
     ]
   }
 }
 ```
+
+`features` is `GpFeatures`: each of weighted-v4's 7 features with its `value` (in the feature's own
+units) and `contribution` (its term in the driver's log-odds score). A plain softmax (T = 1) of the
+summed contributions over the field gives `winProbability`. `gridPosition` comes from the qualifying
+sheet (sprint qualifying for sprint predictions), null when the driver has no row there.
 
 ### `GET /api/predictions/race/:raceId`
 
@@ -347,8 +348,7 @@ Latest Monte Carlo championship odds plus their per-round history (written by `c
 
 ### `GET /api/predictions/race/:raceId/friday-pace`
 
-Each driver's quickest practice long run (`fp2_long_run_times`, the Long Run Pace feature's raw
-input), fastest first: `[{ driver, compound, sessionType, medianLapMs, stintLength, deltaToFastestMs }]`.
+Each driver's quickest practice long run (`fp2_long_run_times`), fastest first: `[{ driver, compound, sessionType, medianLapMs, stintLength, deltaToFastestMs }]`.
 `sessionType` is `FP2`, or `FP1` on sprint weekends. 404 if the race doesn't exist.
 
 ### `GET /api/predictions/history?year=N`
@@ -422,7 +422,7 @@ is `null` when a bucket has zero races (e.g. `sprint` for a season with no sprin
 
 ### `GET /api/predictions/standings?year=N`
 
-Returns the "Intelligence Standings": driver rankings by average prediction score. Each row includes sprint aggregates (`sprintWins`, `sprintPodiums`, `sprintTotalPoints`) and `championshipPoints` (GP + sprint season points).
+Returns the "Intelligence Standings": driver rankings by average prediction score (`rawWeightedScore`, `winProbability`, `overallScore`; no per-feature breakdown). Each row includes sprint aggregates (`sprintWins`, `sprintPodiums`, `sprintTotalPoints`) and `championshipPoints` (GP + sprint season points).
 
 ---
 
@@ -454,6 +454,7 @@ conventional (non-sprint) weekend.
         {
           "predictedPosition": 1,
           "winProbability": "0.29000",
+          "gridPosition": 1,
           "driver": { ... },
           "features": {
             "carPerformance": "0.88000",

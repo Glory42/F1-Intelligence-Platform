@@ -1,0 +1,23 @@
+# Local copy of Neon for scripts/backtest.py: a backtest replays every race many times, which would
+# spend Neon Free CU-hours and egress. Filled once by scripts/backtest_snapshot.py; kept between runs.
+name: f1-backtest
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: f1
+      POSTGRES_PASSWORD: f1
+      POSTGRES_DB: f1_backtest
+    ports:
+      - "5434:5432"
+    volumes:
+      - backtest-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U f1 -d f1_backtest"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  backtest-data:

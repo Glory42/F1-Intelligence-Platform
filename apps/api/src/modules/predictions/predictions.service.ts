@@ -17,7 +17,7 @@ import {
   type HistoryProbRow,
   type HistoryWinnerRow,
 } from './prediction-history.helpers';
-import { aggregateSeasonFeatures, buildIntelStandingRows } from './intel-standings.helpers';
+import { aggregateSeasonScores, buildIntelStandingRows } from './intel-standings.helpers';
 
 export class PredictionsService {
   // The Scorecard: GP and sprint predictions side by side. `year` omitted spans every season
@@ -134,7 +134,7 @@ export class PredictionsService {
 
     if (!featureRows.length) return [];
 
-    const aggregated = aggregateSeasonFeatures(featureRows);
+    const aggregated = aggregateSeasonScores(featureRows);
     const driverIds = aggregated.map((r) => r.driver.id);
 
     const seasonTotalRows = driverIds.length > 0
@@ -168,7 +168,7 @@ export class PredictionsService {
         .limit(1),
     ]);
     return {
-      gpVersion: gp[0]?.version ?? 'weighted-v3',
+      gpVersion: gp[0]?.version ?? 'weighted-v4',
       sprintVersion: sprint[0]?.version ?? 'sprint-v2',
     };
   }

@@ -1,86 +1,94 @@
-"""Recomputes GP (weighted-v3) and sprint (sprint-v2) predictions for every race/sprint
-weekend that already has qualifying_results / sprint_results."""
+"""Regenerates every stored prediction from --from on. Writes to Neon: local only, checks storage_guard first.
+
+GP (weighted-v4): history is read from Neon once, then each season is predicted with weights fitted only on
+the seasons before it, so the scorecard and calibration pages stay out-of-sample. Races still to come are
+left to the live job, which uses the committed fit (src/models/gp_v4.json).
+Sprint (sprint-v2): recomputed race by race as before.
+Usage: python scripts/backfill_all_predictions.py [--from 2018] [--skip-sprint]"""
+import argparse
+import datetime
 import sys
 import time
-import psycopg2
-import psycopg2.extras
 
 sys.path.insert(0, ".")
-from src.config import DATABASE_URL
-from src.jobs import compute_features, compute_predictions
-from src.jobs import compute_sprint_features, compute_sprint_predictions
+
+from src.db.client import get_conn
+from src.jobs import compute_features, compute_predictions, compute_sprint_features, compute_sprint_predictions
+from src.utils.conditional_logit import fit_conditional_logit
+from src.utils.gp_features_v4 import GP_V4_FEATURES
+from src.utils.gp_model_v4 import TRAIN_FROM_YEAR, training_set
+from src.utils.race_history import load_history
+from src.utils.storage_guard import read_storage_tier
+from src.utils.upsert import upsert
 
 
-def get_conn():
-    conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-    conn.autocommit = True
-    return conn
-
-
-def main():
+def backfill_gp(start_year: int) -> list[tuple[int, str]]:
     conn = get_conn()
+    try:
+        if not read_storage_tier(conn).allows_backfill:
+            raise SystemExit("storage_guard: Neon storage too full for a backfill")
+        history = load_history(conn, since=datetime.date(TRAIN_FROM_YEAR - 3, 1, 1))
+    finally:
+        conn.close()
 
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT DISTINCT qr.race_id
-            FROM qualifying_results qr
-            ORDER BY qr.race_id
-            """
-        )
-        gp_race_ids = [r["race_id"] for r in cur.fetchall()]
+    targets = sorted(
+        (r for r in history.races.values()
+         if r["year"] >= start_year and r["status"] in ("qualifying_done", "completed") and history.quali.get(r["id"])),
+        key=lambda r: r["race_date"],
+    )
+    errors = []
+    for year in sorted({r["year"] for r in targets}):
+        model = fit_conditional_logit(training_set(history, before=datetime.date(year, 1, 1)), GP_V4_FEATURES)
+        season = [r for r in targets if r["year"] == year]
+        print(f"── {year}: {len(season)} GP predictions, weights fitted on races before {year}")
+        for race in season:
+            t0 = time.time()
+            try:
+                conn = get_conn()
+                try:
+                    upsert(conn, "driver_prediction_features",
+                           compute_features.feature_rows(history, race["id"], model), ["race_id", "driver_id"])
+                finally:
+                    conn.close()
+                compute_predictions.run(race["id"])
+                print(f"  race {race['id']} done in {time.time() - t0:.1f}s")
+            except Exception as exc:
+                print(f"  race {race['id']} FAILED: {exc}", file=sys.stderr)
+                errors.append((race["id"], str(exc)))
+    return errors
 
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT DISTINCT sr.race_id
-            FROM sprint_results sr
-            ORDER BY sr.race_id
-            """
-        )
-        sprint_race_ids = [r["race_id"] for r in cur.fetchall()]
 
-    conn.close()
+def backfill_sprint() -> list[tuple[int, str]]:
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT race_id FROM sprint_results ORDER BY race_id")
+            race_ids = [r["race_id"] for r in cur.fetchall()]
+    finally:
+        conn.close()
 
-    gp_total     = len(gp_race_ids)
-    sprint_total = len(sprint_race_ids)
-    print(f"GP predictions:     {gp_total} races")
-    print(f"Sprint predictions: {sprint_total} races")
-    print(f"Total:              {gp_total + sprint_total} compute jobs\n")
-
-    gp_errors     = []
-    sprint_errors = []
-
-    print("── GP predictions (weighted-v3) ──────────────────────────────")
-    for i, race_id in enumerate(gp_race_ids, 1):
-        t0 = time.time()
-        try:
-            compute_features.run(race_id)
-            compute_predictions.run(race_id)
-            elapsed = time.time() - t0
-            print(f"  [{i}/{gp_total}] race {race_id} done in {elapsed:.1f}s")
-        except Exception as exc:
-            elapsed = time.time() - t0
-            print(f"  [{i}/{gp_total}] race {race_id} FAILED ({elapsed:.1f}s): {exc}", file=sys.stderr)
-            gp_errors.append((race_id, str(exc)))
-
-    print("\n── Sprint predictions (sprint-v2) ────────────────────────────")
-    for i, race_id in enumerate(sprint_race_ids, 1):
-        t0 = time.time()
+    errors = []
+    print(f"── Sprint predictions (sprint-v2): {len(race_ids)} races")
+    for race_id in race_ids:
         try:
             compute_sprint_features.run(race_id)
             compute_sprint_predictions.run(race_id)
-            elapsed = time.time() - t0
-            print(f"  [{i}/{sprint_total}] sprint race {race_id} done in {elapsed:.1f}s")
         except Exception as exc:
-            elapsed = time.time() - t0
-            print(f"  [{i}/{sprint_total}] sprint race {race_id} FAILED ({elapsed:.1f}s): {exc}", file=sys.stderr)
-            sprint_errors.append((race_id, str(exc)))
+            print(f"  sprint race {race_id} FAILED: {exc}", file=sys.stderr)
+            errors.append((race_id, str(exc)))
+    return errors
 
-    total_errors = len(gp_errors) + len(sprint_errors)
-    total_ok     = (gp_total + sprint_total) - total_errors
-    print(f"\n{'='*60}")
-    print(f"Done. {total_ok} succeeded, {total_errors} failed.")
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--from", dest="start", type=int, default=2018)
+    parser.add_argument("--skip-sprint", action="store_true")
+    args = parser.parse_args()
+
+    gp_errors = backfill_gp(args.start)
+    sprint_errors = [] if args.skip_sprint else backfill_sprint()
+
+    print(f"\nDone. {len(gp_errors)} GP and {len(sprint_errors)} sprint failures.")
     if gp_errors:
         print(f"GP failures:     {[r for r, _ in gp_errors]}")
     if sprint_errors:

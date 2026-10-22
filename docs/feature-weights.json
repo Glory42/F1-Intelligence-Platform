@@ -1,27 +1,67 @@
 {
-  "softmax_temperature": 0.3,
+  "sprint_softmax_temperature": 0.3,
   "gp": {
-    "car_performance": { "weight": 20, "label": "Car Performance" },
-    "long_run_pace": { "weight": 15, "label": "Long Run Pace" },
-    "tyre_deg": { "weight": 8, "label": "Tyre Degradation" },
-    "reliability": { "weight": 8, "label": "Reliability" },
-    "qualifying_delta": { "weight": 8, "label": "Qualifying Delta" },
-    "driver_rating": { "weight": 8, "label": "Driver Rating" },
-    "win_rate": { "weight": 8, "label": "Win Rate" },
-    "luck_factor": { "weight": 7, "label": "Luck Factor" },
-    "sector_strength": { "weight": 6, "label": "Sector Strength" },
-    "circuit_adj_start_pos": { "weight": 7, "label": "Circuit-Adj. Starting Position" },
-    "circuit_adj_position_gain": { "weight": 3, "label": "Circuit-Adj. Position Gain" },
-    "weather_impact": { "weight": 2, "label": "Weather Impact" }
+    "grid": {
+      "importance": 20,
+      "label": "Grid Slot"
+    },
+    "quali_pace": {
+      "importance": 11,
+      "label": "Qualifying Pace"
+    },
+    "team_quali_pace": {
+      "importance": 12,
+      "label": "Team Qualifying Pace"
+    },
+    "driver_points": {
+      "importance": 18,
+      "label": "Driver Form"
+    },
+    "teammate_edge": {
+      "importance": 4,
+      "label": "Teammate Edge"
+    },
+    "grid_processional": {
+      "importance": 17,
+      "label": "Grid × Hard-to-Pass Track"
+    },
+    "team_race_pace": {
+      "importance": 18,
+      "label": "Team Race Pace"
+    }
   },
   "sprint": {
-    "car_performance": { "weight": 25, "label": "Car Performance" },
-    "circuit_adj_start_pos": { "weight": 25, "label": "Circuit-Adj. Starting Position" },
-    "short_run_pace": { "weight": 10, "label": "Short Run Pace" },
-    "driver_rating": { "weight": 10, "label": "Driver Rating" },
-    "weather_impact": { "weight": 8, "label": "Weather Impact" },
-    "win_rate": { "weight": 8, "label": "Win Rate" },
-    "luck_factor": { "weight": 8, "label": "Luck Factor" },
-    "sq_qualifying_delta": { "weight": 6, "label": "SQ vs Teammate" }
+    "car_performance": {
+      "weight": 25,
+      "label": "Car Performance"
+    },
+    "circuit_adj_start_pos": {
+      "weight": 25,
+      "label": "Circuit-Adj. Starting Position"
+    },
+    "short_run_pace": {
+      "weight": 10,
+      "label": "Short Run Pace"
+    },
+    "driver_rating": {
+      "weight": 10,
+      "label": "Driver Rating"
+    },
+    "weather_impact": {
+      "weight": 8,
+      "label": "Weather Impact"
+    },
+    "win_rate": {
+      "weight": 8,
+      "label": "Win Rate"
+    },
+    "luck_factor": {
+      "weight": 8,
+      "label": "Luck Factor"
+    },
+    "sq_qualifying_delta": {
+      "weight": 6,
+      "label": "SQ vs Teammate"
+    }
   }
 }

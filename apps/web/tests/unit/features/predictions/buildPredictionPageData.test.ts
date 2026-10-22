@@ -12,7 +12,7 @@ vi.mock('@/lib/api', () => ({
 import { api } from '@/lib/api';
 import { buildPredictionPageData } from '@/features/predictions/buildPredictionPageData';
 import type {
-  Circuit, Driver, Team, Race, RaceResult, RaceDetailResponse, PredictionResponse, FeatureScores,
+  Circuit, Driver, Team, Race, RaceResult, RaceDetailResponse, PredictionResponse, GpFeatures,
   SprintResult, SprintDetailResponse, SprintPredictionResponse, SprintFeatureScores,
 } from '@/types';
 
@@ -43,11 +43,15 @@ const race: Race = {
   circuit,
 };
 
-const gpFeatures: FeatureScores = {
-  carPerformance: '0.80000', driverRating: '0.75000', startingPosition: '0.90000', winRate: '0.70000',
-  luckFactor: '0.50000', weatherImpact: '0.50000', trackOvertake: null, positionGain: '0.55000',
-  longRunPace: '0.65000', reliability: '0.85000', qualifyingDelta: '0.60000', sectorStrength: '0.70000',
-  tyreDeg: '0.60000', circuitAdjStartPos: '0.72000', circuitAdjPositionGain: '0.40000',
+const term = (value: number, contribution: number) => ({ value, contribution });
+// VER: on pole with the better race pace; LEC: P2, better recent form.
+const verFeatures: GpFeatures = {
+  grid: term(0, 0.6), qualiPace: term(0, 0.3), teamQualiPace: term(-0.1, 0.2), driverPoints: term(15, 0.3),
+  teammateEdge: term(0.2, 0.05), gridProcessional: term(0, 0.4), teamRacePace: term(-0.08, 0.5),
+};
+const lecFeatures: GpFeatures = {
+  grid: term(-0.69, 0.1), qualiPace: term(-0.1, 0.2), teamQualiPace: term(-0.3, 0.1), driverPoints: term(19, 0.5),
+  teammateEdge: term(0.1, 0.02), gridProcessional: term(-0.35, 0.2), teamRacePace: term(-0.42, 0.1),
 };
 const sprintFeatures: SprintFeatureScores = {
   carPerformance: '0.80000', startingPosition: '0.90000', driverRating: '0.75000', trackOvertake: null,
@@ -57,10 +61,10 @@ const sprintFeatures: SprintFeatureScores = {
 
 function gpPrediction(predictedWinner: Driver = driver): PredictionResponse {
   return {
-    race, predictedWinner, computedAt: '2025-09-07T12:00:00.000Z', modelVersion: 'weighted-v3',
+    race, predictedWinner, computedAt: '2025-09-07T12:00:00.000Z', modelVersion: 'weighted-v4',
     drivers: [
-      { driver, winProbability: '0.62000', predictedPosition: 1, features: gpFeatures },
-      { driver: driverB, winProbability: '0.38000', predictedPosition: 2, features: gpFeatures },
+      { driver, winProbability: '0.62000', predictedPosition: 1, gridPosition: 1, features: verFeatures },
+      { driver: driverB, winProbability: '0.38000', predictedPosition: 2, gridPosition: 2, features: lecFeatures },
     ],
   };
 }
@@ -77,8 +81,8 @@ function sprintPrediction(): SprintPredictionResponse {
   return {
     race, predictedWinner: driver, computedAt: '2025-09-06T12:00:00.000Z', modelVersion: 'sprint-v2',
     drivers: [
-      { driver, winProbability: '0.55000', predictedPosition: 1, features: sprintFeatures },
-      { driver: driverB, winProbability: '0.45000', predictedPosition: 2, features: sprintFeatures },
+      { driver, winProbability: '0.55000', predictedPosition: 1, gridPosition: 1, features: sprintFeatures },
+      { driver: driverB, winProbability: '0.45000', predictedPosition: 2, gridPosition: null, features: sprintFeatures },
     ],
   };
 }
@@ -115,8 +119,22 @@ describe('buildPredictionPageData: gp', () => {
     expect(data.actualWinner?.driver.id).toBe(driver.id);
     expect(data.correct).toBe(true);
     expect(data.winner?.driver.id).toBe(driver.id);
-    expect(data.breakdown.length).toBeGreaterThan(0);
-    expect(data.radarFeatures).toHaveLength(12);
+    expect(data.radarFeatures).toHaveLength(7);
+  });
+
+  test('each driver is shown through per-feature terms: the why bar, radar and pace column', async () => {
+    vi.mocked(api.getPredictionByRace).mockResolvedValue(gpPrediction());
+    vi.mocked(api.getRaceById).mockResolvedValue(gpDetail());
+
+    const data = await buildPredictionPageData('gp', 1);
+
+    const [ver, lec] = data.prediction!.drivers;
+    expect(ver.terms.grid).toBe(0.6);
+    // Grid is VER's biggest edge over the field average ((0.6 - 0.35) of his positive edges).
+    expect(data.breakdown[0].key).toBe('grid');
+    expect(data.breakdown.find((b) => b.key === 'driverPoints')!.share).toBe(0);
+    expect([ver.radar.teamRacePace, lec.radar.teamRacePace]).toEqual([1, 0]);
+    expect([ver.pace, lec.pace, ver.gridPosition]).toEqual(['0.08%', '0.42%', 1]);
   });
 
   test('prediction fetch failure falls back to the race detail response', async () => {
@@ -189,6 +207,7 @@ describe('buildPredictionPageData: sprint', () => {
     expect(data.date).toBe(race.sprintDate);
     expect(data.radarFeatures).toHaveLength(8);
     expect(data.correct).toBe(true);
+    expect(data.prediction!.drivers.map((d) => d.pace)).toEqual(['80', '80']);
   });
 
   test('sprint fetch failure flags predictionFailed with no prediction', async () => {

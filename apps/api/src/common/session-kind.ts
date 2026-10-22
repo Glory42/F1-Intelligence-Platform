@@ -1,9 +1,9 @@
 import {
-  driverPredictionFeatures, driverSprintFeatures, lapTimes, racePredictions, raceResults, races, raceStatusEnum,
-  sprintLapTimes, sprintPredictions, sprintResults,
+  driverPredictionFeatures, driverSprintFeatures, lapTimes, qualifyingResults, racePredictions, raceResults, races,
+  raceStatusEnum, sprintLapTimes, sprintPredictions, sprintResults,
 } from '../db/schema';
-import type { FeatureScores, RaceSession, SprintFeatureScores } from './types';
-import { GP_FEATURE_MANIFEST, SPRINT_FEATURE_MANIFEST, type FeatureManifestEntry } from './feature-manifest';
+import type { GpFeatures, RaceSession, SprintFeatureScores } from './types';
+import { mapFeatureRow, mapGpFeatures, SPRINT_FEATURE_MANIFEST } from './feature-manifest';
 
 export type RaceStatus = (typeof raceStatusEnum.enumValues)[number];
 type FeatureTable = typeof driverPredictionFeatures | typeof driverSprintFeatures;
@@ -16,6 +16,8 @@ export interface AnySessionKind {
   features: FeatureTable;
   results: typeof raceResults | typeof sprintResults;
   laps: typeof lapTimes | typeof sprintLapTimes;
+  // The sheet the session's grid comes from: qualifying for the GP, sprint qualifying for the sprint.
+  grid: typeof qualifyingResults | typeof sprintResults;
   date: typeof races.raceDate | typeof races.sprintDate;
   // A prediction is shown as upcoming while the race is in one of these and its session date is ahead.
   upcoming: readonly RaceStatus[];
@@ -23,18 +25,21 @@ export interface AnySessionKind {
   done: readonly RaceStatus[];
 }
 
+// The two models store their features differently (GP: one JSONB object; sprint: a column per score),
+// so each kind says how to read a feature row into its API shape.
 export interface SessionKind<TFeatures extends FeatureTable, TScores> extends AnySessionKind {
   features: TFeatures;
-  manifest: FeatureManifestEntry<TFeatures['$inferSelect'], keyof TScores & string>[];
+  mapFeatures: (row: TFeatures['$inferSelect']) => TScores;
 }
 
-export const GP: SessionKind<typeof driverPredictionFeatures, FeatureScores> = {
+export const GP: SessionKind<typeof driverPredictionFeatures, GpFeatures> = {
   session: 'race',
   predictions: racePredictions,
   features: driverPredictionFeatures,
-  manifest: GP_FEATURE_MANIFEST,
+  mapFeatures: (row) => mapGpFeatures(row.features),
   results: raceResults,
   laps: lapTimes,
+  grid: qualifyingResults,
   date: races.raceDate,
   upcoming: ['qualifying_done'],
   done: ['completed'],
@@ -44,9 +49,10 @@ export const SPRINT: SessionKind<typeof driverSprintFeatures, SprintFeatureScore
   session: 'sprint',
   predictions: sprintPredictions,
   features: driverSprintFeatures,
-  manifest: SPRINT_FEATURE_MANIFEST,
+  mapFeatures: (row) => mapFeatureRow(row, SPRINT_FEATURE_MANIFEST),
   results: sprintResults,
   laps: sprintLapTimes,
+  grid: sprintResults,
   date: races.sprintDate,
   upcoming: ['sprint_qualifying_done', 'sprint_done', 'qualifying_done'],
   done: ['sprint_done', 'qualifying_done', 'completed'],

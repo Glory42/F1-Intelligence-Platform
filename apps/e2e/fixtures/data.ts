@@ -1,6 +1,6 @@
 import type {
   Circuit, Team, Driver, Race, RaceResult, QualifyingResult, LapSummary,
-  FeatureScores, DriverPrediction, PredictionResponse, RaceDetailResponse,
+  GpFeatures, DriverPrediction, PredictionResponse, RaceDetailResponse,
   PredictionHistoryItem, IntelStandingRow, SeasonSummary, ModelInfo, CircuitDetailResponse,
   DriverSeasonStats, DriverYearStats, DriverDetailResponse, TeamSeasonStats, TeamYearStats,
   TeamDetailResponse, DriverStanding,
@@ -55,22 +55,24 @@ export const race: Race = {
   circuit,
 };
 
-const featureScores: FeatureScores = {
-  carPerformance: '0.80000', driverRating: '0.75000', startingPosition: '0.90000', winRate: '0.70000',
-  luckFactor: '0.50000', weatherImpact: '0.50000', trackOvertake: null, positionGain: '0.55000',
-  longRunPace: '0.65000', reliability: '0.85000',
-  qualifyingDelta: '0.60000', sectorStrength: '0.70000',
-  tyreDeg: '0.60000', circuitAdjStartPos: '0.72000', circuitAdjPositionGain: '0.40000',
+const term = (value: number, contribution: number) => ({ value, contribution });
+const poleFeatures: GpFeatures = {
+  grid: term(0, 0.6), qualiPace: term(0, 0.3), teamQualiPace: term(-0.1, 0.2), driverPoints: term(15, 0.3),
+  teammateEdge: term(0.2, 0.05), gridProcessional: term(0, 0.4), teamRacePace: term(-0.08, 0.5),
+};
+const secondFeatures: GpFeatures = {
+  grid: term(-0.69, 0.1), qualiPace: term(-0.1, 0.2), teamQualiPace: term(-0.3, 0.1), driverPoints: term(19, 0.5),
+  teammateEdge: term(0.1, 0.02), gridProcessional: term(-0.35, 0.2), teamRacePace: term(-0.42, 0.1),
 };
 
 const driverPredictions: DriverPrediction[] = [
-  { driver, winProbability: '0.62000', predictedPosition: 1, features: featureScores },
-  { driver: driverB, winProbability: '0.38000', predictedPosition: 2, features: featureScores },
+  { driver, winProbability: '0.62000', predictedPosition: 1, gridPosition: 1, features: poleFeatures },
+  { driver: driverB, winProbability: '0.38000', predictedPosition: 2, gridPosition: 2, features: secondFeatures },
 ];
 
 export const predictionResponse: PredictionResponse = {
   race, predictedWinner: driver, computedAt: '2025-09-07T12:00:00.000Z',
-  modelVersion: 'weighted-v3', drivers: driverPredictions,
+  modelVersion: 'weighted-v4', drivers: driverPredictions,
 };
 
 const raceResults: RaceResult[] = [
@@ -133,12 +135,12 @@ export const predictionHistory2026: PredictionHistoryItem[] = [
 
 export const intelStandings: IntelStandingRow[] = [
   {
-    driver, features: featureScores, rawWeightedScore: '0.680000',
+    driver, rawWeightedScore: '1.850000',
     winProbability: '0.62000', predictedPosition: 1, overallScore: 0.68,
     sprintWins: 0, sprintPodiums: 0, sprintTotalPoints: '0', championshipPoints: '350.0',
   },
   {
-    driver: driverB, features: featureScores, rawWeightedScore: '0.520000',
+    driver: driverB, rawWeightedScore: '1.220000',
     winProbability: '0.38000', predictedPosition: 2, overallScore: 0.52,
     sprintWins: 0, sprintPodiums: 0, sprintTotalPoints: '0', championshipPoints: '210.0',
   },
@@ -149,7 +151,7 @@ export const seasons: SeasonSummary[] = [
   { year: 2024, raceCount: 24 },
 ];
 
-export const modelInfo: ModelInfo = { gpVersion: 'weighted-v3', sprintVersion: 'sprint-v2' };
+export const modelInfo: ModelInfo = { gpVersion: 'weighted-v4', sprintVersion: 'sprint-v2' };
 
 const driverSeasonStats: DriverSeasonStats = {
   racesEntered: 16, racesFinished: 15, wins: 8, podiums: 12, poles: 6,
@@ -267,8 +269,8 @@ const sprintFeatureScores: SprintFeatureScores = {
 };
 
 const sprintDriverPredictions: DriverSprintPrediction[] = [
-  { driver, winProbability: '0.58000', predictedPosition: 1, features: sprintFeatureScores },
-  { driver: driverB, winProbability: '0.42000', predictedPosition: 2, features: sprintFeatureScores },
+  { driver, winProbability: '0.58000', predictedPosition: 1, gridPosition: 1, features: sprintFeatureScores },
+  { driver: driverB, winProbability: '0.42000', predictedPosition: 2, gridPosition: 2, features: sprintFeatureScores },
 ];
 
 export const sprintPredictionResponse: SprintPredictionResponse = {

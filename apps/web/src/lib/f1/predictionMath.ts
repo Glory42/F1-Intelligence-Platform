@@ -1,20 +1,17 @@
-// unknown (not string|number|null) so PredictionDriverVM['features'] passes through directly.
-type FeatureInput = Record<string, unknown>;
+import type { GpFeatureKey } from '@/types';
+
 export type Weights = Record<string, number>;
 
-export const FEATURE_META: Record<string, { label: string; weight: number }> = {
-  carPerformance:           { label: 'Car Performance',                weight: 20 },
-  longRunPace:              { label: 'Long Run Pace',                  weight: 15 },
-  tyreDeg:                  { label: 'Tyre Degradation',               weight: 8 },
-  reliability:              { label: 'Reliability',                    weight: 8 },
-  qualifyingDelta:          { label: 'Qualifying Delta',               weight: 8 },
-  driverRating:             { label: 'Driver Rating',                  weight: 8 },
-  winRate:                  { label: 'Win Rate',                       weight: 8 },
-  luckFactor:               { label: 'Luck Factor',                    weight: 7 },
-  sectorStrength:           { label: 'Sector Strength',                weight: 6 },
-  circuitAdjStartPos:       { label: 'Circuit-Adj. Starting Position', weight: 7 },
-  circuitAdjPositionGain:   { label: 'Circuit-Adj. Position Gain',     weight: 3 },
-  weatherImpact:            { label: 'Weather Impact',                 weight: 2 },
+// weighted-v4 (GP): fitted weights, shown as each feature's share of the summed weight per standard
+// deviation (`weight`). Keys are the API's GpFeatureKey; checked against docs/feature-weights.json.
+export const FEATURE_META: Record<GpFeatureKey, { label: string; weight: number }> = {
+  grid:             { label: 'Grid Slot',                 weight: 20 },
+  qualiPace:        { label: 'Qualifying Pace',           weight: 11 },
+  teamQualiPace:    { label: 'Team Qualifying Pace',      weight: 12 },
+  driverPoints:     { label: 'Driver Form',               weight: 18 },
+  teammateEdge:     { label: 'Teammate Edge',             weight: 4 },
+  gridProcessional: { label: 'Grid × Hard-to-Pass Track', weight: 17 },
+  teamRacePace:     { label: 'Team Race Pace',            weight: 18 },
 };
 
 export const GP_WEIGHTS: Weights = Object.fromEntries(
@@ -36,24 +33,18 @@ export const SPRINT_WEIGHTS: Weights = Object.fromEntries(
   Object.entries(SPRINT_FEATURE_META).map(([key, meta]) => [key, meta.weight]),
 );
 
-export const SOFTMAX_TEMPERATURE = 0.3;
+// The hand-weighted sprint model divides its weighted score by this before the softmax. weighted-v4
+// has no separate temperature: its fitted weights already carry the scale (T = 1).
+export const SPRINT_SOFTMAX_TEMPERATURE = 0.3;
 
 // Derives RADAR_FEATURES' key set from FEATURE_META instead of a second hand-typed list.
 // `shortLabels` keeps the radar chart's intentionally shorter labels.
 export function radarFeatures(
-  meta: Record<string, { label: string; weight: number }>,
+  meta: Partial<Record<string, { label: string; weight: number }>>,
   shortLabels: Partial<Record<string, string>> = {},
 ): [string, string][] {
-  return Object.keys(meta).map((key) => [shortLabels[key] ?? meta[key].label, key]);
+  return Object.entries(meta).map(([key, m]) => [shortLabels[key] ?? m?.label ?? key, key]);
 }
-
-export type FeatureContribution = {
-  key: string;
-  weight: number;
-  score: number;
-  contribution: number;
-  share: number;
-};
 
 type HistoryOutcome = { winProbability: string; correct: boolean | null };
 
@@ -176,27 +167,7 @@ export function confidenceTier(p1: number, p2: number | undefined | null): Confi
   return 'tossup';
 }
 
-export function contributions(features: FeatureInput, weights: Weights): FeatureContribution[] {
-  const rows = Object.keys(weights).map((key) => {
-    const weight = weights[key];
-    const score = Number(features[key] ?? 0);
-    return { key, weight, score, contribution: weight * score };
-  });
-  const total = rows.reduce((sum, r) => sum + r.contribution, 0);
-  return rows
-    .map((r) => ({ ...r, share: total > 0 ? r.contribution / total : 0 }))
-    .sort((a, b) => b.contribution - a.contribution);
-}
-
-export function weightedScore(features: FeatureInput, weights: Weights): number {
-  let total = 0;
-  for (const key of Object.keys(weights)) {
-    total += weights[key] * Number(features[key] ?? 0);
-  }
-  return total;
-}
-
-export function softmax(scores: number[], temperature = SOFTMAX_TEMPERATURE): number[] {
+export function softmax(scores: number[], temperature = 1): number[] {
   const scaled = scores.map((s) => s / temperature);
   const max = Math.max(...scaled);
   const exps = scaled.map((s) => Math.exp(s - max));

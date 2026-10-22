@@ -14,7 +14,7 @@ export async function createRacePrediction(
     .values({
       raceId,
       predictedWinnerId,
-      modelVersion: 'weighted-v3',
+      modelVersion: 'weighted-v4',
       ...overrides,
     })
     .returning();
