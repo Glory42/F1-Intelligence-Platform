@@ -20,7 +20,8 @@ source venv/bin/activate
 
 | Era | Job type | Notes |
 |-----|----------|-------|
-| 2018–present | `ingest_qualifying` + `ingest_race` | Full FastF1 timing data |
+| 2023–present | `ingest_qualifying` + `ingest_race` | Full timing from OpenF1 + Jolpica (ADR 0011) |
+| 2018–2022 | already stored | Can't be re-ingested: FastF1 timing needs F1TV and OpenF1 starts 2023 |
 | 2000–2017 | `ingest_qualifying_legacy` + `ingest_race_legacy` | Ergast results only, no lap times |
 
 ## Round Counts

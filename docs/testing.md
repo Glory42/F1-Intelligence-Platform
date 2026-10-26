@@ -64,10 +64,10 @@ pytest, config in `pyproject.toml` (`pythonpath = ["."]`, `testpaths = ["tests"]
   list of result sets and hands one out per `with conn.cursor()` block, in call order. This covers
   `compute_weather_score`, `compute_luck_score`, `build_feature_context`, `build_driver_code_map`, and
   `ingest_runner.py`'s two shared runners (`run_ingest_job`, `run_qualifying_ingest_job`): the latter via
-  monkeypatched per-job callables and FastF1 helpers, no real session data needed. The same double
+  monkeypatched per-job callables and `openf1_session` readers, no real session data needed. The same double
   covers `data_quality_audit._audit_race` (per-status gate/threshold branching),
   `data_quality_repair.run` (issue grouping, repair plan per race, resolve bookkeeping),
-  `main.auto_detect_round`, (with FastF1's schedule/session mocked) `sync_schedule`
+  `main.auto_detect_round`, (with FastF1's schedule / `load_session` mocked) `sync_schedule`
   and `sync_season`, `compute_title_odds.run` (incl. replaying an earlier round without seeing later
   results or predictions), `auto_runner._retry_missing_race_events` (only the missing coverage's job
   reruns, a cleanly finished job is settled in the memo, budget-limited telemetry stays pending), and

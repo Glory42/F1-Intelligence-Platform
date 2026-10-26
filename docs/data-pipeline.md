@@ -1,10 +1,16 @@
 ---
 title: "Data Pipeline"
-description: "ETL jobs, FastF1 ingestion, cron schedule, and race status flow"
+description: "ETL jobs, OpenF1 + Jolpica ingestion, worker schedule, and race status flow"
 order: 2
 ---
 
 # Data Pipeline
+
+Live ingest reads finished sessions from OpenF1 and the official classification from Jolpica,
+both free with no account (`utils/openf1_session.py`). FastF1 did this until FastF1 3.9
+(October 2026) put its timing data behind a paid F1TV subscription; older FastF1 versions load
+none. FastF1 is kept only for the event calendar, the pre-2018 `_legacy` jobs (results from
+Ergast, still free) and the 2018–2022 backfills, which work from an existing cache. Why we don't pay or log in: ADR 0011.
 
 ## Jobs
 
@@ -15,7 +21,7 @@ All jobs live in `data-engine/src/jobs/`. They are invoked via `src/main.py --jo
 | Job | Purpose |
 |-----|---------|
 | `sync_schedule` | Populates the `races` table for a season from FastF1 (includes sprint dates, event_format). Races are matched by event name first, so when FastF1 renumbers the calendar (an event added or dropped mid-season) each race keeps its row and only its `round_number` moves |
-| `sync_season` | Populates `teams` and `drivers` for a season from FastF1 (one round's lineup). Race, sprint, qualifying and sprint-qualifying ingests also register every driver and team their session lists (`utils/driver_registry.py`), so mid-season replacements are added as they appear; a result for a driver that still can't be matched fails the job instead of being dropped |
+| `sync_season` | Populates `teams` and `drivers` for a season from OpenF1 (one round's lineup). Race, sprint, qualifying and sprint-qualifying ingests also register every driver and team their session lists (`utils/driver_registry.py`), so mid-season replacements are added as they appear; a result for a driver that still can't be matched fails the job instead of being dropped |
 | `ingest_qualifying` | Ingests Q1/Q2/Q3 qualifying session data and sector times: 2018+ |
 | `ingest_qualifying_legacy` | Ingests qualifying from Ergast: pre-2018 |
 | `ingest_fp2` | Ingests practice long-run stints into `fp2_long_run_times`: FP2 primary, **FP1 fallback on sprint weekends** (recorded in `session_type`) |
@@ -38,8 +44,8 @@ All jobs live in `data-engine/src/jobs/`. They are invoked via `src/main.py --jo
 
 ### Race Events Jobs (OpenF1)
 
-Enrich a completed race weekend with data FastF1 doesn't provide, sourced from the free
-[OpenF1 API](https://openf1.org) instead. OpenF1 has no coverage before 2023, and its free
+Enrich a completed race weekend with race control, overtakes, team radio, stints and pit stops from the free
+[OpenF1 API](https://openf1.org). OpenF1 has no coverage before 2023, and its free
 tier only serves data once a session is >30min past its end, so these jobs self-skip until
 the *weekend* is `completed` and `race_date_utc` is safely past that window: the Saturday
 sprint session is always well outside its own live window by then too, so one gate covers
@@ -101,10 +107,11 @@ Overtakes and team radio have no source before 2023, so they stay OpenF1-only.
 
 `run_ingest_job` (`ingest_race` / `ingest_sprint`) also builds lap traces, battles and the weather
 trace from the session it already loaded (no extra download) and writes them in the same
-transaction unless `storage_guard` reports the core-only tier. It loads FastF1 with **no DB
-connection open** (as do `run_qualifying_ingest_job` and `ingest_fp2`): a session load takes minutes
+transaction unless `storage_guard` reports the core-only tier. It fetches the session with **no DB
+connection open** (as do `run_qualifying_ingest_job` and `ingest_fp2`): a paced OpenF1 fetch takes minutes
 and an open connection would keep Neon compute awake. Backfill past races locally with
-`python scripts/backfill_race_story.py <start> <end>` (FastF1 2018+); it writes only the race-story
+`python scripts/backfill_race_story.py <start> <end>` (FastF1, so only from sessions already in the
+local cache); it writes only the race-story
 tables and stops at the storage guard's backfill threshold. `jobs/ingest_race_story.py` builds the race
 story alone: the worker's retry uses it when the race ingest skipped the story under the storage tier.
 
@@ -228,14 +235,14 @@ CLI's auto-detect, the worker's coverage retries, repair and the backfills all d
 
 ### How `auto_runner.py` works:
 1. Queries the database for the most recent active race (where `status != 'completed'`).
-2. Fetches the official F1 schedule via FastF1 to get exact UTC session times. If the race stored at that round has a different name from FastF1's event there (the calendar changed since the last sync), it re-runs `sync_schedule` with that schedule and stops the cycle instead of ingesting another event's sessions: every job loads FastF1 sessions by round number.
+2. Fetches the official F1 schedule via FastF1 to get exact UTC session times. If the race stored at that round has a different name from FastF1's event there (the calendar changed since the last sync), it re-runs `sync_schedule` with that schedule and stops the cycle instead of ingesting another event's sessions: every job finds its session from the stored race's date and round.
 3. Checks if a session ended recently (`weekend_pipeline.STAGES`):
    - Sprint Qualifying + 1.5 hours
    - Sprint Race + 1.5 hours
    - Main Qualifying + 2 hours
    - Main Race + 3 hours
 4. If the time has passed, it attempts to download the data. 
-   - **If F1 data is delayed**, FastF1 throws a `DataNotLoadedError`. The script catches this, exits cleanly, and tries again next hour.
+   - **If the data isn't published yet** (OpenF1 has no session or too few laps, or Jolpica has no classification), the job raises. The script catches this, exits cleanly, and tries again next cycle.
 5. Once ingestion succeeds, it automatically chains the downstream jobs (features, predictions, stats). If any job in the sequence fails, it sets the race `status` to whatever the sequence actually last committed (not blindly back to the pre-sequence value) so the next hour's retry resumes from where it left off instead of redoing already-completed steps.
 6. Qualifying telemetry rides the qualifying actions as a non-fatal step (Q at the end of `MAIN_QUALIFYING`, SQ at the end of `SPRINT_QUALIFYING`). After `MAIN_RACE`'s core steps (`ingest_race`, `compute_season_stats`) commit `completed`, it also runs the OpenF1 Race Events jobs (race control, overtakes, team radio, stints, pit stops) for both the Race and Sprint sessions. These are optional steps: a failure here is logged but never reverts `status` or fails the cycle, since Race Events are supplementary and safe to pick up on a later manual run if OpenF1 has a transient issue.
 7. Because that failure is swallowed rather than retried, and the race is already `completed` by the time it runs (so it drops out of step 1's query on the next poll), `run_cycle` also re-checks the *current* race-weekend window's race on every cycle it's still inside that window (`RaceWeekendWindow`'s 24h tail: see `_retry_missing_race_events`). `enrichment_coverage.read_coverage` checks each table on its own and `missing` decides what is due: race control, overtakes, stints, pit stops and race story per race/sprint session once `completed`; Q telemetry from `qualifying_done`; SQ telemetry on sprint weekends from `sprint_qualifying_done` (complete when it matches the `sprint_results` rows with an SQ1 time); season stats freshness (latest `team_season_stats.races_completed` vs completed races); and title odds for the race's round. Only the job whose table is empty reruns. Team radio is left out on purpose (F1 often publishes none). A job that finishes cleanly is recorded in `WorkerMemo.settled` as `(race_id, step)`, so a legitimately empty table (a sprint with no stops) doesn't keep the worker opening Neon; a job returning `False` (telemetry with the budget spent or still inside the live window) stays pending. Once nothing is pending and no session is due, later cycles skip the DB entirely (`WorkerMemo`). This is the safety net for the case where FastF1's and OpenF1's timing genuinely diverge: e.g. a red-flag-delayed race pushes the real session end past `OPENF1_LIVE_WINDOW_BUFFER`, so OpenF1 wasn't actually ready the first time.
@@ -304,7 +311,7 @@ python -m src.main --job ingest_race_legacy       --year 2015 --round 5
 
 Both download a checksum-verified F1DB release (`scripts/f1db_release.py`). The audit is read-only: it compares
 every completed race's race / qualifying / sprint results with F1DB and lists the drivers we're missing;
-`--modern-plan` prints the 2018+ races to re-ingest from FastF1. The rebuild covers 1980–2017 only (ADR 0009): it
+`--modern-plan` prints the 2018+ races to re-ingest (only 2023+ can be now: OpenF1 has nothing earlier, ADR 0011). The rebuild covers 1980–2017 only (ADR 0009): it
 fixes driver codes, adds missing drivers and teams, merges a person's duplicate rows, upserts every result,
 deletes results filed under the wrong driver and marks rebuilt races `completed`. Dry run unless `--apply`;
 it refuses a season with unmatched drivers or mismatched race dates, and checks `storage_guard` first.
@@ -326,7 +333,7 @@ cd data-engine
 source venv/bin/activate
 
 python scripts/backfill_full.py                        # 2000–2026 (legacy years skip gracefully)
-python scripts/backfill_full.py --start 2018           # 2018–2026 (recommended: full FastF1 coverage)
+python scripts/backfill_full.py --start 2023           # 2023–2026: OpenF1 has no earlier sessions (ADR 0011)
 python scripts/backfill_full.py --start 2025 --end 2025
 ```
 
@@ -356,7 +363,8 @@ Both scripts use `_run()` wrappers: a single failing round does not abort the wh
 
 ## FastF1 Cache
 
-FastF1 caches API responses locally. Enable it in development to avoid re-fetching:
+The 2018–2022 backfills only work from sessions already in this cache (new timing downloads need
+F1TV, ADR 0011):
 
 ```python
 import fastf1
@@ -377,7 +385,7 @@ already-ingested sprint race finish positions (`finish_position`, `points`, `sta
 `total_sprint_time_ms`, `fastest_lap` are never overwritten by SQ ingest).
 
 `ingest_qualifying` and `ingest_sprint_qualifying` both have a **date guard**: they check
-`qualifying_date`/`sprint_qualifying_date <= today` before loading FastF1, and raise an
+`qualifying_date`/`sprint_qualifying_date <= today` before loading the session, and raise an
 error if no results came back. This prevents future rounds from being incorrectly set to
 `qualifying_done`/`sprint_qualifying_done` by a backfill run.
 
