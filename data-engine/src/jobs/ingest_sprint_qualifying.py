@@ -8,7 +8,7 @@ SPRINT_FORMATS = frozenset({"sprint", "sprint_qualifying", "sprint_shootout"})
 def _resolve_race(conn: Any, year: int, round_num: int) -> QualifyingContext:
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT r.id, r.season_id, r.event_format, r.sprint_qualifying_date::date AS sq_day "
+            "SELECT r.id, r.season_id, r.event_format, r.race_date, r.sprint_qualifying_date::date AS sq_day "
             "FROM races r JOIN seasons s ON r.season_id = s.id "
             "WHERE s.year = %s AND r.round_number = %s",
             (year, round_num),
@@ -22,11 +22,12 @@ def _resolve_race(conn: Any, year: int, round_num: int) -> QualifyingContext:
         season_id=race_row["season_id"],
         event_format=race_row["event_format"] or "",
         quali_day=race_row["sq_day"],
+        race_date=race_row["race_date"],
     )
 
 
 def _session_type_for(event_format: str) -> str:
-    # 2023 renamed "Sprint Qualifying" → "Sprint Shootout" (FastF1 identifier: "SS")
+    # 2023 renamed "Sprint Qualifying" → "Sprint Shootout" (identifier: "SS")
     return "SS" if event_format == "sprint_shootout" else "SQ"
 
 

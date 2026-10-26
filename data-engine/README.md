@@ -1,6 +1,11 @@
 # Data Engine: Python ETL on Render
 
-Batch ETL jobs that ingest F1 data from FastF1/Ergast and compute race predictions. Runs on Render as cron jobs; writes directly to Neon PostgreSQL via psycopg2.
+Batch ETL jobs that ingest F1 data from OpenF1 and Jolpica and compute race predictions. Runs on Render as one worker; writes directly to Neon PostgreSQL via psycopg2.
+
+FastF1 is no longer a live source: since 3.9 its timing data needs a paid F1TV subscription and
+older versions load none (ADR 0011). It's kept for the event calendar, the pre-2018 `_legacy`
+jobs (results from Ergast, still free) and the 2018–2022 backfills, which only work from an
+existing FastF1 cache.
 
 ## Setup
 
@@ -40,7 +45,7 @@ python -m src.main --job ingest_race_legacy       --year 2010 --round 5
 
 ```bash
 # Full backfill: sync + all rounds + sprint pipeline + predictions
-python scripts/backfill_full.py --start 2018           # recommended: full FastF1 coverage
+python scripts/backfill_full.py --start 2023           # OpenF1 covers 2023+; 2018–2022 rounds now skip
 python scripts/backfill_full.py --start 2000           # 2000–2026, older years skip gracefully
 
 # Sprint-only backfill: re-run sprint pipeline for specific years
@@ -48,7 +53,7 @@ python scripts/backfill_sprint.py --years 2021 2022 2024 2026
 ```
 
 Data coverage:
-- **2018–present**: FastF1 full timing (qualifying, lap times, sprint lap times, conditions)
+- **2018–present**: full timing (qualifying, lap times, sprint lap times, conditions): OpenF1 for live ingest, FastF1 data already stored for older seasons
 - **2000–2017**: Ergast results only (no lap times; no sprint, format started 2021)
 
 ## Cron Schedule (Render)
@@ -71,7 +76,7 @@ Data coverage:
 
 ## FastF1 Cache
 
-Enable during development to avoid re-downloading sessions:
+The 2018–2022 backfills only work from sessions already in this cache, since new timing downloads need F1TV:
 
 ```python
 import fastf1

@@ -21,7 +21,7 @@ const icons: Record<string, string> = {
 };
 
 const pipeline = [
-  { label: 'FastF1', sub: 'live F1 session data', color: '#a855f7' },
+  { label: 'OpenF1 + Jolpica', sub: 'free F1 session data', color: '#a855f7' },
   { label: 'ETL Jobs', sub: 'Python / Render', color: '#7c3aed' },
   { label: 'Neon DB', sub: 'PostgreSQL', color: '#6d28d9' },
   { label: 'Hono API', sub: 'Cloudflare Workers', color: '#5b21b6' },
@@ -69,7 +69,7 @@ const pipeline = [
           <h2 class="text-sm font-semibold">What is this?</h2>
           <p class="text-sm text-muted-foreground leading-relaxed">
             F1 Intelligence is a Formula 1 race winner prediction platform. It ingests real session
-            data from every grand prix weekend using the FastF1 library, scores each driver on seven
+            data from every grand prix weekend from the free OpenF1 and Jolpica APIs, scores each driver on seven
             features with weights fitted to every grand prix since 2010, and applies a softmax to produce
             win probabilities.
           </p>
@@ -86,10 +86,10 @@ const pipeline = [
           <h2 class="text-sm font-semibold">What data is used?</h2>
           <div class="space-y-2.5">
             {[
-              ['FastF1', 'Lap times, sector splits, tyre data, qualifying times, race results, weather: all from the official F1 timing feed'],
+              ['OpenF1 + Jolpica', 'Lap times, sector splits, tyre data, qualifying times and weather from OpenF1; the official race classification from Jolpica'],
               ['Historical data', '2018–present with full lap telemetry; 1980–2017 with race/qualifying results only'],
               ['Static circuit data', 'Overtake rate and safety car probability seeded once per track: never changes at runtime'],
-              ['No external APIs', 'FastF1 is the sole data source. Everything else is computed or static'],
+              ['Nothing paid', 'Both sources are free and need no account (FastF1 now needs an F1TV subscription). Everything else is computed or static'],
             ].map(([label, desc]) => (
               <div class="flex gap-3">
                 <span class="font-mono text-[9px] text-[#a855f7]/60 mt-0.5 shrink-0">▸</span>
@@ -126,7 +126,7 @@ const pipeline = [
       <!-- step explanations -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {[
-          ['After qualifying', 'FastF1 pulls Q1/Q2/Q3 lap times, sector splits, and grid positions. FP2 long-run stint data is also ingested for race pace estimation.'],
+          ['After qualifying', 'OpenF1 supplies Q1/Q2/Q3 lap times, sector splits, and grid positions. FP2 long-run stint data is also ingested for race pace estimation.'],
           ['Feature computation', 'compute_features scores each driver on seven features: grid slot (and how hard the track is to pass on), qualifying pace, team qualifying and race pace, recent form and the gap to their team-mate.'],
           ['Prediction', 'Each feature is weighted by a model fitted to past winners, and a softmax turns the scores into win probabilities. Only races before each one count, so the scorecard is out-of-sample.'],
           ['After the race', 'compute_season_stats re-aggregates driver and team season totals. DNF counts, win rates, and car performance scores update for the next prediction.'],

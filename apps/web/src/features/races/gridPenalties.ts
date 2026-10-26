@@ -13,7 +13,7 @@ export interface GridDrop {
 }
 
 // Moving up the grid only means someone ahead was penalised, so only drops are reported.
-// FastF1 records a pit-lane start as grid position 0.
+// Jolpica (and FastF1 before it) records a pit-lane start as grid position 0.
 export function gridDrops(results: GridEntry[], qualifying: GridEntry[]): GridDrop[] {
   const qualified = new Map(qualifying.map((q) => [q.driverId, q.gridPosition]));
   return results.flatMap((r): GridDrop[] => {

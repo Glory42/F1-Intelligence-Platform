@@ -20,7 +20,7 @@ honestly, v3 picked 43.2% of winners over 190 races (2018–2026).
 ## Pipeline at a glance
 
 ```
-FastF1 sessions ──► ingest jobs ──► raw tables
+OpenF1 + Jolpica ──► ingest jobs ──► raw tables
                                         │
 compute_season_stats (after each race)  ──► driver_season_stats / team_season_stats
                                         │
@@ -91,7 +91,7 @@ Strength and Position Gain no longer exist in code; the others live on in sprint
 ### circuit-category blend to its car_performance feature (0.25 weight).
 
 ### 2. Long Run Pace: 0.15
-- **Source:** `fp2_long_run_times.median_lap_ms` (FastF1 practice stint medians, medium-normalized).
+- **Source:** `fp2_long_run_times.median_lap_ms` (practice run medians, medium-normalized).
 - **Computed** (@ `compute_features._compute_long_run_pace`): takes `MIN(median_lap_ms)`
   per driver; if ≥70% of drivers have practice data → use it, else fallback to historical
   circuit lap-time median (`lap_times`, last 6 completed races at that circuit).
@@ -151,7 +151,7 @@ Strength and Position Gain no longer exist in code; the others live on in sprint
 - `position_gain = (avg_gain + 15) / 30` then × overtake_rate.
 
 ### 12. Weather Impact: 0.02
-- **Source:** `races.weather` flag (`'wet'`/`'mixed'`, from FastF1 rainfall).
+- **Source:** `races.weather` flag (`'wet'`/`'mixed'`, from the session's rainfall samples).
 - **Computed** (`_compute_weather`): dry → all 0.5 neutral; else driver's historical avg
   wet finish inverted, min-max. Only 2%: weighted barely.
 

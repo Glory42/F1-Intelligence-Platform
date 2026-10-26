@@ -13,6 +13,7 @@ from src.utils.ingest_runner import (
     run_openf1_job,
     run_qualifying_ingest_job,
 )
+from src.utils.openf1_session import OpenF1Session
 from src.utils.storage_guard import StorageTier
 from tests.support.fake_db import FakeConnection
 
@@ -57,25 +58,27 @@ _LAP_ROWS = [
 ]
 
 _DRIVER_MAP = {"VER": 1, "HAM": 2}
+_RACE_DATE = date(2026, 5, 3)
 
 
 def _patch_race_session_helpers(monkeypatch, **overrides):
     defaults = {
-        "get_session": lambda year, round_num, session_type: object(),
-        "validate_session_data": lambda session, session_type: True,
-        "get_weather": lambda session: "Dry",
-        "get_weather_details": lambda session: {
+        "load_session": lambda year, race_date, session_type, parts: OpenF1Session(session_key=1),
+        "fetch_classification": lambda year, round_num, sprint=False: [],
+        "is_complete": lambda session, classification, session_type: True,
+        "weather_label": lambda session: "Dry",
+        "weather_details": lambda session: {
             "air_temp_avg": 25.0,
             "track_temp_avg": 35.0,
             "humidity_avg": 50.0,
         },
-        "get_sc_vsc_laps": lambda session: {"safety_car_laps": 0, "vsc_laps": 0},
-        "session_to_race_results": lambda session: _RESULT_ROWS,
-        "session_to_lap_times": lambda session: _LAP_ROWS,
-        "session_to_lap_records": lambda session: [],
+        "safety_car_laps": lambda session: {"safety_car_laps": 0, "vsc_laps": 0},
+        "race_results": lambda session, classification: _RESULT_ROWS,
+        "lap_times": lambda session: _LAP_ROWS,
+        "lap_records": lambda session: [],
         "session_weather_trace": lambda session: None,
         "read_storage_tier": lambda conn: StorageTier.ALLOW_ALL,
-        "session_entries": lambda session: ["entry"],
+        "session_entries": lambda drivers: ["entry"],
         "register_session_drivers": lambda conn, season_id, entries: dict(_DRIVER_MAP),
     }
     defaults.update(overrides)
@@ -104,7 +107,7 @@ class TestRunIngestJob:
             results_row_label="race result",
             laps_row_label="lap time",
             no_results_error="No results for race {race_id}",
-            resolve_race=lambda conn, year, round_num: RaceContext(race_id=1, season_id=10),
+            resolve_race=lambda conn, year, round_num: RaceContext(race_id=1, season_id=10, race_date=_RACE_DATE),
             mark_status=lambda conn, ctx, weather, weather_details, sc_vsc: None,
         )
         defaults.update(overrides)
@@ -142,8 +145,8 @@ class TestRunIngestJob:
         assert conn.commits == 1
         assert conn.closed is True
 
-    def test_holds_no_database_connection_while_fastf1_loads_the_session(self, monkeypatch):
-        # A FastF1 session load takes minutes; an open connection meanwhile keeps Neon awake.
+    def test_holds_no_database_connection_while_openf1_loads_the_session(self, monkeypatch):
+        # OpenF1's paced requests take a while; an open connection meanwhile keeps Neon awake.
         opened = []
 
         def _get_conn():
@@ -153,11 +156,11 @@ class TestRunIngestJob:
 
         open_during_load = []
 
-        def _get_session(year, round_num, session_type):
+        def _load_session(year, race_date, session_type, parts):
             open_during_load.append(any(not c.closed for c in opened))
-            return object()
+            return OpenF1Session(session_key=1)
 
-        _patch_race_session_helpers(monkeypatch, get_session=_get_session)
+        _patch_race_session_helpers(monkeypatch, load_session=_load_session)
         monkeypatch.setattr(ingest_runner, "upsert", lambda *a, **k: None)
         monkeypatch.setattr(ingest_runner, "get_conn", _get_conn)
 
@@ -166,6 +169,23 @@ class TestRunIngestJob:
         assert open_during_load == [False]
         assert all(c.closed for c in opened)
 
+    @pytest.mark.parametrize("session_type, sprint", [("R", False), ("S", True)])
+    def test_finds_the_session_by_race_date_and_reads_its_classification(self, monkeypatch, session_type, sprint):
+        loads, classifications = [], []
+        _patch_race_session_helpers(
+            monkeypatch,
+            load_session=lambda year, race_date, kind, parts: loads.append((year, race_date, kind, parts))
+            or OpenF1Session(session_key=1),
+            fetch_classification=lambda year, round_num, sprint=False: classifications.append((year, round_num, sprint)) or [],
+        )
+        monkeypatch.setattr(ingest_runner, "upsert", lambda *a, **k: None)
+        monkeypatch.setattr(ingest_runner, "get_conn", lambda: FakeConnection([]))
+
+        run_ingest_job(2026, 5, self._config(session_type=session_type))
+
+        assert loads == [(2026, _RACE_DATE, session_type, ingest_runner.RACE_PARTS)]
+        assert classifications == [(2026, 5, sprint)]
+
     def test_writes_one_lap_trace_row_per_driver_for_the_session(self, monkeypatch):
         records = [
             {"driver": "VER", "lap": 1, "position": 1, "time_ms": 100_000},
@@ -173,7 +193,7 @@ class TestRunIngestJob:
             {"driver": "VER", "lap": 2, "position": 1, "time_ms": 190_000},
             {"driver": "HAM", "lap": 2, "position": 2, "time_ms": 190_500},
         ]
-        _patch_race_session_helpers(monkeypatch, session_to_lap_records=lambda session: records)
+        _patch_race_session_helpers(monkeypatch, lap_records=lambda session: records)
         writes = {}
         monkeypatch.setattr(ingest_runner, "upsert", lambda conn, table, rows, conflict, **k: writes.update({table: (rows, conflict)}))
         monkeypatch.setattr(ingest_runner, "get_conn", lambda: FakeConnection([]))
@@ -233,7 +253,7 @@ class TestRunIngestJob:
         assert conn.commits == 1
 
     def test_raises_when_session_data_invalid(self, monkeypatch):
-        _patch_race_session_helpers(monkeypatch, validate_session_data=lambda session, session_type: False)
+        _patch_race_session_helpers(monkeypatch, is_complete=lambda session, classification, session_type: False)
         upsert_calls = []
         monkeypatch.setattr(ingest_runner, "upsert", lambda *a, **k: upsert_calls.append((a, k)))
         conn = FakeConnection([])
@@ -275,7 +295,7 @@ class TestRunIngestJob:
             {**_RESULT_ROWS[0], "headshot_url": "https://example.com/ver.jpg"},
             {**_RESULT_ROWS[1], "headshot_url": None},
         ]
-        _patch_race_session_helpers(monkeypatch, session_to_race_results=lambda session: result_rows)
+        _patch_race_session_helpers(monkeypatch, race_results=lambda session, classification: result_rows)
         monkeypatch.setattr(ingest_runner, "upsert", lambda *a, **k: None)
         batch_calls = []
         monkeypatch.setattr(
@@ -290,7 +310,7 @@ class TestRunIngestJob:
         assert batch_calls[0] == [("https://example.com/ver.jpg", 1)]
 
     def test_laps_upsert_skipped_when_no_lap_rows(self, monkeypatch):
-        _patch_race_session_helpers(monkeypatch, session_to_lap_times=lambda session: [])
+        _patch_race_session_helpers(monkeypatch, lap_times=lambda session: [])
         upsert_calls = []
         monkeypatch.setattr(ingest_runner, "upsert", lambda *a, **k: upsert_calls.append((a, k)))
         conn = FakeConnection([])
@@ -303,7 +323,7 @@ class TestRunIngestJob:
     def test_conn_closed_even_when_resolve_race_raises(self, monkeypatch):
         get_session_calls = []
         _patch_race_session_helpers(
-            monkeypatch, get_session=lambda year, round_num, session_type: get_session_calls.append(1)
+            monkeypatch, load_session=lambda *a: get_session_calls.append(1)
         )
         conn = FakeConnection([])
         monkeypatch.setattr(ingest_runner, "get_conn", lambda: conn)
@@ -335,9 +355,9 @@ _QUALI_ROWS = [
 
 def _patch_quali_session_helpers(monkeypatch, **overrides):
     defaults = {
-        "get_session": lambda year, round_num, session_type, messages=False: object(),
-        "session_to_quali_results": lambda session: _QUALI_ROWS,
-        "session_entries": lambda session: ["entry"],
+        "load_session": lambda year, race_date, session_type, parts: OpenF1Session(session_key=1),
+        "qualifying_results": lambda session: _QUALI_ROWS,
+        "session_entries": lambda drivers: ["entry"],
         "register_session_drivers": lambda conn, season_id, entries: dict(_DRIVER_MAP),
     }
     defaults.update(overrides)
@@ -357,7 +377,7 @@ class TestRunQualifyingIngestJob:
             no_results_error="no rows for {year} R{round_num} (race {race_id})",
             session_type_for=lambda event_format: "Q",
             resolve_race=lambda conn, year, round_num: QualifyingContext(
-                race_id=1, season_id=10, event_format="conventional", quali_day=None
+                race_id=1, season_id=10, event_format="conventional", quali_day=None, race_date=_RACE_DATE
             ),
             rows_from_quali=lambda quali_rows, driver_map, race_id: [
                 {"race_id": race_id, "driver_id": 1, "grid_position": 1}
@@ -395,7 +415,7 @@ class TestRunQualifyingIngestJob:
         assert conn.commits == 1
         assert conn.closed is True
 
-    def test_holds_no_database_connection_while_fastf1_loads_the_session(self, monkeypatch):
+    def test_holds_no_database_connection_while_openf1_loads_the_session(self, monkeypatch):
         opened = []
 
         def _get_conn():
@@ -405,11 +425,11 @@ class TestRunQualifyingIngestJob:
 
         open_during_load = []
 
-        def _get_session(year, round_num, session_type, messages=False):
+        def _load_session(year, race_date, session_type, parts):
             open_during_load.append(any(not c.closed for c in opened))
-            return object()
+            return OpenF1Session(session_key=1)
 
-        _patch_quali_session_helpers(monkeypatch, get_session=_get_session)
+        _patch_quali_session_helpers(monkeypatch, load_session=_load_session)
         monkeypatch.setattr(ingest_runner, "upsert", lambda *a, **k: None)
         monkeypatch.setattr(ingest_runner, "get_conn", _get_conn)
 
@@ -421,7 +441,7 @@ class TestRunQualifyingIngestJob:
     def test_date_guard_raises_when_quali_day_in_future(self, monkeypatch):
         get_session_calls = []
         _patch_quali_session_helpers(
-            monkeypatch, get_session=lambda *a, **k: get_session_calls.append(1)
+            monkeypatch, load_session=lambda *a, **k: get_session_calls.append(1)
         )
         conn = FakeConnection([])
         monkeypatch.setattr(ingest_runner, "get_conn", lambda: conn)
@@ -429,7 +449,7 @@ class TestRunQualifyingIngestJob:
 
         config = self._config(
             resolve_race=lambda conn, year, round_num: QualifyingContext(
-                race_id=1, season_id=10, event_format="conventional", quali_day=future_day
+                race_id=1, season_id=10, event_format="conventional", quali_day=future_day, race_date=_RACE_DATE
             )
         )
 
@@ -455,7 +475,7 @@ class TestRunQualifyingIngestJob:
 
         config = self._config(
             resolve_race=lambda conn, year, round_num: QualifyingContext(
-                race_id=1, season_id=10, event_format="unknown", quali_day=None
+                race_id=1, season_id=10, event_format="unknown", quali_day=None, race_date=_RACE_DATE
             )
         )
 
@@ -503,13 +523,13 @@ class TestRunQualifyingIngestJob:
         assert "IN %s" in query
         assert params == ("qualifying_done", 1, ("scheduled", "sprint_done"))
 
-    def test_session_type_for_drives_get_session_call(self, monkeypatch):
+    def test_session_type_for_drives_the_session_lookup(self, monkeypatch):
         session_type_calls = []
         _patch_quali_session_helpers(
             monkeypatch,
-            get_session=lambda year, round_num, session_type, messages=False: session_type_calls.append(
+            load_session=lambda year, race_date, session_type, parts: session_type_calls.append(
                 session_type
-            ),
+            ) or OpenF1Session(session_key=1),
         )
         monkeypatch.setattr(ingest_runner, "upsert", lambda *a, **k: None)
         conn = FakeConnection([])

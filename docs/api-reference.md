@@ -138,7 +138,7 @@ available from the 2024 US GP onward; pre-2023 stops carry `pitLaneMs` only. Cac
 
 ### `GET /api/races/:id/race-story?session=race|sprint`
 
-Lap-by-lap story from FastF1 full laps (2018+), drivers in finishing order:
+Lap-by-lap story from full laps (2018+: OpenF1 for races ingested since Oct 2026, FastF1 before), drivers in finishing order:
 
 ```json
 { "drivers": [{ "driver": { "...": "Driver" }, "finishPosition": 1,
@@ -149,7 +149,7 @@ Lap-by-lap story from FastF1 full laps (2018+), drivers in finishing order:
 
 Array index 0 is lap 1. `gapsMs` is null while a car is lapped (`lapsDown > 0`); `intervalsMs` is
 null for the leader. A battle is 3+ consecutive laps within 1.0 s of the same car ahead. `weather`
-is null when FastF1 had no samples. About 40 KB per race before gzip.
+is null when the session had no weather samples. About 40 KB per race before gzip.
 
 ### `GET /api/races/:id/telemetry?session=Q|SQ&a=CODE&b=CODE`
 

@@ -48,7 +48,7 @@ The schema source of truth lives in `apps/api/src/db/schema/`. Generated SQL mig
                      │ psycopg2 TCP
 ┌────────────────────┴────────────────────────────┐
 │  data-engine/  (Python: Render Web Service)    │
-│  Fetches F1 data via FastF1, computes           │
+│  Fetches F1 data via OpenF1 + Jolpica, computes │
 │  features and predictions, writes to DB         │
 └─────────────────────────────────────────────────┘
 ```

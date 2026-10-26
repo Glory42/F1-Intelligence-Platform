@@ -1,21 +1,12 @@
-"""Covers driver_registry: turning a FastF1 session's driver list into entries (code fallbacks,
+"""Covers driver_registry: turning an OpenF1 session's driver list into entries (code fallbacks,
 team keys, number coercion) and registering the drivers/teams a season is missing."""
-from unittest.mock import MagicMock
-
 from src.utils.driver_registry import SessionEntry, register_session_drivers, session_entries
 from tests.support.fake_db import FakeConnection
 
 
-def _info(*, team="Red Bull Racing", full="Max Verstappen", num="1", abbr="VER", country="NED"):
-    return {"TeamName": team, "FullName": full, "DriverNumber": num, "Abbreviation": abbr, "CountryCode": country}
-
-
-def _session(*infos):
-    s = MagicMock()
-    s.drivers = [i["DriverNumber"] for i in infos]
-    by_number = {i["DriverNumber"]: i for i in infos}
-    s.get_driver.side_effect = lambda n: by_number[n]
-    return s
+def _info(*, team="Red Bull Racing", first="Max", last="Verstappen", num=1, abbr="VER", country="NED"):
+    return {"team_name": team, "first_name": first, "last_name": last, "full_name": f"{first} {last.upper()}",
+            "driver_number": num, "name_acronym": abbr, "country_code": country}
 
 
 def _entry(code="VER", number=1, first="Max", last="Verstappen", team="red_bull_racing"):
@@ -25,23 +16,31 @@ def _entry(code="VER", number=1, first="Max", last="Verstappen", team="red_bull_
 
 class TestSessionEntries:
     def test_reads_code_name_number_and_team_key(self):
-        [entry] = session_entries(_session(_info(team="Racing-Bulls F1.Team", full="Isack Hadjar", num="6", abbr="HAD")))
+        [entry] = session_entries([_info(team="Racing-Bulls F1.Team", first="Isack", last="Hadjar", num=6, abbr="HAD")])
         assert (entry.code, entry.first_name, entry.last_name, entry.driver_number, entry.team_key) == (
             "HAD", "Isack", "Hadjar", 6, "racing_bulls_f1team")
 
     def test_missing_abbreviation_falls_back_to_the_surname(self):
-        [blank] = session_entries(_session(_info(full="Ayrton Senna", abbr="")))
-        [nan] = session_entries(_session(_info(full="Ayrton Senna", abbr=float("nan"))))
+        [blank] = session_entries([_info(first="Ayrton", last="Senna", abbr="")])
+        [missing] = session_entries([_info(first="Ayrton", last="Senna", abbr=None)])
         assert blank.code == "SEN"
-        assert nan.code == "SEN"
+        assert missing.code == "SEN"
 
     def test_short_fallback_code_is_padded_with_the_number(self):
-        [entry] = session_entries(_session(_info(full="Guanyu Li", num="44", abbr="")))
+        [entry] = session_entries([_info(first="Guanyu", last="Li", num=44, abbr="")])
         assert entry.code == "LI4"
 
     def test_non_numeric_driver_number_becomes_zero(self):
-        [entry] = session_entries(_session(_info(num="X")))
+        [entry] = session_entries([_info(num="X")])
         assert entry.driver_number == 0
+
+    def test_missing_first_and_last_name_split_the_full_name(self):
+        [entry] = session_entries([{**_info(), "first_name": None, "last_name": None, "full_name": "Max VERSTAPPEN"}])
+        assert (entry.first_name, entry.last_name) == ("Max", "VERSTAPPEN")
+
+    def test_missing_country_code_leaves_nationality_unset(self):
+        [entry] = session_entries([_info(country=None)])
+        assert entry.nationality is None
 
 
 class TestRegisterSessionDrivers:

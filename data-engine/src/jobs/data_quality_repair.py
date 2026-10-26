@@ -56,7 +56,7 @@ def _mark_resolved(issue_ids: list[int]) -> None:
 
 
 def run(year: int, resolve_run: int | None = None) -> None:
-    # No connection is held while the jobs run: each opens its own around its FastF1/OpenF1 calls.
+    # No connection is held while the jobs run: each opens its own around its OpenF1/Jolpica calls.
     run_id, issues = _load_issues(year, resolve_run)
     if run_id is None:
         print(f"[data_quality_repair] no audit run for year={year} resolve={resolve_run}; nothing to do")

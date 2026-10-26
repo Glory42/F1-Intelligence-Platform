@@ -2,7 +2,7 @@
 
 ## Project Overview
 F1 analysis platform (brand: `SITE_NAME` in `apps/web/src/lib/site.ts`). Uses historical + current F1
-data (FastF1, OpenF1) for race analysis and to predict race winners with a weighted feature scoring
+data (OpenF1, Jolpica, F1DB; FastF1 for pre-2023 backfills) for race analysis and to predict race winners with a weighted feature scoring
 system. Roadmap and free-tier budget rules: `docs/plans/intelligence-platform-roadmap.md`.
 
 ## Monorepo Layout
@@ -31,6 +31,8 @@ it's Python, and its jobs run once and exit rather than being a long-running dev
   even just to quote identifiers: so their tests monkeypatch `execute_batch` itself and assert on
   the params it receives, the same pattern `test_ingest_runner.py` already uses for its own
   `execute_batch` call, rather than extending `FakeCursor` to fake SQL rendering.
+  `openf1_session` (OpenF1 + Jolpica → ingest rows) runs against recorded Bahrain 2026 responses
+  (`tests/fixtures/openf1/`, `tests/fixtures/jolpica/`), checked against what FastF1 ingested.
   `weekend_pipeline` (Race Status → due jobs) and `enrichment_coverage` are tested pure; code that runs
   chains is tested by swapping entries in `weekend_pipeline.JOBS`, never by patching each job module.
   The sprint feature job is pinned end to end through `feature_runner` in `test_feature_runner.py`; the GP job
@@ -77,7 +79,7 @@ mirroring the source path being tested.
 | Database | Neon PostgreSQL | |
 | DB driver (Workers) | `@neondatabase/serverless` | HTTP driver: mandatory for CF Workers |
 | DB driver (Python) | `psycopg2` | TCP: fine on Render |
-| Data source | FastF1 | Python library for F1 session data |
+| Data source | OpenF1 + Jolpica | live ingest, free, no login (ADR 0011); FastF1 only for the event schedule and local pre-2023 backfills |
 | Python runtime | Python 3.12 (pinned via `data-engine/.python-version` + `PYTHON_VERSION` in `render.yaml`) | newer Pythons have no numpy/pandas wheels: source builds OOM Render's free tier |
 
 ---
@@ -125,7 +127,7 @@ Running any job twice must produce identical results, never duplicate rows.
 ### 6. Stay inside the free tiers (Neon Free, Render Free, OpenF1 free)
 Exceeding Neon's compute (100 CU-h/mo) or egress (5 GB/mo) suspends the DB until next month; a full
 1 GB blocks every write. Render Free has 512 MB RAM and 750 h/mo (already used by the one service).
-- Never hold a DB connection across HTTP calls (FastF1/OpenF1): connect late, close early.
+- Never hold a DB connection across HTTP calls (OpenF1/Jolpica/FastF1): connect late, close early.
 - No new polling or wake-ups: new ETL steps ride the existing worker cycle in `auto_runner.py`.
 - Whole-race data goes in one row per (race, session, driver) with arrays/JSONB, not row-per-lap.
 - Heavy API routes set `Cache-Control` via `src/common/cache.ts`; `edgeCache()` serves repeats.
@@ -151,7 +153,7 @@ Full rules and numbers: `docs/plans/intelligence-platform-roadmap.md` §1–§2.
 - `race_control_messages` / `race_overtakes` / `team_radio_clips`: race events tagged `session_type` `race`/`sprint`; race control 2018+ (OpenF1 from 2023, FastF1 before), overtakes and radio OpenF1-only (2023+)
 - `race_stints` / `race_pit_stops`: tyre stints and pit stops (2018+: OpenF1 from 2023, FastF1 before), per `session_type`; pre-2023 stops have pit-lane time only
 - `title_odds_drivers` / `title_odds_teams`: Monte Carlo championship odds, one row per contender per round
-- `race_lap_traces` / `race_battles` / `race_weather_traces`: race story from FastF1 full laps (2018+): per-driver int[] arrays, battles, per-minute weather
+- `race_lap_traces` / `race_battles` / `race_weather_traces`: race story from full laps (2018+: OpenF1 live, FastF1 before 2023): per-driver int[] arrays, battles, per-minute weather
 - `qualifying_lap_telemetry`: each driver's fastest Q/SQ lap (2018+: OpenF1 from 2023, FastF1 before), resampled every 10 m into one JSONB row (~11 KB)
 - `history_drivers` / `history_constructors` / `history_constructor_seasons` / `history_constructor_lineage` / `f1db_imports`: all-time history from F1DB (CC-BY-4.0, credit it wherever shown); joined to core drivers by `match_key` (`normalize_person_name`) and to teams via `f1dbConstructorId(team_key)`
 - `driver_season_stats` / `team_season_stats`: aggregated after each race (includes sprint aggregates)
@@ -373,13 +375,17 @@ Typical action timing:
 - **Saturday 22:00 UTC**: `ingest_qualifying` → `compute_features` → `compute_predictions`
 - **Sunday 18:00 UTC**: `ingest_race` → `compute_season_stats`
 
-### FastF1 usage
+### Session data (OpenF1 + Jolpica)
+F1 put FastF1's source behind F1TV logins (FastF1 3.9, Oct 2026) and the project pays for nothing,
+so live ingest reads finished sessions from OpenF1's free tier (ADR 0011):
 ```python
-import fastf1
-session = fastf1.get_session(year, round_num, 'Q')  # or 'R', 'FP1', etc.
-session.load(laps=True, telemetry=False, weather=True, messages=False)
+from src.utils.openf1_session import RACE_PARTS, load_session, race_results
+session = load_session(year, race_date, "R", RACE_PARTS)  # "Q", "SQ", "S", "FP2"...; found by races.race_date
+rows = race_results(session, fetch_classification(year, round_num))  # Jolpica: grid, status, points
 ```
-Cache FastF1 responses locally during development: `fastf1.Cache.enable_cache('./cache')`.
+`openf1_session.py` keeps the row shapes the old FastF1 helpers produced. FastF1 (pinned 3.5.3) is
+still used for `get_event_schedule`, the pre-2018 `_legacy` jobs (Ergast results, still free) and the
+local 2018–2022 backfills, which only work from a cache.
 
 ### Error handling
 Jobs exit with code 1 on failure (Render marks job failed for manual retrigger).
@@ -441,14 +447,14 @@ real units and only use races before the one predicted:
 ### Sprint Weights (sprint-v2)
 | Feature | Weight | Origin |
 |---------|--------|--------|
-| Car Performance | 25% | FastF1 race results → `team_season_stats.car_performance_score` |
-| Circuit-Adj. Starting Position | 25% | FastF1 SQ grid × static circuit overtake rate |
-| Short Run Pace | 10% | FastF1 SQ1/SQ2/SQ3 times → fallback: main qualifying |
-| Driver Rating | 10% | FastF1 sprint points / sprint races; fallback: main race rating |
-| Weather Impact | 8% | FastF1 sprint weather → historical wet-race finish avg |
-| Win Rate | 8% | FastF1 sprint wins; fallback: main race win rate |
-| Luck Factor | 8% | FastF1 GP finish position vs expected, last 5 races |
-| SQ vs Teammate | 6% | FastF1 SQ times → weighted teammate gap, last 5 sprint weekends |
+| Car Performance | 25% | Race results → `team_season_stats.car_performance_score` |
+| Circuit-Adj. Starting Position | 25% | SQ grid × static circuit overtake rate |
+| Short Run Pace | 10% | SQ1/SQ2/SQ3 times → fallback: main qualifying |
+| Driver Rating | 10% | Sprint points / sprint races; fallback: main race rating |
+| Weather Impact | 8% | Sprint weather → historical wet-race finish avg |
+| Win Rate | 8% | Sprint wins; fallback: main race win rate |
+| Luck Factor | 8% | GP finish position vs expected, last 5 races |
+| SQ vs Teammate | 6% | SQ times → weighted teammate gap, last 5 sprint weekends |
 
 ### Static / Hardcoded inputs
 - `circuits.overtake_rate`: seeded once per circuit, never changes

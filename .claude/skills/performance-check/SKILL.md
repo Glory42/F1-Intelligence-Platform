@@ -49,8 +49,8 @@ Grep changed `data-engine/src/jobs/*.py` files for `for ... in ...:` loops conta
 - Exception: a `for` loop that only accumulates values into a list/dict (no `cur.execute` inside) is fine, that's the normal pattern in `compute_features.py`/`compute_sprint_features.py`.
 - Render job timeouts mean per-row round trips to Neon are also a reliability risk, not just a perf one: flag these as higher severity than a typical N+1.
 
-### 7. Uncached FastF1 session loads
-Check any new `fastf1.get_session(...).load(...)` call includes only the data it needs (`laps=`, `telemetry=`, `weather=`, `messages=` set to `False` where unused): loading `telemetry=True` when telemetry isn't used pulls a large payload per session and slows the job for no benefit. Also confirm `fastf1.Cache.enable_cache(...)` is set up in dev so repeated local runs don't re-hit the FastF1 API.
+### 7. Oversized session fetches
+Check any new `openf1_session.load_session(...)` call asks only for the parts the job uses (each part is one paced OpenF1 request against the worker's budget, ADR 0004). For the local FastF1 backfills, check any new `fastf1.get_session(...).load(...)` call includes only the data it needs (`laps=`, `telemetry=`, `weather=`, `messages=` set to `False` where unused): loading `telemetry=True` when telemetry isn't used pulls a large payload per session and slows the job for no benefit. Also confirm `fastf1.Cache.enable_cache(...)` is set up in dev so repeated local runs don't re-hit the FastF1 API.
 
 ## Reporting format
 

@@ -8,7 +8,7 @@ SPRINT_FORMATS = {"sprint", "sprint_qualifying", "sprint_shootout"}
 def _resolve_race(conn: Any, year: int, round_num: int) -> RaceContext:
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT r.id, r.season_id, r.event_format FROM races r "
+            "SELECT r.id, r.season_id, r.event_format, r.race_date FROM races r "
             "JOIN seasons s ON r.season_id = s.id "
             "WHERE s.year = %s AND r.round_number = %s",
             (year, round_num),
@@ -25,7 +25,7 @@ def _resolve_race(conn: Any, year: int, round_num: int) -> RaceContext:
         )
     print(f"  event_format={event_format}: ingesting Session3 (sprint race)")
 
-    return RaceContext(race_id=race_row["id"], season_id=race_row["season_id"])
+    return RaceContext(race_id=race_row["id"], season_id=race_row["season_id"], race_date=race_row["race_date"])
 
 
 def _mark_status(

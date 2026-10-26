@@ -78,7 +78,8 @@ class WeatherTrace:
 
 
 def weather_trace(weather) -> WeatherTrace:
-    """FastF1 session.weather_data (one sample a minute) → arrays; temps as integer tenths of °C."""
+    """A weather frame with FastF1's weather_data columns (openf1_session builds the same) → arrays;
+    temps as integer tenths of °C."""
     start = weather["Time"].iloc[0]
     return WeatherTrace(
         minute_offsets=[round((t - start).total_seconds() / 60) for t in weather["Time"]],

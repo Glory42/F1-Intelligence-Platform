@@ -1,6 +1,6 @@
 ---
 title: "Prediction Model"
-description: "Feature weights, data origins, FastF1 vs static vs computed, softmax"
+description: "Feature weights, data origins, OpenF1/Jolpica vs static vs computed, softmax"
 order: 4
 ---
 
@@ -28,10 +28,14 @@ Two separate models run per race weekend: one for the grand prix, one for the sp
 
 Every feature score ultimately originates from one of three places:
 
-### 1. FastF1 (live F1 session data, Python library)
-FastF1 is the sole external data source. It provides telemetry and session data from the official F1 timing feed. The Python ingest jobs pull this data after each session and store it in raw tables.
+### 1. OpenF1 + Jolpica (session data, free APIs)
+The Python ingest jobs read each finished session from OpenF1 (laps, sectors, tyres, weather,
+race control, qualifying times) and the official race classification from Jolpica (grid,
+status, points), then store them in raw tables (`utils/openf1_session.py`). This was FastF1
+until October 2026, when FastF1 3.9 started requiring a paid F1TV subscription (ADR 0011).
+Seasons ingested before then keep their FastF1 rows.
 
-| FastF1 session | Ingest job | Populates table(s) |
+| Session | Ingest job | Populates table(s) |
 |---------------|-----------|-------------------|
 | Race (`'R'`) | `ingest_race` | `race_results`: finish pos, grid pos, status, points |
 | Qualifying (`'Q'`) | `ingest_qualifying` | `qualifying_results`: Q1/Q2/Q3 lap times, grid pos, sector times |
@@ -40,10 +44,10 @@ FastF1 is the sole external data source. It provides telemetry and session data 
 | Sprint (`'S'`) | `ingest_sprint` | `sprint_results`: sprint finish pos, points |
 | Sprint Qualifying (`'SQ'`) | `ingest_sprint_qualifying` | `sprint_results.sq1/sq2/sq3_time_ms` |
 | Sprint lap data | `ingest_sprint` | `sprint_lap_times`: per-lap sprint data |
-| Weather | every ingest | `races.weather`, `races.sprint_weather`: `Rainfall` flag from session telemetry |
+| Weather | every ingest | `races.weather`, `races.sprint_weather`: share of OpenF1 weather samples with rain |
 
-FastF1 `HeadshotUrl` is used for driver photos (available 2019+, not available earlier).
-FastF1 does **not** provide team logos: those are stored as static files in `apps/web/public/teams/`.
+OpenF1's `headshot_url` is used for driver photos (FastF1's before 2023; not available before 2019).
+Neither source provides team logos: those are stored as static files in `apps/web/public/teams/`.
 
 ### 2. Computed aggregates (run after each race)
 `compute_season_stats` reads from the raw tables above and computes season-wide summaries for the
@@ -71,7 +75,7 @@ Some inputs never change and are seeded once into the database or hardcoded in P
 ## Data pipeline: end-to-end flow
 
 ```
-FastF1 / OpenF1 sessions
+OpenF1 + Jolpica sessions (FastF1 before Oct 2026)
     │
     ▼  (ingest jobs)
 raw tables: race_results, qualifying_results, lap_times, sprint_results,

@@ -1,6 +1,6 @@
 """Three seams, not one: qualifying has no weather/laps/headshots, so forcing it through the
-race/sprint config would just add always-None fields to an already-wide one; OpenF1 jobs pull
-from a REST API instead of a FastF1 session object, so their guard/shape split differs again."""
+race/sprint config would just add always-None fields to an already-wide one; Race Event jobs
+write OpenF1 rows almost as fetched, so their guard/shape split differs again."""
 
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -11,19 +11,22 @@ from psycopg2.extras import execute_batch
 from src.db.client import get_conn
 from src.utils.driver_map import build_driver_number_map
 from src.utils.driver_registry import register_session_drivers, session_entries
-from src.utils.fastf1_helpers import (
-    get_sc_vsc_laps,
-    get_session,
-    get_weather,
-    get_weather_details,
-    session_to_lap_records,
-    session_to_lap_times,
-    session_to_quali_results,
-    session_to_race_results,
-    session_weather_trace,
-    validate_session_data,
-)
+from src.utils.jolpica_client import fetch_classification
 from src.utils.openf1_client import get_session_key
+from src.utils.openf1_session import (
+    QUALIFYING_PARTS,
+    RACE_PARTS,
+    is_complete,
+    lap_records,
+    lap_times,
+    load_session,
+    qualifying_results,
+    race_results,
+    safety_car_laps,
+    session_weather_trace,
+    weather_details,
+    weather_label,
+)
 from src.utils.race_story import build_lap_traces, find_battles
 from src.utils.storage_guard import read_storage_tier
 from src.utils.upsert import upsert
@@ -31,10 +34,12 @@ from src.utils.upsert import upsert
 
 @dataclass(frozen=True)
 class RaceContext:
-    """circuit_id is set only by ingest_race, for the circuits.sc_probability recompute."""
+    """circuit_id is set only by ingest_race, for the circuits.sc_probability recompute.
+    race_date finds the weekend in OpenF1, whichever of its sessions is ingested."""
 
     race_id: int
     season_id: int
+    race_date: date
     circuit_id: int | None = None
 
 
@@ -103,19 +108,20 @@ def run_ingest_job(year: int, round_num: int, config: IngestJobConfig) -> None:
     finally:
         conn.close()
 
-    # Loaded with no connection held: a FastF1 download takes minutes and would keep Neon awake.
-    session = get_session(year, round_num, config.session_type)
-    if not validate_session_data(session, config.session_type):
+    # Fetched with no connection held: OpenF1's paced requests take a while and would keep Neon awake.
+    session = load_session(year, race_ctx.race_date, config.session_type, RACE_PARTS)
+    classification = fetch_classification(year, round_num, sprint=config.session_type == "S")
+    if not is_complete(session, classification, config.session_type):
         raise RuntimeError(
             f"{config.session_label} results not fully available or complete yet: retry later"
         )
-    entries = session_entries(session)
-    weather = get_weather(session)
-    weather_details = get_weather_details(session)
-    sc_vsc = get_sc_vsc_laps(session)
-    result_rows = session_to_race_results(session)
-    lap_time_rows = session_to_lap_times(session)
-    traces = build_lap_traces(session_to_lap_records(session))
+    entries = session_entries(session.drivers)
+    weather = weather_label(session)
+    weather_conditions = weather_details(session)
+    sc_vsc = safety_car_laps(session)
+    result_rows = race_results(session, classification)
+    lap_time_rows = lap_times(session)
+    traces = build_lap_traces(lap_records(session))
     battles = find_battles(traces)
     weather_samples = session_weather_trace(session)
 
@@ -197,7 +203,7 @@ def run_ingest_job(year: int, round_num: int, config: IngestJobConfig) -> None:
             write_session_story(conn, race_ctx.race_id, _STORY_SESSIONS[config.session_type], traces, battles,
                                 weather_samples, driver_map)
 
-        config.mark_status(conn, race_ctx, weather, weather_details, sc_vsc)
+        config.mark_status(conn, race_ctx, weather, weather_conditions, sc_vsc)
         if config.cross_table_hook is not None:
             # Must run after mark_status: it reads races.status='completed', written above
             # in this same (uncommitted) transaction.
@@ -215,6 +221,7 @@ class QualifyingContext:
     season_id: int
     event_format: str
     quali_day: date | None
+    race_date: date
 
 
 @dataclass(frozen=True)
@@ -258,10 +265,10 @@ def run_qualifying_ingest_job(year: int, round_num: int, config: QualifyingJobCo
     finally:
         conn.close()
 
-    # Loaded with no connection held: a FastF1 download takes minutes and would keep Neon awake.
-    session = get_session(year, round_num, session_type, messages=True)
-    quali_rows = session_to_quali_results(session)
-    entries = session_entries(session)
+    # Fetched with no connection held: OpenF1's paced requests take a while and would keep Neon awake.
+    session = load_session(year, ctx.race_date, session_type, QUALIFYING_PARTS)
+    quali_rows = qualifying_results(session)
+    entries = session_entries(session.drivers)
 
     conn = get_conn()
     try:

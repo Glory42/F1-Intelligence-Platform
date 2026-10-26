@@ -37,7 +37,7 @@ seasons
         └── team_radio_clips        (FK → drivers)
         └── race_stints             (FK → drivers)  ← 2018+ (OpenF1 2023+, FastF1 before), per session
         └── race_pit_stops          (FK → drivers)  ← 2018+ (OpenF1 2023+, FastF1 before), per session
-        └── race_lap_traces         (FK → drivers)  ← FastF1 2018+, int[] per lap
+        └── race_lap_traces         (FK → drivers)  ← 2018+ (OpenF1 live, FastF1 before), int[] per lap
         └── race_battles            (2 FKs → drivers)
         └── race_weather_traces     (no driver FK)  ← per-minute weather arrays
         └── lap_times               (FK → drivers)
@@ -119,7 +119,7 @@ Season-scoped: a driver row exists per year they raced.
 | `first_name` | varchar(50) | |
 | `last_name` | varchar(50) | |
 | `nationality` | varchar(50) | |
-| `headshot_url` | varchar(255) | Populated from FastF1 for 2018+ |
+| `headshot_url` | varchar(255) | From OpenF1 (FastF1 for seasons ingested before Oct 2026), 2019+ |
 | UNIQUE | `(season_id, driver_number)` | |
 
 ---
@@ -304,7 +304,7 @@ for 2018–2022 (pit-lane time only; lane visits over 120 s, red-flag waits, are
 
 ### `race_lap_traces`
 One row per driver per session holding per-lap arrays (index 0 = lap 1), built by
-`race_story.build_lap_traces` from FastF1's **full** `session.laps` (unlike `lap_times`, which only
+`race_story.build_lap_traces` from the session's **full** laps (OpenF1 live, FastF1 before; unlike `lap_times`, which only
 keeps accurate laps). ~20 rows and ~18 KB per race: row-per-lap would be ~1,200 rows.
 
 | Column | Type | Notes |

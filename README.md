@@ -2,7 +2,7 @@
 
 ![F1 Prediction Platform](./preview/Preview-homePage.webp)
 
-F1 race analysis and winner prediction built on FastF1, OpenF1 and F1DB. A conditional logit with 7 fitted features (a hand-weighted 8-feature model for sprints) gives every driver a win probability after qualifying, and a Monte Carlo simulation turns those into championship odds after each round.
+F1 race analysis and winner prediction built on OpenF1, Jolpica and F1DB. A conditional logit with 7 fitted features (a hand-weighted 8-feature model for sprints) gives every driver a win probability after qualifying, and a Monte Carlo simulation turns those into championship odds after each round.
 
 - **Races:** results, qualifying, lap chart, tyre strategy, race control, overtakes and team radio, plus a race story (gap to leader, positions, battles, weather) and a two-lap qualifying telemetry comparison, all from 2018 on
 - **Championship:** driver and constructor standings, title odds by round, racecraft and pit crew rankings
@@ -13,6 +13,10 @@ F1 race analysis and winner prediction built on FastF1, OpenF1 and F1DB. A condi
 
 Results data covers 1980–2026.
 
+Live data comes from OpenF1 and Jolpica, which are free and need no account. FastF1 used to be the
+live source, but since FastF1 3.9 (October 2026) its timing data needs a paid F1TV subscription, and this
+project pays for nothing. Why a login is a bad fit here: [ADR 0011](./docs/adr/0011-live-ingest-reads-openf1-and-jolpica.md).
+
 ## Stack
 
 | Layer | Technology | Host |
@@ -20,7 +24,7 @@ Results data covers 1980–2026.
 | Frontend | Astro SSR + Tailwind | Cloudflare Pages |
 | API | Hono + Drizzle ORM | Cloudflare Workers |
 | Database | Neon PostgreSQL | Neon |
-| Data Engine | Python + FastF1 | Render |
+| Data Engine | Python + OpenF1 + Jolpica | Render |
 
 ## Monorepo Layout
 
@@ -101,7 +105,7 @@ python -m src.main --job compute_season_stats --year 2025
 Backfills run locally in bounded chunks, never on Render:
 ```bash
 cd data-engine
-python scripts/backfill_full.py --start 2018                 # results, laps, features, predictions
+python scripts/backfill_full.py --start 2023                 # results, laps, features, predictions (OpenF1 has 2023+)
 python scripts/backfill_openf1.py ingest_stints 2023 2026    # OpenF1 events (2023+)
 python scripts/backfill_fastf1_enrichment.py 2018 2022       # stints, pit stops, race control, telemetry before OpenF1
 python scripts/backfill_race_story.py 2018 2026              # race story charts
