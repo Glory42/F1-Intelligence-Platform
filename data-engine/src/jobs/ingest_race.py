@@ -6,7 +6,7 @@ from src.utils.ingest_runner import IngestJobConfig, RaceContext, run_ingest_job
 def _resolve_race(conn: Any, year: int, round_num: int) -> RaceContext:
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT r.id, r.season_id, r.circuit_id FROM races r "
+            "SELECT r.id, r.season_id, r.circuit_id, r.race_date FROM races r "
             "JOIN seasons s ON r.season_id = s.id "
             "WHERE s.year = %s AND r.round_number = %s",
             (year, round_num),
@@ -18,6 +18,7 @@ def _resolve_race(conn: Any, year: int, round_num: int) -> RaceContext:
     return RaceContext(
         race_id=race_row["id"],
         season_id=race_row["season_id"],
+        race_date=race_row["race_date"],
         circuit_id=race_row["circuit_id"],
     )
 

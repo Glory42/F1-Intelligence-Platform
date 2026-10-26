@@ -4,7 +4,7 @@ from typing import Any, Callable, Optional
 
 import pandas as pd
 import fastf1
-from fastf1.core import DataNotLoadedError, InvalidSessionError, NoLapDataError
+import requests
 from src.db.client import get_conn
 from src.enrichment_coverage import missing, read_coverage
 from src.jobs import sync_schedule
@@ -95,7 +95,7 @@ def _backfill_fp2(log_func, conn, ctx: RaceRunContext) -> bool:
         else:
             log_func(f"[auto_runner] FP2 still not available ({after:.0%}); will retry next cycle")
         return after >= 0.7
-    except (DataNotLoadedError, InvalidSessionError, NoLapDataError) as e:
+    except requests.RequestException as e:
         log_func(f"[auto_runner] FP2 not ready yet: {e}")
         return False
 
@@ -282,7 +282,7 @@ def run_cycle(
             log_func(f"[auto_runner] Failed to fetch schedule from FastF1: {e}")
             return CycleResult(window=window, schedule_available=schedule_available)
 
-        # Jobs load FastF1 sessions by round number, so a calendar change (an event added or
+        # Jobs look sessions up by round number, so a calendar change (an event added or
         # dropped earlier in the season) would make them ingest a different event's sessions.
         stored_name, schedule_name = race_row.get("name"), event.get("EventName")
         if stored_name and schedule_name and stored_name != schedule_name:
@@ -324,8 +324,8 @@ def run_cycle(
                 log_func(f"[auto_runner] {action.label} ingestion completed successfully.")
                 return CycleResult(window=window, schedule_available=schedule_available)
 
-        except (DataNotLoadedError, InvalidSessionError, NoLapDataError, ValueError, RuntimeError) as e:
-            log_func(f"[auto_runner] Data not ready from FastF1 yet. Will try again next hour. Details: {e}")
+        except (ValueError, RuntimeError, requests.RequestException) as e:
+            log_func(f"[auto_runner] Session data not published yet. Will try again next cycle. Details: {e}")
             return CycleResult(window=window, schedule_available=schedule_available)
         except Exception as e:
             # For unexpected errors, we want to fail so it shows up in Render logs

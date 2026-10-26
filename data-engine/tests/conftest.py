@@ -6,6 +6,7 @@ import pytest
 # instantly, so a stray real connection can never reach Neon or another local Postgres.
 os.environ["DATABASE_URL"] = "postgresql://test:test@127.0.0.1:1/test"
 
+import src.utils.jolpica_client as jolpica_client  # noqa: E402, needs DATABASE_URL set first
 import src.utils.openf1_client as openf1_client  # noqa: E402, needs DATABASE_URL set first
 
 
@@ -16,3 +17,4 @@ def _isolated_openf1_client(monkeypatch):
     monkeypatch.setattr(openf1_client, "_sleep", lambda seconds: None)
     monkeypatch.setattr(openf1_client, "_last_request_at", None)
     monkeypatch.setattr(openf1_client, "_remaining_requests", None)
+    monkeypatch.setattr(jolpica_client, "_sleep", lambda seconds: None)

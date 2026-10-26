@@ -74,6 +74,22 @@ def _get(path: str, params: dict[str, Any], operator_filters: str = "") -> Any:
     return resp.json()
 
 
+def _as_date(value: Any) -> date:
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    return datetime.strptime(str(value), "%Y-%m-%d").date()
+
+
+def _closest_session(sessions: list[dict], target: date) -> dict | None:
+    if not sessions:
+        return None
+    closest = min(sessions, key=lambda s: abs((datetime.fromisoformat(s["date_start"]).date() - target).days))
+    drift = abs((datetime.fromisoformat(closest["date_start"]).date() - target).days)
+    return closest if drift <= _MAX_DATE_DRIFT_DAYS else None
+
+
 def get_session_key(year: int, session_date: Any, session_name: str = "Race") -> int:
     """OpenF1's circuit naming doesn't line up 1:1 with our circuit_key values, so matching
     the session by closest start date is the reliable join key instead. session_name is
@@ -84,18 +100,29 @@ def get_session_key(year: int, session_date: Any, session_name: str = "Race") ->
         # OpenF1 has no coverage before 2023, hence the empty list from _get above.
         raise ValueError(f"OpenF1 has no session data for year={year} session={session_name}")
 
-    if isinstance(session_date, datetime):
-        target = session_date.date()
-    elif isinstance(session_date, date):
-        target = session_date
-    else:
-        target = datetime.strptime(str(session_date), "%Y-%m-%d").date()
-
-    closest = min(sessions, key=lambda s: abs((datetime.fromisoformat(s["date_start"]).date() - target).days))
-    drift = abs((datetime.fromisoformat(closest["date_start"]).date() - target).days)
-    if drift > _MAX_DATE_DRIFT_DAYS:
+    target = _as_date(session_date)
+    closest = _closest_session(sessions, target)
+    if closest is None:
         raise ValueError(f"No OpenF1 {session_name} session found for year={year} date={target}")
     return closest["session_key"]
+
+
+def find_weekend_session_key(year: int, race_date: Any, session_names: tuple[str, ...]) -> int:
+    """The weekend is found by its Race's date, then the session by name within that meeting, so
+    every session of a weekend resolves from races.race_date alone. One request for the year."""
+    sessions = [s for s in _get("sessions", {"year": year}) if not s.get("is_cancelled")]
+    target = _as_date(race_date)
+    race = _closest_session([s for s in sessions if s["session_name"] == "Race"], target)
+    if race is None:
+        raise ValueError(f"No OpenF1 race weekend found for year={year} date={target}")
+    for session in sessions:
+        if session["meeting_key"] == race["meeting_key"] and session["session_name"] in session_names:
+            return session["session_key"]
+    raise ValueError(f"OpenF1 has no {'/'.join(session_names)} session for the {year} weekend of {target}")
+
+
+def fetch_session_data(endpoint: str, session_key: int) -> list[dict]:
+    return _get(endpoint, {"session_key": session_key})
 
 
 def fetch_race_control(session_key: int) -> list[dict]:

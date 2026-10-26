@@ -1,5 +1,6 @@
-"""Backfills race-story tables (lap traces, battles, weather) for completed races: FastF1 only,
-so 2018+. Writes nothing else. Run locally, never on Render (FastF1 loads need RAM and bandwidth).
+"""Backfills race-story tables (lap traces, battles, weather) for completed races from FastF1, so
+2018+ and only from the local cache now that FastF1 timing needs F1TV (ADR 0011). Writes nothing
+else. Run locally, never on Render (FastF1 loads need RAM and bandwidth).
 Usage: python scripts/backfill_race_story.py 2018 2025"""
 import argparse
 import sys

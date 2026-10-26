@@ -1,7 +1,7 @@
 from src.db.client import get_conn
 from src.utils.driver_map import build_driver_code_map
-from src.utils.fastf1_helpers import get_session, session_to_lap_records, session_weather_trace
 from src.utils.ingest_runner import write_session_story
+from src.utils.openf1_session import STORY_PARTS, lap_records, load_session, session_weather_trace
 from src.utils.race_story import build_lap_traces, find_battles
 from src.utils.storage_guard import read_storage_tier
 
@@ -10,14 +10,14 @@ _SESSIONS = {"Race": ("R", "race"), "Sprint": ("S", "sprint")}
 
 def run(year: int, round_num: int, session_name: str = "Race") -> None:
     """Race story on its own, for a race that completed while storage was tight (the race
-    ingest skips it then). Loads FastF1 with no connection open, then one short write."""
-    fastf1_session, tag = _SESSIONS[session_name]
+    ingest skips it then). Fetches OpenF1 with no connection open, then one short write."""
+    session_type, tag = _SESSIONS[session_name]
     print(f"[ingest_race_story] year={year} round={round_num} session={session_name}")
     conn = get_conn()
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT r.id, r.season_id, r.sprint_date FROM races r JOIN seasons s ON r.season_id = s.id "
+                "SELECT r.id, r.season_id, r.race_date, r.sprint_date FROM races r JOIN seasons s ON r.season_id = s.id "
                 "WHERE s.year = %s AND r.round_number = %s",
                 (year, round_num),
             )
@@ -32,8 +32,8 @@ def run(year: int, round_num: int, session_name: str = "Race") -> None:
     finally:
         conn.close()
 
-    session = get_session(year, round_num, fastf1_session)
-    traces = build_lap_traces(session_to_lap_records(session))
+    session = load_session(year, race["race_date"], session_type, STORY_PARTS)
+    traces = build_lap_traces(lap_records(session))
     battles = find_battles(traces)
     weather = session_weather_trace(session)
     conn = get_conn()

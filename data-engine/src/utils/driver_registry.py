@@ -1,4 +1,4 @@
-"""Registers the drivers and teams a FastF1 session lists, so results are never dropped for a
+"""Registers the drivers and teams an OpenF1 session lists, so results are never dropped for a
 driver the season doesn't know yet (mid-season replacements, stand-ins, rookies)."""
 from dataclasses import dataclass
 from typing import Any
@@ -18,7 +18,7 @@ class SessionEntry:
 
 
 def _present(value: Any) -> bool:
-    # FastF1 returns NaN (truthy) for missing fields in old seasons: that once became code "NAN".
+    # NaN is truthy: a missing FastF1 field once became driver code "NAN".
     return value is not None and not (isinstance(value, float) and pd.isna(value)) and str(value).strip() != ""
 
 
@@ -36,21 +36,23 @@ def _driver_code(abbreviation: Any, first_name: str, last_name: str, driver_numb
     return code
 
 
-def session_entries(session: Any) -> list[SessionEntry]:
+def session_entries(drivers: list[dict[str, Any]]) -> list[SessionEntry]:
+    """drivers: OpenF1 /drivers rows for one session."""
     entries = []
-    for number in session.drivers:
-        info = session.get_driver(number)
-        team_name = str(info.get("TeamName", "Unknown"))
-        full_name = str(info.get("FullName", f"Driver {number}"))
-        first_name, _, last_name = full_name.partition(" ")
+    for info in drivers:
         try:
-            driver_number = int(info.get("DriverNumber", 0))
+            driver_number = int(info.get("driver_number") or 0)
         except (ValueError, TypeError):
             driver_number = 0
-        country = info.get("CountryCode")
+        first_name = str(info.get("first_name") or "").strip()
+        last_name = str(info.get("last_name") or "").strip()
+        if not first_name and not last_name:
+            first_name, _, last_name = str(info.get("full_name") or f"Driver {driver_number}").partition(" ")
+        team_name = str(info.get("team_name") or "Unknown")
+        country = info.get("country_code")
         entries.append(SessionEntry(
             driver_number=driver_number,
-            code=_driver_code(info.get("Abbreviation"), first_name, last_name, driver_number),
+            code=_driver_code(info.get("name_acronym"), first_name, last_name, driver_number),
             first_name=first_name,
             last_name=last_name,
             team_key=team_key_for(team_name),

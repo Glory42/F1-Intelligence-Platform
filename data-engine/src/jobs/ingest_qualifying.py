@@ -8,7 +8,7 @@ SUPPORTED_FORMATS = frozenset({"conventional", "sprint_qualifying", "sprint", "s
 def _resolve_race(conn: Any, year: int, round_num: int) -> QualifyingContext:
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT r.id, r.season_id, r.event_format, "
+            "SELECT r.id, r.season_id, r.event_format, r.race_date, "
             "       COALESCE(r.qualifying_date::date, r.race_date::date - 1) AS quali_day "
             "FROM races r JOIN seasons s ON r.season_id = s.id "
             "WHERE s.year = %s AND r.round_number = %s",
@@ -23,6 +23,7 @@ def _resolve_race(conn: Any, year: int, round_num: int) -> QualifyingContext:
         season_id=race_row["season_id"],
         event_format=race_row["event_format"] or "conventional",
         quali_day=race_row["quali_day"],
+        race_date=race_row["race_date"],
     )
 
 

@@ -4,7 +4,9 @@ import pytest
 import requests
 
 import src.utils.openf1_client as openf1_client
-from src.utils.openf1_client import fetch_overtakes, fetch_race_control, fetch_team_radio, get_session_key
+from src.utils.openf1_client import (
+    fetch_overtakes, fetch_race_control, fetch_session_data, fetch_team_radio, find_weekend_session_key, get_session_key,
+)
 
 
 class _FakeResponse:
@@ -84,6 +86,64 @@ class TestGetSessionKey:
 
         with pytest.raises(ValueError, match="No OpenF1 Sprint session found"):
             get_session_key(2024, "2024-09-01", session_name="Sprint")
+
+
+def _weekend(meeting_key, race_day, *others):
+    sessions = [{"session_key": meeting_key * 10, "meeting_key": meeting_key, "session_name": "Race",
+                 "date_start": f"{race_day}T13:00:00+00:00"}]
+    for offset, (name, extra) in enumerate(others, start=1):
+        sessions.append({"session_key": meeting_key * 10 + offset, "meeting_key": meeting_key,
+                         "session_name": name, "date_start": f"{race_day}T09:00:00+00:00", **extra})
+    return sessions
+
+
+class TestFindWeekendSessionKey:
+    def test_finds_a_session_in_the_weekend_of_the_race_date(self, monkeypatch):
+        sessions = _weekend(1, "2026-10-04", ("Qualifying", {})) + _weekend(2, "2026-10-11", ("Qualifying", {}))
+        monkeypatch.setattr(openf1_client.requests, "get", lambda *a, **k: _FakeResponse(sessions))
+
+        assert find_weekend_session_key(2026, "2026-10-11", ("Qualifying",)) == 21
+
+    def test_accepts_any_of_the_given_names(self, monkeypatch):
+        sessions = _weekend(1, "2023-07-30", ("Sprint Shootout", {}))
+        monkeypatch.setattr(openf1_client.requests, "get", lambda *a, **k: _FakeResponse(sessions))
+
+        assert find_weekend_session_key(2023, "2023-07-30", ("Sprint Qualifying", "Sprint Shootout")) == 11
+
+    def test_skips_cancelled_sessions(self, monkeypatch):
+        sessions = _weekend(1, "2026-10-04", ("Qualifying", {"is_cancelled": True}))
+        monkeypatch.setattr(openf1_client.requests, "get", lambda *a, **k: _FakeResponse(sessions))
+
+        with pytest.raises(ValueError, match="no Qualifying session"):
+            find_weekend_session_key(2026, "2026-10-04", ("Qualifying",))
+
+    def test_no_race_near_the_date_raises(self, monkeypatch):
+        monkeypatch.setattr(openf1_client.requests, "get", lambda *a, **k: _FakeResponse(_weekend(1, "2026-10-04")))
+
+        with pytest.raises(ValueError, match="No OpenF1 race weekend"):
+            find_weekend_session_key(2026, "2026-10-25", ("Race",))
+
+    def test_queries_the_whole_year_once(self, monkeypatch):
+        calls = []
+
+        def fake_get(url, params, timeout):
+            calls.append((url, params))
+            return _FakeResponse(_weekend(1, "2026-10-04"))
+
+        monkeypatch.setattr(openf1_client.requests, "get", fake_get)
+
+        find_weekend_session_key(2026, "2026-10-04", ("Race",))
+        assert calls == [(f"{openf1_client.BASE_URL}/sessions", {"year": 2026})]
+
+
+class TestFetchSessionData:
+    def test_filters_the_endpoint_by_session_key(self, monkeypatch):
+        calls = []
+        monkeypatch.setattr(openf1_client.requests, "get",
+                            lambda url, params, timeout: calls.append((url, params)) or _FakeResponse([{"x": 1}]))
+
+        assert fetch_session_data("session_result", 11731) == [{"x": 1}]
+        assert calls == [(f"{openf1_client.BASE_URL}/session_result", {"session_key": 11731})]
 
 
 class TestFetchRaceControl:

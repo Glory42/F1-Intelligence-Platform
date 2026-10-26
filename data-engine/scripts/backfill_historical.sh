@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Backfill historical F1 data for 2018-2020.
-# FastF1 has reliable lap/sector/qualifying data from 2018 onwards.
+# Only 2023+ re-ingests with full timing now (OpenF1, ADR 0011); 2018-2022 rounds fail and skip.
 # Run from the data-engine/ directory with the venv active.
 #
 # Usage: bash scripts/backfill_historical.sh [start_year] [end_year]

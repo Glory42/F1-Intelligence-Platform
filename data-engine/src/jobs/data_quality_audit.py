@@ -74,7 +74,7 @@ def _audit_race(conn, race: dict, *, run_season_stats: bool) -> tuple[list[dict]
         })
 
     # qualifying_results: pre-2018 legacy eras intentionally lack this data, so only
-    # FastF1-era rounds are measured.
+    # 2018+ (full timing) rounds are measured.
     if status in ("qualifying_done", "completed") and year >= 2018:
         # Cross-check against race_results (independent reference) when available.
         quali_expected = result_count if result_count else 20

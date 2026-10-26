@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Full historical backfill (default 2000-2026) in dependency order: sync, ingest,
-sprint pipeline, then features/predictions. Reliable FastF1 data starts 2018; sprint format began 2021."""
+sprint pipeline, then features/predictions. Full timing starts 2023 (OpenF1, ADR 0011), pre-2018 is Ergast results only; sprint format began 2021."""
 
 import argparse
 import sys

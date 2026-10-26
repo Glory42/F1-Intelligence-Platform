@@ -135,7 +135,7 @@ if __name__ == "__main__":
     parser.add_argument("--f1db-dir", default=None, help="an already verified, extracted release")
     args = parser.parse_args()
     if args.end > LAST_LEGACY_YEAR:
-        raise SystemExit(f"F1DB only backfills up to {LAST_LEGACY_YEAR}; later seasons re-ingest from FastF1")
+        raise SystemExit(f"F1DB only backfills up to {LAST_LEGACY_YEAR}; later seasons re-ingest with ingest_race")
 
     with tempfile.TemporaryDirectory(prefix="f1db-") as tmp:
         directory = Path(args.f1db_dir) if args.f1db_dir else fetch_release(args.version or latest_version(), Path(tmp))
