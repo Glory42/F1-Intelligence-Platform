@@ -1,15 +1,8 @@
 import { api } from '@/lib/api';
-import {
-  radarFeatures,
-  GP_WEIGHTS,
-  FEATURE_META,
-  SPRINT_WEIGHTS,
-  SPRINT_FEATURE_META,
-  type Weights,
-} from '@/lib/f1/predictionMath';
-import { edgeBreakdown, fieldScaled, gpTerms, sprintTerms, type FeatureEdge, type Terms } from '@/lib/f1/predictionTerms';
+import type { Weights } from '@/lib/f1/predictionMath';
+import { edgeBreakdown, fieldScaled, termsOf, type FeatureEdge } from '@/lib/f1/predictionTerms';
 import { GP_ACCENT, SPRINT_ACCENT, type PredictionAccent, type PredictionDriverVM, type FeatureMeta, type PredictionPageKind } from './types';
-import type { Race, Driver, FridayPaceRow, GpFeatures, PredictionOf, SprintFeatureScores } from '@/types';
+import type { Race, Driver, FeatureInfo, FeatureTerm, FridayPaceRow, GpFeatures, PredictionOf, SprintFeatures } from '@/types';
 
 interface RawResultRow {
   driver: { id: number; fullName: string };
@@ -22,6 +15,7 @@ interface PredictionView {
   predictedWinner: Driver;
   computedAt: string;
   modelVersion: string;
+  featureInfo: FeatureInfo[];
   drivers: PredictionDriverVM[];
 }
 
@@ -30,26 +24,16 @@ interface RawDetail {
   results?: RawResultRow[];
 }
 
-// How one model's features become what the page shows. Typed per model, so nothing downstream
-// needs to know whether a prediction came from weighted-v4 or sprint-v2.
-interface ModelView<F> {
-  terms: (features: F) => Terms;
-  pace: (features: F) => string;
-}
+// The API serves both models' features as {value, contribution} with their labels and importances, so
+// the only model-specific thing left is the driver table's pace column.
+type Pace<F> = (features: F) => string;
 
-const GP_VIEW: ModelView<GpFeatures> = {
-  terms: gpTerms,
-  // teamRacePace is stored as minus the % gap to the fastest outfit's race pace.
-  pace: (f) => `${(-f.teamRacePace.value).toFixed(2)}%`,
-};
+// teamRacePace is stored as minus the % gap to the fastest outfit's race pace.
+const GP_PACE: Pace<GpFeatures> = (f) => `${(-f.teamRacePace.value).toFixed(2)}%`;
+const SPRINT_PACE: Pace<SprintFeatures> = (f) => String(Math.round(f.carPerformance.value * 100));
 
-const SPRINT_VIEW: ModelView<SprintFeatureScores> = {
-  terms: (f) => sprintTerms(f, SPRINT_WEIGHTS),
-  pace: (f) => String(Math.round(Number(f.carPerformance) * 100)),
-};
-
-function toView<F>(prediction: PredictionOf<F>, view: ModelView<F>): PredictionView {
-  const terms = prediction.drivers.map((d) => view.terms(d.features));
+function toView<F extends Record<string, FeatureTerm>>(prediction: PredictionOf<F>, pace: Pace<F>): PredictionView {
+  const terms = prediction.drivers.map((d) => termsOf(d.features));
   const radar = fieldScaled(terms);
   return {
     ...prediction,
@@ -59,21 +43,18 @@ function toView<F>(prediction: PredictionOf<F>, view: ModelView<F>): PredictionV
       gridPosition: d.gridPosition,
       terms: terms[i],
       radar: radar[i],
-      pace: view.pace(d.features),
+      pace: pace(d.features),
     })),
   };
 }
 
-// The behavioural axis between the GP and sprint prediction pages: which endpoints to
-// hit, which weights/meta to show, which race field holds the date. Wording lives
-// in predictionCopy.ts; the fetch, winner-pick and assembly below are identical for both.
+// The behavioural axis between the GP and sprint prediction pages: which endpoints to hit and which
+// race field holds the date. Wording lives in predictionCopy.ts; features, labels and importances
+// come with the prediction, and the fetch, winner-pick and assembly below are identical for both.
 interface PredictionBehaviour {
   fetchPrediction: (raceId: number) => Promise<PredictionView>;
   fetchDetail: (raceId: number) => Promise<RawDetail>;
-  weights: Weights;
-  featureMeta: FeatureMeta;
   accent: PredictionAccent;
-  radarShortLabels: Partial<Record<string, string>>;
   dateField: (race: Race) => string;
   // Sprint weekends have no FP2 session, so only the GP page shows Friday long-run pace.
   fetchFridayPace: ((raceId: number) => Promise<FridayPaceRow[]>) | null;
@@ -81,30 +62,16 @@ interface PredictionBehaviour {
 
 const PREDICTION_BEHAVIOUR: Record<PredictionPageKind, PredictionBehaviour> = {
   gp: {
-    fetchPrediction: async (raceId) => toView(await api.getPredictionByRace(raceId), GP_VIEW),
+    fetchPrediction: async (raceId) => toView(await api.getPredictionByRace(raceId), GP_PACE),
     fetchDetail: api.getRaceById,
-    weights: GP_WEIGHTS,
-    featureMeta: FEATURE_META,
     accent: GP_ACCENT,
-    radarShortLabels: {
-      qualiPace: 'Quali Pace',
-      teamQualiPace: 'Team Quali',
-      gridProcessional: 'Grid × Track',
-      teamRacePace: 'Race Pace',
-    },
     dateField: (race) => race.raceDate,
     fetchFridayPace: api.getFridayPace,
   },
   sprint: {
-    fetchPrediction: async (raceId) => toView(await api.getSprintByRaceId(raceId), SPRINT_VIEW),
+    fetchPrediction: async (raceId) => toView(await api.getSprintByRaceId(raceId), SPRINT_PACE),
     fetchDetail: api.getSprintDetail,
-    weights: SPRINT_WEIGHTS,
-    featureMeta: SPRINT_FEATURE_META,
     accent: SPRINT_ACCENT,
-    radarShortLabels: {
-      circuitAdjStartPos: 'Adj. Grid Pos',
-      weatherImpact: 'Weather',
-    },
     dateField: (race) => race.sprintDate ?? race.raceDate,
     fetchFridayPace: null,
   },
@@ -155,6 +122,7 @@ export async function buildPredictionPageData(kind: PredictionPageKind, raceId: 
     ? (prediction.drivers.find((d) => d.driver.id === prediction!.predictedWinner.id) ?? prediction.drivers[0] ?? null)
     : null;
   const breakdown = winner && prediction ? edgeBreakdown(winner.terms, prediction.drivers.map((d) => d.terms)) : [];
+  const info = prediction?.featureInfo ?? [];
 
   return {
     race,
@@ -167,9 +135,9 @@ export async function buildPredictionPageData(kind: PredictionPageKind, raceId: 
     correct,
     winner,
     breakdown,
-    radarFeatures: radarFeatures(behaviour.featureMeta, behaviour.radarShortLabels),
-    weights: behaviour.weights,
-    featureMeta: behaviour.featureMeta,
+    radarFeatures: info.map((f): [string, string] => [f.shortLabel, f.key]),
+    weights: Object.fromEntries(info.map((f) => [f.key, f.importance])),
+    featureMeta: Object.fromEntries(info.map((f) => [f.key, { label: f.label, weight: f.importance }])),
     accent: behaviour.accent,
     fridayPace: fridayPaceResult.status === 'fulfilled' ? fridayPaceResult.value : [],
   };

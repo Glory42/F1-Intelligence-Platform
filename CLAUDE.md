@@ -439,8 +439,8 @@ real units and only use races before the one predicted:
 - Fitted weights live in `data-engine/src/models/gp_v4.json`, written by `scripts/fit_model_v4.py` from the
   local backtest snapshot and committed. Refit only after `scripts/backtest.py` validates the change.
 - The importances above are each feature's share of |weight per SD|; `fit_model_v4.py` writes them to
-  `docs/feature-weights.json`, then mirror them into `apps/web` `predictionMath.ts` `FEATURE_META`.
-  `test_weights.py`, `predictionMath.test.ts` and the API's `feature-manifest.test.ts` check every copy.
+  `docs/feature-weights.json`, then mirror them into the API's `common/feature-manifest.ts`, which serves them
+  with every Prediction (`featureInfo`); the web keeps no copy. `test_weights.py` and `feature-manifest.test.ts` check both.
 - Each row stores `features` JSONB (feature → value + contribution); `raw_weighted_score` is the summed
   contributions and the probability is a plain softmax (T = 1). There is no hand-set temperature.
 - `utils/gp_model_v4.py` is the only path to a GP Prediction: `training_races` → `fit(before=)` → `predict`, used by
@@ -466,7 +466,8 @@ real units and only use races before the one predicted:
 - `circuits.sc_probability`: **not static**: recomputed after every race ingest from `races.safety_car_laps`
   (`ingest_race._recompute_circuit_sc_probability`)
 - Sprint softmax temperature T=0.3: `SPRINT_SOFTMAX_TEMPERATURE` in `data-engine/src/utils/feature_manifest.py`
-  (applied by `compute_sprint_features.py`) and `apps/web/src/lib/f1/predictionMath.ts`. It applies to the
+  (applied by `compute_sprint_features.py`) and the API's `common/feature-manifest.ts` (to serve each sprint score's
+  contribution as weight × score / T, the GP model's shape). It applies to the
   hand-weighted sprint model only.
 - Sprint weights: `SPRINT_FEATURES` in `feature_manifest.py`, re-exported as `WEIGHTS` by
   `compute_sprint_features.py`, which also writes the probabilities and the predicted winner in one

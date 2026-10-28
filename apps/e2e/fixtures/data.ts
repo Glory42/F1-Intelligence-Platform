@@ -4,7 +4,7 @@ import type {
   PredictionHistoryItem, IntelStandingRow, SeasonSummary, ModelInfo, CircuitDetailResponse,
   DriverSeasonStats, DriverYearStats, DriverDetailResponse, TeamSeasonStats, TeamYearStats,
   TeamDetailResponse, DriverStanding,
-  SprintFeatureScores, DriverSprintPrediction, SprintPredictionResponse,
+  FeatureInfo, GpFeatureKey, SprintFeatureKey, SprintFeatures, DriverSprintPrediction, SprintPredictionResponse,
   SprintResult, SprintDetailResponse, RaceControlMessage, RaceOvertake, TeamRadioClip,
   StrategyResponse, FridayPaceRow, PitCrewRanking, TeamStanding, TitleOddsResponse,
   RacecraftRow, TeammateBattle, RaceStoryResponse, TelemetryResponse, LapTelemetrySamples,
@@ -65,6 +65,17 @@ const secondFeatures: GpFeatures = {
   teammateEdge: term(0.1, 0.02), gridProcessional: term(-0.35, 0.2), teamRacePace: term(-0.42, 0.1),
 };
 
+// The API serves these from apps/api common/feature-manifest.ts.
+const gpFeatureInfo: FeatureInfo<GpFeatureKey>[] = [
+  { key: 'grid', label: 'Grid Slot', shortLabel: 'Grid Slot', importance: 20 },
+  { key: 'qualiPace', label: 'Qualifying Pace', shortLabel: 'Quali Pace', importance: 11 },
+  { key: 'teamQualiPace', label: 'Team Qualifying Pace', shortLabel: 'Team Quali', importance: 12 },
+  { key: 'driverPoints', label: 'Driver Form', shortLabel: 'Driver Form', importance: 18 },
+  { key: 'teammateEdge', label: 'Teammate Edge', shortLabel: 'Teammate Edge', importance: 4 },
+  { key: 'gridProcessional', label: 'Grid × Hard-to-Pass Track', shortLabel: 'Grid × Track', importance: 17 },
+  { key: 'teamRacePace', label: 'Team Race Pace', shortLabel: 'Race Pace', importance: 18 },
+];
+
 const driverPredictions: DriverPrediction[] = [
   { driver, winProbability: '0.62000', predictedPosition: 1, gridPosition: 1, features: poleFeatures },
   { driver: driverB, winProbability: '0.38000', predictedPosition: 2, gridPosition: 2, features: secondFeatures },
@@ -72,7 +83,7 @@ const driverPredictions: DriverPrediction[] = [
 
 export const predictionResponse: PredictionResponse = {
   race, predictedWinner: driver, computedAt: '2025-09-07T12:00:00.000Z',
-  modelVersion: 'weighted-v4', drivers: driverPredictions,
+  modelVersion: 'weighted-v4', featureInfo: gpFeatureInfo, drivers: driverPredictions,
 };
 
 const raceResults: RaceResult[] = [
@@ -261,12 +272,24 @@ export const sprintRace: Race = {
   sprintAirTempAvg: '22.0', sprintTrackTempAvg: '35.0', sprintHumidityAvg: '55.0',
 };
 
-const sprintFeatureScores: SprintFeatureScores = {
-  carPerformance: '0.82000', startingPosition: '0.88000', driverRating: '0.76000',
-  trackOvertake: '0.45000', shortRunPace: '0.70000', weatherImpact: '0.50000',
-  winRate: '0.66000', luckFactor: '0.52000',
-  circuitAdjStartPos: '0.74000', sqQualifyingDelta: '0.61000',
+// sprint-v2 is served like the GP model: each score with weight × score / 0.3 as its log-odds term.
+const sprintFeatureInfo: FeatureInfo<SprintFeatureKey>[] = [
+  { key: 'carPerformance', label: 'Car Performance', shortLabel: 'Car Performance', importance: 25 },
+  { key: 'circuitAdjStartPos', label: 'Circuit-Adj. Starting Position', shortLabel: 'Adj. Grid Pos', importance: 25 },
+  { key: 'shortRunPace', label: 'Short Run Pace', shortLabel: 'Short Run Pace', importance: 10 },
+  { key: 'driverRating', label: 'Driver Rating', shortLabel: 'Driver Rating', importance: 10 },
+  { key: 'weatherImpact', label: 'Weather Impact', shortLabel: 'Weather', importance: 8 },
+  { key: 'winRate', label: 'Win Rate', shortLabel: 'Win Rate', importance: 8 },
+  { key: 'luckFactor', label: 'Luck Factor', shortLabel: 'Luck Factor', importance: 8 },
+  { key: 'sqQualifyingDelta', label: 'SQ vs Teammate', shortLabel: 'SQ vs Teammate', importance: 6 },
+];
+const sprintScores: Record<SprintFeatureKey, number> = {
+  carPerformance: 0.82, circuitAdjStartPos: 0.74, shortRunPace: 0.7, driverRating: 0.76,
+  weatherImpact: 0.5, winRate: 0.66, luckFactor: 0.52, sqQualifyingDelta: 0.61,
 };
+const sprintFeatureScores = Object.fromEntries(
+  sprintFeatureInfo.map(({ key, importance }) => [key, term(sprintScores[key], (importance / 100) * sprintScores[key] / 0.3)]),
+) as SprintFeatures;
 
 const sprintDriverPredictions: DriverSprintPrediction[] = [
   { driver, winProbability: '0.58000', predictedPosition: 1, gridPosition: 1, features: sprintFeatureScores },
@@ -275,7 +298,7 @@ const sprintDriverPredictions: DriverSprintPrediction[] = [
 
 export const sprintPredictionResponse: SprintPredictionResponse = {
   race: sprintRace, predictedWinner: driver, computedAt: '2025-11-07T20:00:00.000Z',
-  modelVersion: 'sprint-v2', drivers: sprintDriverPredictions,
+  modelVersion: 'sprint-v2', featureInfo: sprintFeatureInfo, drivers: sprintDriverPredictions,
 };
 
 const sprintResults: SprintResult[] = [

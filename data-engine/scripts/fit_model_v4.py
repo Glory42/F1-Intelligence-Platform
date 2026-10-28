@@ -1,6 +1,6 @@
 """Refits weighted-v4 on every completed GP since 2010 in the local backtest snapshot and writes
 src/models/gp_v4.json plus the importances in docs/feature-weights.json (then mirror those into
-apps/web predictionMath.ts FEATURE_META: its test fails until you do). Run scripts/backtest.py first: only refit with the setup the backtest validated.
+apps/api common/feature-manifest.ts GP_FEATURE_MANIFEST: its test fails until you do). Run scripts/backtest.py first: only refit with the setup the backtest validated.
 Local only, never Neon. Usage: python scripts/fit_model_v4.py [--l2 1.0]"""
 import argparse
 import json

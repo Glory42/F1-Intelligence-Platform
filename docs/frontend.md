@@ -203,8 +203,9 @@ response change is made once there and `astro check` (and the e2e fixtures' `tsc
 or its fixtures disagree. No workspace or package is involved; type-only imports are erased at build.
 The one web-defined response type is `GlobalSearchResponse` (`types/search.ts`), because `/api/search`
 builds its shape inline. Feature-only view models stay in that feature's `types.ts`.
-`lib/f1/predictionMath.ts`'s `FEATURE_META` / `SPRINT_FEATURE_META` mirror the Python model's weights and
-labels, and `predictionMath.test.ts` checks both against `docs/feature-weights.json`.
+The web keeps no copy of either model's weights or labels: every Prediction carries `featureInfo` (label, short
+label, importance) and each driver's per-feature contributions, for the GP and sprint alike, so
+`buildPredictionPageData` turns both into the same view and only the driver table's pace column differs.
 
 ## Local development
 

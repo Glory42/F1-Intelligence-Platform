@@ -141,9 +141,8 @@ suite never touches Neon.
 
 Vitest, config in `vitest.config.ts` (include `tests/unit/**/*.test.{ts,tsx}`, `@` alias, setup file).
 
-- **Default environment is `node`**: pure logic runs there: `lib/f1/predictionMath.ts` (all exports; `FEATURE_META`
-  importances + labels, `SPRINT_FEATURE_META` and `SPRINT_SOFTMAX_TEMPERATURE` checked against
-  `docs/feature-weights.json`), `lib/f1/predictionTerms.ts` (GP/sprint terms, edge over the field, What-If Lab),
+- **Default environment is `node`**: pure logic runs there: `lib/f1/predictionMath.ts` (all exports), `lib/f1/predictionTerms.ts` (served
+  contributions as terms, edge over the field, What-If Lab),
   `lib/f1/teamColors` / `lib/f1/teamLogos` / `features/history/f1dbCountries`, `features/compare/compareStats.ts`,
   the compare stat rows (`features/compare/{driver,team}CompareConfig.ts`: Championship Points reads the API's
   `championshipPoints`, never a client-side GP + sprint sum), `features/history/historyView.ts`, `features/races/{raceView,calendar,loadRaceEvents}` (race page and

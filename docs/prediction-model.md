@@ -66,9 +66,9 @@ Some inputs never change and are seeded once into the database or hardcoded in P
 |-------|-------------|---------|
 | Circuit overtake rate | `circuits.overtake_rate` | Never: seeded once per track |
 | Circuit SC probability | `circuits.sc_probability` | Never: seeded once per track |
-| GP model weights | `data-engine/src/models/gp_v4.json` (fitted, written by `scripts/fit_model_v4.py`); importances + labels in `docs/feature-weights.json`, mirrored in `predictionMath.ts` `FEATURE_META` and the API's `GP_FEATURE_MANIFEST` | On a deliberate, backtested refit |
-| Sprint model weights + labels | `feature_manifest.py` `SPRINT_FEATURES` (re-exported as `WEIGHTS` by `compute_sprint_features.py`); mirrored in `predictionMath.ts` `SPRINT_FEATURE_META` and the API's `SPRINT_FEATURE_MANIFEST`, same JSON check | Only when model is intentionally updated |
-| Sprint softmax temperature T=0.3 | `feature_manifest.py` / `predictionMath.ts` `SPRINT_SOFTMAX_TEMPERATURE`, checked against `sprint_softmax_temperature` in `docs/feature-weights.json`. The GP model has none (T = 1) | Only when model is intentionally updated |
+| GP model weights | `data-engine/src/models/gp_v4.json` (fitted, written by `scripts/fit_model_v4.py`); importances + labels in `docs/feature-weights.json`, mirrored in the API's `GP_FEATURE_MANIFEST`, which serves them with every Prediction | On a deliberate, backtested refit |
+| Sprint model weights + labels | `feature_manifest.py` `SPRINT_FEATURES` (re-exported as `WEIGHTS` by `compute_sprint_features.py`); mirrored in the API's `SPRINT_FEATURE_MANIFEST`, same JSON check | Only when model is intentionally updated |
+| Sprint softmax temperature T=0.3 | `feature_manifest.py` / the API's `feature-manifest.ts` `SPRINT_SOFTMAX_TEMPERATURE`, checked against `sprint_softmax_temperature` in `docs/feature-weights.json`. The GP model has none (T = 1) | Only when model is intentionally updated |
 
 ---
 
@@ -157,7 +157,7 @@ win_probability = exp_s / exp_s.sum()
 - **GP (weighted-v4): T = 1.** The fitted weights already set how decisive the model is, so there is no
   separate temperature to tune: the fit picks the scale that best matches who actually won.
 - **Sprint (sprint-v2): T = 0.3**, `SPRINT_SOFTMAX_TEMPERATURE` in `feature_manifest.py` and
-  `predictionMath.ts`. Its weights are hand-picked percentages, so it needs one.
+  the API's `feature-manifest.ts`. Its weights are hand-picked percentages, so it needs one.
 
 Probabilities sum to 1.0 across all drivers in a race.
 

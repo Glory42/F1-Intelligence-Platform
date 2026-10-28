@@ -6,7 +6,7 @@ import { circuit, driver, driverB } from '../../../support/msw/fixtures';
 import { loadRacePageData } from '@/features/races/loadRacePageData';
 import type {
   CircuitDetailResponse, LapSummary, PredictionResponse, QualifyingResult, Race, RaceControlMessage, RaceDetailResponse,
-  RaceResult, Driver, SprintDetailResponse, SprintFeatureScores, SprintPredictionResponse, SprintResult,
+  RaceResult, Driver, SprintDetailResponse, SprintFeatures, SprintPredictionResponse, SprintResult,
 } from '@/types';
 
 const NOW = new Date('2025-10-01T12:00:00Z');
@@ -38,7 +38,7 @@ function gpDetail(overrides: Partial<RaceDetailResponse> = {}): RaceDetailRespon
 function gpPrediction(predictedWinner = driver): PredictionResponse {
   const features = {} as PredictionResponse['drivers'][number]['features'];
   return {
-    race, predictedWinner, computedAt: '2025-09-06T20:00:00Z', modelVersion: 'weighted-v4',
+    race, predictedWinner, computedAt: '2025-09-06T20:00:00Z', modelVersion: 'weighted-v4', featureInfo: [],
     drivers: [
       { driver: driverB, winProbability: '0.31000', predictedPosition: 2, gridPosition: 2, features },
       { driver, winProbability: '0.46000', predictedPosition: 1, gridPosition: 1, features },
@@ -216,8 +216,8 @@ describe('loadRacePageData: sprint', () => {
     const requested = recordApiRequests();
     const upcoming: Race = { ...sprintRace, status: 'sprint_qualifying_done' };
     const prediction: SprintPredictionResponse = {
-      race: upcoming, predictedWinner: driverB, computedAt: '2025-09-05T20:00:00Z', modelVersion: 'sprint-v2',
-      drivers: [{ driver: driverB, winProbability: '0.52000', predictedPosition: 1, gridPosition: 1, features: {} as SprintFeatureScores }],
+      race: upcoming, predictedWinner: driverB, computedAt: '2025-09-05T20:00:00Z', modelVersion: 'sprint-v2', featureInfo: [],
+      drivers: [{ driver: driverB, winProbability: '0.52000', predictedPosition: 1, gridPosition: 1, features: {} as SprintFeatures }],
     };
     sprintWeekend({ race: upcoming, prediction, results: [sprintRow(10, driver, null, 1, 'grid_set')], laps: [] });
 

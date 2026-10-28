@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import {
   softmax,
@@ -11,33 +8,7 @@ import {
   bestCall,
   worstMiss,
   longestStreak,
-  GP_WEIGHTS,
-  FEATURE_META,
-  SPRINT_WEIGHTS,
-  SPRINT_FEATURE_META,
-  SPRINT_SOFTMAX_TEMPERATURE,
 } from '../../../../src/lib/f1/predictionMath';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-type FeatureManifestFixture = {
-  sprint_softmax_temperature: number;
-  gp: Record<string, { importance: number; label: string }>;
-  sprint: Record<string, { weight: number; label: string }>;
-};
-
-const featureWeightsFixture: FeatureManifestFixture = JSON.parse(
-  readFileSync(join(__dirname, '../../../../../../docs/feature-weights.json'), 'utf-8'),
-);
-
-// The shared fixture is snake_case (Python-native); FEATURE_META/SPRINT_FEATURE_META are camelCase.
-function toSnakeCaseKeys<T>(record: Record<string, T>): Record<string, T> {
-  return Object.fromEntries(
-    Object.entries(record).map(([key, value]) => [
-      key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`),
-      value,
-    ]),
-  );
-}
 
 describe('softmax', () => {
   test('produces a probability distribution that sums to 1', () => {
@@ -62,45 +33,6 @@ describe('softmax', () => {
 
   test('a temperature divides the scores first', () => {
     expect(softmax([0, 0.3], 0.3)).toEqual(softmax([0, 1]));
-  });
-});
-
-describe('GP_WEIGHTS / FEATURE_META', () => {
-  test('the GP model shows 7 fitted feature importances that sum to 100', () => {
-    const values = Object.values(GP_WEIGHTS);
-    expect(values).toHaveLength(7);
-    expect(values.reduce((a, b) => a + b, 0)).toBe(100);
-  });
-});
-
-describe('SPRINT_WEIGHTS / SPRINT_FEATURE_META', () => {
-  test('the sprint model has 8 weighted features that sum to 100', () => {
-    const values = Object.values(SPRINT_WEIGHTS);
-    expect(values).toHaveLength(8);
-    expect(values.reduce((a, b) => a + b, 0)).toBe(100);
-  });
-
-  test('every weighted sprint feature has display metadata', () => {
-    for (const key of Object.keys(SPRINT_WEIGHTS)) {
-      expect(SPRINT_FEATURE_META[key]?.label).toBeTruthy();
-    }
-  });
-});
-
-describe('docs/feature-weights.json (cross-language drift check)', () => {
-  test('FEATURE_META importances, labels and order match the shared fixture', () => {
-    const asFixture = Object.entries(toSnakeCaseKeys(FEATURE_META)).map(([key, m]) => [key, m.weight, m.label]);
-    expect(asFixture).toEqual(
-      Object.entries(featureWeightsFixture.gp).map(([key, m]) => [key, m.importance, m.label]),
-    );
-  });
-
-  test('SPRINT_FEATURE_META weights and labels match the shared fixture', () => {
-    expect(toSnakeCaseKeys(SPRINT_FEATURE_META)).toEqual(featureWeightsFixture.sprint);
-  });
-
-  test('SPRINT_SOFTMAX_TEMPERATURE matches the shared fixture', () => {
-    expect(SPRINT_SOFTMAX_TEMPERATURE).toBe(featureWeightsFixture.sprint_softmax_temperature);
   });
 });
 
