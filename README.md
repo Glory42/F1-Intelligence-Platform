@@ -107,7 +107,7 @@ cd data-engine
 python scripts/backfill_full.py --start 2023                 # results, laps, features, predictions (OpenF1 has 2023+)
 python scripts/backfill_openf1.py ingest_stints 2023 2026    # OpenF1 events (2023+)
 python scripts/backfill_fastf1_enrichment.py 2018 2022       # stints, pit stops, race control, telemetry before OpenF1
-python scripts/backfill_race_story.py 2018 2026              # race story charts
+python scripts/backfill_race_story.py 2018 2022              # race story charts (FastF1 cache seasons)
 python scripts/backfill_title_odds.py 2018 2026              # title odds after every round
 python scripts/import_f1db.py                                # all-time history (also a weekly GitHub Action)
 ```

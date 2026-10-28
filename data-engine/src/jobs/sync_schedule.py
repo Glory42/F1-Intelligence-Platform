@@ -1,6 +1,7 @@
 import fastf1
 import pandas as pd
 from src.db.client import get_conn
+from src.session_kind import SPRINT_FORMATS
 from src.utils.upsert import upsert
 
 # FastF1 uses Location (city-level): map to our circuit_key
@@ -83,9 +84,6 @@ LOCATION_TO_CIRCUIT_KEY: dict[str, str] = {
     "Detroit": "detroit",
     "Dijon": "dijon",
 }
-
-
-SPRINT_FORMATS = {"sprint", "sprint_qualifying", "sprint_shootout"}
 
 
 def _to_utc_iso(ts) -> str | None:

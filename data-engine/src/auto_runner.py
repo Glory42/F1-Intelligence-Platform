@@ -11,8 +11,9 @@ from src.jobs import sync_schedule
 from src.utils import openf1_client
 from src.utils.logging_utils import log_job_failure, log_job_ok
 from src.utils.schedule_window import race_weekend_window, RaceWeekendWindow
+from src.session_kind import is_sprint_weekend
 from src.weekend_pipeline import (
-    JOBS, Action, ActionKind, JobStep, RaceRunContext, is_sprint_weekend, plan,
+    JOBS, Action, ActionKind, JobStep, RaceRunContext, plan,
 )
 
 

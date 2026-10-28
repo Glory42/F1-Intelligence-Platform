@@ -692,10 +692,11 @@ OpenF1/Jolpica (FastF1 only for the calendar and backfills), computes prediction
 data-engine/
 ├── src/
 │   ├── weekend_pipeline.py        # The only Race Status interpreter: plan() (what is due + when), chain()/JOBS (job chains),
-│   │                              #   due_statuses()/statuses_after() (CLI auto-detect), repair_plan()/repair_steps(), SPRINT_FORMATS
-│   ├── session_kind.py            # SPRINT_FORMATS / is_sprint_weekend(): what a weekend's format means, imported by jobs + pipeline
+│   │                              #   due_statuses()/statuses_after() (CLI auto-detect), repair_plan()/repair_steps()
+│   ├── session_kind.py            # The data engine's session vocabulary: SPRINT_FORMATS/is_sprint_weekend(), RACE/SPRINT (code, name, tag,
+│   │                              #   key cache column), OpenF1 readiness delays, source_for(year), results_ingest_for(year)
 │   ├── enrichment_coverage.py     # What each weekend is owed per (table, session): COVERAGES, read_coverage(), missing(),
-│   │                              #   source_for(year) (FastF1 2018–2022, OpenF1 2023+), CONFLICT_KEYS, normalize_compound()
+│   │                              #   CONFLICT_KEYS, normalize_compound()
 │   ├── auto_runner.py             # Runs weekend_pipeline chains on the worker cycle; reverts status on failure.
 │   │                              # Schedule-gated: skips the DB entirely outside a race-weekend window;
 │   │                              # retries only the (table, session) gaps enrichment_coverage.missing() reports
@@ -778,17 +779,17 @@ data-engine/
 │       ├── quality_utils.py       # health_from_issues() + is_fixable() (derived from weekend_pipeline.repair_steps)
 │       └── schedule_window.py     # race_weekend_window(): pure race-weekend window from the FastF1 calendar, no DB
 ├── scripts/                       # One-off/operational scripts: not imported by src/
-│   ├── run_backfill.py            # Full historical backfill runner: sync + ingest (incl. Ergast legacy jobs) + compute, per year range
-│   ├── backfill_full.py           # Full historical backfill: sync + ingest + sprint + predictions
+│   ├── run_backfill.py            # Historical backfill runner: legacy Ergast jobs < 2018, OpenF1 jobs 2023+, skips 2018–2022
+│   ├── backfill_full.py           # Full historical backfill: sync + ingest + sprint + predictions, routed by results_ingest_for
 │   ├── backfill_sprint.py         # Sprint-only backfill for specific years
-│   ├── backfill_fp2.py            # Backfill FP2 long-run data for 2018+ completed races
+│   ├── backfill_fp2.py            # Backfill FP2 long-run data for completed OpenF1-era (2023+) races
 │   ├── backfill_openf1.py         # Backfill any OpenF1 job (race control, overtakes, radio, stints, pit stops) for a year range: 2023+, local only,
 │   │                              #   skips covered races unless --refresh, stops at the storage guard
 │   ├── backfill_fastf1_enrichment.py # Stints, pit stops, race control, Q telemetry for 2018–2022 from FastF1 [--only] [--refresh]: local only, skips covered races
 │   ├── backfill_title_odds.py     # Replay title odds after every completed round for a year range (default 2018–2026)
-│   ├── backfill_race_story.py     # Backfill race_lap_traces/battles/weather for completed 2018+ races: FastF1, local only
+│   ├── backfill_race_story.py     # Backfill race_lap_traces/battles/weather for completed 2018–2022 races: FastF1 cache, local only
 │   ├── backfill_all_predictions.py # Regenerate GP (weighted-v4, fitted per season on earlier seasons) + sprint-v2 predictions: local only
-│   ├── backfill_historical.sh     # Shell loop over sync_schedule/ingest/compute for a year range
+│   ├── backfill_historical.sh     # Shell loop over sync_schedule/ingest/compute for OpenF1 seasons (2023+)
 │   ├── backtest.py                # Walk-forward GP backtest on the local snapshot: CANDIDATES vs grid-history/uniform baselines
 │   ├── backtest_snapshot.py       # Copy Neon into the local backtest Postgres (docker-compose.backtest.yml); read-only on Neon
 │   ├── fit_model_v4.py            # Refit weighted-v4 on the snapshot → src/models/gp_v4.json + importances in docs/feature-weights.json
@@ -809,7 +810,8 @@ data-engine/
 │   ├── test_math_utils.py          # normalize_minmax, softmax, bayesian_win_rate, clamp, weighted_sum
 │   ├── test_quality_utils.py       # health_from_issues + is_fixable
 │   ├── test_weekend_pipeline.py    # plan() per status/format + readiness, chains, due_statuses, repair_plan: pure
-│   ├── test_enrichment_coverage.py # missing(), source_for(), compound normalisation across sources, coverage query via fake_db
+│   ├── test_enrichment_coverage.py # missing(), compound normalisation across sources, coverage query via fake_db
+│   ├── test_session_kind.py        # sprint formats, race sessions by name/code, source_for, results_ingest_for (2018–2022 refused)
 │   ├── test_compute_features.py    # weighted-v4 job: one transaction, stale drivers dropped, in-sample races skipped, stored p = backtest p
 │   ├── test_conditional_logit.py   # fit recovers known weights from simulated races, field probabilities
 │   ├── test_gp_features_v4.py      # quali/long-run/pace gaps, neutralisation rate, decayed form, gp_features, load_history

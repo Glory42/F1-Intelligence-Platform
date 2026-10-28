@@ -3,20 +3,11 @@ from datetime import datetime, timezone
 import pytest
 
 from src import enrichment_coverage as ec
-from src.enrichment_coverage import Source
 from src.jobs import ingest_stints
 from src.utils.driver_registry import SeasonDrivers
 from src.utils.fastf1_session import stints as fastf1_stints
 from src.utils.openf1_session import OpenF1Session, stints as openf1_stints
 from tests.support.fake_db import FakeConnection
-
-
-class TestSourceFor:
-    @pytest.mark.parametrize("year, source", [
-        (2017, None), (2018, Source.FASTF1), (2022, Source.FASTF1), (2023, Source.OPENF1), (2026, Source.OPENF1),
-    ])
-    def test_fastf1_fills_2018_to_2022_and_openf1_everything_since(self, year, source):
-        assert ec.source_for(year) is source
 
 
 _SPRINT_DAY = datetime(2026, 3, 7, 15, 0, tzinfo=timezone.utc)

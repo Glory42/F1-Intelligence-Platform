@@ -1,5 +1,5 @@
 """Fills the OpenF1-era enrichment tables from FastF1 for the seasons FastF1 serves
-(enrichment_coverage.source_for: 2018-2022): stints, pit stops (pit-lane time only), race control,
+(session_kind.source_for: 2018-2022): stints, pit stops (pit-lane time only), race control,
 and each driver's fastest qualifying lap telemetry. Skips what a race's coverage already has, so it
 resumes after a stop and never touches OpenF1 seasons. Run locally, never on Render (a telemetry
 load is a few hundred MB).
@@ -14,8 +14,9 @@ from psycopg2.extras import Json
 
 from src.db.client import get_conn
 from src.enrichment_coverage import (
-    CONFLICT_KEYS, Source, backfill_allowed, coverage_of, read_coverage, source_for, step_name,
+    CONFLICT_KEYS, backfill_allowed, coverage_of, read_coverage, step_name,
 )
+from src.session_kind import Source, source_for
 from src.utils.driver_registry import SeasonDrivers, season_drivers
 from src.utils.fastf1_session import (
     fastest_lap_inputs, lap_frame_records, pit_stops, race_control_messages, session_message_records, stints,

@@ -345,7 +345,7 @@ python -m src.main --job compute_season_stats --year 2025
 python -m src.main --job compute_title_odds --year 2025
 python -m src.main --job ingest_race_story --year 2026 --round 9 --session Sprint
 python scripts/backfill_openf1.py ingest_stints 2023 2026 [--refresh]   # local only: skips covered races
-python scripts/backfill_race_story.py 2018 2025             # local only
+python scripts/backfill_race_story.py 2018 2022             # local only: FastF1 cache seasons
 python scripts/backfill_fastf1_enrichment.py 2018 2022 [--only stints,pits,race_control,telemetry] [--refresh]  # local only
 python scripts/backfill_title_odds.py 2018 2026             # local only: replays odds after every completed round
 python scripts/backtest_snapshot.py                         # local only: one read-only Neon dump into docker-compose.backtest.yml

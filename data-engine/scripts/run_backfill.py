@@ -1,5 +1,7 @@
 """Full historical backfill runner (positional args, no --help: start year, end year).
-Usage: python scripts/run_backfill.py 2018 2020"""
+Each season goes to the jobs that can serve it (session_kind.results_ingest_for): the legacy Ergast jobs
+before 2018, the OpenF1 + Jolpica jobs from 2023; 2018–2022 is skipped, its stored rows stay (ADR 0011).
+Usage: python scripts/run_backfill.py 2023 2025"""
 import sys
 import traceback
 
@@ -13,6 +15,7 @@ from src.jobs.ingest_qualifying import run as ingest_qualifying
 from src.jobs.ingest_race import run as ingest_race
 from src.jobs.compute_season_stats import run as compute_season_stats
 from src.jobs.compute_features import run as compute_features
+from src.session_kind import OPENF1_FIRST_YEAR, ResultsIngest, results_ingest_for
 
 # Round counts per year
 ROUND_COUNTS = {
@@ -67,7 +70,12 @@ def get_completed_race_ids(year: int) -> list[int]:
 
 def backfill_year(year: int) -> None:
     max_round = ROUND_COUNTS.get(year, 22)
-    legacy = year < 2018
+    ingest = results_ingest_for(year)
+    if ingest is None:
+        print(f"\n[SKIP] {year}: its lap timing can't be re-ingested (ADR 0011), stored rows stay. Its enrichment "
+              "comes from scripts/backfill_fastf1_enrichment.py and a local FastF1 cache.")
+        return
+    legacy = ingest is ResultsIngest.LEGACY
     print(f"\n{'='*52}")
     print(f"  BACKFILLING {year}  ({max_round} rounds)  {'[LEGACY]' if legacy else ''}")
     print(f"{'='*52}")
@@ -75,7 +83,9 @@ def backfill_year(year: int) -> None:
     if not safe(sync_schedule, year):
         print(f"  [ERROR] sync_schedule failed for {year}. Skipping this year.")
         return
-    safe(sync_season, year, 1)
+    if not legacy:
+        # sync_season reads OpenF1's entry list; the legacy jobs work from drivers already stored.
+        safe(sync_season, year, 1)
 
     if legacy:
         from src.jobs.ingest_qualifying_legacy import run as ingest_q_legacy
@@ -86,7 +96,8 @@ def backfill_year(year: int) -> None:
 
     for r in range(1, max_round + 1):
         print(f"\n  [{year} R{r:02d}]")
-        safe(sync_season, year, r)
+        if not legacy:
+            safe(sync_season, year, r)
         safe(q_fn, year, r)
         safe(r_fn, year, r)
 
@@ -101,8 +112,8 @@ def backfill_year(year: int) -> None:
 
 
 if __name__ == "__main__":
-    start = int(sys.argv[1]) if len(sys.argv) > 1 else 2018
-    end   = int(sys.argv[2]) if len(sys.argv) > 2 else 2020
+    start = int(sys.argv[1]) if len(sys.argv) > 1 else OPENF1_FIRST_YEAR
+    end   = int(sys.argv[2]) if len(sys.argv) > 2 else start
 
     for year in range(start, end + 1):
         try:

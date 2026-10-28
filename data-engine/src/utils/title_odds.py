@@ -2,6 +2,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from src.session_kind import SPRINT_FORMATS
+
 
 def sample_finishing_orders(win_probs: np.ndarray, n: int, rng: np.random.Generator) -> np.ndarray:
     """Plackett–Luce draws via the Gumbel-max trick: sorting log(p) + Gumbel noise yields a
@@ -77,7 +79,6 @@ def form_win_probs(history: list[dict[int, float]], driver_ids: list[int], fallb
     return probs / probs.sum()
 
 
-_SPRINT_FORMATS = {"sprint", "sprint_qualifying", "sprint_shootout"}
 _SPRINT_PENDING = {"scheduled", "sprint_qualifying_done"}
 
 
@@ -102,7 +103,7 @@ def build_remaining_races(
     for race in ordered:
         if race["status"] == "completed":
             continue
-        if race["event_format"] in _SPRINT_FORMATS and race["status"] in _SPRINT_PENDING:
+        if race["event_format"] in SPRINT_FORMATS and race["status"] in _SPRINT_PENDING:
             sprint = sprint_predictions.get(race["id"])
             remaining.append(RemainingRace(_vector(sprint, driver_ids) if sprint else form, SPRINT_POINTS))
         gp = gp_predictions.get(race["id"])

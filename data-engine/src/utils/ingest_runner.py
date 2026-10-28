@@ -3,13 +3,14 @@ race/sprint config would just add always-None fields to an already-wide one; Rac
 write OpenF1 rows almost as fetched, so their guard/shape split differs again."""
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Callable, Sequence
 
 from psycopg2.extras import execute_batch
 
 from src.db.client import get_conn
 from src.enrichment_coverage import CONFLICT_KEYS
+from src.session_kind import BY_CODE, BY_NAME, OPENF1_READY_AFTER_RACE_START, SPRINT, RaceSession
 from src.utils.driver_registry import SeasonDrivers, register_session_drivers, season_drivers
 from src.utils.jolpica_client import fetch_classification
 from src.utils.openf1_session import (
@@ -63,15 +64,10 @@ class IngestJobConfig:
     cross_table_hook: Callable[[Any, RaceContext], None] | None = None
 
 
-_STORY_SESSIONS = {"R": "race", "S": "sprint"}
-_SESSION_TYPE_FOR_NAME = {"Race": "R", "Sprint": "S"}
-# OpenF1 session keys cached on the race row, so later jobs on the weekend skip the session lookup.
-SESSION_KEY_COLUMNS = {"R": "openf1_race_session_key", "S": "openf1_sprint_session_key"}
-
-
-def cache_session_key(conn: Any, race_id: int, session_type: str, session_key: int) -> None:
+def cache_session_key(conn: Any, race_id: int, session: RaceSession, session_key: int) -> None:
+    """Later jobs on the weekend read the key from the race row and skip the session lookup."""
     with conn.cursor() as cur:
-        cur.execute(f"UPDATE races SET {SESSION_KEY_COLUMNS[session_type]} = %s WHERE id = %s", (session_key, race_id))
+        cur.execute(f"UPDATE races SET {session.key_column} = %s WHERE id = %s", (session_key, race_id))
 
 
 def write_session_story(conn: Any, race_id: int, session: str, story: SessionStory, driver_map: dict[str, int]) -> None:
@@ -205,8 +201,8 @@ def run_ingest_job(year: int, round_num: int, config: IngestJobConfig) -> None:
             print(f"  Upserted {len(laps_to_upsert)} {config.laps_row_label} rows")
 
         if read_storage_tier(conn).allows_optional:
-            write_session_story(conn, race_ctx.race_id, _STORY_SESSIONS[config.session_type], story, driver_map)
-        cache_session_key(conn, race_ctx.race_id, config.session_type, session.session_key)
+            write_session_story(conn, race_ctx.race_id, BY_CODE[config.session_type].tag, story, driver_map)
+        cache_session_key(conn, race_ctx.race_id, BY_CODE[config.session_type], session.session_key)
 
         config.mark_status(conn, race_ctx, weather, weather_conditions, sc_vsc)
         if config.cross_table_hook is not None:
@@ -299,13 +295,6 @@ def run_qualifying_ingest_job(year: int, round_num: int, config: QualifyingJobCo
         conn.close()
 
 
-# OpenF1's free tier only serves data once a session is >30min past its end. We don't track
-# exact race end time, so this buffers from the (known) start time by a typical race
-# duration + margin: conservative in the direction of waiting longer, never running early
-# enough to hit OpenF1's paid live window.
-OPENF1_LIVE_WINDOW_BUFFER = timedelta(hours=3)
-
-
 @dataclass(frozen=True)
 class OpenF1JobConfig:
     """A Race Event or enrichment table filled from one part of the weekend's Race or Sprint session."""
@@ -325,7 +314,7 @@ def run_openf1_job(year: int, round_num: int, config: OpenF1JobConfig, *, sessio
     time the GP is done and past the buffer, Saturday's sprint session is well outside its own
     live window too, so one gate covers both rather than needing a second timestamp column."""
     print(f"[{config.job_name}] year={year} round={round_num} session={session_name}")
-    session_type = _SESSION_TYPE_FOR_NAME[session_name]
+    race_session = BY_NAME[session_name]
 
     conn = get_conn()
     try:
@@ -342,17 +331,17 @@ def run_openf1_job(year: int, round_num: int, config: OpenF1JobConfig, *, sessio
             raise ValueError(f"Race not found for year={year} round={round_num}")
 
         race_id = race_row["id"]
-        cached_session_key = race_row.get(SESSION_KEY_COLUMNS[session_type])
+        cached_session_key = race_row.get(race_session.key_column)
         if race_row["status"] != "completed":
             print(f"  [SKIP] Race {race_id} is not 'completed' yet (status={race_row['status']})")
             return
 
         race_date_utc = race_row["race_date_utc"]
-        if race_date_utc is not None and datetime.now(timezone.utc) - race_date_utc < OPENF1_LIVE_WINDOW_BUFFER:
+        if race_date_utc is not None and datetime.now(timezone.utc) - race_date_utc < OPENF1_READY_AFTER_RACE_START:
             print(f"  [SKIP] Race {race_id} is still inside OpenF1's live-data window")
             return
 
-        if session_type == "S" and race_row["sprint_date"] is None:
+        if race_session is SPRINT and race_row["sprint_date"] is None:
             print(f"  [SKIP] Race {race_id} has no sprint session")
             return
 
@@ -365,14 +354,14 @@ def run_openf1_job(year: int, round_num: int, config: OpenF1JobConfig, *, sessio
         conn.close()
 
     # No connection held across OpenF1's paced HTTP calls: it would keep Neon compute awake.
-    session = load_session(year, race_row["race_date"], session_type, (config.part,), session_key=cached_session_key)
-    rows, skipped = config.to_rows(config.records(session), drivers, race_id, _STORY_SESSIONS[session_type])
+    session = load_session(year, race_row["race_date"], race_session.code, (config.part,), session_key=cached_session_key)
+    rows, skipped = config.to_rows(config.records(session), drivers, race_id, race_session.tag)
     skip_note = f" ({skipped} skipped: unknown driver number)" if skipped else ""
 
     conn = get_conn()
     try:
         if cached_session_key is None:
-            cache_session_key(conn, race_id, session_type, session.session_key)
+            cache_session_key(conn, race_id, race_session, session.session_key)
         if rows:
             upsert(conn, config.table, rows, CONFLICT_KEYS[config.table], commit=False)
             print(f"  Upserted {len(rows)} {config.row_label}{skip_note}")

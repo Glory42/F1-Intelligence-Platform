@@ -1,8 +1,7 @@
 from typing import Any
 
+from src.session_kind import SPRINT_FORMATS
 from src.utils.ingest_runner import QualifyingContext, QualifyingJobConfig, run_qualifying_ingest_job
-
-SPRINT_FORMATS = frozenset({"sprint", "sprint_qualifying", "sprint_shootout"})
 
 
 def _resolve_race(conn: Any, year: int, round_num: int) -> QualifyingContext:

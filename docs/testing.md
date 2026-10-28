@@ -56,7 +56,7 @@ pytest, config in `pyproject.toml` (`pythonpath = ["."]`, `testpaths = ["tests"]
   metrics, calibration, `GridWinRates`), `rank_by_probability`,
   `race_weekend_window`, `weekend_pipeline` (`test_weekend_pipeline.py`: `plan`, the chains,
   `due_statuses`, `repair_plan`, `prediction_steps`), `enrichment_coverage` (`test_enrichment_coverage.py`:
-  `source_for`, `missing`, compound normalisation from either source; the coverage query through the
+  `missing`, compound normalisation from either source; the coverage query through the
   fake DB), and the FastF1 adapter (`test_fastf1_session.py`: stint,
   pit-stop and race-control rows over plain records, telemetry input reshaping).
 - **DB-touching functions are tested through a fake double**: `tests/support/fake_db.py` provides

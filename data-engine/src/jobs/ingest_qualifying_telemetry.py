@@ -1,9 +1,10 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from psycopg2.extras import Json
 
 from src.db.client import get_conn
 from src.enrichment_coverage import CONFLICT_KEYS
+from src.session_kind import OPENF1_READY_AFTER_QUALIFYING_START
 from src.utils.driver_registry import season_drivers
 from src.utils.openf1_client import OpenF1BudgetExceeded
 from src.utils.openf1_session import fastest_laps, lap_samples, load_session
@@ -12,8 +13,6 @@ from src.utils.telemetry import build_lap_telemetry, telemetry_samples
 from src.utils.upsert import upsert
 
 _DATE_COLUMNS = {"Q": "qualifying_date", "SQ": "sprint_qualifying_date"}
-# OpenF1's free tier only serves a session's data once it's comfortably over.
-_READY_AFTER = timedelta(hours=2)
 
 
 def run(year: int, round_num: int, session_type: str = "Q") -> bool:
@@ -41,7 +40,7 @@ def run(year: int, round_num: int, session_type: str = "Q") -> bool:
             )
             stored = {r["driver_id"] for r in cur.fetchall()}
         session_date = race[_DATE_COLUMNS[session_type]]
-        if session_date is None or datetime.now(timezone.utc) - session_date < _READY_AFTER:
+        if session_date is None or datetime.now(timezone.utc) - session_date < OPENF1_READY_AFTER_QUALIFYING_START:
             print(f"  [SKIP] {session_type} session not held or not yet past OpenF1's live window")
             return session_date is None
         if not read_storage_tier(conn).allows_optional:

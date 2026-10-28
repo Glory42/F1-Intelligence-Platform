@@ -82,7 +82,7 @@ allow-all tier.
 One definition per enrichment (table, session): the pipeline step that fills it, the ingest it waits
 on, and the SQL that says a weekend has it. `read_coverage(conn, from, to, round)` returns one row per
 race with a flag per coverage; `missing(row)` is what the row should have by now but doesn't;
-`source_for(year)` says who fills a season (FastF1 2018–2022, OpenF1 2023+). It also owns each
+`session_kind.source_for(year)` says who fills a season (FastF1 2018–2022, OpenF1 2023+). It also owns each
 table's conflict key (`CONFLICT_KEYS`), compound normalisation (`normalize_compound`: one uppercase
 spelling, `None` for `nan`/`UNKNOWN`, whichever source) and the backfills' storage check
 (`backfill_allowed`). The worker's retries and both enrichment backfills read it.
@@ -320,13 +320,13 @@ Other backfill scripts in `data-engine/scripts/`:
 
 ### Full backfill (`scripts/backfill_full.py`)
 
-Runs the complete pipeline (sync → ingest → sprint ingest → season stats → predictions) for every round in a year range. Each completed round then rebuilds its Predictions with `weekend_pipeline.prediction_steps`: the sprint chain's steps after its ingest (sprint features + predictions) on sprint weekends, then the GP chain's (FP2/FP1 long runs, features, predictions) on every weekend.
+Runs the complete pipeline (sync → ingest → sprint ingest → season stats → predictions) for every round in a year range. Each year goes to the jobs that can serve it (`session_kind.results_ingest_for`): the `_legacy` Ergast jobs before 2018, the OpenF1 + Jolpica jobs from 2023; 2018–2022 is skipped, since its timing can't be re-ingested (ADR 0011) and its stored rows stay. Each completed round then rebuilds its Predictions with `weekend_pipeline.prediction_steps`: the sprint chain's steps after its ingest (sprint features + predictions) on sprint weekends, then the GP chain's (FP2/FP1 long runs, features, predictions) on every weekend.
 
 ```bash
 cd data-engine
 source venv/bin/activate
 
-python scripts/backfill_full.py                        # 2000–2026 (legacy years skip gracefully)
+python scripts/backfill_full.py                        # 2000–2017 legacy results, 2018–2022 skipped, 2023–2026 live
 python scripts/backfill_full.py --start 2023           # 2023–2026: OpenF1 has no earlier sessions (ADR 0011)
 python scripts/backfill_full.py --start 2025 --end 2025
 ```

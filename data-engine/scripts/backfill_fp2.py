@@ -1,4 +1,4 @@
-"""Backfills FP2 long-run data for all completed races (2018+).
+"""Backfills FP2 long-run data for all completed races OpenF1 serves (2023+, ADR 0011).
 Failures are logged and skipped: FP2 data availability varies."""
 import sys
 import time
@@ -8,6 +8,7 @@ import psycopg2.extras
 sys.path.insert(0, ".")
 from src.config import DATABASE_URL
 from src.jobs.ingest_fp2 import run as ingest_fp2
+from src.session_kind import OPENF1_FIRST_YEAR
 
 
 def get_conn():
@@ -25,15 +26,16 @@ def main():
             FROM races r
             JOIN seasons s ON r.season_id = s.id
             WHERE r.status = 'completed'
-              AND s.year >= 2018
+              AND s.year >= %s
             ORDER BY r.race_date
-            """
+            """,
+            (OPENF1_FIRST_YEAR,),
         )
         races = cur.fetchall()
     conn.close()
 
     total = len(races)
-    print(f"FP2 backfill: {total} races (2018+)")
+    print(f"FP2 backfill: {total} races ({OPENF1_FIRST_YEAR}+)")
     errors = []
 
     for i, race in enumerate(races, 1):

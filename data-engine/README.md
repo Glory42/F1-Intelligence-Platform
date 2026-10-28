@@ -43,8 +43,8 @@ python -m src.main --job ingest_race_legacy       --year 2010 --round 5
 
 ```bash
 # Full backfill: sync + all rounds + sprint pipeline + predictions
-python scripts/backfill_full.py --start 2023           # OpenF1 covers 2023+; 2018–2022 rounds now skip
-python scripts/backfill_full.py --start 2000           # 2000–2026, older years skip gracefully
+python scripts/backfill_full.py --start 2023           # OpenF1 covers 2023+
+python scripts/backfill_full.py --start 2000           # 2000–2017 legacy results, 2018–2022 skipped (ADR 0011), 2023+ live
 
 # Sprint-only backfill: re-run sprint pipeline for specific years
 python scripts/backfill_sprint.py --years 2021 2022 2024 2026

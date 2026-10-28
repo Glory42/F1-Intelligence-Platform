@@ -25,8 +25,8 @@ from src.jobs import (
     ingest_stints,
     ingest_team_radio,
 )
-from src.enrichment_coverage import SESSIONS, coverage_of, step_name
-from src.session_kind import SPRINT_FORMATS, is_sprint_weekend  # noqa: F401 (re-exported)
+from src.enrichment_coverage import coverage_of, step_name
+from src.session_kind import RACE_SESSIONS
 from src.utils.logging_utils import log_job_failure
 
 WEEKEND_STATUSES = ("scheduled", "sprint_qualifying_done", "sprint_done", "qualifying_done", "completed")
@@ -106,7 +106,7 @@ JOBS: dict[str, Callable[[RaceRunContext], Any]] = {
         lambda ctx: ingest_qualifying_telemetry.run(ctx.year, ctx.round_number, session_type="SQ"),
     **{step_name(name, session_type): _session_job(module, session)
        for name, module in (*RACE_EVENT_JOBS.items(), ("ingest_race_story", ingest_race_story))
-       for session_type, session in SESSIONS.items()},
+       for session_type, session in ((s.tag, s.name) for s in RACE_SESSIONS)},
 }
 
 
@@ -159,7 +159,7 @@ _CHAINS: dict[ActionKind, tuple[JobStep, ...]] = {
         # Race Events self-skip inside OpenF1's live window and, for the sprint, on a weekend
         # without one: see run_openf1_job.
         *(JobStep(step_name(name, session_type), optional=True)
-          for session_type in SESSIONS for name in RACE_EVENT_JOBS),
+          for session_type in (s.tag for s in RACE_SESSIONS) for name in RACE_EVENT_JOBS),
     ),
 }
 
