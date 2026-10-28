@@ -1,6 +1,12 @@
-import src.jobs.ingest_race_control as ingest_race_control
-from src.jobs.ingest_race_control import _to_rows, run
-from src.utils.openf1_client import fetch_race_control
+from src.jobs.ingest_race_control import CONFIG
+from src.utils.driver_registry import SeasonDrivers
+from src.utils.openf1_session import OpenF1Session
+
+
+def _to_rows(raw, race_id, driver_map):
+    """Raw OpenF1 rows through the adapter and the job's row mapping, as run_openf1_job runs them."""
+    records = CONFIG.records(OpenF1Session(session_key=1, **{CONFIG.part: raw}))
+    return CONFIG.to_rows(records, SeasonDrivers(by_number=driver_map, by_code={}), race_id, "race")
 
 
 class TestToRows:
@@ -15,7 +21,7 @@ class TestToRows:
 
         assert skipped == 0
         assert rows == [{
-            "race_id": 1, "date": "2024-11-03T15:31:01+00:00", "category": "Flag",
+            "race_id": 1, "session_type": "race", "date": "2024-11-03T15:31:01+00:00", "category": "Flag",
             "flag": "YELLOW", "lap_number": 12, "driver_number": 44,
             "scope": "Sector", "sector": 4, "message": "YELLOW IN TRACK SECTOR 4",
         }]
@@ -35,36 +41,3 @@ class TestToRows:
 
     def test_empty_input_returns_empty(self):
         assert _to_rows([], race_id=1, driver_map={}) == ([], 0)
-
-
-class TestRun:
-    def test_wires_the_expected_config(self, monkeypatch):
-        captured = {}
-        monkeypatch.setattr(
-            ingest_race_control, "run_openf1_job",
-            lambda year, round_num, config, session_name="Race":
-                captured.update(year=year, round_num=round_num, config=config, session_name=session_name)
-        )
-
-        run(2024, 20)
-
-        assert captured["year"] == 2024
-        assert captured["round_num"] == 20
-        assert captured["session_name"] == "Race"
-        config = captured["config"]
-        assert config.job_name == "ingest_race_control"
-        assert config.table == "race_control_messages"
-        assert config.conflict_cols == ["race_id", "date", "message"]
-        assert config.fetch is fetch_race_control
-        assert config.to_rows is _to_rows
-
-    def test_forwards_session_name(self, monkeypatch):
-        captured = {}
-        monkeypatch.setattr(
-            ingest_race_control, "run_openf1_job",
-            lambda year, round_num, config, session_name="Race": captured.update(session_name=session_name)
-        )
-
-        run(2024, 20, session_name="Sprint")
-
-        assert captured["session_name"] == "Sprint"

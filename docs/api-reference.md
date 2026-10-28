@@ -279,7 +279,7 @@ but never its sister team Red Bull. Each entry keeps its own season's `teamId`.
 
 ### `GET /api/predictions/model-info`
 
-Returns the most recently computed model versions for GP and sprint predictions. Updates automatically whenever `compute_predictions` or `compute_sprint_predictions` runs: no deploy needed.
+Returns the most recently computed model versions for GP and sprint predictions. Updates automatically whenever `compute_features` or `compute_sprint_features` runs: no deploy needed.
 
 ```json
 {
@@ -302,6 +302,11 @@ Returns the prediction for the next `qualifying_done` race with `race_date >= to
     "race": { "id": 200, "name": "Monaco Grand Prix", "raceDate": "2026-06-07", "hasSprint": false, ... },
     "predictedWinner": { "id": 42, "fullName": "Max Verstappen", ... },
     "modelVersion": "weighted-v4",
+    "featureInfo": [
+      { "key": "grid", "label": "Grid Slot", "shortLabel": "Grid Slot", "importance": 20 },
+      { "key": "qualiPace", "label": "Qualifying Pace", "shortLabel": "Quali Pace", "importance": 11 },
+      ...
+    ],
     "drivers": [
       {
         "predictedPosition": 1,
@@ -325,7 +330,11 @@ Returns the prediction for the next `qualifying_done` race with `race_date >= to
 
 `features` is `GpFeatures`: each of weighted-v4's 7 features with its `value` (in the feature's own
 units) and `contribution` (its term in the driver's log-odds score). A plain softmax (T = 1) of the
-summed contributions over the field gives `winProbability`. `gridPosition` comes from the qualifying
+summed contributions over the field gives `winProbability`. Sprint predictions use the same shape
+(`SprintFeatures`): `value` is the 0–1 Feature Score and `contribution` is weight × score / 0.3, so the
+same softmax gives their probabilities too. `featureInfo` lists the model's features in display order
+with their label, a short label for tight spaces (the radar) and `importance`, the feature's share of the
+model in % (GP: of the fitted |weight per SD|; sprint: its hand weight), from `common/feature-manifest.ts`. `gridPosition` comes from the qualifying
 sheet (sprint qualifying for sprint predictions), null when the driver has no row there.
 
 ### `GET /api/predictions/race/:raceId`
@@ -450,6 +459,7 @@ conventional (non-sprint) weekend.
     "prediction": {
       "predictedWinner": { "code": "ANT", ... },
       "modelVersion": "sprint-v2",
+      "featureInfo": [{ "key": "carPerformance", "label": "Car Performance", "shortLabel": "Car Performance", "importance": 25 }, ...],
       "drivers": [
         {
           "predictedPosition": 1,
@@ -457,14 +467,10 @@ conventional (non-sprint) weekend.
           "gridPosition": 1,
           "driver": { ... },
           "features": {
-            "carPerformance": "0.88000",
-            "circuitAdjStartPos": "1.00000",
-            "shortRunPace": "0.91000",
-            "driverRating": "0.75000",
-            "weatherImpact": "0.50000",
-            "winRate": "0.65000",
-            "luckFactor": "0.55000",
-            "sqQualifyingDelta": "0.68000"
+            "carPerformance": { "value": 0.88, "contribution": 0.73333 },
+            "circuitAdjStartPos": { "value": 1, "contribution": 0.83333 },
+            "shortRunPace": { "value": 0.91, "contribution": 0.30333 },
+            "...": "one per sprint-v2 Feature Score"
           }
         }
       ]

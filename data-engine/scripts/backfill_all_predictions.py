@@ -13,13 +13,10 @@ import time
 sys.path.insert(0, ".")
 
 from src.db.client import get_conn
-from src.jobs import compute_features, compute_predictions, compute_sprint_features, compute_sprint_predictions
-from src.utils.conditional_logit import fit_conditional_logit
-from src.utils.gp_features_v4 import GP_V4_FEATURES
-from src.utils.gp_model_v4 import TRAIN_FROM_YEAR, training_set
+from src.jobs import compute_features, compute_sprint_features
+from src.utils.gp_model_v4 import TRAIN_FROM_YEAR, fit, history_start, load_committed, predict, training_races
 from src.utils.race_history import load_history
 from src.utils.storage_guard import read_storage_tier
-from src.utils.upsert import upsert
 
 
 def backfill_gp(start_year: int) -> list[tuple[int, str]]:
@@ -27,10 +24,12 @@ def backfill_gp(start_year: int) -> list[tuple[int, str]]:
     try:
         if not read_storage_tier(conn).allows_backfill:
             raise SystemExit("storage_guard: Neon storage too full for a backfill")
-        history = load_history(conn, since=datetime.date(TRAIN_FROM_YEAR - 3, 1, 1))
+        history = load_history(conn, since=history_start(TRAIN_FROM_YEAR))
     finally:
         conn.close()
 
+    l2 = load_committed().l2
+    training = training_races(history)
     targets = sorted(
         (r for r in history.races.values()
          if r["year"] >= start_year and r["status"] in ("qualifying_done", "completed") and history.quali.get(r["id"])),
@@ -38,7 +37,7 @@ def backfill_gp(start_year: int) -> list[tuple[int, str]]:
     )
     errors = []
     for year in sorted({r["year"] for r in targets}):
-        model = fit_conditional_logit(training_set(history, before=datetime.date(year, 1, 1)), GP_V4_FEATURES)
+        model = fit(training, before=datetime.date(year, 1, 1), l2=l2)
         season = [r for r in targets if r["year"] == year]
         print(f"── {year}: {len(season)} GP predictions, weights fitted on races before {year}")
         for race in season:
@@ -46,11 +45,9 @@ def backfill_gp(start_year: int) -> list[tuple[int, str]]:
             try:
                 conn = get_conn()
                 try:
-                    upsert(conn, "driver_prediction_features",
-                           compute_features.feature_rows(history, race["id"], model), ["race_id", "driver_id"])
+                    compute_features.write_prediction(conn, race["id"], predict(history, race["id"], model))
                 finally:
                     conn.close()
-                compute_predictions.run(race["id"])
                 print(f"  race {race['id']} done in {time.time() - t0:.1f}s")
             except Exception as exc:
                 print(f"  race {race['id']} FAILED: {exc}", file=sys.stderr)
@@ -72,7 +69,6 @@ def backfill_sprint() -> list[tuple[int, str]]:
     for race_id in race_ids:
         try:
             compute_sprint_features.run(race_id)
-            compute_sprint_predictions.run(race_id)
         except Exception as exc:
             print(f"  sprint race {race_id} FAILED: {exc}", file=sys.stderr)
             errors.append((race_id, str(exc)))

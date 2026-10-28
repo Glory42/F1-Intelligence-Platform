@@ -71,8 +71,7 @@ The schema source of truth lives in `apps/api/src/db/schema/`. Generated SQL mig
 Saturday
   data-engine: ingest_qualifying   → qualifying_results table
   data-engine: ingest_fp2          → fp2_long_run_times table
-  data-engine: compute_features    → driver_prediction_features table
-  data-engine: compute_predictions → race_predictions table
+  data-engine: compute_features    → driver_prediction_features + race_predictions (one transaction)
   race.status: scheduled → qualifying_done
 
 Sunday
@@ -86,8 +85,7 @@ Sunday
 ```
 Friday
   data-engine: ingest_sprint_qualifying → sprint_results (SQ grid + sq1/sq2/sq3 times)
-  data-engine: compute_sprint_features  → driver_sprint_features
-  data-engine: compute_sprint_predictions → sprint_predictions
+  data-engine: compute_sprint_features  → driver_sprint_features + sprint_predictions
   race.status: scheduled → sprint_qualifying_done
 
 Saturday
@@ -98,8 +96,7 @@ Saturday
 
   data-engine: ingest_qualifying    → qualifying_results
   data-engine: ingest_fp2           → fp2_long_run_times
-  data-engine: compute_features     → driver_prediction_features
-  data-engine: compute_predictions  → race_predictions
+  data-engine: compute_features     → driver_prediction_features + race_predictions
   race.status: sprint_done → qualifying_done
 
 Sunday

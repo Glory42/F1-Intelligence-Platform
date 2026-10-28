@@ -7,35 +7,12 @@ from typing import Any, Callable, Iterable, Optional
 
 import pandas as pd
 
-from src.jobs import (
-    compute_features,
-    compute_predictions,
-    compute_season_stats,
-    compute_sprint_features,
-    compute_sprint_predictions,
-    compute_title_odds,
-    ingest_fp2,
-    ingest_overtakes,
-    ingest_pit_stops,
-    ingest_qualifying,
-    ingest_qualifying_telemetry,
-    ingest_race,
-    ingest_race_control,
-    ingest_race_story,
-    ingest_sprint,
-    ingest_sprint_qualifying,
-    ingest_stints,
-    ingest_team_radio,
-)
-from src.enrichment_coverage import SESSIONS, coverage_of, step_name
+from src.jobs.registry import JOBS as REGISTRY, RACE_EVENT_JOBS, JobArgs, Needs
+from src.enrichment_coverage import coverage_of, step_name
+from src.session_kind import RACE, RACE_SESSIONS, RaceSession
 from src.utils.logging_utils import log_job_failure
 
-SPRINT_FORMATS = frozenset({"sprint", "sprint_qualifying", "sprint_shootout"})
 WEEKEND_STATUSES = ("scheduled", "sprint_qualifying_done", "sprint_done", "qualifying_done", "completed")
-
-
-def is_sprint_weekend(event_format: Optional[str]) -> bool:
-    return event_format in SPRINT_FORMATS
 
 
 class ActionKind(str, Enum):
@@ -81,40 +58,18 @@ class RaceRunContext:
     round_number: int
 
 
-def _session_job(module: Any, session_name: str) -> Callable[[RaceRunContext], Any]:
-    return lambda ctx: module.run(ctx.year, ctx.round_number, session_name=session_name)
+def _step(job: str, session: RaceSession = RACE) -> Callable[[RaceRunContext], Any]:
+    return lambda ctx: REGISTRY[job].run(
+        JobArgs(year=ctx.year, round_number=ctx.round_number, race_id=ctx.race_id, session=session)
+    )
 
 
-# Race Events (OpenF1), each run once per session of a completed weekend.
-RACE_EVENT_JOBS = {
-    "ingest_race_control": ingest_race_control,
-    "ingest_overtakes": ingest_overtakes,
-    "ingest_team_radio": ingest_team_radio,
-    "ingest_stints": ingest_stints,
-    "ingest_pit_stops": ingest_pit_stops,
-}
-
-# Every step any chain or coverage retry runs, by name. Job modules are looked up at call time, and tests swap
-# entries here rather than patching each job module.
+# Every step any chain, coverage retry or Repair runs, by step name (`ingest_stints_sprint` is ingest_stints for the
+# sprint), derived from the job registry. Tests swap entries here rather than patching each job module.
 JOBS: dict[str, Callable[[RaceRunContext], Any]] = {
-    "ingest_sprint_qualifying": lambda ctx: ingest_sprint_qualifying.run(ctx.year, ctx.round_number),
-    "compute_sprint_features": lambda ctx: compute_sprint_features.run(ctx.race_id),
-    "compute_sprint_predictions": lambda ctx: compute_sprint_predictions.run(ctx.race_id),
-    "ingest_sprint": lambda ctx: ingest_sprint.run(ctx.year, ctx.round_number),
-    "compute_season_stats": lambda ctx: compute_season_stats.run(ctx.year),
-    "ingest_qualifying": lambda ctx: ingest_qualifying.run(ctx.year, ctx.round_number),
-    "ingest_fp2": lambda ctx: ingest_fp2.run(ctx.year, ctx.round_number),
-    "compute_features": lambda ctx: compute_features.run(ctx.race_id),
-    "compute_predictions": lambda ctx: compute_predictions.run(ctx.race_id),
-    "ingest_race": lambda ctx: ingest_race.run(ctx.year, ctx.round_number),
-    "compute_title_odds": lambda ctx: compute_title_odds.run(ctx.year),
-    "ingest_qualifying_telemetry":
-        lambda ctx: ingest_qualifying_telemetry.run(ctx.year, ctx.round_number, session_type="Q"),
-    "ingest_qualifying_telemetry_sprint":
-        lambda ctx: ingest_qualifying_telemetry.run(ctx.year, ctx.round_number, session_type="SQ"),
-    **{step_name(name, session_type): _session_job(module, session)
-       for name, module in (*RACE_EVENT_JOBS.items(), ("ingest_race_story", ingest_race_story))
-       for session_type, session in SESSIONS.items()},
+    **{job.name: _step(job.name) for job in REGISTRY.values() if job.needs in (Needs.ROUND, Needs.YEAR, Needs.RACE)},
+    **{step_name(job.name, session.tag): _step(job.name, session)
+       for job in REGISTRY.values() if job.needs is Needs.SESSION for session in RACE_SESSIONS},
 }
 
 
@@ -144,7 +99,6 @@ _CHAINS: dict[ActionKind, tuple[JobStep, ...]] = {
     ActionKind.SPRINT_QUALIFYING: (
         JobStep("ingest_sprint_qualifying", commits_status="sprint_qualifying_done"),
         JobStep("compute_sprint_features"),
-        JobStep("compute_sprint_predictions"),
         _TITLE_ODDS,
         # Telemetry (~41 OpenF1 requests) outruns one cycle's budget; the coverage retry resumes it.
         JobStep("ingest_qualifying_telemetry_sprint", optional=True),
@@ -158,7 +112,6 @@ _CHAINS: dict[ActionKind, tuple[JobStep, ...]] = {
         JobStep("ingest_qualifying", commits_status="qualifying_done"),
         JobStep("ingest_fp2"),
         JobStep("compute_features"),
-        JobStep("compute_predictions"),
         _TITLE_ODDS,
         JobStep("ingest_qualifying_telemetry", optional=True),
     ),
@@ -169,7 +122,7 @@ _CHAINS: dict[ActionKind, tuple[JobStep, ...]] = {
         # Race Events self-skip inside OpenF1's live window and, for the sprint, on a weekend
         # without one: see run_openf1_job.
         *(JobStep(step_name(name, session_type), optional=True)
-          for session_type in SESSIONS for name in RACE_EVENT_JOBS),
+          for session_type in (s.tag for s in RACE_SESSIONS) for name in RACE_EVENT_JOBS),
     ),
 }
 
@@ -242,7 +195,7 @@ _REPAIR_OWNERS: dict[tuple[str, str], str] = {
     ("sprint_results", "row_count"): "ingest_sprint",
     ("sprint_lap_times", "lap_coverage"): "ingest_sprint",
     ("driver_prediction_features", "feature_rows"): "compute_features",
-    ("race_predictions", "prediction_present"): "compute_predictions",
+    ("race_predictions", "prediction_present"): "compute_features",
     ("driver_season_stats", "driver_presence"): "compute_season_stats",
 }
 

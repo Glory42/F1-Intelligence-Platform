@@ -3,61 +3,21 @@ import featureWeights from '../../../../../docs/feature-weights.json';
 import {
   GP_FEATURE_MANIFEST,
   SPRINT_FEATURE_MANIFEST,
-  mapFeatureRow,
+  SPRINT_SOFTMAX_TEMPERATURE,
+  featureInfo,
   mapGpFeatures,
+  mapSprintFeatures,
 } from '../../../src/common/feature-manifest';
 import { storedGpFeatures } from '../../support/factories/driverPredictionFeatures.factory';
-import type { FeatureManifestEntry } from '../../../src/common/feature-manifest';
+import type { driverSprintFeatures } from '../../../src/db/schema';
 
-type Row = Record<string, unknown>;
+type SprintRow = typeof driverSprintFeatures.$inferSelect;
 
-const manifest: FeatureManifestEntry<Row>[] = [
-  { key: 'req', column: 'reqCol', label: 'Required', nullable: false },
-  { key: 'opt', column: 'optCol', label: 'Optional', nullable: true },
-];
-
-describe('mapFeatureRow', () => {
-  test('projects manifest keys from their mapped columns', () => {
-    const out = mapFeatureRow<Row, Record<string, unknown>>(
-      { reqCol: '0.5', optCol: '0.9', extra: 'ignored' },
-      manifest,
-    );
-    expect(out).toEqual({ req: '0.5', opt: '0.9' });
-  });
-
-  test('coalesces a null nullable column to null', () => {
-    const out = mapFeatureRow<Row, Record<string, unknown>>(
-      { reqCol: '0.5', optCol: null },
-      manifest,
-    );
-    expect(out.opt).toBeNull();
-  });
-
-  test('coalesces a missing nullable column to null', () => {
-    const out = mapFeatureRow<Row, Record<string, unknown>>({ reqCol: '0.5' }, manifest);
-    expect(out.opt).toBeNull();
-  });
-
-  test('passes a non-nullable column through without coalescing', () => {
-    const out = mapFeatureRow<Row, Record<string, unknown>>(
-      { reqCol: null, optCol: '0.9' },
-      manifest,
-    );
-    expect(out.req).toBeNull();
-  });
-
-  const asGenericEntries = (
-    entries: readonly { key: string; column: string | number | symbol; label: string; nullable: boolean }[],
-  ): FeatureManifestEntry<Row>[] =>
-    entries.map((e) => ({ key: e.key, column: e.column as string, label: e.label, nullable: e.nullable }));
-
-  test('sprint manifest yields exactly its 10 feature keys', () => {
-    const raw: Row = {};
-    for (const e of SPRINT_FEATURE_MANIFEST) raw[e.column as string] = '0.5';
-    const out = mapFeatureRow<Row, Record<string, unknown>>(raw, asGenericEntries(SPRINT_FEATURE_MANIFEST));
-    expect(Object.keys(out).sort()).toEqual(SPRINT_FEATURE_MANIFEST.map((e) => e.key).sort());
-  });
-});
+function sprintRow(scores: Partial<SprintRow> = {}): SprintRow {
+  const row: Record<string, unknown> = {};
+  for (const { column } of SPRINT_FEATURE_MANIFEST) row[column] = '0.50000';
+  return { ...row, ...scores } as SprintRow;
+}
 
 describe('mapGpFeatures', () => {
   test('renames the stored snake_case features to the API keys, value and contribution intact', () => {
@@ -74,25 +34,56 @@ describe('mapGpFeatures', () => {
   });
 });
 
-// The shared fixture is snake_case (Python-native) and lists only the weighted sprint features; the
-// sprint manifest also maps unweighted columns (starting position, track overtake), which have no entry.
-function labelsOf(manifest: readonly { key: string; label: string }[], model: Record<string, { label: string }>) {
-  const byKey = new Map(manifest.map((e) => [e.key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`), e.label]));
-  return Object.fromEntries(Object.keys(model).map((key) => [key, byKey.get(key)]));
-}
+describe('mapSprintFeatures', () => {
+  test('serves each score in the GP shape: the score, and weight × score / T as its log-odds term', () => {
+    const out = mapSprintFeatures(sprintRow({ carPerformanceScore: '0.90000' }));
 
-function fixtureLabels(model: Record<string, { label: string }>) {
-  return Object.fromEntries(Object.entries(model).map(([key, { label }]) => [key, label]));
-}
+    expect(Object.keys(out)).toEqual(SPRINT_FEATURE_MANIFEST.map((e) => e.key));
+    expect(out.carPerformance.value).toBe(0.9);
+    expect(out.carPerformance.contribution).toBeCloseTo((0.25 * 0.9) / 0.3, 10);
+  });
+
+  test('the summed contributions softmax to sprint-v2’s own probabilities', () => {
+    const a = mapSprintFeatures(sprintRow({ carPerformanceScore: '0.90000', shortRunPaceScore: '0.20000' }));
+    const b = mapSprintFeatures(sprintRow({ carPerformanceScore: '0.40000', shortRunPaceScore: '0.80000' }));
+    const sum = (f: typeof a) => Object.values(f).reduce((s, t) => s + t.contribution, 0);
+    const weighted = (car: number, pace: number) => 0.25 * car + 0.1 * pace + 0.65 * 0.5;
+
+    expect(sum(a) - sum(b)).toBeCloseTo((weighted(0.9, 0.2) - weighted(0.4, 0.8)) / SPRINT_SOFTMAX_TEMPERATURE, 10);
+  });
+
+  test('an older row with no SQ score reads as zero rather than failing', () => {
+    expect(mapSprintFeatures(sprintRow({ sqQualifyingDeltaScore: null })).sqQualifyingDelta).toEqual({
+      value: 0,
+      contribution: 0,
+    });
+  });
+});
+
+describe('featureInfo', () => {
+  test('falls back to the full label where no short one is set', () => {
+    const [grid, quali] = featureInfo(GP_FEATURE_MANIFEST);
+
+    expect(grid).toEqual({ key: 'grid', label: 'Grid Slot', shortLabel: 'Grid Slot', importance: 20 });
+    expect(quali.shortLabel).toBe('Quali Pace');
+  });
+});
 
 describe('docs/feature-weights.json (cross-language drift check)', () => {
-  test('GP manifest names, order and labels match the shared fixture', () => {
-    expect(GP_FEATURE_MANIFEST.map((e) => [e.name, e.label])).toEqual(
-      Object.entries(featureWeights.gp).map(([name, { label }]) => [name, label]),
+  test('GP manifest names, order, labels and importances match the shared fixture', () => {
+    expect(GP_FEATURE_MANIFEST.map((e) => [e.name, e.label, e.importance])).toEqual(
+      Object.entries(featureWeights.gp).map(([name, { label, importance }]) => [name, label, importance]),
     );
   });
 
-  test('sprint manifest labels match the shared fixture', () => {
-    expect(labelsOf(SPRINT_FEATURE_MANIFEST, featureWeights.sprint)).toEqual(fixtureLabels(featureWeights.sprint));
+  test('sprint manifest keys, order, labels and weights match the shared fixture', () => {
+    const snake = (key: string) => key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+    expect(SPRINT_FEATURE_MANIFEST.map((e) => [snake(e.key), e.label, e.importance])).toEqual(
+      Object.entries(featureWeights.sprint).map(([name, { label, weight }]) => [name, label, weight]),
+    );
+  });
+
+  test('the sprint softmax temperature matches the shared fixture', () => {
+    expect(SPRINT_SOFTMAX_TEMPERATURE).toBe(featureWeights.sprint_softmax_temperature);
   });
 });

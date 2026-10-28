@@ -1,48 +1,11 @@
 import { describe, expect, test } from 'vitest';
-import { softmax, SPRINT_SOFTMAX_TEMPERATURE } from '../../../../src/lib/f1/predictionMath';
-import {
-  edgeBreakdown,
-  fieldScaled,
-  gpTerms,
-  sprintTerms,
-  whatIfProbabilities,
-} from '../../../../src/lib/f1/predictionTerms';
-import type { GpFeatures, SprintFeatureScores } from '../../../../src/types';
+import { softmax } from '../../../../src/lib/f1/predictionMath';
+import { edgeBreakdown, fieldScaled, termsOf, whatIfProbabilities } from '../../../../src/lib/f1/predictionTerms';
 
-const term = (contribution: number) => ({ value: 0, contribution });
-const gpFeatures: GpFeatures = {
-  grid: term(0.5), qualiPace: term(0.2), teamQualiPace: term(0.1), driverPoints: term(0.4),
-  teammateEdge: term(0), gridProcessional: term(0.3), teamRacePace: term(-0.1),
-};
-
-describe('gpTerms', () => {
-  test('a GP driver\'s terms are the stored contributions, one per feature', () => {
-    expect(gpTerms(gpFeatures)).toEqual({
-      grid: 0.5, qualiPace: 0.2, teamQualiPace: 0.1, driverPoints: 0.4,
-      teammateEdge: 0, gridProcessional: 0.3, teamRacePace: -0.1,
-    });
-  });
-});
-
-describe('sprintTerms', () => {
-  const scores = (car: string, grid: string) =>
-    ({ carPerformance: car, circuitAdjStartPos: grid }) as unknown as SprintFeatureScores;
-
-  test('reproduces sprint-v2: softmax of summed terms equals its weighted score at T=0.3', () => {
-    const weights = { carPerformance: 50, circuitAdjStartPos: 50 };
-    const a = sprintTerms(scores('0.9', '0.5'), weights);
-    const b = sprintTerms(scores('0.4', '0.8'), weights);
-    const sum = (t: Record<string, number>) => Object.values(t).reduce((x, y) => x + y, 0);
-
-    expect(softmax([sum(a), sum(b)])).toEqual(
-      softmax([0.5 * 0.9 + 0.5 * 0.5, 0.5 * 0.4 + 0.5 * 0.8], SPRINT_SOFTMAX_TEMPERATURE).map(
-        (p) => expect.closeTo(p, 10),
-      ),
-    );
-  });
-
-  test('a missing score counts as zero', () => {
-    expect(sprintTerms(scores('0.5', '0.5'), { carPerformance: 50, sqQualifyingDelta: 50 }).sqQualifyingDelta).toBe(0);
+describe('termsOf', () => {
+  test('a driver\'s terms are the served contributions, one per feature, whichever model', () => {
+    expect(termsOf({ grid: { value: -1.1, contribution: 0.5 }, carPerformance: { value: 0.8, contribution: 0.67 } }))
+      .toEqual({ grid: 0.5, carPerformance: 0.67 });
   });
 });
 

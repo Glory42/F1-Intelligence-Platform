@@ -7,7 +7,7 @@ from psycopg2.extras import execute_batch
 
 from src.db.client import get_conn
 from src.utils.quality_utils import health_from_issues, is_fixable
-from src.weekend_pipeline import is_sprint_weekend
+from src.session_kind import is_sprint_weekend
 
 # FP2 coverage below this triggers a flag: mirrors compute_features' fallback gate.
 FP2_COVERAGE_GATE = 0.7

@@ -28,12 +28,10 @@ python -m src.main --job ingest_qualifying --year 2026 --round 6
 python -m src.main --job ingest_race       --year 2026 --round 6
 python -m src.main --job compute_season_stats --year 2026
 python -m src.main --job compute_features    --race_id 42
-python -m src.main --job compute_predictions --race_id 42
 
 # Sprint pipeline (sprint weekends only)
 python -m src.main --job ingest_sprint_qualifying --year 2026 --round 9
 python -m src.main --job compute_sprint_features  --race_id 55
-python -m src.main --job compute_sprint_predictions --race_id 55
 python -m src.main --job ingest_sprint            --year 2026 --round 9
 
 # Pre-2018 legacy jobs (Ergast: no lap data)
@@ -45,8 +43,8 @@ python -m src.main --job ingest_race_legacy       --year 2010 --round 5
 
 ```bash
 # Full backfill: sync + all rounds + sprint pipeline + predictions
-python scripts/backfill_full.py --start 2023           # OpenF1 covers 2023+; 2018–2022 rounds now skip
-python scripts/backfill_full.py --start 2000           # 2000–2026, older years skip gracefully
+python scripts/backfill_full.py --start 2023           # OpenF1 covers 2023+
+python scripts/backfill_full.py --start 2000           # 2000–2017 legacy results, 2018–2022 skipped (ADR 0011), 2023+ live
 
 # Sprint-only backfill: re-run sprint pipeline for specific years
 python scripts/backfill_sprint.py --years 2021 2022 2024 2026
@@ -62,16 +60,16 @@ Data coverage:
 
 | Time (UTC) | Jobs |
 |------------|------|
-| Saturday 22:00 | `ingest_qualifying` → `compute_features` → `compute_predictions` |
+| Saturday 22:00 | `ingest_qualifying` → `compute_features` |
 | Sunday 18:00 | `ingest_race` → `compute_season_stats` |
 
 ### Sprint Weekend
 
 | Time (UTC) | Jobs |
 |------------|------|
-| Friday 22:00 | `ingest_sprint_qualifying` → `compute_sprint_features` → `compute_sprint_predictions` |
+| Friday 22:00 | `ingest_sprint_qualifying` → `compute_sprint_features` |
 | Saturday 16:00 | `ingest_sprint` → `compute_season_stats` |
-| Saturday 22:00 | `ingest_qualifying` → `compute_features` → `compute_predictions` |
+| Saturday 22:00 | `ingest_qualifying` → `compute_features` |
 | Sunday 18:00 | `ingest_race` → `compute_season_stats` |
 
 ## FastF1 Cache

@@ -1,28 +1,10 @@
 """One definition per enrichment (table, session): the step that fills it, which source serves a
 season, how a weekend is known to be missing it, and how its rows are keyed and shaped."""
 from dataclasses import dataclass
-from enum import Enum
 from typing import Any, Optional
 
+from src.session_kind import RACE_SESSIONS
 from src.utils.storage_guard import read_storage_tier
-
-
-class Source(Enum):
-    FASTF1 = "fastf1"
-    OPENF1 = "openf1"
-
-
-FASTF1_FIRST_YEAR = 2018
-OPENF1_FIRST_YEAR = 2023
-
-
-def source_for(year: int) -> Optional[Source]:
-    """OpenF1 has no data before 2023; FastF1's lap timing (stints, pits, telemetry) starts 2018."""
-    if year >= OPENF1_FIRST_YEAR:
-        return Source.OPENF1
-    if year >= FASTF1_FIRST_YEAR:
-        return Source.FASTF1
-    return None
 
 
 # Natural key of each enrichment table: whichever source fills a row, it upserts on these.
@@ -46,7 +28,6 @@ def normalize_compound(value: Any) -> Optional[str]:
 
 
 # races.session_type tag -> the session name OpenF1 jobs and the CLI take.
-SESSIONS = {"race": "Race", "sprint": "Sprint"}
 
 
 def step_name(job: str, session_type: str) -> str:
@@ -96,7 +77,11 @@ COVERAGES: tuple[Coverage, ...] = (
              _telemetry_complete("SQ", "SELECT count(*) FROM sprint_results q "
                                        "WHERE q.race_id = r.id AND q.sq1_time_ms IS NOT NULL")),
     *(Coverage(table, session_type, step_name(job, session_type), "ingest_race", _session_rows(table, session_type))
-      for session_type in SESSIONS for table, job in _RACE_TABLES),
+      for session_type in (s.tag for s in RACE_SESSIONS) for table, job in _RACE_TABLES),
+    # Practice long runs feed only the Friday-pace table; under 70% of the grid, OpenF1 hasn't published them all.
+    Coverage("fp2_long_run_times", None, "ingest_fp2", "ingest_qualifying",
+             "(SELECT count(DISTINCT f.driver_id) FROM fp2_long_run_times f WHERE f.race_id = r.id)"
+             " >= 0.7 * (SELECT count(*) FROM qualifying_results q WHERE q.race_id = r.id)"),
     Coverage("team_season_stats", None, "compute_season_stats", "ingest_race",
              "COALESCE((SELECT max(t.races_completed) FROM team_season_stats t WHERE t.season_id = r.season_id), 0)"
              " >= (SELECT count(*) FROM races c WHERE c.season_id = r.season_id AND c.status = 'completed')"),

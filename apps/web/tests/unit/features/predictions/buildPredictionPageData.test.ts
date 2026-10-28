@@ -13,7 +13,7 @@ import { api } from '@/lib/api';
 import { buildPredictionPageData } from '@/features/predictions/buildPredictionPageData';
 import type {
   Circuit, Driver, Team, Race, RaceResult, RaceDetailResponse, PredictionResponse, GpFeatures,
-  SprintResult, SprintDetailResponse, SprintPredictionResponse, SprintFeatureScores,
+  SprintResult, SprintDetailResponse, SprintPredictionResponse, SprintFeatures, FeatureInfo,
 } from '@/types';
 
 const team: Team = { id: 1, seasonId: 2025, teamKey: 'red-bull', name: 'Red Bull Racing', nationality: 'Austrian' };
@@ -53,15 +53,24 @@ const lecFeatures: GpFeatures = {
   grid: term(-0.69, 0.1), qualiPace: term(-0.1, 0.2), teamQualiPace: term(-0.3, 0.1), driverPoints: term(19, 0.5),
   teammateEdge: term(0.1, 0.02), gridProcessional: term(-0.35, 0.2), teamRacePace: term(-0.42, 0.1),
 };
-const sprintFeatures: SprintFeatureScores = {
-  carPerformance: '0.80000', startingPosition: '0.90000', driverRating: '0.75000', trackOvertake: null,
-  shortRunPace: '0.65000', weatherImpact: '0.50000', winRate: '0.70000', luckFactor: '0.50000',
-  circuitAdjStartPos: '0.72000', sqQualifyingDelta: '0.60000',
+const sprintFeatures: SprintFeatures = {
+  carPerformance: term(0.8, 0.67), circuitAdjStartPos: term(0.72, 0.6), shortRunPace: term(0.65, 0.22),
+  driverRating: term(0.75, 0.25), weatherImpact: term(0.5, 0.13), winRate: term(0.7, 0.19),
+  luckFactor: term(0.5, 0.13), sqQualifyingDelta: term(0.6, 0.12),
 };
+const info = (key: string, label: string, importance: number, shortLabel = label): FeatureInfo => ({ key, label, shortLabel, importance });
+const gpFeatureInfo: FeatureInfo[] = [
+  info('grid', 'Grid Slot', 20), info('qualiPace', 'Qualifying Pace', 11, 'Quali Pace'),
+  info('teamQualiPace', 'Team Qualifying Pace', 12, 'Team Quali'), info('driverPoints', 'Driver Form', 18),
+  info('teammateEdge', 'Teammate Edge', 4), info('gridProcessional', 'Grid × Hard-to-Pass Track', 17, 'Grid × Track'),
+  info('teamRacePace', 'Team Race Pace', 18, 'Race Pace'),
+];
+const sprintFeatureInfo: FeatureInfo[] = Object.keys(sprintFeatures).map((key) => info(key, key, 12.5));
 
 function gpPrediction(predictedWinner: Driver = driver): PredictionResponse {
   return {
     race, predictedWinner, computedAt: '2025-09-07T12:00:00.000Z', modelVersion: 'weighted-v4',
+    featureInfo: gpFeatureInfo as PredictionResponse['featureInfo'],
     drivers: [
       { driver, winProbability: '0.62000', predictedPosition: 1, gridPosition: 1, features: verFeatures },
       { driver: driverB, winProbability: '0.38000', predictedPosition: 2, gridPosition: 2, features: lecFeatures },
@@ -80,6 +89,7 @@ function gpDetail(winnerDriver: Driver = driver): RaceDetailResponse {
 function sprintPrediction(): SprintPredictionResponse {
   return {
     race, predictedWinner: driver, computedAt: '2025-09-06T12:00:00.000Z', modelVersion: 'sprint-v2',
+    featureInfo: sprintFeatureInfo as SprintPredictionResponse['featureInfo'],
     drivers: [
       { driver, winProbability: '0.55000', predictedPosition: 1, gridPosition: 1, features: sprintFeatures },
       { driver: driverB, winProbability: '0.45000', predictedPosition: 2, gridPosition: null, features: sprintFeatures },
@@ -135,6 +145,17 @@ describe('buildPredictionPageData: gp', () => {
     expect(data.breakdown.find((b) => b.key === 'driverPoints')!.share).toBe(0);
     expect([ver.radar.teamRacePace, lec.radar.teamRacePace]).toEqual([1, 0]);
     expect([ver.pace, lec.pace, ver.gridPosition]).toEqual(['0.08%', '0.42%', 1]);
+  });
+
+  test('labels, importances and radar labels come with the prediction, not from a web copy', async () => {
+    vi.mocked(api.getPredictionByRace).mockResolvedValue(gpPrediction());
+    vi.mocked(api.getRaceById).mockResolvedValue(gpDetail());
+
+    const data = await buildPredictionPageData('gp', 1);
+
+    expect(data.featureMeta.qualiPace).toEqual({ label: 'Qualifying Pace', weight: 11 });
+    expect(data.weights.grid).toBe(20);
+    expect(data.radarFeatures[1]).toEqual(['Quali Pace', 'qualiPace']);
   });
 
   test('prediction fetch failure falls back to the race detail response', async () => {
@@ -208,6 +229,17 @@ describe('buildPredictionPageData: sprint', () => {
     expect(data.radarFeatures).toHaveLength(8);
     expect(data.correct).toBe(true);
     expect(data.prediction!.drivers.map((d) => d.pace)).toEqual(['80', '80']);
+  });
+
+  test('a sprint driver is shown through the contributions the API serves, pace from the car score', async () => {
+    vi.mocked(api.getSprintByRaceId).mockResolvedValue(sprintPrediction());
+    vi.mocked(api.getSprintDetail).mockResolvedValue(sprintDetail());
+
+    const data = await buildPredictionPageData('sprint', 1);
+
+    const [ver] = data.prediction!.drivers;
+    expect(ver.terms.carPerformance).toBe(0.67);
+    expect(ver.pace).toBe('80');
   });
 
   test('sprint fetch failure flags predictionFailed with no prediction', async () => {

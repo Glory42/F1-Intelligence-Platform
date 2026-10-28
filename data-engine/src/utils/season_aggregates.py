@@ -1,10 +1,25 @@
-"""Season aggregates shared by compute_season_stats (whole season so far) and the feature jobs
+"""Season aggregates shared by compute_season_stats (whole season so far) and the sprint feature job
 (as of a race date). A feature row must only see races before the one it predicts, otherwise a
 recomputed past prediction already knows its own result."""
 from datetime import date
 from typing import Any, Optional
 
-from src.utils.feature_helpers import compute_compressed_car_perf
+from src.utils.math_utils import clamp, normalize_minmax
+
+
+def compute_compressed_car_perf(
+    pace_signals: list[float],
+    grid_signals: list[float],
+    rel_weight: float = 0.5,
+) -> list[float]:
+    """Blends relative field min-max with an absolute grid scale (1..20) so top-tier
+    constructors don't get runaway 1.0 vs 0.74 gaps."""
+    if not pace_signals or not grid_signals:
+        return []
+    raw = [0.6 * p + 0.4 * g for p, g in zip(pace_signals, grid_signals)]
+    rel_norm = normalize_minmax(raw)
+    abs_norm = [clamp((s - 1.0) / 19.0, 0.0, 1.0) for s in raw]
+    return [clamp(rel_weight * r + (1.0 - rel_weight) * a) for r, a in zip(rel_norm, abs_norm)]
 
 
 def _before_clause(before: Optional[date]) -> tuple[str, tuple]:

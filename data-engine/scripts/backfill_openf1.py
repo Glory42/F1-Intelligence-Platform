@@ -10,7 +10,8 @@ import sys
 sys.path.insert(0, ".")
 
 from src.db.client import get_conn
-from src.enrichment_coverage import Source, backfill_allowed, read_coverage, source_for, step_name
+from src.enrichment_coverage import backfill_allowed, read_coverage, step_name
+from src.session_kind import Source, source_for
 from src.weekend_pipeline import JOBS, RACE_EVENT_JOBS, RaceRunContext
 
 JOB_CHOICES = (*RACE_EVENT_JOBS, "ingest_qualifying_telemetry")

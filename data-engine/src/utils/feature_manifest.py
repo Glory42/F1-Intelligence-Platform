@@ -9,6 +9,7 @@ class FeatureSpec:
     nullable: bool
 
 
+SPRINT_MODEL_VERSION = "sprint-v2"
 SPRINT_FEATURES: tuple[FeatureSpec, ...] = (
     FeatureSpec("car_performance", 0.25, "Car Performance", nullable=False),
     FeatureSpec("circuit_adj_start_pos", 0.25, "Circuit-Adj. Starting Position", nullable=True),

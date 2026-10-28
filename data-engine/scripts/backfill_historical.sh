@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
-# Backfill historical F1 data for 2018-2020.
-# Only 2023+ re-ingests with full timing now (OpenF1, ADR 0011); 2018-2022 rounds fail and skip.
-# Run from the data-engine/ directory with the venv active.
+# Backfill F1 seasons OpenF1 serves (2023+, ADR 0011). 2018-2022 can't be re-ingested and is skipped:
+# its stored rows stay. Run from the data-engine/ directory with the venv active.
 #
 # Usage: bash scripts/backfill_historical.sh [start_year] [end_year]
-#   Default: 2018 2020
+#   Default: 2023 2023
 
 set -e
 
-START_YEAR=${1:-2018}
-END_YEAR=${2:-2020}
+START_YEAR=${1:-2023}
+END_YEAR=${2:-$START_YEAR}
 
 # Round counts per season (including sprint weekends counted as rounds)
 declare -A ROUND_COUNTS
@@ -21,6 +20,10 @@ ROUND_COUNTS[2022]=22
 ROUND_COUNTS[2023]=22
 
 for year in $(seq $START_YEAR $END_YEAR); do
+  if [ "$year" -lt 2023 ]; then
+    echo "[SKIP] $year: only OpenF1 seasons (2023+) re-ingest; use run_backfill.py for pre-2018 Ergast results"
+    continue
+  fi
   max_round=${ROUND_COUNTS[$year]:-22}
   echo ""
   echo "========================================"
@@ -64,7 +67,7 @@ for rid in race_ids:
     print(f'  features + predictions for race_id={rid}')
 " 2>&1
 
-  # Run compute_features and compute_predictions for each completed race
+  # compute_features writes the whole Prediction; races inside the committed fit skip (backfill_all_predictions.py)
   python -c "
 import sys, subprocess; sys.path.insert(0, '.')
 from src.db.client import get_conn
@@ -79,8 +82,7 @@ cur.execute('''
 race_ids = [row['id'] for row in cur.fetchall()]
 conn.close()
 for rid in race_ids:
-    r1 = subprocess.run(['python', '-m', 'src.main', '--job', 'compute_features', '--race_id', str(rid)], capture_output=False)
-    r2 = subprocess.run(['python', '-m', 'src.main', '--job', 'compute_predictions', '--race_id', str(rid)], capture_output=False)
+    subprocess.run(['python', '-m', 'src.main', '--job', 'compute_features', '--race_id', str(rid)], capture_output=False)
 "
 
   echo ""

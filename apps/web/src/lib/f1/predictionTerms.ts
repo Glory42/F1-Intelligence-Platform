@@ -1,8 +1,8 @@
-import type { GpFeatures, SprintFeatureScores } from '@/types';
-import { softmax, SPRINT_SOFTMAX_TEMPERATURE, SPRINT_WEIGHTS, type Weights } from './predictionMath';
+import type { FeatureTerm } from '@/types';
+import { softmax, type Weights } from './predictionMath';
 
 // A driver's score split by feature, on the log-odds scale: softmax over the field of the summed
-// terms is the driver's win probability. Both models are shown through this one shape.
+// terms is the driver's win probability. The API serves both models' contributions this way.
 export type Terms = Record<string, number>;
 
 export type FeatureEdge = {
@@ -13,19 +13,8 @@ export type FeatureEdge = {
   share: number;
 };
 
-export function gpTerms(features: GpFeatures): Terms {
+export function termsOf(features: Record<string, FeatureTerm>): Terms {
   return Object.fromEntries(Object.entries(features).map(([key, f]) => [key, f.contribution]));
-}
-
-// sprint-v2's softmax(Σ weight × score / T) written as per-feature terms with T folded in.
-export function sprintTerms(features: SprintFeatureScores, weights: Weights = SPRINT_WEIGHTS): Terms {
-  const total = Object.values(weights).reduce((a, b) => a + b, 0);
-  return Object.fromEntries(
-    Object.entries(weights).map(([key, weight]) => [
-      key,
-      (weight * Number(features[key as keyof SprintFeatureScores] ?? 0)) / (total * SPRINT_SOFTMAX_TEMPERATURE),
-    ]),
-  );
 }
 
 export function edgeBreakdown(driver: Terms, field: Terms[]): FeatureEdge[] {

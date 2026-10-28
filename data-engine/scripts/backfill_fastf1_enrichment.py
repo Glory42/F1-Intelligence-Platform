@@ -1,5 +1,5 @@
 """Fills the OpenF1-era enrichment tables from FastF1 for the seasons FastF1 serves
-(enrichment_coverage.source_for: 2018-2022): stints, pit stops (pit-lane time only), race control,
+(session_kind.source_for: 2018-2022): stints, pit stops (pit-lane time only), race control,
 and each driver's fastest qualifying lap telemetry. Skips what a race's coverage already has, so it
 resumes after a stop and never touches OpenF1 seasons. Run locally, never on Render (a telemetry
 load is a few hundred MB).
@@ -14,12 +14,14 @@ from psycopg2.extras import Json
 
 from src.db.client import get_conn
 from src.enrichment_coverage import (
-    CONFLICT_KEYS, Source, backfill_allowed, coverage_of, read_coverage, source_for, step_name,
+    CONFLICT_KEYS, backfill_allowed, coverage_of, read_coverage, step_name,
 )
-from src.utils.driver_map import build_driver_code_map
-from src.utils.fastf1_enrichment import (
-    fastest_lap_inputs, pit_stop_rows, race_control_rows, session_lap_records, session_message_records, stint_rows,
+from src.session_kind import Source, source_for
+from src.utils.driver_registry import SeasonDrivers, season_drivers
+from src.utils.fastf1_session import (
+    fastest_lap_inputs, lap_frame_records, pit_stops, race_control_messages, session_message_records, stints,
 )
+from src.utils.session_records import pit_stop_rows, race_control_rows, stint_rows
 from src.utils.telemetry import build_lap_telemetry, telemetry_samples
 from src.utils.upsert import upsert
 
@@ -57,39 +59,40 @@ def write(rows_by_table: dict[str, list[dict]]) -> None:
         conn.close()
 
 
-def code_map_for(season_id: int) -> dict[str, int]:
+def drivers_for(season_id: int) -> SeasonDrivers:
     conn = get_conn()
     try:
-        return build_driver_code_map(conn, season_id)
+        return season_drivers(conn, season_id)
     finally:
         conn.close()
 
 
-def backfill_race_session(race: dict, tag: str, parts: set[str], code_map: dict[str, int], refresh: bool) -> None:
+def backfill_race_session(race: dict, tag: str, parts: set[str], drivers: SeasonDrivers, refresh: bool) -> None:
     wanted = [p for p in SESSION_PARTS if p in parts and (refresh or not race[step_name(PARTS[p], tag)])]
     if not wanted:
         return
     # Loaded with no DB connection open (Neon compute), then one short write.
     session = fastf1.get_session(race["year"], race["round_number"], "R" if tag == "race" else "S")
     session.load(laps=True, telemetry=False, weather=False, messages="race_control" in wanted)
-    laps = session_lap_records(session)
+    laps = lap_frame_records(session)
     built = {
-        "stints": lambda: stint_rows(laps, code_map, race["id"], tag),
-        "pits": lambda: pit_stop_rows(laps, code_map, race["id"], tag),
-        "race_control": lambda: race_control_rows(session_message_records(session), race["id"], tag),
+        "stints": lambda: stint_rows(stints(laps), drivers, race["id"], tag),
+        "pits": lambda: pit_stop_rows(pit_stops(laps), drivers, race["id"], tag),
+        "race_control": lambda: race_control_rows(race_control_messages(session_message_records(session)), drivers,
+                                                  race["id"], tag),
     }
-    rows = {coverage_of(step_name(PARTS[p], tag)).table: built[p]() for p in wanted}
+    rows = {coverage_of(step_name(PARTS[p], tag)).table: built[p]()[0] for p in wanted}
     write(rows)
     print(f"  {tag}: " + ", ".join(f"{len(r)} {t}" for t, r in rows.items()))
 
 
-def backfill_telemetry(race: dict, code_map: dict[str, int]) -> None:
+def backfill_telemetry(race: dict, drivers: SeasonDrivers) -> None:
     session = fastf1.get_session(race["year"], race["round_number"], "Q")
     session.load(laps=True, telemetry=True, weather=False, messages=False)
     track_length_m = float(race["track_length_km"]) * 1000
     rows = []
     for code, car, location, window in fastest_lap_inputs(session):
-        driver_id = code_map.get(code)
+        driver_id = drivers.id_for(code=code)
         if driver_id is None:
             continue
         try:
@@ -121,11 +124,11 @@ if __name__ == "__main__":
     failed = []
     for i, race in enumerate(races, 1):
         print(f"[{i}/{len(races)}] {race['year']} R{race['round_number']:02d}")
-        code_map = code_map_for(race["season_id"])
+        drivers = drivers_for(race["season_id"])
         sessions = ("race", "sprint") if race["sprint_date"] is not None else ("race",)
         for tag in sessions:
             try:
-                backfill_race_session(race, tag, parts, code_map, args.refresh)
+                backfill_race_session(race, tag, parts, drivers, args.refresh)
             except SystemExit:
                 raise
             except Exception as e:
@@ -133,7 +136,7 @@ if __name__ == "__main__":
                 failed.append((race["year"], race["round_number"], tag))
         if "telemetry" in parts and (args.refresh or not race[PARTS["telemetry"]]):
             try:
-                backfill_telemetry(race, code_map)
+                backfill_telemetry(race, drivers)
             except SystemExit:
                 raise
             except Exception as e:

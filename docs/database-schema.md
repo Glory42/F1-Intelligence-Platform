@@ -232,7 +232,7 @@ race control feed (`scripts/backfill_fastf1_enrichment.py`).
 ### `race_overtakes`
 One row per on-track position exchange per race, sourced from OpenF1: same 2023+/completed/
 past-live-window coverage as `race_control_messages`. Unlike that table, OpenF1's driver
-numbers here are resolved to `drivers.id` at ingest time (via `build_driver_number_map`),
+numbers here are resolved to `drivers.id` at ingest time (via `driver_registry.season_drivers`),
 since both sides of the exchange are needed for a usable UI.
 
 | Column | Type | Notes |
@@ -257,7 +257,7 @@ session, so sparse or missing coverage for a given race is expected, not a data 
 |--------|------|-------|
 | `id` | serial PK | |
 | `race_id` | FK → races | |
-| `driver_id` | FK → drivers | Resolved from OpenF1's car number via `build_driver_number_map` |
+| `driver_id` | FK → drivers | Resolved from OpenF1's car number via `season_drivers` |
 | `date` | timestamptz | Clip timestamp, from OpenF1 |
 | `recording_url` | text | Direct link to F1's own audio CDN |
 | `session_type` | varchar(10) | `race` (default) or `sprint`: both sessions of a sprint weekend share `race_id` |
@@ -501,7 +501,7 @@ full per-round history.
 ---
 
 ### `driver_prediction_features`
-One row per driver per grand prix race (`weighted-v4`). Written by `compute_features`, updated by `compute_predictions`.
+One row per driver per grand prix race (`weighted-v4`). Written by `compute_features` together with the `race_predictions` row, in one transaction; drivers no longer in the field are deleted.
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -530,7 +530,7 @@ One row per grand prix: the single predicted winner.
 ---
 
 ### `driver_sprint_features`
-One row per driver per sprint weekend. Written by `compute_sprint_features`, updated by `compute_sprint_predictions`.
+One row per driver per sprint weekend. Written by `compute_sprint_features` together with the `sprint_predictions` row, in one transaction.
 
 | Column | Type | Notes |
 |--------|------|-------|

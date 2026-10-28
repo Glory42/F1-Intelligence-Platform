@@ -52,8 +52,6 @@ conn.close()
 if [ -n "$RACE_ID" ]; then
   echo "[$(date)] compute_features race_id=$RACE_ID"
   python -m src.main --job compute_features --race_id "$RACE_ID" 2>&1 | tail -3
-  echo "[$(date)] compute_predictions race_id=$RACE_ID"
-  python -m src.main --job compute_predictions --race_id "$RACE_ID" 2>&1 | tail -3
 fi
 
 # Historical years

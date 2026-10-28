@@ -13,15 +13,14 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
-import numpy as np
 import psycopg2
 import psycopg2.extras
 
 sys.path.insert(0, ".")
 
 from src.utils.backtest import GridWinRates, calibration_table, paired_difference, race_metrics, summarize
-from src.utils.conditional_logit import fit_conditional_logit
-from src.utils.gp_features_v4 import GP_V4_FEATURES, gp_features
+from src.utils.gp_features_v4 import GP_V4_FEATURES
+from src.utils.gp_model_v4 import DEFAULT_L2, eligible, fit, history_start, training_races
 from src.utils.race_history import RaceHistory, load_history
 
 BACKTEST_DATABASE_URL = os.environ.get(
@@ -29,7 +28,6 @@ BACKTEST_DATABASE_URL = os.environ.get(
 )
 RESULTS_DIR = pathlib.Path("cache/backtest")
 
-Field = dict[int, dict[str, float]]  # driver_id → named feature values
 Probabilities = dict[int, float]
 
 
@@ -40,7 +38,7 @@ class Candidate:
 
     name: str
     features: tuple[str, ...]
-    l2: float = 1.0
+    l2: float = DEFAULT_L2
 
 
 CANDIDATES: list[Candidate] = [
@@ -64,13 +62,8 @@ def load(conn: Any, train_from: int) -> dict[str, Any]:
         stored: dict[int, Probabilities] = defaultdict(dict)
         for r in cur.fetchall():
             stored[r["race_id"]][r["driver_id"]] = float(r["win_probability"] or 0)
-    # Form features look back up to ~2 seasons, so history starts before the first training race.
-    history = load_history(conn, since=datetime.date(train_from - 3, 1, 1))
+    history = load_history(conn, since=history_start(train_from))
     return {"history": history, "stored": stored}
-
-
-def _matrix(field: Field, features: tuple[str, ...]) -> np.ndarray:
-    return np.array([[field[d][f] for f in features] for d in field], dtype=float)
 
 
 def run(
@@ -80,8 +73,9 @@ def run(
     per_race: dict[str, list] = defaultdict(list)
     calibration: dict[str, list] = defaultdict(list)
     grid_rates = GridWinRates()
-    training: dict[str, list] = defaultdict(list)  # candidate → [(X, winner row)]
     weights: dict[str, Any] = {}
+    training = training_races(history, from_year=train_from)
+    scored = {t.race_id: t for t in training}
 
     def score(name: str, race: dict[str, Any], probs: Probabilities, winner: int) -> None:
         per_race[name].append({"race_id": race["id"], "year": race["year"], **race_metrics(probs, winner)})
@@ -90,23 +84,20 @@ def run(
     completed = sorted((r for r in history.races.values() if r["status"] == "completed"), key=lambda r: r["race_date"])
     for race in completed:
         results = history.results.get(race["id"], [])
-        winner = next((r["driver_id"] for r in results if r["finish_position"] == 1), None)
-        grid = {q["driver_id"]: q["grid_position"] for q in history.quali.get(race["id"], [])}
-        if race["year"] >= train_from and winner in grid:
-            field = gp_features(history, race["id"])
-            if race["year"] in years:
+        target = scored.get(race["id"])
+        if target is not None and race["year"] in years:
+            grid = {q["driver_id"]: q["grid_position"] for q in history.quali.get(race["id"], [])}
+            # fit(before=) is the same leak-free cut the live job and the backfill use.
+            if len(eligible(training, race["race_date"])) >= MIN_TRAINING_RACES:
                 for c in candidates:
-                    if len(training[c.name]) >= MIN_TRAINING_RACES:
-                        model = fit_conditional_logit(training[c.name], c.features, l2=c.l2)
-                        weights[c.name] = model
-                        score(c.name, race, model.probabilities(field), winner)
-                score("grid-history", race, grid_rates.probabilities(grid), winner)
-                score("uniform", race, {d: 1 / len(grid) for d in grid}, winner)
-                stored = data["stored"].get(race["id"])
-                if stored and sum(stored.values()) > 0:
-                    score("stored in DB", race, stored, winner)
-            for c in candidates:
-                training[c.name].append((_matrix(field, c.features), list(field).index(winner)))
+                    model = fit(training, before=race["race_date"], features=c.features, l2=c.l2)
+                    weights[c.name] = model
+                    score(c.name, race, model.probabilities(target.field), target.winner)
+            score("grid-history", race, grid_rates.probabilities(grid), target.winner)
+            score("uniform", race, {d: 1 / len(grid) for d in grid}, target.winner)
+            stored = data["stored"].get(race["id"])
+            if stored and sum(stored.values()) > 0:
+                score("stored in DB", race, stored, target.winner)
         # Recorded after scoring, so the baseline only ever knows earlier races.
         grid_rates.record((r["grid_position"], r["finish_position"] == 1) for r in results)
 

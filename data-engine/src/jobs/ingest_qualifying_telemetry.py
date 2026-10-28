@@ -1,48 +1,32 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from psycopg2.extras import Json
 
 from src.db.client import get_conn
 from src.enrichment_coverage import CONFLICT_KEYS
-from src.utils.driver_map import build_driver_number_map
-from src.utils.openf1_client import (
-    OpenF1BudgetExceeded, fetch_car_data, fetch_laps, fetch_location, get_session_key,
-)
+from src.session_kind import OPENF1_READY_AFTER_QUALIFYING_START
+from src.utils.driver_registry import season_drivers
+from src.utils.openf1_client import OpenF1BudgetExceeded
+from src.utils.openf1_session import fastest_laps, lap_samples, load_session
 from src.utils.storage_guard import read_storage_tier
-from src.utils.telemetry import build_lap_telemetry, fastest_laps, telemetry_samples
+from src.utils.telemetry import build_lap_telemetry, telemetry_samples
 from src.utils.upsert import upsert
 
-# OpenF1 session names; 2023's sprint qualifying was called the "Sprint Shootout".
-_SESSIONS = {
-    "Q": {"names": ("Qualifying",), "date_column": "qualifying_date"},
-    "SQ": {"names": ("Sprint Qualifying", "Sprint Shootout"), "date_column": "sprint_qualifying_date"},
-}
-# OpenF1's free tier only serves a session's data once it's comfortably over.
-_READY_AFTER = timedelta(hours=2)
-
-
-def _resolve_session_key(year: int, session_date, names: tuple[str, ...]) -> int:
-    last_error: Exception | None = None
-    for name in names:
-        try:
-            return get_session_key(year, session_date, session_name=name)
-        except ValueError as e:
-            last_error = e
-    raise last_error or ValueError("no OpenF1 session")
+_DATE_COLUMNS = {"Q": "qualifying_date", "SQ": "sprint_qualifying_date"}
 
 
 def run(year: int, round_num: int, session_type: str = "Q") -> bool:
     """Stores each driver's fastest lap telemetry. Resumable: drivers already stored are skipped,
     and if the cycle's OpenF1 request budget runs out it writes what it has: later cycles finish.
     Returns False while there is more to fetch later (not ready yet, or the budget ran out)."""
-    config = _SESSIONS[session_type]
     print(f"[ingest_qualifying_telemetry] year={year} round={round_num} session={session_type}")
 
     conn = get_conn()
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT r.id, r.season_id, r.status, r.qualifying_date, r.sprint_qualifying_date, c.track_length_km "
+                "SELECT r.id, r.season_id, r.race_date, r.status, r.qualifying_date, r.sprint_qualifying_date, "
+                "       c.track_length_km "
                 "FROM races r JOIN seasons s ON r.season_id = s.id JOIN circuits c ON r.circuit_id = c.id "
                 "WHERE s.year = %s AND r.round_number = %s",
                 (year, round_num),
@@ -55,30 +39,28 @@ def run(year: int, round_num: int, session_type: str = "Q") -> bool:
                 (race["id"], session_type),
             )
             stored = {r["driver_id"] for r in cur.fetchall()}
-        session_date = race[config["date_column"]]
-        if session_date is None or datetime.now(timezone.utc) - session_date < _READY_AFTER:
+        session_date = race[_DATE_COLUMNS[session_type]]
+        if session_date is None or datetime.now(timezone.utc) - session_date < OPENF1_READY_AFTER_QUALIFYING_START:
             print(f"  [SKIP] {session_type} session not held or not yet past OpenF1's live window")
             return session_date is None
         if not read_storage_tier(conn).allows_optional:
             print("  [SKIP] Neon storage tier blocks optional enrichment")
             return True
-        driver_map = build_driver_number_map(conn, race["season_id"])
+        drivers = season_drivers(conn, race["season_id"])
     finally:
         conn.close()
 
-    session_key = _resolve_session_key(year, session_date, config["names"])
     track_length_m = float(race["track_length_km"]) * 1000
     rows = []
     finished = True
     try:
-        laps = sorted(fastest_laps(fetch_laps(session_key)).items(), key=lambda kv: kv[1].lap_ms)
+        session = load_session(year, race["race_date"], session_type, ("laps",))
+        laps = sorted(fastest_laps(session).items(), key=lambda kv: kv[1].lap_ms)
         for driver_number, window in laps:
-            driver_id = driver_map.get(driver_number)
+            driver_id = drivers.id_for(driver_number)
             if driver_id is None or driver_id in stored:
                 continue
-            end = window.start + timedelta(milliseconds=window.lap_ms)
-            car = fetch_car_data(session_key, driver_number, window.start, end)
-            location = fetch_location(session_key, driver_number, window.start, end)
+            car, location = lap_samples(session.session_key, driver_number, window)
             if len(location) < 2:
                 continue
             try:

@@ -1,16 +1,22 @@
-"""One session of a race weekend read from OpenF1, shaped into the rows the ingest jobs write.
-Live ingest moved here from FastF1 when F1 put its timing feed behind F1TV logins (FastF1 3.9,
-Oct 2026): OpenF1 serves finished sessions free, and Jolpica supplies the race classification."""
+"""The OpenF1 + Jolpica adapter: the only module that knows OpenF1's endpoints and field names (Jolpica's
+classification fields included). It finds a weekend's session, loads it, and hands the jobs typed records
+(session_records) or the row shapes the result tables take. Live ingest moved here from FastF1 when F1 put
+its timing feed behind F1TV logins (FastF1 3.9, Oct 2026, ADR 0011)."""
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Optional
 
 import pandas as pd
 
+from src.enrichment_coverage import normalize_compound
 from src.utils import openf1_client
-from src.utils.driver_registry import session_entries
+from src.utils.driver_registry import SessionEntry, team_key_for
 from src.utils.race_story import WeatherTrace, weather_trace
+from src.utils.session_records import (
+    CarSample, Overtake, PitStop, PositionSample, RaceControlMessage, RadioClip, SessionNotReady, Stint,
+)
+from src.utils.telemetry import LapWindow
 
 # Keyed by the FastF1 session identifiers the job configs already use.
 SESSION_NAMES: dict[str, tuple[str, ...]] = {
@@ -26,7 +32,8 @@ SESSION_NAMES: dict[str, tuple[str, ...]] = {
 
 _ENDPOINTS = {
     "drivers": "drivers", "results": "session_result", "laps": "laps", "stints": "stints",
-    "pits": "pit", "weather": "weather", "race_control": "race_control",
+    "pits": "pit", "weather": "weather", "race_control": "race_control", "overtakes": "overtakes",
+    "team_radio": "team_radio",
 }
 RACE_PARTS = ("drivers", "laps", "stints", "pits", "weather", "race_control")
 QUALIFYING_PARTS = ("drivers", "results", "laps")
@@ -48,15 +55,69 @@ class OpenF1Session:
     pits: list[dict] = field(default_factory=list)
     weather: list[dict] = field(default_factory=list)
     race_control: list[dict] = field(default_factory=list)
+    overtakes: list[dict] = field(default_factory=list)
+    team_radio: list[dict] = field(default_factory=list)
 
 
-def load_session(year: int, race_date: Any, session_type: str, parts: tuple[str, ...]) -> OpenF1Session:
-    """One request to find the session, then one per part, all through the paced OpenF1 client."""
-    key = openf1_client.find_weekend_session_key(year, race_date, SESSION_NAMES[session_type])
+def find_session(year: int, race_date: Any, session_type: str) -> int:
+    """The weekend is found by its Race's date, then the session by name within that meeting
+    (cancelled sessions skipped): one way for every job, whichever session it reads."""
+    try:
+        return openf1_client.find_weekend_session_key(year, race_date, SESSION_NAMES[session_type])
+    except ValueError as e:
+        raise SessionNotReady(str(e)) from e
+
+
+def load_session(
+    year: int, race_date: Any, session_type: str, parts: tuple[str, ...], session_key: Optional[int] = None,
+) -> OpenF1Session:
+    """One request to find the session (none when `session_key` is cached), then one per part, all through
+    the paced OpenF1 client."""
+    key = session_key or find_session(year, race_date, session_type)
     return OpenF1Session(
         session_key=key,
         **{part: openf1_client.fetch_session_data(_ENDPOINTS[part], key) for part in parts},
     )
+
+
+def _present(value: Any) -> bool:
+    return value is not None and str(value).strip() != ""
+
+
+def _driver_code(abbreviation: Any, first_name: str, last_name: str, driver_number: int) -> str:
+    if _present(abbreviation):
+        return str(abbreviation).upper()[:3]
+    source = last_name or first_name
+    code = "".join(c for c in source if c.isalpha())[:3].upper()
+    if len(code) < 3:
+        code = (code + str(driver_number))[:3].upper()
+    return code
+
+
+def session_entries(session: OpenF1Session) -> list[SessionEntry]:
+    """Who the session lists, from its drivers part."""
+    entries = []
+    for info in session.drivers:
+        try:
+            driver_number = int(info.get("driver_number") or 0)
+        except (ValueError, TypeError):
+            driver_number = 0
+        first_name = str(info.get("first_name") or "").strip()
+        last_name = str(info.get("last_name") or "").strip()
+        if not first_name and not last_name:
+            first_name, _, last_name = str(info.get("full_name") or f"Driver {driver_number}").partition(" ")
+        team_name = str(info.get("team_name") or "Unknown")
+        country = info.get("country_code")
+        entries.append(SessionEntry(
+            driver_number=driver_number,
+            code=_driver_code(info.get("name_acronym"), first_name, last_name, driver_number),
+            first_name=first_name,
+            last_name=last_name,
+            team_key=team_key_for(team_name),
+            team_name=team_name,
+            nationality=str(country) if _present(country) else None,
+        ))
+    return entries
 
 
 def _ms(seconds: Any) -> int | None:
@@ -75,7 +136,7 @@ def _window(lap: dict) -> tuple[datetime, datetime] | None:
 
 
 def driver_codes(session: OpenF1Session) -> dict[int, str]:
-    return {entry.driver_number: entry.code for entry in session_entries(session.drivers)}
+    return {entry.driver_number: entry.code for entry in session_entries(session)}
 
 
 @dataclass(frozen=True)
@@ -342,3 +403,99 @@ def weather_details(session: OpenF1Session) -> dict[str, float | None]:
 def session_weather_trace(session: OpenF1Session) -> WeatherTrace | None:
     frame = _weather_frame(session).dropna(subset=["Time", "AirTemp", "TrackTemp", "Rainfall"])
     return weather_trace(frame) if not frame.empty else None
+
+
+def stints(session: OpenF1Session) -> list[Stint]:
+    return [
+        Stint(driver_number=s["driver_number"], driver_code=None, stint_number=s["stint_number"],
+              compound=normalize_compound(s.get("compound")), lap_start=s["lap_start"], lap_end=s["lap_end"],
+              tyre_age_at_start=s.get("tyre_age_at_start"))
+        for s in session.stints
+    ]
+
+
+def pit_stops(session: OpenF1Session) -> list[PitStop]:
+    return [
+        PitStop(driver_number=p["driver_number"], driver_code=None, lap_number=p["lap_number"],
+                pit_lane_ms=_ms(p.get("pit_duration")), stationary_ms=_ms(p.get("stop_duration")),
+                date=p["date"])
+        for p in session.pits
+    ]
+
+
+def race_control_messages(session: OpenF1Session) -> list[RaceControlMessage]:
+    return [
+        RaceControlMessage(date=m["date"], category=m["category"], flag=m.get("flag"), lap_number=m.get("lap_number"),
+                           driver_number=m.get("driver_number"), scope=m.get("scope"), sector=m.get("sector"),
+                           message=m["message"])
+        for m in session.race_control
+    ]
+
+
+def overtakes(session: OpenF1Session) -> list[Overtake]:
+    return [
+        Overtake(date=o["date"], overtaking_number=o["overtaking_driver_number"],
+                 overtaken_number=o["overtaken_driver_number"], position=o["position"])
+        for o in session.overtakes
+    ]
+
+
+def radio_clips(session: OpenF1Session) -> list[RadioClip]:
+    return [RadioClip(driver_number=c["driver_number"], date=c["date"], recording_url=c["recording_url"])
+            for c in session.team_radio]
+
+
+@dataclass(frozen=True)
+class PracticeLap:
+    driver_number: int
+    lap_number: int
+    lap_ms: Optional[int]
+    is_pit_out_lap: bool
+    compound: str  # upper-case, "" when the stint is unknown
+
+
+def practice_laps(session: OpenF1Session) -> list[PracticeLap]:
+    """Every practice lap with the compound of the stint it was run on."""
+    by_driver = stints_by_driver(session.stints)
+    out = []
+    for lap in session.laps:
+        stint = stint_for(by_driver.get(lap["driver_number"], []), lap["lap_number"])
+        duration = lap.get("lap_duration")
+        out.append(PracticeLap(
+            driver_number=lap["driver_number"],
+            lap_number=lap["lap_number"],
+            lap_ms=round(duration * 1000) if duration and duration > 0 else None,
+            is_pit_out_lap=bool(lap.get("is_pit_out_lap")),
+            compound=(stint.get("compound") or "").upper() if stint else "",
+        ))
+    return out
+
+
+def fastest_laps(session: OpenF1Session) -> dict[int, LapWindow]:
+    """Each car number's quickest timed lap; out-laps and untimed laps are skipped."""
+    best: dict[int, LapWindow] = {}
+    for lap in session.laps:
+        # OpenF1 occasionally sends a timed lap without its start date; it can't be windowed.
+        if not lap.get("lap_duration") or lap.get("is_pit_out_lap") or not lap.get("date_start"):
+            continue
+        window = LapWindow(
+            lap_number=lap["lap_number"],
+            start=datetime.fromisoformat(lap["date_start"]),
+            lap_ms=round(lap["lap_duration"] * 1000),
+        )
+        current = best.get(lap["driver_number"])
+        if current is None or window.lap_ms < current.lap_ms:
+            best[lap["driver_number"]] = window
+    return best
+
+
+def lap_samples(session_key: int, driver_number: int, window: LapWindow) -> tuple[list[CarSample], list[PositionSample]]:
+    """The car and position samples over one lap: two paced requests."""
+    end = window.start + timedelta(milliseconds=window.lap_ms)
+    car = openf1_client.fetch_lap_samples("car_data", session_key, driver_number, window.start, end)
+    location = openf1_client.fetch_lap_samples("location", session_key, driver_number, window.start, end)
+    return (
+        [CarSample(at=datetime.fromisoformat(c["date"]), speed=float(c["speed"]), throttle=float(c["throttle"]),
+                   brake=bool(c["brake"]), gear=int(c["n_gear"])) for c in car],
+        [PositionSample(at=datetime.fromisoformat(p["date"]), x=float(p["x"]), y=float(p["y"])) for p in location],
+    )

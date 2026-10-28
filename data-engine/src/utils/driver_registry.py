@@ -1,9 +1,7 @@
-"""Registers the drivers and teams an OpenF1 session lists, so results are never dropped for a
-driver the season doesn't know yet (mid-season replacements, stand-ins, rookies)."""
+"""A season's drivers: registering the ones a session lists, so results are never dropped for a driver the
+season doesn't know yet (mid-season replacements, stand-ins, rookies), and finding them again by number or code."""
 from dataclasses import dataclass
-from typing import Any
-
-import pandas as pd
+from typing import Any, Optional
 
 
 @dataclass(frozen=True)
@@ -17,49 +15,31 @@ class SessionEntry:
     nationality: str | None
 
 
-def _present(value: Any) -> bool:
-    # NaN is truthy: a missing FastF1 field once became driver code "NAN".
-    return value is not None and not (isinstance(value, float) and pd.isna(value)) and str(value).strip() != ""
-
-
 def team_key_for(team_name: str) -> str:
     return team_name.lower().replace(" ", "_").replace("-", "_").replace(".", "")
 
 
-def _driver_code(abbreviation: Any, first_name: str, last_name: str, driver_number: int) -> str:
-    if _present(abbreviation):
-        return str(abbreviation).upper()[:3]
-    source = last_name or first_name
-    code = "".join(c for c in source if c.isalpha())[:3].upper()
-    if len(code) < 3:
-        code = (code + str(driver_number))[:3].upper()
-    return code
+@dataclass(frozen=True)
+class SeasonDrivers:
+    """One season's driver rows, found by car number (OpenF1) or by code (FastF1, the legacy jobs)."""
+
+    by_number: dict[int, int]
+    by_code: dict[str, int]
+
+    def id_for(self, number: Optional[int] = None, code: Optional[str] = None) -> Optional[int]:
+        if number is not None and number in self.by_number:
+            return self.by_number[number]
+        return self.by_code.get(code) if code else None
 
 
-def session_entries(drivers: list[dict[str, Any]]) -> list[SessionEntry]:
-    """drivers: OpenF1 /drivers rows for one session."""
-    entries = []
-    for info in drivers:
-        try:
-            driver_number = int(info.get("driver_number") or 0)
-        except (ValueError, TypeError):
-            driver_number = 0
-        first_name = str(info.get("first_name") or "").strip()
-        last_name = str(info.get("last_name") or "").strip()
-        if not first_name and not last_name:
-            first_name, _, last_name = str(info.get("full_name") or f"Driver {driver_number}").partition(" ")
-        team_name = str(info.get("team_name") or "Unknown")
-        country = info.get("country_code")
-        entries.append(SessionEntry(
-            driver_number=driver_number,
-            code=_driver_code(info.get("name_acronym"), first_name, last_name, driver_number),
-            first_name=first_name,
-            last_name=last_name,
-            team_key=team_key_for(team_name),
-            team_name=team_name,
-            nationality=str(country) if _present(country) else None,
-        ))
-    return entries
+def season_drivers(conn: Any, season_id: int) -> SeasonDrivers:
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, code, driver_number FROM drivers WHERE season_id = %s", (season_id,))
+        rows = cur.fetchall()
+    return SeasonDrivers(
+        by_number={r["driver_number"]: r["id"] for r in rows if r["driver_number"] is not None},
+        by_code={r["code"]: r["id"] for r in rows if r["code"]},
+    )
 
 
 def register_session_drivers(

@@ -64,6 +64,7 @@ async function assemblePrediction<TF extends FeatureTable, TS>(
     predictedWinner: toDriver(winner.driver, winner.team),
     computedAt: prediction.computedAt.toISOString(),
     modelVersion: prediction.modelVersion,
+    featureInfo: kind.featureInfo,
     drivers: rows.map((r) => ({
       driver: toDriver(r.driver, r.team),
       winProbability: r.feature.winProbability,

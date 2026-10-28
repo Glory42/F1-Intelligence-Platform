@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""Full historical backfill (default 2000-2026) in dependency order: sync, ingest,
-sprint pipeline, then features/predictions. Full timing starts 2023 (OpenF1, ADR 0011), pre-2018 is Ergast results only; sprint format began 2021."""
+"""Full historical backfill (default 2000-2026) in dependency order: sync, ingest, sprint pipeline, then
+features/predictions. Each season goes to the jobs that can serve it (session_kind.results_ingest_for): Ergast
+results only before 2018, full OpenF1 + Jolpica timing from 2023; 2018–2022 is skipped and its stored rows stay
+(ADR 0011). Sprint format began 2021."""
 
 import argparse
 import sys
@@ -9,7 +11,8 @@ sys.path.insert(0, ".")
 import src.config as _config  # triggers FastF1 cache + env setup
 
 from src.db.client import get_conn
-from src.weekend_pipeline import RaceRunContext, is_sprint_weekend, prediction_steps
+from src.session_kind import ResultsIngest, is_sprint_weekend, results_ingest_for
+from src.weekend_pipeline import RaceRunContext, prediction_steps
 
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
@@ -63,6 +66,11 @@ def process_year(year: int) -> None:
     print(f"\n{'='*52}")
     print(f"  BACKFILL  {year}")
     print(f"{'='*52}")
+    ingest = results_ingest_for(year)
+    if ingest is None:
+        print(f"  [SKIP] {year}: its lap timing can't be re-ingested (ADR 0011), stored rows stay")
+        return
+    legacy = ingest is ResultsIngest.LEGACY
 
     # 1 ── Sync schedule (idempotent: safe to re-run)
     print(f"\n[{year}] sync_schedule ...")
@@ -72,10 +80,11 @@ def process_year(year: int) -> None:
         return
 
     # 2 ── Sync season (drivers + teams): try round 1 first, fall back to 2
-    print(f"[{year}] sync_season ...")
-    from src.jobs.sync_season import run as sync_season
-    if not _run(f"sync_season {year} r1", sync_season, year, 1):
-        _run(f"sync_season {year} r2", sync_season, year, 2)
+    if not legacy:
+        print(f"[{year}] sync_season ...")
+        from src.jobs.sync_season import run as sync_season
+        if not _run(f"sync_season {year} r1", sync_season, year, 1):
+            _run(f"sync_season {year} r2", sync_season, year, 2)
 
     # 3 ── Per-round ingestion
     conn = get_conn()
@@ -88,8 +97,12 @@ def process_year(year: int) -> None:
 
     print(f"[{year}] ingesting {len(rounds)} rounds ...")
 
-    from src.jobs.ingest_qualifying import run as ingest_qualifying
-    from src.jobs.ingest_race       import run as ingest_race
+    if legacy:
+        from src.jobs.ingest_qualifying_legacy import run as ingest_qualifying
+        from src.jobs.ingest_race_legacy import run as ingest_race
+    else:
+        from src.jobs.ingest_qualifying import run as ingest_qualifying
+        from src.jobs.ingest_race import run as ingest_race
 
     for r in rounds:
         rn = r["round_number"]

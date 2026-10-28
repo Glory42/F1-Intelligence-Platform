@@ -66,9 +66,9 @@ Some inputs never change and are seeded once into the database or hardcoded in P
 |-------|-------------|---------|
 | Circuit overtake rate | `circuits.overtake_rate` | Never: seeded once per track |
 | Circuit SC probability | `circuits.sc_probability` | Never: seeded once per track |
-| GP model weights | `data-engine/src/models/gp_v4.json` (fitted, written by `scripts/fit_model_v4.py`); importances + labels in `docs/feature-weights.json`, mirrored in `predictionMath.ts` `FEATURE_META` and the API's `GP_FEATURE_MANIFEST` | On a deliberate, backtested refit |
-| Sprint model weights + labels | `feature_manifest.py` `SPRINT_FEATURES` (re-exported as `WEIGHTS` by `compute_sprint_features.py`); mirrored in `predictionMath.ts` `SPRINT_FEATURE_META` and the API's `SPRINT_FEATURE_MANIFEST`, same JSON check | Only when model is intentionally updated |
-| Sprint softmax temperature T=0.3 | `feature_manifest.py` / `predictionMath.ts` `SPRINT_SOFTMAX_TEMPERATURE`, checked against `sprint_softmax_temperature` in `docs/feature-weights.json`. The GP model has none (T = 1) | Only when model is intentionally updated |
+| GP model weights | `data-engine/src/models/gp_v4.json` (fitted, written by `scripts/fit_model_v4.py`); importances + labels in `docs/feature-weights.json`, mirrored in the API's `GP_FEATURE_MANIFEST`, which serves them with every Prediction | On a deliberate, backtested refit |
+| Sprint model weights + labels | `feature_manifest.py` `SPRINT_FEATURES` (re-exported as `WEIGHTS` by `compute_sprint_features.py`); mirrored in the API's `SPRINT_FEATURE_MANIFEST`, same JSON check | Only when model is intentionally updated |
+| Sprint softmax temperature T=0.3 | `feature_manifest.py` / the API's `feature-manifest.ts` `SPRINT_SOFTMAX_TEMPERATURE`, checked against `sprint_softmax_temperature` in `docs/feature-weights.json`. The GP model has none (T = 1) | Only when model is intentionally updated |
 
 ---
 
@@ -88,7 +88,7 @@ raw tables: race_results, qualifying_results, lap_times, sprint_results,
          ▼
     driver_prediction_features (features JSONB) / driver_sprint_features (score columns)
          │
-         ▼  (compute_predictions: softmax T = 1 / compute_sprint_predictions: T = 0.3)
+         ▼  (same job, same transaction: softmax T = 1 for GP / T = 0.3 for sprint)
     race_predictions / sprint_predictions
          │
          ▼  (Hono API reads)
@@ -104,13 +104,12 @@ conventional weekend:
   scheduled → qualifying_done → completed
                    │                │
           compute_features    ingest_race
-          compute_predictions compute_season_stats
+                              compute_season_stats
 
 sprint weekend:
   scheduled → sprint_qualifying_done → sprint_done → qualifying_done → completed
                        │                   │               │
               compute_sprint_features  ingest_sprint  compute_features
-              compute_sprint_predictions               compute_predictions
 ```
 
 Main race predictions are computed at `qualifying_done`. Sprint predictions are computed at `sprint_qualifying_done` (after SQ session).
@@ -158,7 +157,7 @@ win_probability = exp_s / exp_s.sum()
 - **GP (weighted-v4): T = 1.** The fitted weights already set how decisive the model is, so there is no
   separate temperature to tune: the fit picks the scale that best matches who actually won.
 - **Sprint (sprint-v2): T = 0.3**, `SPRINT_SOFTMAX_TEMPERATURE` in `feature_manifest.py` and
-  `predictionMath.ts`. Its weights are hand-picked percentages, so it needs one.
+  the API's `feature-manifest.ts`. Its weights are hand-picked percentages, so it needs one.
 
 Probabilities sum to 1.0 across all drivers in a race.
 
@@ -207,8 +206,8 @@ still available (26 per GP 2019–2024, 25 otherwise; 8 per sprint, 3 in 2021) f
 
 `scripts/backtest.py` replays every completed GP from a local snapshot of Neon
 (`scripts/backtest_snapshot.py` → `docker-compose.backtest.yml`; it refuses Neon itself). Each race is
-predicted with the real feature job, which reads season stats as of the race date
-(`utils/season_aggregates.py`), and scored with `utils/backtest.py`: log loss, multi-class Brier,
+predicted through the same `utils/gp_model_v4.py` the live job and the backfill use: `training_races` →
+`fit(before=race date)` → probabilities from the in-memory `RaceHistory`, and scored with `utils/backtest.py`: log loss, multi-class Brier,
 top-1/top-3 (tie-aware) and a calibration table. Baselines: `grid-history`, P(win | grid slot) learned only
 from earlier races (its top pick is the pole-sitter), and `uniform`. New candidates are one entry in
 `CANDIDATES`.

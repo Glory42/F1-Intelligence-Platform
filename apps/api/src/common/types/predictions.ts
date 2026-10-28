@@ -8,10 +8,14 @@ export type ModelInfo = {
   sprintVersion: string;
 };
 
+// One feature of a driver's Prediction, for either model. value: the feature in its own units (GP) or its
+// 0–1 Feature Score (sprint); contribution: its term in the driver's log-odds score, so a softmax over the
+// field of the summed contributions is the win probability.
+export type FeatureTerm = { value: number; contribution: number };
+
 // weighted-v4's features as stored by data-engine's compute_features (snake_case keys, the Python names).
-// value: the feature in its own units; contribution: its term in the driver's log-odds score.
-export type StoredGpFeatureTerm = { value: number; contribution: number };
-export type StoredGpFeatures = Record<string, StoredGpFeatureTerm>;
+export type StoredGpFeatureTerm = FeatureTerm;
+export type StoredGpFeatures = Record<string, FeatureTerm>;
 
 export type GpFeatureKey =
   | 'grid'
@@ -22,10 +26,18 @@ export type GpFeatureKey =
   | 'gridProcessional'
   | 'teamRacePace';
 
-// A driver's win probability is softmax over the field of the summed contributions (T = 1).
-export type GpFeatures = Record<GpFeatureKey, StoredGpFeatureTerm>;
+export type GpFeatures = Record<GpFeatureKey, FeatureTerm>;
 
-// GP and sprint predictions share one shape and differ only in their features.
+// How a Prediction's page presents one feature. importance: the feature's share of the model in %
+// (GP: of the fitted |weight per SD|; sprint: its hand weight).
+export type FeatureInfo<TKey extends string = string> = {
+  key: TKey;
+  label: string;
+  shortLabel: string;
+  importance: number;
+};
+
+// GP and sprint predictions share one shape and differ only in which features they have.
 export type DriverPredictionOf<TFeatures> = {
   driver: Driver;
   winProbability: string;
@@ -40,6 +52,8 @@ export type PredictionOf<TFeatures> = {
   predictedWinner: Driver;
   computedAt: string;
   modelVersion: string;
+  // The model's features in display order.
+  featureInfo: FeatureInfo<Extract<keyof TFeatures, string>>[];
   drivers: DriverPredictionOf<TFeatures>[];
 };
 

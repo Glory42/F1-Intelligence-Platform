@@ -3,18 +3,11 @@ from datetime import datetime, timezone
 import pytest
 
 from src import enrichment_coverage as ec
-from src.enrichment_coverage import Source
 from src.jobs import ingest_stints
-from src.utils.fastf1_enrichment import stint_rows
+from src.utils.driver_registry import SeasonDrivers
+from src.utils.fastf1_session import stints as fastf1_stints
+from src.utils.openf1_session import OpenF1Session, stints as openf1_stints
 from tests.support.fake_db import FakeConnection
-
-
-class TestSourceFor:
-    @pytest.mark.parametrize("year, source", [
-        (2017, None), (2018, Source.FASTF1), (2022, Source.FASTF1), (2023, Source.OPENF1), (2026, Source.OPENF1),
-    ])
-    def test_fastf1_fills_2018_to_2022_and_openf1_everything_since(self, year, source):
-        assert ec.source_for(year) is source
 
 
 _SPRINT_DAY = datetime(2026, 3, 7, 15, 0, tzinfo=timezone.utc)
@@ -68,14 +61,16 @@ class TestStintCompounds:
         ("UNKNOWN", None), ("TEST_UNKNOWN", None), ("nan", None), (None, None),
     ])
     def test_openf1_and_fastf1_stints_store_the_same_compound(self, raw, stored):
-        openf1, _ = ingest_stints._to_rows(
-            [{"driver_number": 44, "stint_number": 1, "compound": raw, "lap_start": 1, "lap_end": 9,
-              "tyre_age_at_start": 0}],
-            race_id=7, driver_map={44: 1},
-        )
-        fastf1 = stint_rows([{"Driver": "HAM", "LapNumber": 1, "Stint": 1.0, "Compound": raw, "TyreLife": 1}],
-                            {"HAM": 1}, race_id=7, session_type="race")
-        assert openf1[0]["compound"] == fastf1[0]["compound"] == stored
+        drivers = SeasonDrivers(by_number={44: 1}, by_code={"HAM": 1})
+        [from_openf1] = openf1_stints(OpenF1Session(session_key=1, stints=[
+            {"driver_number": 44, "stint_number": 1, "compound": raw, "lap_start": 1, "lap_end": 9, "tyre_age_at_start": 0},
+        ]))
+        [from_fastf1] = fastf1_stints([{"Driver": "HAM", "LapNumber": 1, "Stint": 1.0, "Compound": raw, "TyreLife": 1}])
+
+        rows, _ = ingest_stints.CONFIG.to_rows([from_openf1, from_fastf1], drivers, 7, "race")
+
+        assert rows[0]["compound"] == rows[1]["compound"] == stored
+        assert rows[0]["driver_id"] == rows[1]["driver_id"] == 1
 
 
 class TestCoverageOf:

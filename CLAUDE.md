@@ -22,11 +22,11 @@ it's Python, and its jobs run once and exit rather than being a long-running dev
 
 ### Where tests live
 - `data-engine/tests/`: pytest. Pure functions (`math_utils.py`, pure `feature_helpers.py` helpers, model
-  `WEIGHTS` invariants) are tested directly. DB-touching functions (`compute_weather_score`, `compute_luck_score`,
-  `build_feature_context`, `build_driver_code_map`) are tested via `tests/support/fake_db.py`: a scripted
+  `WEIGHTS` invariants) are tested directly. DB-touching functions (`compute_luck_score`, `same_person_rows`,
+  `compute_team_circuit_perf`, `season_drivers`) are tested via `tests/support/fake_db.py`: a scripted
   `FakeCursor`/`FakeConnection` double shaped like psycopg2's `RealDictCursor`, no real DB. `ingest_runner.py`'s
   two shared runners (`run_ingest_job` for race/sprint, `run_qualifying_ingest_job` for qualifying/sprint-qualifying)
-  are tested the same way. `upsert.py` and `prediction_runner.py` route their writes through
+  are tested the same way. `upsert.py` and the two prediction jobs route their writes through
   `psycopg2.extras.execute_batch`, which renders SQL via a C extension that needs a real connection
   even just to quote identifiers: so their tests monkeypatch `execute_batch` itself and assert on
   the params it receives, the same pattern `test_ingest_runner.py` already uses for its own
@@ -35,7 +35,7 @@ it's Python, and its jobs run once and exit rather than being a long-running dev
   (`tests/fixtures/openf1/`, `tests/fixtures/jolpica/`), checked against what FastF1 ingested.
   `weekend_pipeline` (Race Status → due jobs) and `enrichment_coverage` are tested pure; code that runs
   chains is tested by swapping entries in `weekend_pipeline.JOBS`, never by patching each job module.
-  The sprint feature job is pinned end to end through `feature_runner` in `test_feature_runner.py`; the GP job
+  The sprint job (`compute_sprint_features`, sprint-v2) is pinned end to end in `test_compute_sprint_features.py`; the GP job
   (`compute_features`, weighted-v4) and its pure features run against an in-memory `RaceHistory`
   (`tests/support/race_history.py`) in `test_compute_features.py` / `test_gp_features_v4.py`.
 - `apps/api/tests/unit/`: `bun test`, mirrors `src/` by domain (e.g. `tests/unit/common/mappers.test.ts`
@@ -341,12 +341,11 @@ cd data-engine
 python -m src.main --job ingest_race --year 2025 --round 14
 python -m src.main --job ingest_qualifying --year 2025 --round 14
 python -m src.main --job compute_features --race_id 42
-python -m src.main --job compute_predictions --race_id 42
 python -m src.main --job compute_season_stats --year 2025
 python -m src.main --job compute_title_odds --year 2025
 python -m src.main --job ingest_race_story --year 2026 --round 9 --session Sprint
 python scripts/backfill_openf1.py ingest_stints 2023 2026 [--refresh]   # local only: skips covered races
-python scripts/backfill_race_story.py 2018 2025             # local only
+python scripts/backfill_race_story.py 2018 2022             # local only: FastF1 cache seasons
 python scripts/backfill_fastf1_enrichment.py 2018 2022 [--only stints,pits,race_control,telemetry] [--refresh]  # local only
 python scripts/backfill_title_odds.py 2018 2026             # local only: replays odds after every completed round
 python scripts/backtest_snapshot.py                         # local only: one read-only Neon dump into docker-compose.backtest.yml
@@ -366,13 +365,13 @@ Status to the jobs due next: the worker, the CLI auto-detect, Repair and `backfi
 Typical action timing:
 
 **Conventional weekend:**
-- **Saturday 22:00 UTC**: `ingest_qualifying` → `compute_features` → `compute_predictions`
+- **Saturday 22:00 UTC**: `ingest_qualifying` → `compute_features`
 - **Sunday 18:00 UTC**: `ingest_race` → `compute_season_stats`
 
 **Sprint weekend:**
-- **Friday 22:00 UTC**: `ingest_sprint_qualifying` → `compute_sprint_features` → `compute_sprint_predictions`
+- **Friday 22:00 UTC**: `ingest_sprint_qualifying` → `compute_sprint_features`
 - **Saturday 16:00 UTC**: `ingest_sprint` → `compute_season_stats`
-- **Saturday 22:00 UTC**: `ingest_qualifying` → `compute_features` → `compute_predictions`
+- **Saturday 22:00 UTC**: `ingest_qualifying` → `compute_features`
 - **Sunday 18:00 UTC**: `ingest_race` → `compute_season_stats`
 
 ### Session data (OpenF1 + Jolpica)
@@ -391,6 +390,9 @@ local 2018–2022 backfills, which only work from a cache.
 Jobs exit with code 1 on failure (Render marks job failed for manual retrigger).
 Never use `sleep()` inside jobs for waiting on data: retry on the next worker cycle instead. The
 only sanctioned waits are `openf1_client`'s request pacing/backoff (see `docs/adr/0004`).
+A job whose source hasn't published the session yet raises `SessionNotReady` (`utils/session_records.py`): the
+worker retries only that (plus a spent OpenF1 budget and network errors); any other exception is a real failure.
+A new job is one entry in `src/jobs/registry.py`: the CLI and the pipeline's step table both read it.
 Use structured logging: `{"job": "ingest_race", "round": 14, "status": "failed", "error": "..."}`.
 
 ---
@@ -437,10 +439,13 @@ real units and only use races before the one predicted:
 - Fitted weights live in `data-engine/src/models/gp_v4.json`, written by `scripts/fit_model_v4.py` from the
   local backtest snapshot and committed. Refit only after `scripts/backtest.py` validates the change.
 - The importances above are each feature's share of |weight per SD|; `fit_model_v4.py` writes them to
-  `docs/feature-weights.json`, then mirror them into `apps/web` `predictionMath.ts` `FEATURE_META`.
-  `test_weights.py`, `predictionMath.test.ts` and the API's `feature-manifest.test.ts` check every copy.
+  `docs/feature-weights.json`, then mirror them into the API's `common/feature-manifest.ts`, which serves them
+  with every Prediction (`featureInfo`); the web keeps no copy. `test_weights.py` and `feature-manifest.test.ts` check both.
 - Each row stores `features` JSONB (feature → value + contribution); `raw_weighted_score` is the summed
-  contributions and `compute_predictions` applies a plain softmax (T = 1). There is no hand-set temperature.
+  contributions and the probability is a plain softmax (T = 1). There is no hand-set temperature.
+- `utils/gp_model_v4.py` is the only path to a GP Prediction: `training_races` → `fit(before=)` → `predict`, used by
+  `compute_features`, the backfill, the fit script and the backtest. `compute_features` writes features, probabilities
+  and the predicted winner in one transaction, and skips races inside the committed fit (`trained_on.to_date`).
 - Every feature must be computable from races before the predicted one: the backtest replays history and
   a feature that peeks ahead makes it lie (the v3 numbers did, see ADR 0010).
 
@@ -461,10 +466,12 @@ real units and only use races before the one predicted:
 - `circuits.sc_probability`: **not static**: recomputed after every race ingest from `races.safety_car_laps`
   (`ingest_race._recompute_circuit_sc_probability`)
 - Sprint softmax temperature T=0.3: `SPRINT_SOFTMAX_TEMPERATURE` in `data-engine/src/utils/feature_manifest.py`
-  (passed by `compute_sprint_predictions.py`) and `apps/web/src/lib/f1/predictionMath.ts`. It applies to the
+  (applied by `compute_sprint_features.py`) and the API's `common/feature-manifest.ts` (to serve each sprint score's
+  contribution as weight × score / T, the GP model's shape). It applies to the
   hand-weighted sprint model only.
 - Sprint weights: `SPRINT_FEATURES` in `feature_manifest.py`, re-exported as `WEIGHTS` by
-  `compute_sprint_features.py` (a `feature_runner` spec); weights, labels and the temperature are checked
+  `compute_sprint_features.py`, which also writes the probabilities and the predicted winner in one
+  transaction; weights, labels and the temperature are checked
   against `docs/feature-weights.json` by the same three tests.
 
 ---

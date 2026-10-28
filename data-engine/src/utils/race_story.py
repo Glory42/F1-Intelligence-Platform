@@ -1,6 +1,7 @@
 from bisect import bisect_right
 from collections import defaultdict
 from dataclasses import dataclass, field
+from typing import Optional
 
 
 @dataclass
@@ -87,3 +88,16 @@ def weather_trace(weather) -> WeatherTrace:
         track_temp_tenths=[round(v * 10) for v in weather["TrackTemp"]],
         rainfall=[bool(v) for v in weather["Rainfall"]],
     )
+
+
+@dataclass(frozen=True)
+class SessionStory:
+    traces: dict[str, LapTrace]
+    battles: list[Battle]
+    weather: Optional[WeatherTrace]
+
+
+def session_story(lap_records: list[dict], weather: Optional[WeatherTrace]) -> SessionStory:
+    """A session's race story from either adapter's lap records (driver code, lap, position, time_ms)."""
+    traces = build_lap_traces(lap_records)
+    return SessionStory(traces=traces, battles=find_battles(traces), weather=weather)

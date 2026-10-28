@@ -9,9 +9,11 @@ def upsert(
     rows: list[dict[str, Any]],
     conflict_cols: list[str],
     exclude_update: list[str] | None = None,
+    commit: bool = True,
 ) -> None:
     """exclude_update skips extra columns in UPDATE SET beyond conflict_cols (e.g. 'status',
-    so existing completed rows aren't reset to 'scheduled')."""
+    so existing completed rows aren't reset to 'scheduled'). commit=False leaves the write in the
+    caller's transaction, for jobs that must land several tables together."""
     if not rows:
         return
 
@@ -40,4 +42,5 @@ def upsert(
     with conn.cursor() as cur:
         param_list = [[row[c] for c in cols] for row in rows]
         execute_batch(cur, query, param_list, page_size=200)
-    conn.commit()
+    if commit:
+        conn.commit()

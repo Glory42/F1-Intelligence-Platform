@@ -2,8 +2,8 @@ import {
   driverPredictionFeatures, driverSprintFeatures, lapTimes, qualifyingResults, racePredictions, raceResults, races,
   raceStatusEnum, sprintLapTimes, sprintPredictions, sprintResults,
 } from '../db/schema';
-import type { GpFeatures, RaceSession, SprintFeatureScores } from './types';
-import { mapFeatureRow, mapGpFeatures, SPRINT_FEATURE_MANIFEST } from './feature-manifest';
+import type { FeatureInfo, GpFeatures, RaceSession, SprintFeatures } from './types';
+import { featureInfo, GP_FEATURE_MANIFEST, mapGpFeatures, mapSprintFeatures, SPRINT_FEATURE_MANIFEST } from './feature-manifest';
 
 export type RaceStatus = (typeof raceStatusEnum.enumValues)[number];
 type FeatureTable = typeof driverPredictionFeatures | typeof driverSprintFeatures;
@@ -26,10 +26,11 @@ export interface AnySessionKind {
 }
 
 // The two models store their features differently (GP: one JSONB object; sprint: a column per score),
-// so each kind says how to read a feature row into its API shape.
+// so each kind reads its feature row into the one {value, contribution} shape both are served in.
 export interface SessionKind<TFeatures extends FeatureTable, TScores> extends AnySessionKind {
   features: TFeatures;
   mapFeatures: (row: TFeatures['$inferSelect']) => TScores;
+  featureInfo: FeatureInfo<Extract<keyof TScores, string>>[];
 }
 
 export const GP: SessionKind<typeof driverPredictionFeatures, GpFeatures> = {
@@ -37,6 +38,7 @@ export const GP: SessionKind<typeof driverPredictionFeatures, GpFeatures> = {
   predictions: racePredictions,
   features: driverPredictionFeatures,
   mapFeatures: (row) => mapGpFeatures(row.features),
+  featureInfo: featureInfo(GP_FEATURE_MANIFEST),
   results: raceResults,
   laps: lapTimes,
   grid: qualifyingResults,
@@ -45,11 +47,12 @@ export const GP: SessionKind<typeof driverPredictionFeatures, GpFeatures> = {
   done: ['completed'],
 };
 
-export const SPRINT: SessionKind<typeof driverSprintFeatures, SprintFeatureScores> = {
+export const SPRINT: SessionKind<typeof driverSprintFeatures, SprintFeatures> = {
   session: 'sprint',
   predictions: sprintPredictions,
   features: driverSprintFeatures,
-  mapFeatures: (row) => mapFeatureRow(row, SPRINT_FEATURE_MANIFEST),
+  mapFeatures: mapSprintFeatures,
+  featureInfo: featureInfo(SPRINT_FEATURE_MANIFEST),
   results: sprintResults,
   laps: sprintLapTimes,
   grid: sprintResults,

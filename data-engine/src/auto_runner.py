@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, TypeVar
 
 import pandas as pd
 import fastf1
@@ -11,9 +11,14 @@ from src.jobs import sync_schedule
 from src.utils import openf1_client
 from src.utils.logging_utils import log_job_failure, log_job_ok
 from src.utils.schedule_window import race_weekend_window, RaceWeekendWindow
-from src.weekend_pipeline import (
-    JOBS, Action, ActionKind, JobStep, RaceRunContext, is_sprint_weekend, plan,
-)
+from src.session_kind import is_sprint_weekend
+from src.utils.session_records import SessionNotReady
+from src.weekend_pipeline import Action, JobStep, RaceRunContext, plan
+
+T = TypeVar("T")
+# What "try again next cycle" means: the source hasn't published the session yet, this cycle's OpenF1
+# request budget is spent, or the network failed. Anything else is a real failure and is logged as one.
+NOT_READY = (SessionNotReady, openf1_client.OpenF1BudgetExceeded, requests.RequestException)
 
 
 @dataclass(frozen=True)
@@ -60,48 +65,18 @@ def revert_race_status(
         conn.close()
 
 
-def _fp2_coverage(conn, race_id: int) -> float:
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT COUNT(DISTINCT driver_id) AS n FROM fp2_long_run_times "
-            "WHERE race_id = %s",
-            (race_id,),
-        )
-        covered = cur.fetchone()["n"]
-        cur.execute(
-            "SELECT COUNT(*) AS n FROM qualifying_results WHERE race_id = %s",
-            (race_id,),
-        )
-        expected = cur.fetchone()["n"]
-    if not expected:
-        return 1.0
-    return covered / expected
-
-
-def _backfill_fp2(log_func, conn, ctx: RaceRunContext) -> bool:
-    """ingest_fp2 only runs once (at MAIN_QUALIFYING); if data wasn't ready it was never
-    retried, so retry here each wait-cycle while coverage is below 0.7. FP2 now only feeds the
-    Friday-pace table (weighted-v4 doesn't read it), so predictions aren't recomputed after it.
-    Returns whether coverage has reached the gate."""
-    before = _fp2_coverage(conn, ctx.race_id)
-    if before >= 0.7:
-        return True
-    log_func(f"[auto_runner] FP2 coverage {before:.0%}, retrying FP2 while waiting for race")
+def _read(conn_factory: Callable[[], Any], query: Callable[[Any], T]) -> T:
+    """One short read on its own connection: jobs open theirs, so none is held while they call OpenF1."""
+    conn = conn_factory()
     try:
-        JOBS["ingest_fp2"](ctx)
-        after = _fp2_coverage(conn, ctx.race_id)
-        if after > before:
-            log_func(f"[auto_runner] FP2 backfilled ({before:.0%} -> {after:.0%})")
-        else:
-            log_func(f"[auto_runner] FP2 still not available ({after:.0%}); will retry next cycle")
-        return after >= 0.7
-    except requests.RequestException as e:
-        log_func(f"[auto_runner] FP2 not ready yet: {e}")
-        return False
+        return query(conn)
+    finally:
+        conn.close()
 
 
 def _retry_missing_race_events(
-    log_func: Callable[[str], None], conn: Any, round_number: int, year: int, memo: Optional["WorkerMemo"] = None,
+    log_func: Callable[[str], None], conn_factory: Callable[[], Any], round_number: int, year: int,
+    memo: Optional["WorkerMemo"] = None,
 ) -> bool:
     """Safety net for the chains' optional steps (see JobStep.run), re-checked every
     cycle inside the window's race-weekend window (up to 24h after the race). Each coverage
@@ -110,7 +85,7 @@ def _retry_missing_race_events(
     legitimately empty table never keeps the worker opening Neon every cycle.
 
     Returns False when anything still needs another pass, so the caller keeps re-checking."""
-    rows = read_coverage(conn, year, year, round_number)
+    rows = _read(conn_factory, lambda conn: read_coverage(conn, year, year, round_number))
     if not rows:
         return True
 
@@ -229,111 +204,107 @@ def run_cycle(
 
     if memo is not None:
         memo.tracked = None
-    conn = conn_factory()
-    try:
-        # The window's race may already be 'completed' and so invisible to the "active race"
-        # query below (or superseded by the next round already being 'scheduled'): check it
-        # directly on every cycle we're still inside its window (up to 24h post-race-start).
-        race_events_settled = True
-        if window is not None:
-            race_events_settled = _retry_missing_race_events(log_func, conn, window.round_number, now_utc.year, memo)
+    # The window's race may already be 'completed' and so invisible to the "active race"
+    # query below (or superseded by the next round already being 'scheduled'): check it
+    # directly on every cycle we're still inside its window (up to 24h post-race-start).
+    race_events_settled = True
+    if window is not None:
+        race_events_settled = _retry_missing_race_events(log_func, conn_factory, window.round_number, now_utc.year, memo)
 
-        with conn.cursor() as cur:
-            # Find the most recent active race
-            cur.execute(
-                """
-                SELECT r.id, r.round_number, s.year, r.status, r.event_format, r.name
-                FROM races r
-                JOIN seasons s ON r.season_id = s.id
-                WHERE r.status != 'completed' AND s.year >= EXTRACT(YEAR FROM CURRENT_DATE)
-                ORDER BY r.race_date ASC
-                LIMIT 1
-                """
-            )
-            race_row = cur.fetchone()
+    race_row = _read(conn_factory, _active_race)
+    if not race_row:
+        log_func("[auto_runner] No active races found. Exiting.")
+        return CycleResult(window=window, schedule_available=schedule_available)
 
-        if not race_row:
-            log_func("[auto_runner] No active races found. Exiting.")
-            return CycleResult(window=window, schedule_available=schedule_available)
+    ctx = RaceRunContext(
+        race_id=race_row["id"],
+        year=race_row["year"],
+        round_number=race_row["round_number"],
+    )
+    status = race_row["status"]
+    is_sprint = is_sprint_weekend(race_row["event_format"])
 
-        ctx = RaceRunContext(
-            race_id=race_row["id"],
-            year=race_row["year"],
-            round_number=race_row["round_number"],
-        )
-        status = race_row["status"]
-        is_sprint = is_sprint_weekend(race_row["event_format"])
+    log_func(f"[auto_runner] Tracking {ctx.year} Round {ctx.round_number} (Status: {status})")
 
-        log_func(f"[auto_runner] Tracking {ctx.year} Round {ctx.round_number} (Status: {status})")
-
-        # Reuse the schedule already fetched for the gate; only re-fetch if that fetch failed.
-        if schedule is None:
-            try:
-                schedule = fetch()
-                schedule_available = True
-                window = race_weekend_window(schedule, now_utc)
-            except Exception as e:
-                log_func(f"[auto_runner] Failed to fetch schedule from FastF1: {e}")
-                return CycleResult(window=None, schedule_available=False)
-
+    # Reuse the schedule already fetched for the gate; only re-fetch if that fetch failed.
+    if schedule is None:
         try:
-            event = schedule[schedule["RoundNumber"] == ctx.round_number].iloc[0]
+            schedule = fetch()
+            schedule_available = True
+            window = race_weekend_window(schedule, now_utc)
         except Exception as e:
             log_func(f"[auto_runner] Failed to fetch schedule from FastF1: {e}")
-            return CycleResult(window=window, schedule_available=schedule_available)
+            return CycleResult(window=None, schedule_available=False)
 
-        # Jobs look sessions up by round number, so a calendar change (an event added or
-        # dropped earlier in the season) would make them ingest a different event's sessions.
-        stored_name, schedule_name = race_row.get("name"), event.get("EventName")
-        if stored_name and schedule_name and stored_name != schedule_name:
+    try:
+        event = schedule[schedule["RoundNumber"] == ctx.round_number].iloc[0]
+    except Exception as e:
+        log_func(f"[auto_runner] Failed to fetch schedule from FastF1: {e}")
+        return CycleResult(window=window, schedule_available=schedule_available)
+
+    # Jobs look sessions up by round number, so a calendar change (an event added or
+    # dropped earlier in the season) would make them ingest a different event's sessions.
+    stored_name, schedule_name = race_row.get("name"), event.get("EventName")
+    if stored_name and schedule_name and stored_name != schedule_name:
+        log_func(
+            f"[auto_runner] Round {ctx.round_number} is {schedule_name} in FastF1 but {stored_name} "
+            f"in the database: re-syncing the {ctx.year} calendar."
+        )
+        sync_schedule.run(ctx.year, schedule=schedule)
+        return CycleResult(window=window, schedule_available=schedule_available)
+
+    try:
+        action = plan(status=status, is_sprint=is_sprint, event=event, now=now_utc)
+
+        if action is None:
+            log_func(f"[auto_runner] Unhandled status '{status}'. Exiting.")
+            return CycleResult(window=window, schedule_available=schedule_available)
+        if not action.ready:
+            if memo is not None and race_events_settled:
+                memo.tracked = TrackedRace(ctx=ctx, status=status, is_sprint=is_sprint)
+            ready_at_str = f"{action.ready_at:%Y-%m-%d %H:%MZ}" if action.ready_at else "unknown (session time missing from schedule)"
             log_func(
-                f"[auto_runner] Round {ctx.round_number} is {schedule_name} in FastF1 but {stored_name} "
-                f"in the database: re-syncing the {ctx.year} calendar."
+                f"[auto_runner] {action.label} not finished yet or hasn't reached delay threshold "
+                f"(ready at {ready_at_str}, now {now_utc:%Y-%m-%d %H:%MZ}). Exiting."
             )
-            sync_schedule.run(ctx.year, schedule=schedule)
             return CycleResult(window=window, schedule_available=schedule_available)
 
-        try:
-            action = plan(status=status, is_sprint=is_sprint, event=event, now=now_utc)
+        log_func(f"[auto_runner] {action.label} time passed. Attempting ingestion...")
+        outcome = _run_action_steps(action, ctx)
+        if not outcome.ok:
+            log_func(f"[auto_runner] Error during {action.label} sequence: {outcome.error}. Reverting status.")
+            revert_race_status(
+                conn_factory, ctx, outcome.last_committed_status, status, outcome.error, outcome.failed_step
+            )
+            raise outcome.error
+        log_func(f"[auto_runner] {action.label} ingestion completed successfully.")
+        return CycleResult(window=window, schedule_available=schedule_available)
 
-            if action is None:
-                log_func(f"[auto_runner] Unhandled status '{status}'. Exiting.")
-                return CycleResult(window=window, schedule_available=schedule_available)
-            if not action.ready:
-                fp2_settled = True
-                # Opportunistically backfill FP2 (see _backfill_fp2) while waiting for the race.
-                if status == "qualifying_done" and action.kind == ActionKind.MAIN_RACE:
-                    fp2_settled = _backfill_fp2(log_func, conn, ctx)
-                if memo is not None and fp2_settled and race_events_settled:
-                    memo.tracked = TrackedRace(ctx=ctx, status=status, is_sprint=is_sprint)
-                ready_at_str = f"{action.ready_at:%Y-%m-%d %H:%MZ}" if action.ready_at else "unknown (session time missing from schedule)"
-                log_func(
-                    f"[auto_runner] {action.label} not finished yet or hasn't reached delay threshold "
-                    f"(ready at {ready_at_str}, now {now_utc:%Y-%m-%d %H:%MZ}). Exiting."
-                )
-                return CycleResult(window=window, schedule_available=schedule_available)
-            else:
-                log_func(f"[auto_runner] {action.label} time passed. Attempting ingestion...")
-                outcome = _run_action_steps(action, ctx)
-                if not outcome.ok:
-                    log_func(f"[auto_runner] Error during {action.label} sequence: {outcome.error}. Reverting status.")
-                    revert_race_status(
-                        conn_factory, ctx, outcome.last_committed_status, status, outcome.error, outcome.failed_step
-                    )
-                    raise outcome.error
-                log_func(f"[auto_runner] {action.label} ingestion completed successfully.")
-                return CycleResult(window=window, schedule_available=schedule_available)
+    except NOT_READY as e:
+        log_func(f"[auto_runner] Session data not published yet. Will try again next cycle. Details: {e}")
+        return CycleResult(window=window, schedule_available=schedule_available)
+    except Exception as e:
+        # A real failure: logged so it shows up in Render logs; the status was already reverted.
+        log_func(f"[auto_runner] Unexpected error during execution: {e}")
+        log_job_failure("auto_runner", e, race_id=ctx.race_id, year=ctx.year, round=ctx.round_number)
+        raise
 
-        except (ValueError, RuntimeError, requests.RequestException) as e:
-            log_func(f"[auto_runner] Session data not published yet. Will try again next cycle. Details: {e}")
-            return CycleResult(window=window, schedule_available=schedule_available)
-        except Exception as e:
-            # For unexpected errors, we want to fail so it shows up in Render logs
-            log_func(f"[auto_runner] Unexpected error during execution: {e}")
-            log_job_failure("auto_runner", e, race_id=ctx.race_id, year=ctx.year, round=ctx.round_number)
-            raise
-    finally:
-        conn.close()
+
+def _active_race(conn: Any) -> Optional[dict[str, Any]]:
+    """The season's next weekend still being worked on."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT r.id, r.round_number, s.year, r.status, r.event_format, r.name
+            FROM races r
+            JOIN seasons s ON r.season_id = s.id
+            WHERE r.status != 'completed' AND s.year >= EXTRACT(YEAR FROM CURRENT_DATE)
+            ORDER BY r.race_date ASC
+            LIMIT 1
+            """
+        )
+        return cur.fetchone()
+
 
 if __name__ == "__main__":
     run_cycle()

@@ -38,17 +38,19 @@ ROUND_COUNTS = {
 
 ## Full Year Backfill (recommended)
 
-Use `scripts/run_backfill.py` for one or more years. It handles sync → ingest → compute automatically:
+Use `scripts/run_backfill.py` for one or more years. It handles sync → ingest → compute automatically, routing each
+year by `session_kind.results_ingest_for`: legacy Ergast jobs before 2018, OpenF1 + Jolpica from 2023, and it skips
+2018–2022 (that timing can't be re-ingested, ADR 0011):
 
 ```bash
 # Single year
-python scripts/run_backfill.py 2022 2022
+python scripts/run_backfill.py 2025 2025
 
 # Range
 python scripts/run_backfill.py 2005 2017
 
 # Background with log
-python scripts/run_backfill.py 2019 2023 > /tmp/backfill_2019_2023.log 2>&1 &
+python scripts/run_backfill.py 2023 2026 > /tmp/backfill_2023_2026.log 2>&1 &
 ```
 
 ## Individual Jobs
