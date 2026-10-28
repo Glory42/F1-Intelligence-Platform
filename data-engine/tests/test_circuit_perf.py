@@ -1,16 +1,19 @@
+from datetime import date
+
 from src.utils.feature_helpers import compute_team_circuit_perf
 from tests.support.fake_db import FakeConnection
 
+DAY = date(2025, 1, 1)
+
+
+def _perf(conn, driver_ids, category):
+    same = (list(driver_ids), list(driver_ids))
+    return compute_team_circuit_perf(conn, same, driver_ids, 10, DAY, category)
+
 
 class TestComputeTeamCircuitPerf:
-    def test_race_not_found_returns_none_for_all(self):
-        conn = FakeConnection([None])
-        result = compute_team_circuit_perf(conn, [1, 2], 999, "high_downforce")
-        assert result == {1: {"score": None, "n": 0}, 2: {"score": None, "n": 0}}
-
     def test_normalizes_category_scores_across_field(self):
         conn = FakeConnection([
-            {"race_date": "2025-01-01"},  # race lookup
             [  # category aggregation rows (21 - avg_finish relative, normalized after)
                 {"driver_id": 1, "cat_avg": 2.0, "cat_n": 8},    # strongest
                 {"driver_id": 2, "cat_avg": 10.0, "cat_n": 12},  # mid
@@ -18,7 +21,7 @@ class TestComputeTeamCircuitPerf:
             ],
         ])
 
-        result = compute_team_circuit_perf(conn, [1, 2, 3], 10, "high_downforce")
+        result = _perf(conn, [1, 2, 3], "high_downforce")
 
         # 21 - avg: 19, 11, 2 -> minmax -> 1.0, ~0.47, 0.0
         assert result[1]["score"] == 1.0
@@ -30,7 +33,6 @@ class TestComputeTeamCircuitPerf:
 
     def test_below_min_races_is_none(self):
         conn = FakeConnection([
-            {"race_date": "2025-01-01"},
             # driver 1 has plenty, driver 2 has only 1 category race
             [
                 {"driver_id": 1, "cat_avg": 3.0, "cat_n": 7},
@@ -38,7 +40,7 @@ class TestComputeTeamCircuitPerf:
             ],
         ])
 
-        result = compute_team_circuit_perf(conn, [1, 2], 10, "street")
+        result = _perf(conn, [1, 2], "street")
 
         # single valid driver -> normalize_minmax defaults to 0.5 (no spread)
         assert result[1]["score"] == 0.5
@@ -47,7 +49,6 @@ class TestComputeTeamCircuitPerf:
 
     def test_high_speed_blends_speed_trap_telemetry(self):
         conn = FakeConnection([
-            {"race_date": "2025-01-01"},
             [  # finish averages
                 {"driver_id": 1, "cat_avg": 3.0, "cat_n": 10},
                 {"driver_id": 2, "cat_avg": 4.0, "cat_n": 10},
@@ -58,7 +59,7 @@ class TestComputeTeamCircuitPerf:
             ],
         ])
 
-        result = compute_team_circuit_perf(conn, [1, 2], 10, "high_speed")
+        result = _perf(conn, [1, 2], "high_speed")
 
         # Driver 1 had slightly better finish avg, Driver 2 had higher top speed
         # Both are valid and have scores blended between finish and speed trap

@@ -2,9 +2,9 @@ import pytest
 
 from src.utils.feature_helpers import (
     car_rank, circuit_adj_start_pos, blend_car_perf,
-    compute_compressed_car_perf,
     CAR_CIRCUIT_BLEND_MAX, CAR_CIRCUIT_MIN_RACES,
 )
+from src.utils.season_aggregates import compute_compressed_car_perf
 
 
 class TestCarRank:

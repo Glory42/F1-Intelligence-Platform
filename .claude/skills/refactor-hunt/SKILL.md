@@ -19,8 +19,7 @@ If the user says "hunt in the sprint pipeline" or names a module, scope to that.
 
 ### 1. GP/sprint pipeline drift (data-engine/)
 
-This codebase runs two model pipelines, GP (`weighted-v4`) and sprint (`sprint-v2`). The feature jobs differ on purpose: `compute_features.py` applies the fitted conditional logit (`src/models/gp_v4.json`) to `gp_features_v4` over an in-memory `race_history`, while `compute_sprint_features.py` is a `feature_runner` spec over season aggregates. Do not flag those two as duplicates. The rest still mirror each other structurally:
-- `compute_predictions.py` / `compute_sprint_predictions.py` (both through `prediction_runner.py`)
+This codebase runs two model pipelines, GP (`weighted-v4`) and sprint (`sprint-v2`). The feature jobs differ on purpose: `compute_features.py` applies the fitted conditional logit (`src/models/gp_v4.json`) to `gp_features_v4` over an in-memory `race_history`, while `compute_sprint_features.py` is the whole hand-weighted sprint-v2 model over season aggregates. Do not flag those two as duplicates. The rest still mirror each other structurally:
 - `ingest_qualifying.py` / `ingest_sprint_qualifying.py`
 - `ingest_race.py` / `ingest_sprint.py`
 

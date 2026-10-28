@@ -62,6 +62,7 @@ class _SpyScheduleProvider:
 def _jobs(monkeypatch, **fakes):
     """Swaps entries of the pipeline's one job table: each fake takes the RaceRunContext."""
     for name, fake in fakes.items():
+        assert name in wp.JOBS, f"{name} is not a pipeline job"
         monkeypatch.setitem(wp.JOBS, name, fake)
 
 
@@ -314,8 +315,7 @@ class TestRunActionSteps:
             monkeypatch,
             ingest_sprint_qualifying=lambda ctx: calls.append("ingest"),
             compute_sprint_features=lambda ctx: calls.append("features"),
-            compute_sprint_predictions=lambda ctx: calls.append("predictions"),
-            compute_title_odds=lambda ctx: None,
+            compute_title_odds=lambda ctx: calls.append("title odds"),
             ingest_qualifying_telemetry_sprint=lambda ctx: None,
         )
 
@@ -324,7 +324,7 @@ class TestRunActionSteps:
         assert outcome == auto_runner.StepOutcome(
             ok=True, last_committed_status="sprint_qualifying_done", failed_step=None, error=None
         )
-        assert calls == ["ingest", "features", "predictions"]
+        assert calls == ["ingest", "features", "title odds"]
 
     def test_step_failure_returns_last_committed_status_and_failed_step(self, monkeypatch):
         boom = RuntimeError("boom")
@@ -332,7 +332,7 @@ class TestRunActionSteps:
             monkeypatch,
             ingest_sprint_qualifying=lambda ctx: None,
             compute_sprint_features=_boom(boom),
-            compute_sprint_predictions=lambda ctx: pytest.fail("the sequence must stop at the failing step"),
+            compute_title_odds=lambda ctx: pytest.fail("the sequence must stop at the failing step"),
         )
 
         outcome = auto_runner._run_action_steps(_action(ActionKind.SPRINT_QUALIFYING), _CTX)
@@ -420,7 +420,7 @@ class TestRunCycleSequenceRetry:
             monkeypatch,
             ingest_sprint_qualifying=lambda ctx: None,
             compute_sprint_features=_boom(ConnectionError("boom")),
-            compute_sprint_predictions=lambda ctx: pytest.fail("compute_sprint_features already failed"),
+            compute_title_odds=lambda ctx: pytest.fail("compute_sprint_features already failed"),
         )
 
         # First row answers the missing-race-events recheck (no race found -> no-op), second

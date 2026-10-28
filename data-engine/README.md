@@ -32,7 +32,6 @@ python -m src.main --job compute_features    --race_id 42
 # Sprint pipeline (sprint weekends only)
 python -m src.main --job ingest_sprint_qualifying --year 2026 --round 9
 python -m src.main --job compute_sprint_features  --race_id 55
-python -m src.main --job compute_sprint_predictions --race_id 55
 python -m src.main --job ingest_sprint            --year 2026 --round 9
 
 # Pre-2018 legacy jobs (Ergast: no lap data)
@@ -68,7 +67,7 @@ Data coverage:
 
 | Time (UTC) | Jobs |
 |------------|------|
-| Friday 22:00 | `ingest_sprint_qualifying` → `compute_sprint_features` → `compute_sprint_predictions` |
+| Friday 22:00 | `ingest_sprint_qualifying` → `compute_sprint_features` |
 | Saturday 16:00 | `ingest_sprint` → `compute_season_stats` |
 | Saturday 22:00 | `ingest_qualifying` → `compute_features` |
 | Sunday 18:00 | `ingest_race` → `compute_season_stats` |

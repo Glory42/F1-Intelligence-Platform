@@ -36,8 +36,7 @@ All jobs live in `data-engine/src/jobs/`. They are invoked via `src/main.py --jo
 |-----|---------|
 | `ingest_sprint_qualifying` | Ingests SQ session: stores SQ1/SQ2/SQ3 times + sector times + speed in `sprint_results`; uses `messages=True`; has date guard |
 | `ingest_sprint` | Ingests sprint race results, sprint lap times, and sprint conditions (weather, SC/VSC, temps) |
-| `compute_sprint_features` | Computes 8 sprint-specific feature scores per driver |
-| `compute_sprint_predictions` | Runs softmax on sprint feature scores → sprint win probabilities |
+| `compute_sprint_features` | The `sprint-v2` Prediction: 8 Feature Scores, softmax (T=0.3), ranks and the predicted sprint winner, in one transaction |
 | `data_quality_audit` | Measures per-table completeness/coverage across a season; writes `data_quality_runs` + `data_quality_issues` |
 | `data_quality_repair` | Re-ingests data for open, `fixable` issues reported by the audit, then recomputes the affected features/predictions/season-stats |
 
@@ -186,8 +185,7 @@ sync_schedule + sync_season
 ingest_sprint_qualifying   → sprint_results (sq1/sq2/sq3 times + grid)
                              race.status → sprint_qualifying_done
       ↓
-compute_sprint_features    → driver_sprint_features
-compute_sprint_predictions → sprint_predictions
+compute_sprint_features    → driver_sprint_features + sprint_predictions
 ingest_qualifying_telemetry (SQ) → non-fatal, resumable
       ↓
 ingest_sprint              → sprint_results (finish positions, points)
@@ -267,7 +265,6 @@ python -m src.main --job compute_features  --race_id 42
 # Sprint pipeline
 python -m src.main --job ingest_sprint_qualifying --year 2026 --round 9
 python -m src.main --job compute_sprint_features  --race_id 55
-python -m src.main --job compute_sprint_predictions --race_id 55
 python -m src.main --job ingest_sprint            --year 2026 --round 9
 
 # Race Events (OpenF1) and race story: --session defaults to Race; pass Sprint for the sprint session

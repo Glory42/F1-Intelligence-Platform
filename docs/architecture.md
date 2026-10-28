@@ -85,8 +85,7 @@ Sunday
 ```
 Friday
   data-engine: ingest_sprint_qualifying → sprint_results (SQ grid + sq1/sq2/sq3 times)
-  data-engine: compute_sprint_features  → driver_sprint_features
-  data-engine: compute_sprint_predictions → sprint_predictions
+  data-engine: compute_sprint_features  → driver_sprint_features + sprint_predictions
   race.status: scheduled → sprint_qualifying_done
 
 Saturday

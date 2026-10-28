@@ -11,7 +11,6 @@ from src.jobs import (
     compute_features,
     compute_season_stats,
     compute_sprint_features,
-    compute_sprint_predictions,
     compute_title_odds,
     ingest_fp2,
     ingest_overtakes,
@@ -27,14 +26,10 @@ from src.jobs import (
     ingest_team_radio,
 )
 from src.enrichment_coverage import SESSIONS, coverage_of, step_name
+from src.session_kind import SPRINT_FORMATS, is_sprint_weekend  # noqa: F401 (re-exported)
 from src.utils.logging_utils import log_job_failure
 
-SPRINT_FORMATS = frozenset({"sprint", "sprint_qualifying", "sprint_shootout"})
 WEEKEND_STATUSES = ("scheduled", "sprint_qualifying_done", "sprint_done", "qualifying_done", "completed")
-
-
-def is_sprint_weekend(event_format: Optional[str]) -> bool:
-    return event_format in SPRINT_FORMATS
 
 
 class ActionKind(str, Enum):
@@ -98,7 +93,6 @@ RACE_EVENT_JOBS = {
 JOBS: dict[str, Callable[[RaceRunContext], Any]] = {
     "ingest_sprint_qualifying": lambda ctx: ingest_sprint_qualifying.run(ctx.year, ctx.round_number),
     "compute_sprint_features": lambda ctx: compute_sprint_features.run(ctx.race_id),
-    "compute_sprint_predictions": lambda ctx: compute_sprint_predictions.run(ctx.race_id),
     "ingest_sprint": lambda ctx: ingest_sprint.run(ctx.year, ctx.round_number),
     "compute_season_stats": lambda ctx: compute_season_stats.run(ctx.year),
     "ingest_qualifying": lambda ctx: ingest_qualifying.run(ctx.year, ctx.round_number),
@@ -142,7 +136,6 @@ _CHAINS: dict[ActionKind, tuple[JobStep, ...]] = {
     ActionKind.SPRINT_QUALIFYING: (
         JobStep("ingest_sprint_qualifying", commits_status="sprint_qualifying_done"),
         JobStep("compute_sprint_features"),
-        JobStep("compute_sprint_predictions"),
         _TITLE_ODDS,
         # Telemetry (~41 OpenF1 requests) outruns one cycle's budget; the coverage retry resumes it.
         JobStep("ingest_qualifying_telemetry_sprint", optional=True),

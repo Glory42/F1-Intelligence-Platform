@@ -98,13 +98,6 @@ def _dispatch(job: str, args: argparse.Namespace) -> None:
         from src.jobs.compute_sprint_features import run
         run(args.race_id)
 
-    elif job == "compute_sprint_predictions":
-        if not args.race_id:
-            print("--race_id required for compute_sprint_predictions", file=sys.stderr)
-            sys.exit(1)
-        from src.jobs.compute_sprint_predictions import run
-        run(args.race_id)
-
     elif job == "compute_features":
         if not args.race_id:
             print("--race_id required for compute_features", file=sys.stderr)
@@ -132,7 +125,6 @@ def main() -> None:
         "compute_season_stats",
         "compute_title_odds",
         "compute_sprint_features",
-        "compute_sprint_predictions",
         "compute_features",
         "data_quality_audit",
         "data_quality_repair",

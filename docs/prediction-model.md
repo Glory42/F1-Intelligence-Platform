@@ -88,7 +88,7 @@ raw tables: race_results, qualifying_results, lap_times, sprint_results,
          ▼
     driver_prediction_features (features JSONB) / driver_sprint_features (score columns)
          │
-         ▼  (compute_predictions: softmax T = 1 / compute_sprint_predictions: T = 0.3)
+         ▼  (same job, same transaction: softmax T = 1 for GP / T = 0.3 for sprint)
     race_predictions / sprint_predictions
          │
          ▼  (Hono API reads)
@@ -110,7 +110,6 @@ sprint weekend:
   scheduled → sprint_qualifying_done → sprint_done → qualifying_done → completed
                        │                   │               │
               compute_sprint_features  ingest_sprint  compute_features
-              compute_sprint_predictions               compute_predictions
 ```
 
 Main race predictions are computed at `qualifying_done`. Sprint predictions are computed at `sprint_qualifying_done` (after SQ session).

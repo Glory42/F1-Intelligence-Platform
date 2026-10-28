@@ -13,7 +13,7 @@ import time
 sys.path.insert(0, ".")
 
 from src.db.client import get_conn
-from src.jobs import compute_features, compute_sprint_features, compute_sprint_predictions
+from src.jobs import compute_features, compute_sprint_features
 from src.utils.gp_model_v4 import TRAIN_FROM_YEAR, fit, history_start, load_committed, predict, training_races
 from src.utils.race_history import load_history
 from src.utils.storage_guard import read_storage_tier
@@ -69,7 +69,6 @@ def backfill_sprint() -> list[tuple[int, str]]:
     for race_id in race_ids:
         try:
             compute_sprint_features.run(race_id)
-            compute_sprint_predictions.run(race_id)
         except Exception as exc:
             print(f"  sprint race {race_id} FAILED: {exc}", file=sys.stderr)
             errors.append((race_id, str(exc)))

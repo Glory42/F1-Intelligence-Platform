@@ -279,7 +279,7 @@ but never its sister team Red Bull. Each entry keeps its own season's `teamId`.
 
 ### `GET /api/predictions/model-info`
 
-Returns the most recently computed model versions for GP and sprint predictions. Updates automatically whenever `compute_predictions` or `compute_sprint_predictions` runs: no deploy needed.
+Returns the most recently computed model versions for GP and sprint predictions. Updates automatically whenever `compute_features` or `compute_sprint_features` runs: no deploy needed.
 
 ```json
 {

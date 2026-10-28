@@ -229,7 +229,7 @@ class TestRepairPlan:
 class TestPredictionSteps:
     def test_a_sprint_weekend_rebuilds_both_predictions_once_each(self):
         assert [s.name for s in wp.prediction_steps(is_sprint=True)] == [
-            "compute_sprint_features", "compute_sprint_predictions",
+            "compute_sprint_features",
             "ingest_fp2", "compute_features",
         ]
 

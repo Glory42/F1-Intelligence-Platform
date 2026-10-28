@@ -1,4 +1,10 @@
+"""sprint-v2's database-backed feature helpers. History is matched by person (identity.person_ids), never
+by driver code: codes are labels, VER is Vergne and Verstappen."""
 from collections import defaultdict
+from datetime import date
+from typing import Any
+
+from src.utils.identity import person_ids
 from src.utils.math_utils import normalize_minmax, clamp
 
 # Weight of the circuit-category signal vs season car_performance_score, ramping in
@@ -7,20 +13,22 @@ CAR_CIRCUIT_BLEND_MAX = 0.35
 CAR_CIRCUIT_MIN_RACES = 2
 CAR_CIRCUIT_RAMP_RACES = 6
 
+# (driver row on this grid, any row of the same person) pairs, as two parallel id lists for unnest().
+SamePerson = tuple[list[int], list[int]]
+_SAME_PERSON = "unnest(%s::int[], %s::int[]) AS same(driver_id, hist_id)"
 
-def compute_compressed_car_perf(
-    pace_signals: list[float],
-    grid_signals: list[float],
-    rel_weight: float = 0.5,
-) -> list[float]:
-    """Blends relative field min-max with an absolute grid scale (1..20) so top-tier
-    constructors don't get runaway 1.0 vs 0.74 gaps."""
-    if not pace_signals or not grid_signals:
-        return []
-    raw = [0.6 * p + 0.4 * g for p, g in zip(pace_signals, grid_signals)]
-    rel_norm = normalize_minmax(raw)
-    abs_norm = [clamp((s - 1.0) / 19.0, 0.0, 1.0) for s in raw]
-    return [clamp(rel_weight * r + (1.0 - rel_weight) * a) for r, a in zip(rel_norm, abs_norm)]
+
+def same_person_rows(conn: Any, driver_ids: list[int]) -> SamePerson:
+    with conn.cursor() as cur:
+        cur.execute("SELECT d.id, d.code, d.first_name, d.last_name FROM drivers d")
+        person = person_ids(cur.fetchall())
+    wanted = {person[d] for d in driver_ids if d in person}
+    rows_of: dict[str, list[int]] = defaultdict(list)
+    for row_id, key in person.items():
+        if key in wanted:
+            rows_of[key].append(row_id)
+    pairs = [(d, h) for d in driver_ids for h in rows_of.get(person.get(d, ""), [d])]
+    return [d for d, _ in pairs], [h for _, h in pairs]
 
 
 def blend_car_perf(season: float, category: float | None, category_races: int) -> float:
@@ -33,34 +41,25 @@ def blend_car_perf(season: float, category: float | None, category_races: int) -
     return clamp(season * (1 - w) + category * w)
 
 
-def compute_team_circuit_perf(conn, driver_ids: list[int], race_id: int, circuit_category: str) -> dict[int, dict]:
-    """Cross-season via driver.code; returns {driver_id: {"score": 0-1 | None, "n": count}},
-    score None below CAR_CIRCUIT_MIN_RACES. high_speed tracks also blend in speed trap pace."""
-    with conn.cursor() as cur:
-        cur.execute("SELECT race_date FROM races WHERE id = %s", (race_id,))
-        race_info = cur.fetchone()
-    if not race_info:
-        return {d: {"score": None, "n": 0} for d in driver_ids}
-
+def compute_team_circuit_perf(
+    conn: Any, same: SamePerson, driver_ids: list[int], race_id: int, race_date: date, circuit_category: str,
+) -> dict[int, dict]:
+    """{driver_id: {"score": 0-1 | None, "n": count}} from this person's earlier races at this circuit
+    category, score None below CAR_CIRCUIT_MIN_RACES. high_speed tracks also blend in speed trap pace."""
     with conn.cursor() as cur:
         cur.execute(
-            """
-            SELECT d_cur.id AS driver_id,
+            f"""
+            SELECT same.driver_id,
                    AVG(rr.finish_position) FILTER (WHERE rr.finish_position IS NOT NULL) AS cat_avg,
                    COUNT(rr.finish_position) FILTER (WHERE rr.finish_position IS NOT NULL) AS cat_n
-            FROM drivers d_cur
-            JOIN drivers d_hist ON d_hist.code = d_cur.code
-            JOIN race_results rr ON rr.driver_id = d_hist.id
+            FROM {_SAME_PERSON}
+            JOIN race_results rr ON rr.driver_id = same.hist_id
             JOIN races r ON rr.race_id = r.id
             JOIN circuits c ON r.circuit_id = c.id
-            WHERE d_cur.id = ANY(%s)
-              AND r.status = 'completed'
-              AND r.id != %s
-              AND r.race_date <= %s
-              AND c.track_category = %s
-            GROUP BY d_cur.id
+            WHERE r.status = 'completed' AND r.id != %s AND r.race_date < %s AND c.track_category = %s
+            GROUP BY same.driver_id
             """,
-            (driver_ids, race_id, race_info["race_date"], circuit_category),
+            (*same, race_id, race_date, circuit_category),
         )
         rows = {r["driver_id"]: r for r in cur.fetchall()}
 
@@ -75,24 +74,20 @@ def compute_team_circuit_perf(conn, driver_ids: list[int], race_id: int, circuit
     if circuit_category == "high_speed" and valid:
         with conn.cursor() as cur:
             cur.execute(
-                """
-                SELECT d_cur.id AS driver_id,
+                f"""
+                SELECT same.driver_id,
                        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY lt.speed_st::numeric) AS med_speed
-                FROM drivers d_cur
-                JOIN drivers d_hist ON d_hist.code = d_cur.code
-                JOIN lap_times lt ON lt.driver_id = d_hist.id
+                FROM {_SAME_PERSON}
+                JOIN lap_times lt ON lt.driver_id = same.hist_id
                 JOIN races r ON lt.race_id = r.id
                 JOIN circuits c ON r.circuit_id = c.id
-                WHERE d_cur.id = ANY(%s)
-                  AND r.status = 'completed'
-                  AND r.id != %s
-                  AND r.race_date <= %s
+                WHERE r.status = 'completed' AND r.id != %s AND r.race_date < %s
                   AND c.track_category = 'high_speed'
                   AND lt.speed_st IS NOT NULL AND lt.speed_st > 0
                   AND lt.is_pit_lap = false
-                GROUP BY d_cur.id
+                GROUP BY same.driver_id
                 """,
-                (driver_ids, race_id, race_info["race_date"]),
+                (*same, race_id, race_date),
             )
             speed_rows = {
                 r["driver_id"]: float(r["med_speed"])
@@ -117,74 +112,29 @@ def compute_team_circuit_perf(conn, driver_ids: list[int], race_id: int, circuit
     return out
 
 
-def compute_weather_score(conn, driver_ids: list[int], weather: str) -> dict[int, float]:
-    """Historical wet-race finish position (cross-season via driver.code), normalized. Neutral (0.5) if dry."""
-    if weather == "dry":
-        return {d: 0.5 for d in driver_ids}
-
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT d_cur.id AS driver_id,
-                   AVG(rr.finish_position) FILTER (WHERE rr.finish_position IS NOT NULL) AS wet_avg,
-                   COUNT(*) AS wet_races
-            FROM drivers d_cur
-            JOIN drivers d_hist ON d_hist.code = d_cur.code
-            JOIN race_results rr ON rr.driver_id = d_hist.id
-            JOIN races r ON rr.race_id = r.id
-            WHERE r.weather IN ('wet', 'mixed') AND d_cur.id = ANY(%s)
-            GROUP BY d_cur.id
-            """,
-            (driver_ids,),
-        )
-        wet_rows = {r["driver_id"]: r for r in cur.fetchall()}
-
-    raw = []
-    for d in driver_ids:
-        row = wet_rows.get(d)
-        if row and row["wet_races"] and int(row["wet_races"]) >= 1:
-            raw.append(21.0 - float(row["wet_avg"]))
-        else:
-            raw.append(None)
-
-    valid = [s for s in raw if s is not None]
-    field_avg = sum(valid) / len(valid) if valid else 10.5
-    filled = [s if s is not None else field_avg for s in raw]
-    normalized = normalize_minmax(filled)
-    return {driver_ids[i]: normalized[i] for i in range(len(driver_ids))}
-
-
 def car_rank(team_id, team_perf: dict) -> float:
     if not team_id:
         return 10.0
     return 20.0 - (team_perf.get(team_id, 0.5) * 19.0)
 
 
-def compute_luck_score(conn, driver_ids: list[int], race_id: int, team_perf: dict, stats_rows: dict) -> dict[int, float]:
-    """Finish position vs expected (avg of grid + car rank), last 5 completed races, cross-season via driver.code."""
-    with conn.cursor() as cur:
-        cur.execute("SELECT race_date FROM races WHERE id = %s", (race_id,))
-        race_info = cur.fetchone()
-    if not race_info:
-        return {d: 0.5 for d in driver_ids}
-
+def compute_luck_score(
+    conn: Any, same: SamePerson, driver_ids: list[int], race_date: date, team_perf: dict, stats_rows: dict,
+) -> dict[int, float]:
+    """Finish position vs expected (avg of grid + car rank) over the person's last 5 completed races."""
     with conn.cursor() as cur:
         cur.execute(
-            """
+            f"""
             SELECT driver_id, grid_position, finish_position FROM (
-                SELECT d_cur.id AS driver_id, rr.grid_position, rr.finish_position,
-                       ROW_NUMBER() OVER (PARTITION BY d_cur.id ORDER BY r.race_date DESC) AS rn
-                FROM drivers d_cur
-                JOIN drivers d_hist ON d_hist.code = d_cur.code
-                JOIN race_results rr ON rr.driver_id = d_hist.id
+                SELECT same.driver_id, rr.grid_position, rr.finish_position,
+                       ROW_NUMBER() OVER (PARTITION BY same.driver_id ORDER BY r.race_date DESC) AS rn
+                FROM {_SAME_PERSON}
+                JOIN race_results rr ON rr.driver_id = same.hist_id
                 JOIN races r ON rr.race_id = r.id
-                WHERE d_cur.id = ANY(%s)
-                  AND r.status = 'completed'
-                  AND r.race_date < %s
-                  AND rr.finish_position IS NOT NULL
+                WHERE r.status = 'completed' AND r.race_date < %s AND rr.finish_position IS NOT NULL
             ) t WHERE rn <= 5
             """,
-            (driver_ids, race_info["race_date"]),
+            (*same, race_date),
         )
         driver_results: dict[int, list] = defaultdict(list)
         for row in cur.fetchall():
@@ -208,49 +158,37 @@ def compute_luck_score(conn, driver_ids: list[int], race_id: int, team_perf: dic
 
 def circuit_adj_start_pos(start_pos: float, overtake_rate: float, sc_probability: float) -> float:
     """Grid position matters more at low-overtake tracks; high SC probability bunches the
-    field, reducing it further. Shared by GP and sprint: same formula, different WEIGHTS."""
+    field, reducing it further."""
     return clamp(start_pos * (1 + (1 - overtake_rate)) * (1 - 0.3 * sc_probability))
 
 
+# Statuses whose weekend has run Sprint Qualifying, this one included: its SQ is known before the sprint.
+_SQ_RUN = ["sprint_qualifying_done", "sprint_done", "qualifying_done", "completed"]
+
+
 def compute_rolling_teammate_delta(
-    conn,
-    driver_ids: list[int],
-    race_id: int,
-    *,
-    table: str,
-    time_cols: tuple[str, str, str],
-    status_filter: tuple[str, ...],
+    conn: Any, same: SamePerson, driver_ids: list[int], race_date: date,
 ) -> dict[int, float]:
-    """Weighted mean (recent=5..oldest=1) teammate delta over the last 5 sessions, cross-season.
-    `table`/`time_cols`/`status_filter` pick GP vs sprint qualifying; the algorithm is shared."""
-    with conn.cursor() as cur:
-        cur.execute("SELECT race_date FROM races WHERE id = %s", (race_id,))
-        race_info = cur.fetchone()
-    if not race_info:
-        return {d: 0.5 for d in driver_ids}
-
-    q1_col, q2_col, q3_col = time_cols
-
+    """Weighted mean (recent=5..oldest=1) Sprint Qualifying gap to the team-mate over the person's last 5
+    sprint weekends, this one included."""
     with conn.cursor() as cur:
         cur.execute(
             f"""
             SELECT sub.driver_id, sub.team_id, sub.best_ms, sub.race_date,
                    ROW_NUMBER() OVER (PARTITION BY sub.driver_id ORDER BY sub.race_date DESC) AS rn
             FROM (
-                SELECT d_cur.id AS driver_id, d_hist.team_id,
-                       LEAST(NULLIF(qr.{q3_col},0), NULLIF(qr.{q2_col},0), NULLIF(qr.{q1_col},0)) AS best_ms,
+                SELECT same.driver_id, d_hist.team_id,
+                       LEAST(NULLIF(sr.sq3_time_ms,0), NULLIF(sr.sq2_time_ms,0), NULLIF(sr.sq1_time_ms,0)) AS best_ms,
                        r.race_date
-                FROM drivers d_cur
-                JOIN drivers d_hist ON d_hist.code = d_cur.code
-                JOIN {table} qr ON qr.driver_id = d_hist.id
-                JOIN races r ON qr.race_id = r.id
-                WHERE d_cur.id = ANY(%s)
-                  AND r.race_date <= %s
-                  AND r.status::text = ANY(%s)
+                FROM {_SAME_PERSON}
+                JOIN drivers d_hist ON d_hist.id = same.hist_id
+                JOIN sprint_results sr ON sr.driver_id = same.hist_id
+                JOIN races r ON sr.race_id = r.id
+                WHERE r.race_date <= %s AND r.status::text = ANY(%s)
             ) sub
             WHERE sub.best_ms IS NOT NULL
             """,
-            (driver_ids, race_info["race_date"], list(status_filter)),
+            (*same, race_date, _SQ_RUN),
         )
         all_rows = cur.fetchall()
 

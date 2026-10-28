@@ -530,7 +530,7 @@ One row per grand prix: the single predicted winner.
 ---
 
 ### `driver_sprint_features`
-One row per driver per sprint weekend. Written by `compute_sprint_features`, updated by `compute_sprint_predictions`.
+One row per driver per sprint weekend. Written by `compute_sprint_features` together with the `sprint_predictions` row, in one transaction.
 
 | Column | Type | Notes |
 |--------|------|-------|

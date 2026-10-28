@@ -62,7 +62,7 @@ pytest, config in `pyproject.toml` (`pythonpath = ["."]`, `testpaths = ["tests"]
 - **DB-touching functions are tested through a fake double**: `tests/support/fake_db.py` provides
   `FakeCursor` / `FakeConnection`, shaped like psycopg2's `RealDictCursor`. `FakeConnection` takes a
   list of result sets and hands one out per `with conn.cursor()` block, in call order. This covers
-  `compute_weather_score`, `compute_luck_score`, `build_feature_context`, `build_driver_code_map`, and
+  `compute_luck_score`, `same_person_rows`, `compute_team_circuit_perf`, `build_driver_code_map`, and
   `ingest_runner.py`'s two shared runners (`run_ingest_job`, `run_qualifying_ingest_job`): the latter via
   monkeypatched per-job callables and `openf1_session` readers, no real session data needed. The same double
   covers `data_quality_audit._audit_race` (per-status gate/threshold branching),
@@ -76,14 +76,14 @@ pytest, config in `pyproject.toml` (`pythonpath = ["."]`, `testpaths = ["tests"]
   of the one job table, `weekend_pipeline.JOBS` (`monkeypatch.setitem`), never by patching job modules.
 - `conftest.py` sets a placeholder `DATABASE_URL` so importing a job module (which reads it at import
   time) works with or without a local `.env`. Tests never open a real connection.
-- `upsert.py` and `prediction_runner.py` write via `psycopg2.extras.execute_batch`, which renders SQL
+- `upsert.py` and the prediction jobs write via `psycopg2.extras.execute_batch`, which renders SQL
   through a C extension that needs a real connection even just to quote identifiers: so their tests
-  (`test_upsert.py`, `test_prediction_runner.py`) monkeypatch `execute_batch` itself and assert on the
+  (`test_upsert.py`, `test_compute_sprint_features.py`) monkeypatch `execute_batch` itself and assert on the
   params it receives, the same pattern `test_ingest_runner.py` already uses for its own `execute_batch`
   call, rather than extending `FakeCursor` to fake SQL rendering.
-- `test_feature_runner.py` runs the sprint feature job (`compute_sprint_features`, a
-  `feature_runner.FeatureJobSpec`) end to end and pins every written score to the rows sprint-v2
-  produced before the runner existed. Its fake connection routes each read by a marker in its
+- `test_compute_sprint_features.py` runs the sprint-v2 job end to end and pins every written score to the
+  rows sprint-v2 produced before it became one module, plus its probabilities, the predicted winner and the
+  person-keyed history reads. Its fake connection routes each read by a marker in its
   SQL rather than call order (the reads are independent), and it reads the written rows back from
   `execute_batch`'s params, naming columns from the composed INSERT.
 - `test_compute_features.py` covers the weighted-v4 GP job: each feature's value and contribution land in
