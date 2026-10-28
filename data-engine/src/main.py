@@ -112,13 +112,6 @@ def _dispatch(job: str, args: argparse.Namespace) -> None:
         from src.jobs.compute_features import run
         run(args.race_id)
 
-    elif job == "compute_predictions":
-        if not args.race_id:
-            print("--race_id required for compute_predictions", file=sys.stderr)
-            sys.exit(1)
-        from src.jobs.compute_predictions import run
-        run(args.race_id)
-
     elif job == "data_quality_audit":
         from src.jobs.data_quality_audit import run
         run(year=(args.year or date.today().year), all_years=args.all)
@@ -141,7 +134,6 @@ def main() -> None:
         "compute_sprint_features",
         "compute_sprint_predictions",
         "compute_features",
-        "compute_predictions",
         "data_quality_audit",
         "data_quality_repair",
     ])

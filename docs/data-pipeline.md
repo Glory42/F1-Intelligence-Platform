@@ -28,8 +28,7 @@ All jobs live in `data-engine/src/jobs/`. They are invoked via `src/main.py --jo
 | `ingest_race` | Ingests race results, lap times, and race conditions (weather, SC/VSC, temps): 2018+ |
 | `ingest_race_legacy` | Ingests race results from Ergast (no lap data): pre-2018 |
 | `compute_season_stats` | Aggregates `driver_season_stats` and `team_season_stats` for a year (includes sprint aggregates) |
-| `compute_features` | Computes the 12 feature scores per driver for a grand prix |
-| `compute_predictions` | Runs softmax on feature scores, writes win probabilities and predicted positions |
+| `compute_features` | The `weighted-v4` Prediction: 7 features, win probabilities, ranks and the predicted winner, in one transaction. Skips races inside the committed fit (`backfill_all_predictions.py` rebuilds those out-of-sample) |
 
 ### Sprint Race Jobs
 
@@ -175,9 +174,8 @@ compute_season_stats driver_season_stats and team_season_stats must be fresh
 ingest_race_control, ingest_overtakes, ingest_team_radio, ingest_stints, ingest_pit_stops
                      (Race, then Sprint if applicable) Race Events (OpenF1): non-fatal, 2023+ only
       ↓
-compute_features     produces driver_prediction_features (raw weighted scores)
-      ↓
-compute_predictions  reads raw scores, runs softmax, writes probabilities
+compute_features     driver_prediction_features (values, contributions, probabilities)
+                     + race_predictions, in one transaction
 ```
 
 ### Sprint Weekend
@@ -201,7 +199,7 @@ compute_season_stats       → updates sprint_wins, sprint_total_points, etc.
 ingest_qualifying          → qualifying_results
                              race.status → qualifying_done
       ↓
-compute_features + compute_predictions  → main race prediction
+compute_features                        → main race prediction
 ingest_qualifying_telemetry (Q)         → non-fatal, resumable
       ↓
 ingest_race                → race_results + lap_times
@@ -265,7 +263,6 @@ python -m src.main --job ingest_qualifying --year 2026 --round 6
 python -m src.main --job ingest_race       --year 2026 --round 6
 python -m src.main --job compute_season_stats --year 2026
 python -m src.main --job compute_features  --race_id 42
-python -m src.main --job compute_predictions --race_id 42
 
 # Sprint pipeline
 python -m src.main --job ingest_sprint_qualifying --year 2026 --round 9

@@ -9,7 +9,6 @@ import pandas as pd
 
 from src.jobs import (
     compute_features,
-    compute_predictions,
     compute_season_stats,
     compute_sprint_features,
     compute_sprint_predictions,
@@ -105,7 +104,6 @@ JOBS: dict[str, Callable[[RaceRunContext], Any]] = {
     "ingest_qualifying": lambda ctx: ingest_qualifying.run(ctx.year, ctx.round_number),
     "ingest_fp2": lambda ctx: ingest_fp2.run(ctx.year, ctx.round_number),
     "compute_features": lambda ctx: compute_features.run(ctx.race_id),
-    "compute_predictions": lambda ctx: compute_predictions.run(ctx.race_id),
     "ingest_race": lambda ctx: ingest_race.run(ctx.year, ctx.round_number),
     "compute_title_odds": lambda ctx: compute_title_odds.run(ctx.year),
     "ingest_qualifying_telemetry":
@@ -158,7 +156,6 @@ _CHAINS: dict[ActionKind, tuple[JobStep, ...]] = {
         JobStep("ingest_qualifying", commits_status="qualifying_done"),
         JobStep("ingest_fp2"),
         JobStep("compute_features"),
-        JobStep("compute_predictions"),
         _TITLE_ODDS,
         JobStep("ingest_qualifying_telemetry", optional=True),
     ),
@@ -242,7 +239,7 @@ _REPAIR_OWNERS: dict[tuple[str, str], str] = {
     ("sprint_results", "row_count"): "ingest_sprint",
     ("sprint_lap_times", "lap_coverage"): "ingest_sprint",
     ("driver_prediction_features", "feature_rows"): "compute_features",
-    ("race_predictions", "prediction_present"): "compute_predictions",
+    ("race_predictions", "prediction_present"): "compute_features",
     ("driver_season_stats", "driver_presence"): "compute_season_stats",
 }
 

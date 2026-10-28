@@ -182,13 +182,13 @@ class TestRepairSteps:
 
     def test_a_qualifying_repair_rebuilds_the_prediction(self):
         assert [s.name for s in wp.repair_steps("qualifying_results", "q_time_present")] == [
-            "ingest_qualifying", "ingest_fp2", "compute_features", "compute_predictions",
+            "ingest_qualifying", "ingest_fp2", "compute_features",
             "compute_title_odds", "ingest_qualifying_telemetry",
         ]
 
-    def test_a_missing_prediction_starts_from_the_prediction_step(self):
+    def test_a_missing_prediction_reruns_the_gp_model(self):
         assert [s.name for s in wp.repair_steps("race_predictions", "prediction_present")] == [
-            "compute_predictions", "compute_title_odds", "ingest_qualifying_telemetry",
+            "compute_features", "compute_title_odds", "ingest_qualifying_telemetry",
         ]
 
     def test_a_sprint_results_repair_reruns_the_sprint_race_chain(self):
@@ -210,17 +210,17 @@ class TestRepairPlan:
     def test_checks_in_one_chain_run_it_once_from_the_earliest_owner(self):
         plan = wp.repair_plan([("race_predictions", "prediction_present"), ("driver_prediction_features", "feature_rows")])
         assert [s.name for s in plan] == [
-            "compute_features", "compute_predictions", "compute_title_odds", "ingest_qualifying_telemetry",
+            "compute_features", "compute_title_odds", "ingest_qualifying_telemetry",
         ]
 
     def test_checks_in_several_chains_run_them_in_weekend_order(self):
         plan = wp.repair_plan([("race_results", "winner_present"), ("qualifying_results", "row_count")])
         names = [s.name for s in plan]
-        assert names[:6] == [
-            "ingest_qualifying", "ingest_fp2", "compute_features", "compute_predictions",
+        assert names[:5] == [
+            "ingest_qualifying", "ingest_fp2", "compute_features",
             "compute_title_odds", "ingest_qualifying_telemetry",
         ]
-        assert names[6:9] == ["ingest_race", "compute_season_stats", "compute_title_odds"]
+        assert names[5:8] == ["ingest_race", "compute_season_stats", "compute_title_odds"]
 
     def test_checks_without_a_repair_path_add_nothing(self):
         assert wp.repair_plan([("fp2_long_run_times", "driver_coverage")]) == ()
@@ -230,12 +230,12 @@ class TestPredictionSteps:
     def test_a_sprint_weekend_rebuilds_both_predictions_once_each(self):
         assert [s.name for s in wp.prediction_steps(is_sprint=True)] == [
             "compute_sprint_features", "compute_sprint_predictions",
-            "ingest_fp2", "compute_features", "compute_predictions",
+            "ingest_fp2", "compute_features",
         ]
 
     def test_a_conventional_weekend_rebuilds_the_gp_prediction(self):
         assert [s.name for s in wp.prediction_steps(is_sprint=False)] == [
-            "ingest_fp2", "compute_features", "compute_predictions",
+            "ingest_fp2", "compute_features",
         ]
 
 

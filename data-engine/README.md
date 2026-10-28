@@ -28,7 +28,6 @@ python -m src.main --job ingest_qualifying --year 2026 --round 6
 python -m src.main --job ingest_race       --year 2026 --round 6
 python -m src.main --job compute_season_stats --year 2026
 python -m src.main --job compute_features    --race_id 42
-python -m src.main --job compute_predictions --race_id 42
 
 # Sprint pipeline (sprint weekends only)
 python -m src.main --job ingest_sprint_qualifying --year 2026 --round 9
@@ -62,7 +61,7 @@ Data coverage:
 
 | Time (UTC) | Jobs |
 |------------|------|
-| Saturday 22:00 | `ingest_qualifying` → `compute_features` → `compute_predictions` |
+| Saturday 22:00 | `ingest_qualifying` → `compute_features` |
 | Sunday 18:00 | `ingest_race` → `compute_season_stats` |
 
 ### Sprint Weekend
@@ -71,7 +70,7 @@ Data coverage:
 |------------|------|
 | Friday 22:00 | `ingest_sprint_qualifying` → `compute_sprint_features` → `compute_sprint_predictions` |
 | Saturday 16:00 | `ingest_sprint` → `compute_season_stats` |
-| Saturday 22:00 | `ingest_qualifying` → `compute_features` → `compute_predictions` |
+| Saturday 22:00 | `ingest_qualifying` → `compute_features` |
 | Sunday 18:00 | `ingest_race` → `compute_season_stats` |
 
 ## FastF1 Cache

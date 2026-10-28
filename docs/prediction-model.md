@@ -104,7 +104,7 @@ conventional weekend:
   scheduled → qualifying_done → completed
                    │                │
           compute_features    ingest_race
-          compute_predictions compute_season_stats
+                              compute_season_stats
 
 sprint weekend:
   scheduled → sprint_qualifying_done → sprint_done → qualifying_done → completed
@@ -207,8 +207,8 @@ still available (26 per GP 2019–2024, 25 otherwise; 8 per sprint, 3 in 2021) f
 
 `scripts/backtest.py` replays every completed GP from a local snapshot of Neon
 (`scripts/backtest_snapshot.py` → `docker-compose.backtest.yml`; it refuses Neon itself). Each race is
-predicted with the real feature job, which reads season stats as of the race date
-(`utils/season_aggregates.py`), and scored with `utils/backtest.py`: log loss, multi-class Brier,
+predicted through the same `utils/gp_model_v4.py` the live job and the backfill use: `training_races` →
+`fit(before=race date)` → probabilities from the in-memory `RaceHistory`, and scored with `utils/backtest.py`: log loss, multi-class Brier,
 top-1/top-3 (tie-aware) and a calibration table. Baselines: `grid-history`, P(win | grid slot) learned only
 from earlier races (its top pick is the pole-sitter), and `uniform`. New candidates are one entry in
 `CANDIDATES`.

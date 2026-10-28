@@ -35,7 +35,7 @@ compute_sprint_predictions (after SQ)   ──► softmax(raw_weighted_score, T=
   + weighted sum, reading season aggregates as of the race date (`utils/season_aggregates.py`).
 - **`compute_sprint_predictions.py`**: softmax over `raw_weighted_score` (T=0.3) → winner.
 
-The **GP pipeline** (`compute_features.py` / `compute_predictions.py`) runs `weighted-v4`: 7 fitted
+The **GP pipeline** (`compute_features.py` through `utils/gp_model_v4.py`) runs `weighted-v4`: 7 fitted
 features stored as `features` JSONB, softmax at T=1. It is not RuleBased, so not covered here.
 
 ---

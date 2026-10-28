@@ -341,7 +341,6 @@ cd data-engine
 python -m src.main --job ingest_race --year 2025 --round 14
 python -m src.main --job ingest_qualifying --year 2025 --round 14
 python -m src.main --job compute_features --race_id 42
-python -m src.main --job compute_predictions --race_id 42
 python -m src.main --job compute_season_stats --year 2025
 python -m src.main --job compute_title_odds --year 2025
 python -m src.main --job ingest_race_story --year 2026 --round 9 --session Sprint
@@ -366,13 +365,13 @@ Status to the jobs due next: the worker, the CLI auto-detect, Repair and `backfi
 Typical action timing:
 
 **Conventional weekend:**
-- **Saturday 22:00 UTC**: `ingest_qualifying` → `compute_features` → `compute_predictions`
+- **Saturday 22:00 UTC**: `ingest_qualifying` → `compute_features`
 - **Sunday 18:00 UTC**: `ingest_race` → `compute_season_stats`
 
 **Sprint weekend:**
 - **Friday 22:00 UTC**: `ingest_sprint_qualifying` → `compute_sprint_features` → `compute_sprint_predictions`
 - **Saturday 16:00 UTC**: `ingest_sprint` → `compute_season_stats`
-- **Saturday 22:00 UTC**: `ingest_qualifying` → `compute_features` → `compute_predictions`
+- **Saturday 22:00 UTC**: `ingest_qualifying` → `compute_features`
 - **Sunday 18:00 UTC**: `ingest_race` → `compute_season_stats`
 
 ### Session data (OpenF1 + Jolpica)
@@ -440,7 +439,10 @@ real units and only use races before the one predicted:
   `docs/feature-weights.json`, then mirror them into `apps/web` `predictionMath.ts` `FEATURE_META`.
   `test_weights.py`, `predictionMath.test.ts` and the API's `feature-manifest.test.ts` check every copy.
 - Each row stores `features` JSONB (feature → value + contribution); `raw_weighted_score` is the summed
-  contributions and `compute_predictions` applies a plain softmax (T = 1). There is no hand-set temperature.
+  contributions and the probability is a plain softmax (T = 1). There is no hand-set temperature.
+- `utils/gp_model_v4.py` is the only path to a GP Prediction: `training_races` → `fit(before=)` → `predict`, used by
+  `compute_features`, the backfill, the fit script and the backtest. `compute_features` writes features, probabilities
+  and the predicted winner in one transaction, and skips races inside the committed fit (`trained_on.to_date`).
 - Every feature must be computable from races before the predicted one: the backtest replays history and
   a feature that peeks ahead makes it lie (the v3 numbers did, see ADR 0010).
 

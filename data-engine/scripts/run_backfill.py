@@ -13,7 +13,6 @@ from src.jobs.ingest_qualifying import run as ingest_qualifying
 from src.jobs.ingest_race import run as ingest_race
 from src.jobs.compute_season_stats import run as compute_season_stats
 from src.jobs.compute_features import run as compute_features
-from src.jobs.compute_predictions import run as compute_predictions
 
 # Round counts per year
 ROUND_COUNTS = {
@@ -97,7 +96,6 @@ def backfill_year(year: int) -> None:
     print(f"\n  Features+predictions for {len(race_ids)} completed races...")
     for rid in race_ids:
         safe(compute_features, rid)
-        safe(compute_predictions, rid)
 
     print(f"\n  ✓ {year} done")
 

@@ -501,7 +501,7 @@ full per-round history.
 ---
 
 ### `driver_prediction_features`
-One row per driver per grand prix race (`weighted-v4`). Written by `compute_features`, updated by `compute_predictions`.
+One row per driver per grand prix race (`weighted-v4`). Written by `compute_features` together with the `race_predictions` row, in one transaction; drivers no longer in the field are deleted.
 
 | Column | Type | Notes |
 |--------|------|-------|

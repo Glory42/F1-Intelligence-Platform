@@ -728,8 +728,7 @@ data-engine/
 │   │   ├── compute_season_stats.py     # Aggregate driver/team stats including sprint aggregates
 │   │   ├── compute_title_odds.py       # Monte Carlo title odds after the latest completed round → title_odds_drivers/teams (seeded, idempotent);
 │   │   │                              #   run(year, after_round) replays an earlier round (later races still to run)
-│   │   ├── compute_features.py         # weighted-v4: gp_features_v4 over race_history × the committed gp_v4.json fit → features JSONB
-│   │   ├── compute_predictions.py      # Softmax (T=1) on GP raw scores → win probabilities
+│   │   ├── compute_features.py         # weighted-v4 Prediction: committed fit → features JSONB, probabilities, winner in one transaction
 │   │   ├── compute_sprint_features.py  # Sprint feature_runner spec: 8 sprint feature scores per driver
 │   │   ├── compute_sprint_predictions.py # Softmax (T=0.3) on sprint scores → sprint win probabilities
 │   │   ├── import_f1db.py              # Import an extracted F1DB release → history_* tables (weekly GitHub Action or local; skips imported versions)
@@ -762,7 +761,7 @@ data-engine/
 │       ├── logging_utils.py       # log_job_failure(), log_job_ok(), peak_rss_mb(): structured JSON job logs
 │       ├── conditional_logit.py   # LogitModel + fit_conditional_logit(): softmax over coef · standardized features, fitted by max likelihood
 │       ├── gp_features_v4.py      # gp_features(history, race_id): weighted-v4's features in real units, from races before this one only
-│       ├── gp_model_v4.py         # load_model()/save_model() for src/models/gp_v4.json, training_set(), importance_percentages()
+│       ├── gp_model_v4.py         # the GP model: training_races() → fit(before=) → predict(); load_committed()/save_model() for src/models/gp_v4.json
 │       ├── race_history.py        # RaceHistory + load_history(conn, since, until): the in-memory slice the v4 features read
 │       ├── identity.py            # person_key(), is_same_person(), constructor_key(): mirrors apps/api common/identity.ts
 │       ├── season_aggregates.py   # Driver/team season aggregates, optionally as of a race date (season stats + sprint features)
@@ -816,7 +815,7 @@ data-engine/
 │   ├── test_weekend_pipeline.py    # plan() per status/format + readiness, chains, due_statuses, repair_plan: pure
 │   ├── test_enrichment_coverage.py # missing(), source_for(), compound normalisation across sources, coverage query via fake_db
 │   ├── test_feature_runner.py      # sprint feature job pinned end to end: via fake_db + monkeypatched execute_batch
-│   ├── test_compute_features.py    # weighted-v4 job: features JSONB values + contributions, history window, one row per driver
+│   ├── test_compute_features.py    # weighted-v4 job: one transaction, stale drivers dropped, in-sample races skipped, stored p = backtest p
 │   ├── test_conditional_logit.py   # fit recovers known weights from simulated races, field probabilities
 │   ├── test_gp_features_v4.py      # quali/long-run/pace gaps, neutralisation rate, decayed form, gp_features, load_history
 │   ├── test_gp_model_v4.py         # gp_v4.json save/load, importance percentages, training set
@@ -896,8 +895,7 @@ data-engine/
 | `ingest_race_story` | `--year --round --session` | Race story alone for a race whose `ingest_race` skipped it under the storage tier |
 | `compute_season_stats` | `--year` | Rolling aggregates for drivers and teams, including sprint stats |
 | `compute_title_odds` | `--year` | Monte Carlo driver/team title odds after the latest completed round; `scripts/backfill_title_odds.py` replays every earlier round |
-| `compute_features` | `--race_id` | weighted-v4's 7 features (value + contribution) per driver for a GP |
-| `compute_predictions` | `--race_id` | Softmax (T=1) → GP win probabilities and predicted positions |
+| `compute_features` | `--race_id` | weighted-v4 Prediction for a GP: 7 features (value + contribution), win probabilities, predicted winner |
 | `compute_sprint_features` | `--race_id` | 8 sprint feature scores per driver |
 | `compute_sprint_predictions` | `--race_id` | Softmax (T=0.3) → sprint win probabilities and predicted positions |
 | `data_quality_audit` | `[--year] [--all]` | Completeness/coverage audit → `data_quality_runs`/`data_quality_issues` |
@@ -913,7 +911,7 @@ data-engine/
 | `fastf1_helpers.py` | FastF1 readers kept for the local pre-2023 backfills (`backfill_race_story.py`, `backfill_fastf1_enrichment.py`, the `_legacy` jobs): `get_session()`, `ms_to_int()`, `session_to_lap_records()`, `session_weather_trace()` |
 | `feature_manifest.py` | `SPRINT_FEATURES: tuple[FeatureSpec, ...]` (name, weight, label, nullable): the sprint model's hand weights; `SPRINT_WEIGHTS` and `SPRINT_SOFTMAX_TEMPERATURE` live beside it; `assemble_scores(values, features)` raises `KeyError` if a manifest feature's score was never computed. Checked against `docs/feature-weights.json` (also read by `apps/web`'s `predictionMath.test.ts`) so Python and TS weights can't silently drift. The GP model has no hand weights (`src/models/gp_v4.json`) |
 | `math_utils.py` | `normalize_minmax(values)`: min-max to [0,1]; `softmax(scores, temperature=1.0)`: plain by default, sprint passes T=0.3; `bayesian_win_rate(wins, races)`: Laplace smoothed; `clamp(value)`; `weighted_sum(scores, weights)`: dot product of a feature-score dict against a model's `WEIGHTS` dict, used by `feature_runner` |
-| `conditional_logit.py` / `gp_model_v4.py` | `fit_conditional_logit()` (damped Newton, L2 on standardized features) → `LogitModel` (`probabilities()`, `contributions()`); `load_model()`/`save_model()` for `src/models/gp_v4.json`, `training_set()`, `importance_percentages()` (ADR 0010) |
+| `conditional_logit.py` / `gp_model_v4.py` | `fit_conditional_logit()` (damped Newton, L2 on standardized features) → `LogitModel` (`probabilities()`, `contributions()`); `training_races()` → `fit(before=)` → `predict()`, the only path to a GP Prediction (live job, backfill, fit script, backtest); `load_committed()`/`save_model()` for `src/models/gp_v4.json`, `importance_percentages()` (ADR 0010) |
 | `gp_features_v4.py` / `race_history.py` | `gp_features(history, race_id)`: grid, quali_pace, team_quali_pace, driver_points, teammate_edge, grid_processional, team_race_pace (plus backtest-only candidates) from an in-memory `RaceHistory` (`load_history(conn, since, until)`) |
 | `season_aggregates.py` | Driver/team season aggregates shared by `compute_season_stats` and the sprint features; `before=` limits them to races before a date so a recomputed prediction can't see its own result |
 | `backtest.py` | Scoring for `scripts/backtest.py`: `race_metrics()`, `summarize()`, `paired_difference()`, `calibration_table()`, `GridWinRates` (P(win \| grid slot) from earlier races) |

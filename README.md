@@ -97,7 +97,6 @@ python -m src.main --job sync_season   --year 2025 --round 1
 # Weekly pipeline
 python -m src.main --job ingest_qualifying   --year 2025 --round 14
 python -m src.main --job compute_features    --race_id 42
-python -m src.main --job compute_predictions --race_id 42
 python -m src.main --job ingest_race         --year 2025 --round 14
 python -m src.main --job compute_season_stats --year 2025
 ```

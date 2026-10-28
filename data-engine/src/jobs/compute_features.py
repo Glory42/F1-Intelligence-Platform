@@ -1,56 +1,71 @@
-"""weighted-v4 GP features: the committed conditional-logit weights (src/models/gp_v4.json) applied to
-gp_features_v4, one row per driver. Each feature's value and its contribution to the driver's score are
-stored as JSON so the prediction page can show why a driver is favoured."""
-from datetime import date, timedelta
+"""weighted-v4 GP Prediction for one race: the committed fit applied to gp_features_v4, written as one
+transaction (each driver's feature values and contributions, win probability and rank, and the predicted
+winner), so a reader never sees features without probabilities or a field with a dropped driver in it."""
+from datetime import datetime, timezone
 from typing import Any
 
 from psycopg2.extras import Json
 
 from src.db.client import get_conn
-from src.utils.conditional_logit import LogitModel
-from src.utils.gp_features_v4 import gp_features
-from src.utils.gp_model_v4 import GP_V4_MODEL_VERSION, load_model
-from src.utils.race_history import RaceHistory, load_history
+from src.utils.gp_model_v4 import GP_V4_MODEL_VERSION, DriverPrediction, history_start, load_committed, predict
+from src.utils.race_history import load_history
 from src.utils.upsert import upsert
 
-# Form looks back up to 40 races and the circuit safety-car rate further: three seasons covers both.
-HISTORY_DAYS = 3 * 365
 
-
-def feature_rows(history: RaceHistory, race_id: int, model: LogitModel) -> list[dict[str, Any]]:
-    rows = []
-    for driver_id, values in gp_features(history, race_id).items():
-        contributions = model.contributions(values)
-        rows.append({
+def prediction_rows(race_id: int, predictions: list[DriverPrediction]) -> list[dict[str, Any]]:
+    return [
+        {
             "race_id": race_id,
-            "driver_id": driver_id,
+            "driver_id": p.driver_id,
             "features": Json({
-                f: {"value": round(values[f], 5), "contribution": round(contributions[f], 5)} for f in model.features
+                f: {"value": round(p.values[f], 5), "contribution": round(p.contributions[f], 5)} for f in p.values
             }),
-            "raw_weighted_score": round(sum(contributions.values()), 6),
-            "win_probability": 0.0,
-            "predicted_position": None,
-        })
-    return rows
+            "raw_weighted_score": round(p.score, 6),
+            "win_probability": round(p.probability, 5),
+            "predicted_position": p.position,
+        }
+        for p in predictions
+    ]
 
 
-def history_for(conn: Any, race_id: int) -> RaceHistory:
+def write_prediction(conn: Any, race_id: int, predictions: list[DriverPrediction]) -> None:
+    upsert(conn, "driver_prediction_features", prediction_rows(race_id, predictions), ["race_id", "driver_id"],
+           commit=False)
     with conn.cursor() as cur:
-        cur.execute("SELECT race_date FROM races WHERE id = %s", (race_id,))
-        race = cur.fetchone()
-    if not race:
-        raise ValueError(f"Race {race_id} not found")
-    race_date: date = race["race_date"]
-    return load_history(conn, since=race_date - timedelta(days=HISTORY_DAYS), until=race_date)
+        cur.execute(
+            "DELETE FROM driver_prediction_features WHERE race_id = %s AND NOT (driver_id = ANY(%s))",
+            (race_id, [p.driver_id for p in predictions]),
+        )
+    upsert(conn, "race_predictions", [{
+        "race_id": race_id,
+        "predicted_winner_id": predictions[0].driver_id,
+        "computed_at": datetime.now(timezone.utc),
+        "model_version": GP_V4_MODEL_VERSION,
+    }], ["race_id"], commit=False)
+    conn.commit()
 
 
 def run(race_id: int) -> None:
     print(f"[compute_features] race_id={race_id}")
-    model = load_model()
+    committed = load_committed()
     conn = get_conn()
     try:
-        rows = feature_rows(history_for(conn, race_id), race_id, model)
-        upsert(conn, "driver_prediction_features", rows, ["race_id", "driver_id"])
-        print(f"  Computed features for {len(rows)} drivers ({GP_V4_MODEL_VERSION})")
+        with conn.cursor() as cur:
+            cur.execute("SELECT race_date, EXTRACT(YEAR FROM race_date)::int AS year FROM races WHERE id = %s",
+                        (race_id,))
+            race = cur.fetchone()
+        if not race:
+            raise ValueError(f"Race {race_id} not found")
+        if committed.is_in_sample(race["race_date"]):
+            # The committed weights saw this race's result: the stored out-of-sample Prediction stays.
+            print(f"  [SKIP] race {race_id} is inside the committed fit (trained to {committed.trained_to}): "
+                  f"run scripts/backfill_all_predictions.py --from {race['year']} to rebuild it out-of-sample")
+            return
+        history = load_history(conn, since=history_start(race["year"]), until=race["race_date"])
+        predictions = predict(history, race_id, committed.model)
+        write_prediction(conn, race_id, predictions)
+        top = predictions[0]
+        print(f"  {len(predictions)} drivers ({GP_V4_MODEL_VERSION}); predicted winner driver_id={top.driver_id} "
+              f"(p={top.probability:.3f})")
     finally:
         conn.close()

@@ -3,7 +3,6 @@ src/models/gp_v4.json plus the importances in docs/feature-weights.json (then mi
 apps/web predictionMath.ts FEATURE_META: its test fails until you do). Run scripts/backtest.py first: only refit with the setup the backtest validated.
 Local only, never Neon. Usage: python scripts/fit_model_v4.py [--l2 1.0]"""
 import argparse
-import datetime
 import json
 import pathlib
 import sys
@@ -11,9 +10,10 @@ import sys
 sys.path.insert(0, ".")
 
 from scripts.backtest import connect
-from src.utils.conditional_logit import fit_conditional_logit
 from src.utils.gp_features_v4 import GP_V4_FEATURES
-from src.utils.gp_model_v4 import MODEL_PATH, TRAIN_FROM_YEAR, importance_percentages, save_model, training_set
+from src.utils.gp_model_v4 import (
+    DEFAULT_L2, MODEL_PATH, TRAIN_FROM_YEAR, fit, history_start, importance_percentages, save_model, training_races,
+)
 from src.utils.race_history import load_history
 
 FEATURE_WEIGHTS_JSON = pathlib.Path(__file__).resolve().parents[2] / "docs" / "feature-weights.json"
@@ -21,18 +21,18 @@ FEATURE_WEIGHTS_JSON = pathlib.Path(__file__).resolve().parents[2] / "docs" / "f
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--l2", type=float, default=1.0)
+    parser.add_argument("--l2", type=float, default=DEFAULT_L2)
     args = parser.parse_args()
 
     conn = connect()
     try:
-        history = load_history(conn, since=datetime.date(TRAIN_FROM_YEAR - 3, 1, 1))
+        history = load_history(conn, since=history_start(TRAIN_FROM_YEAR))
     finally:
         conn.close()
 
-    training = training_set(history)
-    model = fit_conditional_logit(training, GP_V4_FEATURES, l2=args.l2)
-    last = max(r["race_date"] for r in history.races.values() if r["status"] == "completed")
+    training = training_races(history)
+    model = fit(training, l2=args.l2)
+    last = training[-1].race_date
     trained_on = {"from_year": TRAIN_FROM_YEAR, "to_date": str(last), "races": len(training)}
     save_model(model, trained_on, args.l2)
     shared = json.loads(FEATURE_WEIGHTS_JSON.read_text())

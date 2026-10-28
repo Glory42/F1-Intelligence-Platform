@@ -64,7 +64,7 @@ for rid in race_ids:
     print(f'  features + predictions for race_id={rid}')
 " 2>&1
 
-  # Run compute_features and compute_predictions for each completed race
+  # compute_features writes the whole Prediction; races inside the committed fit skip (backfill_all_predictions.py)
   python -c "
 import sys, subprocess; sys.path.insert(0, '.')
 from src.db.client import get_conn
@@ -79,8 +79,7 @@ cur.execute('''
 race_ids = [row['id'] for row in cur.fetchall()]
 conn.close()
 for rid in race_ids:
-    r1 = subprocess.run(['python', '-m', 'src.main', '--job', 'compute_features', '--race_id', str(rid)], capture_output=False)
-    r2 = subprocess.run(['python', '-m', 'src.main', '--job', 'compute_predictions', '--race_id', str(rid)], capture_output=False)
+    subprocess.run(['python', '-m', 'src.main', '--job', 'compute_features', '--race_id', str(rid)], capture_output=False)
 "
 
   echo ""

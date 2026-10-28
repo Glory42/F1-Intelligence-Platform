@@ -71,7 +71,7 @@ class TestRunSelection:
 class TestRepairExecution:
     def test_single_issue_runs_its_repair_plan_for_its_race_and_marks_it_resolved(self, monkeypatch):
         conn, calls = _run(monkeypatch, [{"id": 1}, [_issue()], []])
-        assert [name for name, _ in calls] == ["compute_predictions", "compute_title_odds", "ingest_qualifying_telemetry"]
+        assert [name for name, _ in calls] == ["compute_features", "compute_title_odds", "ingest_qualifying_telemetry"]
         assert {ctx for _, ctx in calls} == {wp.RaceRunContext(race_id=10, year=2024, round_number=5)}
         assert _resolved(conn) == [(1,)]
         assert conn.commits == 1
@@ -98,7 +98,7 @@ class TestRepairExecution:
             _issue(id=2, race_id=11, round_number=6),
         ]
         conn, calls = _run(monkeypatch, [{"id": 1}, issues, [], []])
-        assert [ctx.race_id for name, ctx in calls if name == "compute_predictions"] == [10, 11]
+        assert [ctx.race_id for name, ctx in calls if name == "compute_features"] == [10, 11]
         assert conn.commits == 2
 
     def test_issue_with_no_repair_path_is_skipped(self, monkeypatch):
@@ -113,6 +113,6 @@ class TestRepairExecution:
         assert calls[0] == ("ingest_race", wp.RaceRunContext(race_id=10, year=2024, round_number=8))
 
     def test_step_failure_leaves_the_issue_unresolved(self, monkeypatch):
-        conn, _ = _run(monkeypatch, [{"id": 1}, [_issue(id=1)]], fail={"compute_predictions"})
+        conn, _ = _run(monkeypatch, [{"id": 1}, [_issue(id=1)]], fail={"compute_features"})
         assert _resolved(conn) == []
         assert conn.commits == 0
