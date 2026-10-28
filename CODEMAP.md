@@ -691,19 +691,20 @@ OpenF1/Jolpica (FastF1 only for the calendar and backfills), computes prediction
 ```
 data-engine/
 ├── src/
-│   ├── weekend_pipeline.py        # The only Race Status interpreter: plan() (what is due + when), chain()/JOBS (job chains),
+│   ├── weekend_pipeline.py        # The only Race Status interpreter: plan() (what is due + when), chain()/JOBS (step table derived from jobs/registry.py),
 │   │                              #   due_statuses()/statuses_after() (CLI auto-detect), repair_plan()/repair_steps()
 │   ├── session_kind.py            # The data engine's session vocabulary: SPRINT_FORMATS/is_sprint_weekend(), RACE/SPRINT (code, name, tag,
 │   │                              #   key cache column), OpenF1 readiness delays, source_for(year), results_ingest_for(year)
-│   ├── enrichment_coverage.py     # What each weekend is owed per (table, session): COVERAGES, read_coverage(), missing(),
+│   ├── enrichment_coverage.py     # What each weekend is owed per (table, session), FP2 long runs included: COVERAGES, read_coverage(), missing(),
 │   │                              #   CONFLICT_KEYS, normalize_compound()
 │   ├── auto_runner.py             # Runs weekend_pipeline chains on the worker cycle; reverts status on failure.
 │   │                              # Schedule-gated: skips the DB entirely outside a race-weekend window;
-│   │                              # retries only the (table, session) gaps enrichment_coverage.missing() reports
+│   │                              # retries only the (table, session) gaps enrichment_coverage.missing() reports;
+│   │                              # short reads only, never a connection held while jobs run; retries only NOT_READY errors
 │   ├── server.py                  # HTTP server: login-gated live dashboard + HEAD health check for UptimeRobot;
 │   │                              # worker loop polls ~20 min in-window, ~6 h otherwise
 │   ├── dashboard.py               # Renders the /login and status-dashboard HTML (styled to match apps/web)
-│   ├── main.py                    # CLI entry point: --job, --year, --round, --race_id, --session (Race|Sprint), --all, --resolve_run
+│   ├── main.py                    # CLI entry point over jobs/registry.py: --job, --year, --round, --race_id, --session, --all, --resolve_run
 │   │                              # auto_detect_round(job, year): the round in a status weekend_pipeline says the job is due in
 │   ├── config.py                  # FastF1 cache setup, environment loading
 │   ├── db/
@@ -730,6 +731,7 @@ data-engine/
 │   │   ├── compute_season_stats.py     # Aggregate driver/team stats including sprint aggregates
 │   │   ├── compute_title_odds.py       # Monte Carlo title odds after the latest completed round → title_odds_drivers/teams (seeded, idempotent);
 │   │   │                              #   run(year, after_round) replays an earlier round (later races still to run)
+│   │   ├── registry.py                 # The one job list: Job(name, needs, run); main.py and weekend_pipeline.JOBS read it
 │   │   ├── compute_features.py         # weighted-v4 Prediction: committed fit → features JSONB, probabilities, winner in one transaction
 │   │   ├── compute_sprint_features.py  # sprint-v2 Prediction: 8 Feature Scores, softmax T=0.3, winner in one transaction
 │   │   ├── import_f1db.py              # Import an extracted F1DB release → history_* tables (weekly GitHub Action or local; skips imported versions)

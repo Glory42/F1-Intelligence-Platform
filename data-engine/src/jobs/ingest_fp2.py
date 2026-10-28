@@ -1,7 +1,11 @@
+import requests
+
 from src.db.client import get_conn
 from src.session_kind import is_sprint_weekend
 from src.utils.driver_registry import SeasonDrivers, season_drivers
+from src.utils.openf1_client import OpenF1BudgetExceeded
 from src.utils.openf1_session import PRACTICE_PARTS, PracticeLap, load_session, practice_laps
+from src.utils.session_records import SessionNotReady
 from src.utils.upsert import upsert
 
 # Normalise all compounds to a MEDIUM baseline (ms to add to raw lap time)
@@ -63,7 +67,8 @@ def long_run_rows(laps: list[PracticeLap], drivers: SeasonDrivers, race_id: int,
     return list(best.values())
 
 
-def run(year: int, round_num: int) -> None:
+def run(year: int, round_num: int) -> bool:
+    """False while OpenF1 hasn't published the practice session: the worker's coverage retry tries again."""
     print(f"[ingest_fp2] year={year} round={round_num}")
 
     conn = get_conn()
@@ -88,12 +93,12 @@ def run(year: int, round_num: int) -> None:
     session_type = select_practice_session(race_row.get("event_format"))
     try:
         session = load_session(year, race_row["race_date"], session_type, PRACTICE_PARTS)
-    except Exception as e:
+    except (SessionNotReady, OpenF1BudgetExceeded, requests.RequestException) as e:
         print(f"  [SKIP] {session_type} practice session could not be loaded: {e}")
-        return
+        return False
     if not session.laps:
         print(f"  [SKIP] {session_type} laps not available for {year} round {round_num}")
-        return
+        return False
 
     final_rows = long_run_rows(practice_laps(session), drivers, race_id, session_type)
 
@@ -109,3 +114,4 @@ def run(year: int, round_num: int) -> None:
         conn.commit()
     finally:
         conn.close()
+    return True

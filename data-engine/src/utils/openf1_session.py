@@ -14,7 +14,7 @@ from src.utils import openf1_client
 from src.utils.driver_registry import SessionEntry, team_key_for
 from src.utils.race_story import WeatherTrace, weather_trace
 from src.utils.session_records import (
-    CarSample, Overtake, PitStop, PositionSample, RaceControlMessage, RadioClip, Stint,
+    CarSample, Overtake, PitStop, PositionSample, RaceControlMessage, RadioClip, SessionNotReady, Stint,
 )
 from src.utils.telemetry import LapWindow
 
@@ -62,7 +62,10 @@ class OpenF1Session:
 def find_session(year: int, race_date: Any, session_type: str) -> int:
     """The weekend is found by its Race's date, then the session by name within that meeting
     (cancelled sessions skipped): one way for every job, whichever session it reads."""
-    return openf1_client.find_weekend_session_key(year, race_date, SESSION_NAMES[session_type])
+    try:
+        return openf1_client.find_weekend_session_key(year, race_date, SESSION_NAMES[session_type])
+    except ValueError as e:
+        raise SessionNotReady(str(e)) from e
 
 
 def load_session(

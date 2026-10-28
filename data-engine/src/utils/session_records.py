@@ -72,6 +72,11 @@ class PositionSample:
     y: float
 
 
+class SessionNotReady(RuntimeError):
+    """The source hasn't published the session (or all of it) yet: the worker retries next cycle. Anything
+    else a job raises is a real failure and is logged as one."""
+
+
 Rows = tuple[list[dict[str, Any]], int]  # (rows to upsert, records skipped for an unknown driver)
 R = TypeVar("R")
 

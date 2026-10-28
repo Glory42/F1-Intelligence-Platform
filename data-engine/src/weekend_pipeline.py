@@ -7,26 +7,9 @@ from typing import Any, Callable, Iterable, Optional
 
 import pandas as pd
 
-from src.jobs import (
-    compute_features,
-    compute_season_stats,
-    compute_sprint_features,
-    compute_title_odds,
-    ingest_fp2,
-    ingest_overtakes,
-    ingest_pit_stops,
-    ingest_qualifying,
-    ingest_qualifying_telemetry,
-    ingest_race,
-    ingest_race_control,
-    ingest_race_story,
-    ingest_sprint,
-    ingest_sprint_qualifying,
-    ingest_stints,
-    ingest_team_radio,
-)
+from src.jobs.registry import JOBS as REGISTRY, RACE_EVENT_JOBS, JobArgs, Needs
 from src.enrichment_coverage import coverage_of, step_name
-from src.session_kind import RACE_SESSIONS
+from src.session_kind import RACE, RACE_SESSIONS, RaceSession
 from src.utils.logging_utils import log_job_failure
 
 WEEKEND_STATUSES = ("scheduled", "sprint_qualifying_done", "sprint_done", "qualifying_done", "completed")
@@ -75,38 +58,18 @@ class RaceRunContext:
     round_number: int
 
 
-def _session_job(module: Any, session_name: str) -> Callable[[RaceRunContext], Any]:
-    return lambda ctx: module.run(ctx.year, ctx.round_number, session_name=session_name)
+def _step(job: str, session: RaceSession = RACE) -> Callable[[RaceRunContext], Any]:
+    return lambda ctx: REGISTRY[job].run(
+        JobArgs(year=ctx.year, round_number=ctx.round_number, race_id=ctx.race_id, session=session)
+    )
 
 
-# Race Events (OpenF1), each run once per session of a completed weekend.
-RACE_EVENT_JOBS = {
-    "ingest_race_control": ingest_race_control,
-    "ingest_overtakes": ingest_overtakes,
-    "ingest_team_radio": ingest_team_radio,
-    "ingest_stints": ingest_stints,
-    "ingest_pit_stops": ingest_pit_stops,
-}
-
-# Every step any chain or coverage retry runs, by name. Job modules are looked up at call time, and tests swap
-# entries here rather than patching each job module.
+# Every step any chain, coverage retry or Repair runs, by step name (`ingest_stints_sprint` is ingest_stints for the
+# sprint), derived from the job registry. Tests swap entries here rather than patching each job module.
 JOBS: dict[str, Callable[[RaceRunContext], Any]] = {
-    "ingest_sprint_qualifying": lambda ctx: ingest_sprint_qualifying.run(ctx.year, ctx.round_number),
-    "compute_sprint_features": lambda ctx: compute_sprint_features.run(ctx.race_id),
-    "ingest_sprint": lambda ctx: ingest_sprint.run(ctx.year, ctx.round_number),
-    "compute_season_stats": lambda ctx: compute_season_stats.run(ctx.year),
-    "ingest_qualifying": lambda ctx: ingest_qualifying.run(ctx.year, ctx.round_number),
-    "ingest_fp2": lambda ctx: ingest_fp2.run(ctx.year, ctx.round_number),
-    "compute_features": lambda ctx: compute_features.run(ctx.race_id),
-    "ingest_race": lambda ctx: ingest_race.run(ctx.year, ctx.round_number),
-    "compute_title_odds": lambda ctx: compute_title_odds.run(ctx.year),
-    "ingest_qualifying_telemetry":
-        lambda ctx: ingest_qualifying_telemetry.run(ctx.year, ctx.round_number, session_type="Q"),
-    "ingest_qualifying_telemetry_sprint":
-        lambda ctx: ingest_qualifying_telemetry.run(ctx.year, ctx.round_number, session_type="SQ"),
-    **{step_name(name, session_type): _session_job(module, session)
-       for name, module in (*RACE_EVENT_JOBS.items(), ("ingest_race_story", ingest_race_story))
-       for session_type, session in ((s.tag, s.name) for s in RACE_SESSIONS)},
+    **{job.name: _step(job.name) for job in REGISTRY.values() if job.needs in (Needs.ROUND, Needs.YEAR, Needs.RACE)},
+    **{step_name(job.name, session.tag): _step(job.name, session)
+       for job in REGISTRY.values() if job.needs is Needs.SESSION for session in RACE_SESSIONS},
 }
 
 

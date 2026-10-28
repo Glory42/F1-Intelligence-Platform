@@ -30,7 +30,7 @@ from src.utils.openf1_session import (
     weather_label,
 )
 from src.utils.race_story import SessionStory, session_story
-from src.utils.session_records import Rows
+from src.utils.session_records import Rows, SessionNotReady
 from src.utils.storage_guard import read_storage_tier
 from src.utils.upsert import upsert
 
@@ -115,9 +115,7 @@ def run_ingest_job(year: int, round_num: int, config: IngestJobConfig) -> None:
     session = load_session(year, race_ctx.race_date, config.session_type, RACE_PARTS)
     classification = fetch_classification(year, round_num, sprint=config.session_type == "S")
     if not is_complete(session, classification, config.session_type):
-        raise RuntimeError(
-            f"{config.session_label} results not fully available or complete yet: retry later"
-        )
+        raise SessionNotReady(f"{config.session_label} results not fully available or complete yet: retry later")
     entries = session_entries(session)
     weather = weather_label(session)
     weather_conditions = weather_details(session)
@@ -251,9 +249,7 @@ def run_qualifying_ingest_job(year: int, round_num: int, config: QualifyingJobCo
         ctx = config.resolve_race(conn, year, round_num)
 
         if ctx.quali_day is not None and ctx.quali_day > date.today():
-            raise RuntimeError(
-                config.date_guard_error.format(year=year, round_num=round_num, day=ctx.quali_day)
-            )
+            raise SessionNotReady(config.date_guard_error.format(year=year, round_num=round_num, day=ctx.quali_day))
 
         if ctx.event_format not in config.allowed_event_formats:
             raise ValueError(
@@ -276,9 +272,7 @@ def run_qualifying_ingest_job(year: int, round_num: int, config: QualifyingJobCo
         driver_map = register_session_drivers(conn, ctx.season_id, entries)
         rows = config.rows_from_quali(quali_rows, driver_map, ctx.race_id)
         if not rows:
-            raise RuntimeError(
-                config.no_results_error.format(year=year, round_num=round_num, race_id=ctx.race_id)
-            )
+            raise SessionNotReady(config.no_results_error.format(year=year, round_num=round_num, race_id=ctx.race_id))
 
         upsert(conn, config.results_table, rows, ["race_id", "driver_id"], exclude_update=config.exclude_update)
         print(f"  Upserted {len(rows)} {config.results_row_label} rows")

@@ -78,6 +78,10 @@ COVERAGES: tuple[Coverage, ...] = (
                                        "WHERE q.race_id = r.id AND q.sq1_time_ms IS NOT NULL")),
     *(Coverage(table, session_type, step_name(job, session_type), "ingest_race", _session_rows(table, session_type))
       for session_type in (s.tag for s in RACE_SESSIONS) for table, job in _RACE_TABLES),
+    # Practice long runs feed only the Friday-pace table; under 70% of the grid, OpenF1 hasn't published them all.
+    Coverage("fp2_long_run_times", None, "ingest_fp2", "ingest_qualifying",
+             "(SELECT count(DISTINCT f.driver_id) FROM fp2_long_run_times f WHERE f.race_id = r.id)"
+             " >= 0.7 * (SELECT count(*) FROM qualifying_results q WHERE q.race_id = r.id)"),
     Coverage("team_season_stats", None, "compute_season_stats", "ingest_race",
              "COALESCE((SELECT max(t.races_completed) FROM team_season_stats t WHERE t.season_id = r.season_id), 0)"
              " >= (SELECT count(*) FROM races c WHERE c.season_id = r.season_id AND c.status = 'completed')"),

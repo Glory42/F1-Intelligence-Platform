@@ -118,7 +118,8 @@ class TestRunScheduleGate:
 
     def test_queries_the_database_when_inside_a_race_weekend(self):
         # First row answers the missing-race-events recheck (no race found -> no-op), second
-        # answers the active-race query (no active race row -> run_cycle() exits cleanly).
+        # answers the active-race query (no active race row -> run_cycle() exits cleanly), each
+        # on its own short connection.
         spy = _SpyConnFactory(FakeConnection([None, None]))
         race = _utc(2026, 3, 8, 4, 0)
         now = race - timedelta(hours=6)  # Saturday evening, well inside the window
@@ -130,7 +131,7 @@ class TestRunScheduleGate:
             conn_factory=spy,
         )
 
-        assert spy.calls == 1
+        assert spy.calls == 2
 
     def test_falls_back_to_checking_the_database_when_the_schedule_fetch_fails(self):
         spy = _SpyConnFactory(FakeConnection([None]))
@@ -265,7 +266,7 @@ class TestRetryMissingRaceEvents:
         return calls
 
     def _retry(self, row, memo=None):
-        return auto_runner._retry_missing_race_events(lambda *_: None, FakeConnection([row]), 5, 2026, memo)
+        return auto_runner._retry_missing_race_events(lambda *_: None, lambda: FakeConnection([row]), 5, 2026, memo)
 
     def test_noop_when_race_not_found(self, monkeypatch):
         calls = self._patch_jobs(monkeypatch)
@@ -476,15 +477,13 @@ class TestQuietCyclesBetweenSessions:
         assert spy.calls == 0
 
     def test_keeps_checking_while_fp2_coverage_is_below_the_gate(self, monkeypatch):
-        _jobs(monkeypatch, ingest_fp2=lambda ctx: None)
+        _jobs(monkeypatch, ingest_fp2=lambda ctx: False)  # OpenF1 hasn't published practice yet
         race = _utc(2026, 3, 8, 4, 0)
         saturday_night = race - timedelta(hours=6)  # qualifying ingested, race not yet run
         memo = auto_runner.WorkerMemo()
         first = FakeConnection([
-            None,
+            {"id": 1, "status": "qualifying_done", "sprint_date": None, "ingest_fp2": False},
             _active_race_row(status="qualifying_done", event_format="conventional"),
-            {"n": 5}, {"n": 20},  # FP2 coverage before the retry: 25%
-            {"n": 5}, {"n": 20},  # ...and still 25% after it
         ])
 
         auto_runner.run_cycle(
@@ -503,7 +502,7 @@ class TestQuietCyclesBetweenSessions:
             memo=memo,
         )
 
-        assert spy.calls == 1
+        assert spy.calls == 2
 
     def test_checks_the_database_when_the_schedule_has_no_time_for_the_pending_session(self):
         race = _utc(2026, 3, 8, 4, 0)
@@ -523,7 +522,7 @@ class TestQuietCyclesBetweenSessions:
             schedule_provider=lambda: timeless, conn_factory=spy, memo=memo,
         )
 
-        assert spy.calls == 1
+        assert spy.calls == 2
 
     def test_keeps_checking_while_the_windows_race_is_missing_race_events(self, monkeypatch):
         _jobs(monkeypatch, ingest_race_control=lambda ctx: False)
@@ -547,7 +546,7 @@ class TestQuietCyclesBetweenSessions:
             schedule_provider=lambda: schedule, conn_factory=spy, memo=memo,
         )
 
-        assert spy.calls == 1
+        assert spy.calls == 2
 
 
 class TestCycleOpenF1Budget:
@@ -606,3 +605,59 @@ class TestRunCycleCalendarDrift:
         assert len(synced) == 1
         assert synced[0][0] == 2026
         assert synced[0][1] is schedule
+
+
+class TestConnectionsDuringJobs:
+    """A connection held across OpenF1's paced requests keeps Neon Free compute awake (CLAUDE.md §6)."""
+
+    def _cycle(self, monkeypatch, step):
+        opened = []
+        scripts = [
+            [None],  # coverage read for the window's race: not found
+            [_active_race_row(status="scheduled", event_format="conventional")],
+            [None],  # revert_race_status's UPDATE, when the chain fails
+        ]
+
+        def factory():
+            conn = FakeConnection(scripts.pop(0) if scripts else [])
+            opened.append(conn)
+            return conn
+
+        seen_open = []
+
+        def ingest(ctx):
+            seen_open.append(any(not c.closed for c in opened))
+            step()
+
+        _jobs(monkeypatch, ingest_qualifying=ingest, ingest_fp2=lambda ctx: None, compute_features=lambda ctx: None,
+              compute_title_odds=lambda ctx: None, ingest_qualifying_telemetry=lambda ctx: None)
+        race = _utc(2026, 3, 8, 4, 0)
+        logs = []
+        try:
+            auto_runner.run_cycle(
+                log_func=logs.append, now_utc=race - timedelta(hours=6),
+                schedule_provider=lambda: _schedule_with_race(1, race), conn_factory=factory,
+            )
+        finally:
+            assert seen_open == [False]
+        return logs
+
+    def test_no_connection_is_open_while_a_chain_runs(self, monkeypatch):
+        self._cycle(monkeypatch, lambda: None)
+
+    def test_an_unpublished_session_is_retried_next_cycle(self, monkeypatch):
+        from src.utils.session_records import SessionNotReady
+
+        def not_yet():
+            raise SessionNotReady("results not complete yet")
+
+        logs = self._cycle(monkeypatch, not_yet)
+
+        assert any("not published yet" in line for line in logs)
+
+    def test_a_real_error_is_raised_not_mistaken_for_an_unpublished_session(self, monkeypatch):
+        def bug():
+            raise ValueError("a real bug")
+
+        with pytest.raises(ValueError, match="a real bug"):
+            self._cycle(monkeypatch, bug)

@@ -141,7 +141,9 @@ class TestJobStep:
 
     def test_sprint_race_events_pull_the_sprint_session(self, monkeypatch):
         calls = []
-        monkeypatch.setattr(wp.ingest_stints, "run", lambda y, r, session_name: calls.append((y, r, session_name)))
+        from src.jobs import ingest_stints
+
+        monkeypatch.setattr(ingest_stints, "run", lambda y, r, session_name: calls.append((y, r, session_name)))
         wp.JobStep("ingest_stints_sprint", optional=True).run(_CTX)
         assert calls == [(2026, 5, "Sprint")]
 

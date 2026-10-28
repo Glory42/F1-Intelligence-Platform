@@ -390,6 +390,9 @@ local 2018–2022 backfills, which only work from a cache.
 Jobs exit with code 1 on failure (Render marks job failed for manual retrigger).
 Never use `sleep()` inside jobs for waiting on data: retry on the next worker cycle instead. The
 only sanctioned waits are `openf1_client`'s request pacing/backoff (see `docs/adr/0004`).
+A job whose source hasn't published the session yet raises `SessionNotReady` (`utils/session_records.py`): the
+worker retries only that (plus a spent OpenF1 budget and network errors); any other exception is a real failure.
+A new job is one entry in `src/jobs/registry.py`: the CLI and the pipeline's step table both read it.
 Use structured logging: `{"job": "ingest_race", "round": 14, "status": "failed", "error": "..."}`.
 
 ---
