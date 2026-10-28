@@ -9,10 +9,10 @@ sys.path.insert(0, ".")
 
 from src.db.client import get_conn
 from src.enrichment_coverage import backfill_allowed
-from src.utils.driver_map import build_driver_code_map
-from src.utils.fastf1_helpers import get_session, session_to_lap_records, session_weather_trace
+from src.utils.driver_registry import season_drivers
+from src.utils.fastf1_session import get_session, lap_records, session_weather_trace
 from src.utils.ingest_runner import write_session_story
-from src.utils.race_story import build_lap_traces, find_battles
+from src.utils.race_story import session_story
 
 SESSIONS = (("R", "race"), ("S", "sprint"))
 
@@ -36,18 +36,16 @@ def completed_races(start: int, end: int) -> list[dict]:
 def backfill_session(race: dict, fastf1_session: str, tag: str) -> None:
     # FastF1 is loaded with no DB connection open (Neon compute), then one short write.
     session = get_session(race["year"], race["round_number"], fastf1_session)
-    traces = build_lap_traces(session_to_lap_records(session))
-    battles = find_battles(traces)
-    weather = session_weather_trace(session)
+    story = session_story(lap_records(session), session_weather_trace(session))
     conn = get_conn()
     try:
         if not backfill_allowed(conn):
             raise SystemExit(1)
-        write_session_story(conn, race["id"], tag, traces, battles, weather, build_driver_code_map(conn, race["season_id"]))
+        write_session_story(conn, race["id"], tag, story, season_drivers(conn, race["season_id"]).by_code)
         conn.commit()
     finally:
         conn.close()
-    print(f"  {tag}: {len(traces)} traces, {len(battles)} battles, weather={'yes' if weather else 'no'}")
+    print(f"  {tag}: {len(story.traces)} traces, {len(story.battles)} battles, weather={'yes' if story.weather else 'no'}")
 
 
 if __name__ == "__main__":

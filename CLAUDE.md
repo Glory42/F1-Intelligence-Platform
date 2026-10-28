@@ -23,7 +23,7 @@ it's Python, and its jobs run once and exit rather than being a long-running dev
 ### Where tests live
 - `data-engine/tests/`: pytest. Pure functions (`math_utils.py`, pure `feature_helpers.py` helpers, model
   `WEIGHTS` invariants) are tested directly. DB-touching functions (`compute_luck_score`, `same_person_rows`,
-  `compute_team_circuit_perf`, `build_driver_code_map`) are tested via `tests/support/fake_db.py`: a scripted
+  `compute_team_circuit_perf`, `season_drivers`) are tested via `tests/support/fake_db.py`: a scripted
   `FakeCursor`/`FakeConnection` double shaped like psycopg2's `RealDictCursor`, no real DB. `ingest_runner.py`'s
   two shared runners (`run_ingest_job` for race/sprint, `run_qualifying_ingest_job` for qualifying/sprint-qualifying)
   are tested the same way. `upsert.py` and the two prediction jobs route their writes through

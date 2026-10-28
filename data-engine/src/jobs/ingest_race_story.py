@@ -1,8 +1,8 @@
 from src.db.client import get_conn
-from src.utils.driver_map import build_driver_code_map
+from src.utils.driver_registry import season_drivers
 from src.utils.ingest_runner import write_session_story
 from src.utils.openf1_session import STORY_PARTS, lap_records, load_session, session_weather_trace
-from src.utils.race_story import build_lap_traces, find_battles
+from src.utils.race_story import session_story
 from src.utils.storage_guard import read_storage_tier
 
 _SESSIONS = {"Race": ("R", "race"), "Sprint": ("S", "sprint")}
@@ -33,13 +33,11 @@ def run(year: int, round_num: int, session_name: str = "Race") -> None:
         conn.close()
 
     session = load_session(year, race["race_date"], session_type, STORY_PARTS)
-    traces = build_lap_traces(lap_records(session))
-    battles = find_battles(traces)
-    weather = session_weather_trace(session)
+    story = session_story(lap_records(session), session_weather_trace(session))
     conn = get_conn()
     try:
-        write_session_story(conn, race["id"], tag, traces, battles, weather, build_driver_code_map(conn, race["season_id"]))
+        write_session_story(conn, race["id"], tag, story, season_drivers(conn, race["season_id"]).by_code)
         conn.commit()
     finally:
         conn.close()
-    print(f"  {tag}: {len(traces)} traces, {len(battles)} battles")
+    print(f"  {tag}: {len(story.traces)} traces, {len(story.battles)} battles")

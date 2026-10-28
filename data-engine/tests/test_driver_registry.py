@@ -1,7 +1,13 @@
 """Covers driver_registry: turning an OpenF1 session's driver list into entries (code fallbacks,
 team keys, number coercion) and registering the drivers/teams a season is missing."""
-from src.utils.driver_registry import SessionEntry, register_session_drivers, session_entries
+from src.utils.driver_registry import SessionEntry, register_session_drivers
+from src.utils.openf1_session import OpenF1Session
+from src.utils.openf1_session import session_entries as _entries
 from tests.support.fake_db import FakeConnection
+
+
+def session_entries(drivers):
+    return _entries(OpenF1Session(session_key=1, drivers=drivers))
 
 
 def _info(*, team="Red Bull Racing", first="Max", last="Verstappen", num=1, abbr="VER", country="NED"):

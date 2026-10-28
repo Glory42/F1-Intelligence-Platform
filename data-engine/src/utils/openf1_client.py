@@ -90,23 +90,6 @@ def _closest_session(sessions: list[dict], target: date) -> dict | None:
     return closest if drift <= _MAX_DATE_DRIFT_DAYS else None
 
 
-def get_session_key(year: int, session_date: Any, session_name: str = "Race") -> int:
-    """OpenF1's circuit naming doesn't line up 1:1 with our circuit_key values, so matching
-    the session by closest start date is the reliable join key instead. session_name is
-    "Race" for the Sunday GP or "Sprint" for the Saturday sprint session: both are covered
-    by OpenF1 (2023+ only)."""
-    sessions = _get("sessions", {"year": year, "session_name": session_name})
-    if not sessions:
-        # OpenF1 has no coverage before 2023, hence the empty list from _get above.
-        raise ValueError(f"OpenF1 has no session data for year={year} session={session_name}")
-
-    target = _as_date(session_date)
-    closest = _closest_session(sessions, target)
-    if closest is None:
-        raise ValueError(f"No OpenF1 {session_name} session found for year={year} date={target}")
-    return closest["session_key"]
-
-
 def find_weekend_session_key(year: int, race_date: Any, session_names: tuple[str, ...]) -> int:
     """The weekend is found by its Race's date, then the session by name within that meeting, so
     every session of a weekend resolves from races.race_date alone. One request for the year."""
@@ -125,40 +108,12 @@ def fetch_session_data(endpoint: str, session_key: int) -> list[dict]:
     return _get(endpoint, {"session_key": session_key})
 
 
-def fetch_race_control(session_key: int) -> list[dict]:
-    return _get("race_control", {"session_key": session_key})
-
-
-def fetch_overtakes(session_key: int) -> list[dict]:
-    return _get("overtakes", {"session_key": session_key})
-
-
-def fetch_team_radio(session_key: int) -> list[dict]:
-    return _get("team_radio", {"session_key": session_key})
-
-
-def fetch_stints(session_key: int) -> list[dict]:
-    return _get("stints", {"session_key": session_key})
-
-
-def fetch_pit_stops(session_key: int) -> list[dict]:
-    return _get("pit", {"session_key": session_key})
-
-
-
 def _time_window(start: datetime, end: datetime) -> str:
     """OpenF1 range filters are `date>=X` / `date<=Y` (operator, no `=` separator), which requests'
     params would encode as `date>==X`: so they're appended to the path pre-encoded."""
     return f"?date%3E%3D{quote(start.isoformat(), safe=':')}&date%3C%3D{quote(end.isoformat(), safe=':')}"
 
 
-def fetch_laps(session_key: int) -> list[dict]:
-    return _get("laps", {"session_key": session_key})
-
-
-def fetch_car_data(session_key: int, driver_number: int, start: datetime, end: datetime) -> list[dict]:
-    return _get("car_data", {"session_key": session_key, "driver_number": driver_number}, _time_window(start, end))
-
-
-def fetch_location(session_key: int, driver_number: int, start: datetime, end: datetime) -> list[dict]:
-    return _get("location", {"session_key": session_key, "driver_number": driver_number}, _time_window(start, end))
+def fetch_lap_samples(endpoint: str, session_key: int, driver_number: int, start: datetime, end: datetime) -> list[dict]:
+    """car_data or location for one car between two instants."""
+    return _get(endpoint, {"session_key": session_key, "driver_number": driver_number}, _time_window(start, end))

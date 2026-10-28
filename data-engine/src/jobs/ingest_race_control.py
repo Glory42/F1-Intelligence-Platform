@@ -1,40 +1,11 @@
-from typing import Any
-
-from src.enrichment_coverage import CONFLICT_KEYS
 from src.utils.ingest_runner import OpenF1JobConfig, run_openf1_job
-from src.utils.openf1_client import fetch_race_control
+from src.utils.openf1_session import race_control_messages
+from src.utils.session_records import race_control_rows
 
-
-def _to_rows(
-    messages: list[dict[str, Any]], race_id: int, driver_map: dict[int, int]
-) -> tuple[list[dict[str, Any]], int]:
-    rows = [
-        {
-            "race_id": race_id,
-            "date": m["date"],
-            "category": m["category"],
-            "flag": m.get("flag"),
-            "lap_number": m.get("lap_number"),
-            "driver_number": m.get("driver_number"),
-            "scope": m.get("scope"),
-            "sector": m.get("sector"),
-            "message": m["message"],
-        }
-        for m in messages
-    ]
-    return rows, 0
+CONFIG = OpenF1JobConfig(
+    job_name="ingest_race_control", table="race_control_messages", part="race_control", records=race_control_messages, to_rows=race_control_rows, row_label="race control messages",
+)
 
 
 def run(year: int, round_num: int, session_name: str = "Race") -> None:
-    run_openf1_job(
-        year, round_num,
-        OpenF1JobConfig(
-            job_name="ingest_race_control",
-            table="race_control_messages",
-            conflict_cols=CONFLICT_KEYS["race_control_messages"],
-            row_label="race control messages",
-            fetch=fetch_race_control,
-            to_rows=_to_rows,
-        ),
-        session_name=session_name,
-    )
+    run_openf1_job(year, round_num, CONFIG, session_name=session_name)

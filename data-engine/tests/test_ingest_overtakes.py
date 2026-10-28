@@ -1,6 +1,12 @@
-import src.jobs.ingest_overtakes as ingest_overtakes
-from src.jobs.ingest_overtakes import _to_rows, run
-from src.utils.openf1_client import fetch_overtakes
+from src.jobs.ingest_overtakes import CONFIG
+from src.utils.driver_registry import SeasonDrivers
+from src.utils.openf1_session import OpenF1Session
+
+
+def _to_rows(raw, race_id, driver_map):
+    """Raw OpenF1 rows through the adapter and the job's row mapping, as run_openf1_job runs them."""
+    records = CONFIG.records(OpenF1Session(session_key=1, **{CONFIG.part: raw}))
+    return CONFIG.to_rows(records, SeasonDrivers(by_number=driver_map, by_code={}), race_id, "race")
 
 
 class TestToRows:
@@ -14,7 +20,7 @@ class TestToRows:
 
         assert skipped == 0
         assert rows == [{
-            "race_id": 1, "date": "2024-11-03T15:50:07+00:00",
+            "race_id": 1, "session_type": "race", "date": "2024-11-03T15:50:07+00:00",
             "overtaking_driver_id": 100, "overtaken_driver_id": 101, "position": 1,
         }]
 
@@ -36,36 +42,3 @@ class TestToRows:
 
     def test_empty_input_returns_empty(self):
         assert _to_rows([], race_id=1, driver_map={}) == ([], 0)
-
-
-class TestRun:
-    def test_wires_the_expected_config(self, monkeypatch):
-        captured = {}
-        monkeypatch.setattr(
-            ingest_overtakes, "run_openf1_job",
-            lambda year, round_num, config, session_name="Race":
-                captured.update(year=year, round_num=round_num, config=config, session_name=session_name)
-        )
-
-        run(2024, 20)
-
-        assert captured["year"] == 2024
-        assert captured["round_num"] == 20
-        assert captured["session_name"] == "Race"
-        config = captured["config"]
-        assert config.job_name == "ingest_overtakes"
-        assert config.table == "race_overtakes"
-        assert config.conflict_cols == ["race_id", "date", "overtaking_driver_id", "overtaken_driver_id"]
-        assert config.fetch is fetch_overtakes
-        assert config.to_rows is _to_rows
-
-    def test_forwards_session_name(self, monkeypatch):
-        captured = {}
-        monkeypatch.setattr(
-            ingest_overtakes, "run_openf1_job",
-            lambda year, round_num, config, session_name="Race": captured.update(session_name=session_name)
-        )
-
-        run(2024, 20, session_name="Sprint")
-
-        assert captured["session_name"] == "Sprint"

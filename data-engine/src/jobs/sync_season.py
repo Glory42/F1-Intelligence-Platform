@@ -1,6 +1,6 @@
 from src.db.client import get_conn
-from src.utils.driver_registry import register_session_drivers, session_entries
-from src.utils.openf1_session import load_session
+from src.utils.driver_registry import register_session_drivers
+from src.utils.openf1_session import load_session, session_entries
 
 
 def run(year: int, round_num: int = 1) -> None:
@@ -30,7 +30,7 @@ def run(year: int, round_num: int = 1) -> None:
 
     conn = get_conn()
     try:
-        driver_map = register_session_drivers(conn, row["season_id"], session_entries(session.drivers), update_existing=True)
+        driver_map = register_session_drivers(conn, row["season_id"], session_entries(session), update_existing=True)
         conn.commit()
         print(f"  Synced {len(driver_map)} drivers")
     finally:

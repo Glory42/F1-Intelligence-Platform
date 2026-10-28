@@ -57,12 +57,12 @@ pytest, config in `pyproject.toml` (`pythonpath = ["."]`, `testpaths = ["tests"]
   `race_weekend_window`, `weekend_pipeline` (`test_weekend_pipeline.py`: `plan`, the chains,
   `due_statuses`, `repair_plan`, `prediction_steps`), `enrichment_coverage` (`test_enrichment_coverage.py`:
   `source_for`, `missing`, compound normalisation from either source; the coverage query through the
-  fake DB), and the FastF1 enrichment converters (`test_fastf1_enrichment.py`: stint,
+  fake DB), and the FastF1 adapter (`test_fastf1_session.py`: stint,
   pit-stop and race-control rows over plain records, telemetry input reshaping).
 - **DB-touching functions are tested through a fake double**: `tests/support/fake_db.py` provides
   `FakeCursor` / `FakeConnection`, shaped like psycopg2's `RealDictCursor`. `FakeConnection` takes a
   list of result sets and hands one out per `with conn.cursor()` block, in call order. This covers
-  `compute_luck_score`, `same_person_rows`, `compute_team_circuit_perf`, `build_driver_code_map`, and
+  `compute_luck_score`, `same_person_rows`, `compute_team_circuit_perf`, `season_drivers`, and
   `ingest_runner.py`'s two shared runners (`run_ingest_job`, `run_qualifying_ingest_job`): the latter via
   monkeypatched per-job callables and `openf1_session` readers, no real session data needed. The same double
   covers `data_quality_audit._audit_race` (per-status gate/threshold branching),

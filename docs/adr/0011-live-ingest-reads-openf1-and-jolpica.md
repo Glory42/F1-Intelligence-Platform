@@ -55,3 +55,8 @@ OpenF1 also builds on F1's timing data, so the same thing could happen to it. Ev
 Jolpica field the jobs read goes through `openf1_session.py` and `jolpica_client.py`, so moving
 to another free source means rewriting those two modules, not the jobs. If FastF1's schedule
 breaks too, Jolpica's `/{year}.json` calendar replaces it.
+
+Since 2026-10-28 that boundary is enforced by structure: `openf1_session.py` is the only module that reads
+OpenF1 or Jolpica fields, and it returns `session_records` (stints, pit stops, race-control messages,
+overtakes, radio clips, car and position samples). `fastf1_session.py` returns the same records for the
+2018–2022 backfills, so a third source is a third adapter with the same interface.

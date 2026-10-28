@@ -59,7 +59,7 @@ reverting the core race-completion pipeline it rides on.
 | Job | Purpose |
 |-----|---------|
 | `ingest_race_control` | Ingests OpenF1 flags/safety-car/VSC/incident messages into `race_control_messages`: 2023+ only |
-| `ingest_overtakes` | Ingests OpenF1 on-track overtakes into `race_overtakes`, resolving each driver number to a `drivers.id` via `build_driver_number_map`: 2023+ only |
+| `ingest_overtakes` | Ingests OpenF1 on-track overtakes into `race_overtakes`, resolving each driver number to a `drivers.id` via `season_drivers`: 2023+ only |
 | `ingest_team_radio` | Ingests OpenF1 team radio clips into `team_radio_clips`, same driver-number resolution: 2023+ only; F1 doesn't release radio for every session (far fewer since 2026), so a partial or empty result is normal |
 | `ingest_stints` | Ingests OpenF1 tyre stints into `race_stints` (compound, lap range, tyre age at start): 2023+ only |
 | `ingest_pit_stops` | Ingests OpenF1 pit stops into `race_pit_stops` (pit-lane and stationary time in ms; stationary only from the 2024 US GP): 2023+ only |
@@ -91,7 +91,7 @@ spelling, `None` for `nan`/`UNKNOWN`, whichever source) and the backfills' stora
 
 Stints, pit stops, race control and qualifying telemetry also exist for 2018–2022, filled locally from
 FastF1 by `python scripts/backfill_fastf1_enrichment.py 2018 2022 [--only stints,pits,race_control,telemetry] [--refresh]`
-(converters in `utils/fastf1_enrichment.py`). It only touches FastF1 seasons (`source_for`) and skips
+(the FastF1 adapter, `utils/fastf1_session.py`, returns the same `session_records` the OpenF1 jobs map). It only touches FastF1 seasons (`source_for`) and skips
 what a race's coverage already has (Q telemetry counts as covered once every qualifier has a lap), so it
 resumes after a stop and never overwrites OpenF1 data; `--refresh` rewrites the chosen parts. Pre-2023
 pit stops carry pit-lane time only (`stationary_ms` null: FastF1 has none) and lane visits over 120 s
