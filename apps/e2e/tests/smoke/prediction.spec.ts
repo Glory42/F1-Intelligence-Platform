@@ -27,11 +27,3 @@ test('the old season recap URL lands on that season’s Scorecard', async ({ pag
   await expect(page).toHaveURL(/\/prediction\?tab=scorecard&year=2025$/);
   await expect(page.getByRole('region', { name: 'Scorecard' })).toBeVisible();
 });
-
-test('the race prediction page explains long-run pace with the Friday ranking', async ({ page }) => {
-  await page.goto('/prediction/1');
-
-  const table = page.getByRole('table', { name: 'Friday long-run pace' });
-  await expect(table.getByRole('row', { name: /LEC.*MEDIUM.*1:24\.120/ })).toBeVisible();
-  await expect(table.getByRole('row', { name: /VER.*HARD.*\+0\.230/ })).toBeVisible();
-});

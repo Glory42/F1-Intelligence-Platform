@@ -6,7 +6,7 @@ import { circuitYearItems, conditionsOf, driverMapOf, fastestLapOf, predictedPod
 import {
   MUTED_TONE, SESSION_BEHAVIOUR, type RacePageKind, type RacePagePrediction, type RacePredictionRow, type StatusBadge,
 } from './raceSessionBehaviour';
-import type { CircuitHistoryItem, Driver, LapSummary, QualifyingResult, Race, RaceResult } from '@/types';
+import type { CircuitHistoryItem, Driver, LapSummary, LongRunRow, QualifyingResult, Race, RaceResult } from '@/types';
 
 export type { RacePageKind } from './raceSessionBehaviour';
 
@@ -21,6 +21,7 @@ export interface RacePageData {
   results: RaceResult[];
   qualifying: QualifyingResult[];
   laps: LapSummary[];
+  longRuns: LongRunRow[];
   drops: GridDrop[];
   driverMap: Map<number, Driver>;
   events: RaceEvents;
@@ -44,7 +45,7 @@ export interface RacePageData {
 }
 
 const NO_RACE: RacePageData = {
-  error: null, race: null, results: [], qualifying: [], laps: [], drops: [], driverMap: new Map(),
+  error: null, race: null, results: [], qualifying: [], laps: [], longRuns: [], drops: [], driverMap: new Map(),
   events: NO_RACE_EVENTS, eventTabs: [], raceYear: 0,
   prediction: null, podium: [], confidence: 0, predCorrect: null, actualWinnerName: null, isDone: false,
   status: { icon: 'timer', label: '', toneClass: MUTED_TONE }, sessionDate: null, countdownTo: null,
@@ -61,7 +62,7 @@ export async function loadRacePageData(kind: RacePageKind, raceId: number, now: 
     const reason: unknown = sessionResult.reason;
     return { ...NO_RACE, raceYear: now.getFullYear(), error: reason instanceof Error ? reason.message : behaviour.loadError };
   }
-  const { race, results, qualifying, laps, prediction } = sessionResult.value;
+  const { race, results, qualifying, laps, prediction, longRuns } = sessionResult.value;
   const circuitHistory: CircuitHistoryItem[] = await api.getCircuitDetails(race.circuit.circuitKey).then((d) => d.history, () => []);
 
   const isDone = behaviour.isDone(race);
@@ -71,6 +72,7 @@ export async function loadRacePageData(kind: RacePageKind, raceId: number, now: 
   const tabs = [
     ...(isDone && results.length > 0 ? [{ id: 'results', label: 'Results' }] : []),
     ...(qualifying.length > 0 ? [{ id: 'qualifying', label: behaviour.qualifyingLabel }] : []),
+    ...(longRuns.length > 0 ? [{ id: 'long-runs', label: 'Long Runs' }] : []),
     ...(isDone && laps.length > 0 ? [{ id: 'laps', label: 'Lap Chart' }] : []),
     ...eventTabs,
     { id: 'circuit', label: 'Circuit' },
@@ -83,6 +85,7 @@ export async function loadRacePageData(kind: RacePageKind, raceId: number, now: 
     results,
     qualifying,
     laps,
+    longRuns,
     drops: gridDrops(results, qualifying),
     driverMap: driverMapOf(results),
     events,

@@ -5,7 +5,7 @@ import { apiError, apiOk, recordApiRequests } from '../../../support/msw/routes'
 import { circuit, driver, driverB } from '../../../support/msw/fixtures';
 import { loadRacePageData } from '@/features/races/loadRacePageData';
 import type {
-  CircuitDetailResponse, LapSummary, PredictionResponse, QualifyingResult, Race, RaceControlMessage, RaceDetailResponse,
+  CircuitDetailResponse, LapSummary, LongRunRow, PredictionResponse, QualifyingResult, Race, RaceControlMessage, RaceDetailResponse,
   RaceResult, Driver, SprintDetailResponse, SprintFeatures, SprintPredictionResponse, SprintResult,
 } from '@/types';
 
@@ -30,6 +30,9 @@ const qualifying: QualifyingResult[] = [
   { id: 1, driverId: 10, gridPosition: 1, q1TimeMs: null, q2TimeMs: null, q3TimeMs: 80_000, sector1Ms: null, sector2Ms: null, sector3Ms: null, speedSt: null, driver },
 ];
 const laps: LapSummary[] = [{ driverId: 11, fastestLapMs: 81_234, avgLapMs: 83_000, totalLaps: 53, driver: driverB }];
+const longRuns: LongRunRow[] = [
+  { driver: driverB, compound: 'MEDIUM', sessionType: 'FP2', medianLapMs: 84_120, stintLength: 9, deltaToFastestMs: 0 },
+];
 
 function gpDetail(overrides: Partial<RaceDetailResponse> = {}): RaceDetailResponse {
   return { race, results, qualifying, laps, ...overrides };
@@ -67,6 +70,7 @@ function gpWeekend(detail: RaceDetailResponse = gpDetail(), prediction: Predicti
   server.use(
     apiOk('/api/races/7', detail),
     apiOk('/api/predictions/race/7', prediction),
+    apiOk('/api/races/7/long-runs', []),
     apiOk('/api/races/circuit/monza', circuitDetail),
     ...quietEvents(),
   );
@@ -91,6 +95,21 @@ describe('loadRacePageData: grand prix', () => {
     expect(data.tabs.map((t) => t.id)).toEqual(['qualifying', 'circuit']);
     expect(data.status).toEqual({ icon: 'zap', label: 'qualifying done', toneClass: 'border-yellow-500/30 text-yellow-400/70' });
     expect(data.countdownTo).toBe('2025-09-07T13:00:00Z');
+  });
+
+  test('practice long runs get a tab after qualifying, and lead the page before qualifying', async () => {
+    gpWeekend();
+    server.use(apiOk('/api/races/7/long-runs', longRuns));
+    const completed = await loadRacePageData('gp', 7, NOW);
+
+    gpWeekend(gpDetail({ race: { ...race, status: 'scheduled' }, results: [], qualifying: [], laps: [] }));
+    server.use(apiOk('/api/races/7/long-runs', longRuns));
+    const friday = await loadRacePageData('gp', 7, NOW);
+
+    expect(completed.tabs.map((t) => t.id)).toEqual(['results', 'qualifying', 'long-runs', 'laps', 'circuit']);
+    expect(completed.longRuns).toEqual(longRuns);
+    expect(friday.tabs.map((t) => t.id)).toEqual(['long-runs', 'circuit']);
+    expect(friday.defaultTab).toBe('long-runs');
   });
 
   test('scores the prediction against the result', async () => {
@@ -158,13 +177,13 @@ describe('loadRacePageData: grand prix', () => {
 
   test('a missing race is an error; a missing prediction or circuit only empties its slice', async () => {
     gpWeekend();
-    server.use(apiError('/api/predictions/race/7'), apiError('/api/races/circuit/monza'));
+    server.use(apiError('/api/predictions/race/7'), apiError('/api/races/7/long-runs'), apiError('/api/races/circuit/monza'));
     const partial = await loadRacePageData('gp', 7, NOW);
 
     server.use(apiError('/api/races/7', 404));
     const missing = await loadRacePageData('gp', 7, NOW);
 
-    expect(partial).toMatchObject({ error: null, prediction: null, predCorrect: null, yearItems: [], confidence: 0 });
+    expect(partial).toMatchObject({ error: null, prediction: null, predCorrect: null, longRuns: [], yearItems: [], confidence: 0 });
     expect(partial.race?.name).toBe('Italian Grand Prix');
     expect(missing).toMatchObject({ error: 'API 404: /api/races/7', race: null, results: [], tabs: [] });
   });

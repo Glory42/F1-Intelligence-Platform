@@ -81,3 +81,13 @@ export type RaceRecap = {
   fastestStop: { driver: Driver; stationaryMs: number } | null;
   topBattle: RaceBattle | null;
 };
+
+// Each driver's quickest practice long run of the weekend, FP2 unless only FP1 had one.
+export type LongRunRow = {
+  driver: Driver;
+  compound: string;
+  sessionType: string;
+  medianLapMs: number;
+  stintLength: number | null;
+  deltaToFastestMs: number;
+};

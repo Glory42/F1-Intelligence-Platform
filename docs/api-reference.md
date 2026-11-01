@@ -95,6 +95,12 @@ The `Race` object includes:
 - `sprintDate` / `sprintQualifyingDate`: ISO strings, null for conventional weekends
 - `sprintWeather`, `sprintSafetyCarLaps`, `sprintVscLaps`, `sprintAirTempAvg`, `sprintTrackTempAvg`, `sprintHumidityAvg`: sprint-specific conditions
 
+### `GET /api/races/:id/long-runs`
+
+Each driver's quickest practice long run (`fp2_long_run_times`), fastest first: `[{ driver, compound, sessionType, medianLapMs, stintLength, deltaToFastestMs }]`.
+`medianLapMs` is adjusted to a MEDIUM baseline. `sessionType` is `FP2`, or `FP1` on sprint weekends. Shown on the race
+page's Long Runs tab; the GP model doesn't use it (weighted-v4 dropped long runs, ADR 0010). 404 if the race doesn't exist.
+
 ### `GET /api/races/:id/race-control`
 
 Returns race-control messages (flags, safety car/VSC, incidents) for a race, ordered by
@@ -354,11 +360,6 @@ Latest Monte Carlo championship odds plus their per-round history (written by `c
 
 `history` has one entry per contender per completed round (2018–2026 replayed by
 `scripts/backfill_title_odds.py`). 404 if no odds exist for the season yet.
-
-### `GET /api/predictions/race/:raceId/friday-pace`
-
-Each driver's quickest practice long run (`fp2_long_run_times`), fastest first: `[{ driver, compound, sessionType, medianLapMs, stintLength, deltaToFastestMs }]`.
-`sessionType` is `FP2`, or `FP1` on sprint weekends. 404 if the race doesn't exist.
 
 ### `GET /api/predictions/history?year=N`
 

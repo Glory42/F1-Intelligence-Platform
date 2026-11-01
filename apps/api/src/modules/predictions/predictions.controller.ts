@@ -2,7 +2,6 @@ import type { Context } from 'hono';
 import type { Bindings } from '../../common/types';
 import { createDb } from '../../config/database';
 import { PredictionsService } from './predictions.service';
-import { FridayPaceService } from './friday-pace.service';
 import { TitleOddsService } from './title-odds.service';
 import { raceRoute, seasonRoute } from '../../common/route';
 import { CACHE_ACTIVE, CACHE_REFERENCE, cacheControlForStatus } from '../../common/cache';
@@ -10,7 +9,6 @@ import { GP } from '../../common/session-kind';
 import { findPrediction, findUpcomingPrediction } from '../../common/session-reads';
 
 const service = new PredictionsService();
-const fridayPace = new FridayPaceService();
 const titleOdds = new TitleOddsService();
 
 export const PredictionsController = {
@@ -26,11 +24,6 @@ export const PredictionsController = {
   getTitleOdds: seasonRoute({
     load: ({ db, year }) => titleOdds.findTitleOdds(db, year),
     missing: (year) => `No title odds for ${year}`,
-  }),
-
-  getFridayPace: raceRoute({
-    param: 'raceId',
-    load: ({ db, race }) => fridayPace.findFridayPace(db, race.id),
   }),
 
   getByRaceId: raceRoute({

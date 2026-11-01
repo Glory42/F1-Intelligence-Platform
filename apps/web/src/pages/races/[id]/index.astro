@@ -3,6 +3,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import { RaceResultsTable } from '@/features/races/components/RaceResultsTable';
 import { QualifyingGrid } from '@/features/races/components/QualifyingGrid';
 import LapChart from '@/features/races/components/LapChart.astro';
+import LongRunsTable from '@/features/races/components/LongRunsTable.astro';
 import RaceHeroInfo from '@/features/races/components/RaceHeroInfo.astro';
 import RacePredictionPanel from '@/features/races/components/RacePredictionPanel.astro';
 import SessionSwitcher from '@/features/races/components/SessionSwitcher.astro';
@@ -15,7 +16,7 @@ import { loadRacePageData } from '@/features/races/loadRacePageData';
 import { GP_ACCENT } from '@/features/predictions/types';
 
 const {
-  error, race, results, qualifying, laps, drops, driverMap, events, eventTabs, raceYear, prediction, podium, confidence,
+  error, race, results, qualifying, laps, longRuns, drops, driverMap, events, eventTabs, raceYear, prediction, podium, confidence,
   predCorrect, actualWinnerName, isDone, status, sessionDate, countdownTo, conditions, fastestLap, yearItems, links,
   tabs, defaultTab,
 } = await loadRacePageData('gp', Number(Astro.params.id));
@@ -103,6 +104,12 @@ const {
               <div class="border border-white/[0.06] overflow-hidden">
                 <QualifyingGrid qualifying={qualifying} year={raceYear} />
               </div>
+            </RaceTabPanel>
+          )}
+
+          {longRuns.length > 0 && (
+            <RaceTabPanel id="long-runs" defaultTab={defaultTab}>
+              <LongRunsTable rows={longRuns} year={raceYear} />
             </RaceTabPanel>
           )}
 

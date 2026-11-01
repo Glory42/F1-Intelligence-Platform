@@ -130,9 +130,9 @@ suite never touches Neon.
 - **Lifecycle**: each test file calls `truncateAll(db)` in `beforeAll` and `afterAll`, seeds its
   own fixtures (typically under a sentinel year like `2097`/`2099`), and asserts on the JSON
   response. `truncateAll` is a single `TRUNCATE … RESTART IDENTITY CASCADE` over every table.
-- **Covered**: `races` (incl. circuit outline + circuit telemetry), `race-events`, `race-story`,
+- **Covered**: `races` (incl. practice long runs, circuit outline + circuit telemetry), `race-events`, `race-story`,
   `strategy`, `telemetry`, `drivers` (incl. career, racecraft, teammate battle), `teams` (incl. pit
-  stops), `seasons`, `search`, `predictions` (incl. Friday pace, title odds), `sprint`, `history`,
+  stops), `seasons`, `search`, `predictions` (incl. title odds), `sprint`, `history`,
   the home hub's on-this-day query, the `edgeCache` middleware (`common/edge-cache.ts`), and the route
   factories (`route/route.test.ts`: 400/404 answers and Cache-Control derived from the data's race
   status or season, never from `?year=`). Not yet: `quality`.

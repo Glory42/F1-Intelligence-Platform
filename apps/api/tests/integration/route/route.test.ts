@@ -128,7 +128,7 @@ describe('route policy (integration)', () => {
 
   it.each([
     ['/api/races/1.5/strategy', 'id must be a number'],
-    ['/api/predictions/race/abc/friday-pace', 'raceId must be a number'],
+    ['/api/races/abc/long-runs', 'id must be a number'],
     ['/api/drivers/abc/career', 'id must be a number'],
     ['/api/teams/99999999999', 'id must be a number'],
   ])('rejects the id in %s with 400 INVALID_ID', async (path, message) => {

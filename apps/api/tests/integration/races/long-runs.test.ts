@@ -8,18 +8,18 @@ import { createDriver } from '../../support/factories/driver.factory';
 import { createRace } from '../../support/factories/race.factory';
 import { createFp2LongRun } from '../../support/factories/fp2LongRun.factory';
 
-interface FridayPaceBody {
+interface LongRunsBody {
   data: Array<{ driver: { code: string }; compound: string; medianLapMs: number; deltaToFastestMs: number }>;
 }
 
-describe('friday long-run pace (integration)', () => {
+describe('practice long runs (integration)', () => {
   const db = getTestDb();
   let raceId: number;
 
   beforeAll(async () => {
     await truncateAll(db);
     const season = await createSeason(db, { year: 2094 });
-    const circuit = await createCircuit(db, { circuitKey: 'friday-circuit' });
+    const circuit = await createCircuit(db, { circuitKey: 'long-runs-circuit' });
     const team = await createTeam(db, season.id);
     const ver = await createDriver(db, season.id, team.id, { driverNumber: 1, code: 'VER' });
     const nor = await createDriver(db, season.id, team.id, { driverNumber: 4, code: 'NOR' });
@@ -36,8 +36,8 @@ describe('friday long-run pace (integration)', () => {
   });
 
   it("ranks each driver's best long run with the gap to the fastest", async () => {
-    const res = await apiRequest(`/api/predictions/race/${raceId}/friday-pace`);
-    const { data } = (await res.json()) as FridayPaceBody;
+    const res = await apiRequest(`/api/races/${raceId}/long-runs`);
+    const { data } = (await res.json()) as LongRunsBody;
 
     expect(data.map((r) => [r.driver.code, r.compound, r.medianLapMs, r.deltaToFastestMs])).toEqual([
       ['NOR', 'MEDIUM', 84120, 0],

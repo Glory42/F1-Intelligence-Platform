@@ -11,6 +11,15 @@ test('renders race results, qualifying, and prediction against fixture data', as
   await expect(page.getByText(/failed to load/i)).toHaveCount(0);
 });
 
+test('renders the long runs tab with the practice long-run ranking', async ({ page }) => {
+  await page.goto('/races/1');
+  await page.getByRole('tab', { name: 'Long Runs' }).click();
+
+  const table = page.locator('#panel-long-runs').getByRole('table', { name: 'Practice long runs' });
+  await expect(table.getByRole('row', { name: /LEC.*MEDIUM.*1:24\.120/ })).toBeVisible();
+  await expect(table.getByRole('row', { name: /VER.*HARD.*\+0\.230/ })).toBeVisible();
+});
+
 test('renders the incidents tab with race control messages', async ({ page }) => {
   await page.goto('/races/1');
 

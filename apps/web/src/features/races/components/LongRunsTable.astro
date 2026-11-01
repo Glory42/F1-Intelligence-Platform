@@ -1,5 +1,4 @@
 ---
-import SectionKicker from '@/components/page/SectionKicker.astro';
 import DataList from '@/components/data/DataList.astro';
 import DataRow from '@/components/data/DataRow.astro';
 import DriverIdentity from '@/components/identity/DriverIdentity.astro';
@@ -7,24 +6,21 @@ import RankCell from '@/components/data/RankCell.astro';
 import { compoundToken } from '@/lib/f1/tyres';
 import { getTeamColor } from '@/lib/f1/teamColors';
 import { formatMs } from '@/lib/utils';
-import type { PredictionAccent } from '../types';
-import type { FridayPaceRow } from '@/types';
+import type { LongRunRow } from '@/types';
 
 interface Props {
-  rows: FridayPaceRow[];
-  accent: PredictionAccent;
+  rows: LongRunRow[];
   year: number;
 }
 
-const { rows, accent, year } = Astro.props;
+const { rows, year } = Astro.props;
 const COLUMNS = 'grid-cols-[40px_1fr_90px_70px] md:grid-cols-[40px_1fr_110px_100px_80px_60px]';
 const formatDelta = (ms: number) => (ms === 0 ? '-' : `+${(ms / 1000).toFixed(3)}`);
 ---
 
 <section>
-  <SectionKicker label="./friday-pace · long runs" accentRgb={accent.rgb} />
   <DataList
-    label="Friday long-run pace"
+    label="Practice long runs"
     columns={COLUMNS}
     headers={[
       { label: 'Pos' }, { label: 'Driver' }, { label: 'Compound', class: 'hidden md:block' },
@@ -45,6 +41,7 @@ const formatDelta = (ms: number) => (ms === 0 ? '-' : `+${(ms / 1000).toFixed(3)
     ))}
   </DataList>
   <p class="font-mono text-[7px] text-muted-foreground/50 mt-3 leading-relaxed">
-    Median lap of each driver's quickest practice long run: the raw input behind the Long Run Pace feature.
+    Median lap of each driver's quickest long run in FP2 (or FP1 where the laps column says so), adjusted to a
+    medium-tyre baseline: soft +0.5 s, hard −0.4 s.
   </p>
 </section>

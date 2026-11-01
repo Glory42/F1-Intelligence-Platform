@@ -98,8 +98,9 @@ apps/api/
 │   └── modules/                   # Feature modules (service / controller / module)
 │       ├── races/
 │       │   ├── races.service.ts   # DB queries: race list, race detail (results, qualifying, lap summaries)
+│       │   ├── long-runs.service.ts # findLongRuns(): each driver's best practice long run + gap to fastest
 │       │   ├── races.controller.ts# Parses context, calls service, returns JSON
-│       │   └── races.module.ts    # GET /, /:id
+│       │   └── races.module.ts    # GET /, /:id, /:id/long-runs
 │       ├── circuits/              # Mounted at /api/races ahead of races' /:id (URLs predate the module)
 │       │   ├── circuits.service.ts        # Circuit list, circuit details (history, eras, stats, outline), circuit telemetry (pole lap)
 │       │   ├── circuit-era.helpers.ts     # Pure era bucketing: Era/EraMap/ERAS, aggregateEraWins(), buildDominanceByEra(), normalizeTeamKey()
@@ -144,10 +145,9 @@ apps/api/
 │       │   ├── accuracy.helpers.ts    # aggregateAccuracyBySeason(): per-season gp/sprint/overall accuracy buckets
 │       │   ├── prediction-history.helpers.ts # buildHistoryItems(), buildWinnerMap(), buildProbPosMaps(), mergeHistoryByDateDesc()
 │       │   ├── intel-standings.helpers.ts # aggregateSeasonScores() (per-person average raw score + win probability) + buildIntelStandingRows() (rank + min-max normalise + sprint totals) for findIntelStandings()
-│       │   ├── friday-pace.service.ts # findFridayPace(): each driver's best practice long run + gap to fastest
 │       │   ├── title-odds.service.ts  # findTitleOdds(): latest round's driver/team title odds + per-round history for charting
 │       │   ├── predictions.controller.ts
-│       │   └── predictions.module.ts  # GET /model-info, /upcoming, /history, /accuracy, /standings, /title-odds, /race/:raceId/friday-pace, /race/:raceId
+│       │   └── predictions.module.ts  # GET /model-info, /upcoming, /history, /accuracy, /standings, /title-odds, /race/:raceId
 │       ├── sprint/
 │       │   ├── sprint.service.ts  # Sprint prediction (upcoming/by race) + sprint detail: results, SQ grid, lap summaries
 │       │   ├── sprint.controller.ts
@@ -184,6 +184,7 @@ apps/api/
 │   ├── integration/                # bun test: real Hono `app.request()` against a LOCAL Postgres (docker-compose.test.yml behind
 │   │   │                           #   a Neon HTTP proxy; `bun run test:db:up`, config in .env.test): never Neon
 │   │   ├── races/races.test.ts     # list/filter/detail/circuit-history joins
+│   │   ├── races/long-runs.test.ts # best long run per driver + gap to fastest
 │   │   ├── circuits/circuit-outline.test.ts # circuit outline from the latest stored pole lap; none without telemetry
 │   │   ├── circuits/circuit-telemetry.test.ts # pole lap preferred over a faster non-pole lap; null without telemetry
 │   │   ├── race-events/race-events.test.ts # race-control message + overtakes + team-radio lists, ordering, 404
@@ -204,7 +205,6 @@ apps/api/
 │   │   ├── seasons/seasons.test.ts # race-count aggregation
 │   │   ├── search/search.test.ts   # cross-season dedup
 │   │   ├── predictions/predictions.test.ts # upcoming/by-id/history/standings/accuracy/model-info
-│   │   ├── predictions/friday-pace.test.ts # best long run per driver + gap to fastest
 │   │   ├── predictions/title-odds.test.ts  # latest-round odds ranked + history, expected-points tiebreak
 │   │   ├── sprint/sprint.test.ts   # upcoming/by-id/detail, conventional-race guard
 │   │   ├── session-kind/           # predictions + lap summaries asserted the same way for GP and sprint (pit/null laps excluded)
@@ -251,6 +251,7 @@ A module with a second query area adds another `*.service.ts` beside the first (
 | GET | `/api/races/circuit/:circuitKey` | - |
 | GET | `/api/races/circuit/:circuitKey/telemetry` | - |
 | GET | `/api/races/:id` | - |
+| GET | `/api/races/:id/long-runs` | - |
 | GET | `/api/races/:id/race-control` | `session` (`race`\|`sprint`) |
 | GET | `/api/races/:id/overtakes` | `session` |
 | GET | `/api/races/:id/team-radio` | `session` |
@@ -279,7 +280,6 @@ A module with a second query area adds another `*.service.ts` beside the first (
 | GET | `/api/predictions/standings` | `year` |
 | GET | `/api/predictions/title-odds` | `year` |
 | GET | `/api/predictions/race/:raceId` | - |
-| GET | `/api/predictions/race/:raceId/friday-pace` | - |
 | GET | `/api/sprint/upcoming` | - |
 | GET | `/api/sprint/race/:raceId` | - |
 | GET | `/api/sprint/race/:raceId/detail` | - |
@@ -303,7 +303,7 @@ apps/web/
 │   ├── pages/                     # File-based routes
 │   │   ├── index.astro            # Home: season progress strip + next race, last race (Recap), championship blocks
 │   │   ├── prediction.astro       # Tabs: Upcoming (GP + sprint panels, model ratings) · Scorecard (history, calibration, Brier)
-│   │   ├── prediction/[id].astro  # Historical GP prediction: contribution breakdown, radar compare, Friday pace, what-if lab
+│   │   ├── prediction/[id].astro  # Historical GP prediction: contribution breakdown, radar compare, what-if lab
 │   │   ├── health-quality.astro   # Dev-only data-quality dashboard (404-guarded outside DEV)
 │   │   ├── history.astro          # /history: tabs Records · Milestones · On this day · Lineage (F1DB)
 │   │   ├── compare/
@@ -372,7 +372,7 @@ apps/web/
 │   │   │   │                          #   call; returns facts + a slim PREDICTION_BEHAVIOUR axis (fetchers, weights, meta, date field)
 │   │   │   ├── predictionCopy.ts       # PREDICTION_COPY[kind]: all GP-vs-sprint wording (titles, kicker, labels, headings, blurbs); the views own it
 │   │   │   └── components/
-│   │   │       ├── PredictionPageBody.astro        # Full page body (header→banner→table→radar→Friday pace→WhatIfLab); both
+│   │   │       ├── PredictionPageBody.astro        # Full page body (header→banner→table→radar→WhatIfLab); both
 │   │   │       │                                   #   [id].astro routes reduce to a fetch + <PredictionPageBody data={data} copy={copy} />
 │   │   │       ├── ConfidenceBadge.astro           # LOCK / LIKELY / TOSS-UP badge from the P1−P2 win-probability gap
 │   │   │       ├── PredictionHeader.astro          # Round kicker + title + ConfidenceBadge + circuit/model lines
@@ -380,7 +380,6 @@ apps/web/
 │   │   │       ├── ContributionBar.astro           # "why {CODE}": stacked bar of each feature's share of the driver's edge over the field
 │   │   │       ├── PredictionDriverTable.astro     # Full ranked driver table (accent via scoped <style define:vars>)
 │   │   │       ├── DriverRadarCompare.astro        # 2-driver radar of features ranked within the field; bundled <script> reads a JSON payload node
-│   │   │       ├── FridayPaceTable.astro           # GP only: each driver's best practice long run, compound, gap to fastest
 │   │   │       ├── ModelWeightsGrid.astro          # Feature-weight grid (rendered xl + mobile per page)
 │   │   │       ├── ModelRatingsTable.astro         # /prediction: season-average model rating per driver
 │   │   │       ├── WhatIfLab.astro                 # Re-weight sliders scale each feature's term; whatIfProbabilities() in-browser
@@ -399,6 +398,7 @@ apps/web/
 │   │   │   ├── weatherSpells.ts       # rainSpells(): contiguous rainfall minutes → spells
 │   │   │   └── components/
 │   │   │       ├── LapChart.astro         # Plain SVG lap time chart (no chart library)
+│   │   │       ├── LongRunsTable.astro    # Long Runs tab (GP page): each driver's best practice long run, compound, gap to fastest
 │   │   │       ├── CalendarRow.astro / CalendarCard.astro # /races: completed row, upcoming card (status badge + prediction links)
 │   │   │       ├── RaceEventPanels.astro  # Strategy / Incidents / Overtakes / Team radio tab panels, shared by GP + sprint pages
 │   │   │       ├── CircuitStatsGrid.astro # Circuit tab: laps, length, distance, corners, DRS, overtake rate (race or sprint distance)
@@ -595,11 +595,11 @@ apps/web/
 | `/docs/[slug]` | Astro Content Collections | Rendered markdown with sidebar nav + on-this-page rail |
 | `/` | `races?year=` + `races/:id` + `predictions/upcoming` + `predictions/history` + `races/:id/recap` + driver/team standings + `predictions/title-odds` | Season progress strip + three blocks: next race, last race Recap, championship top 5 with title odds |
 | `/prediction` | Upcoming: `predictions/upcoming` + `sprint/upcoming` + `predictions/standings` + `predictions/model-info` · Scorecard: `predictions/history?year=N` + `predictions/accuracy` | Tabs: Upcoming · Scorecard (hit rates, best call/worst miss/streak, race by race, calibration when ≥5 races, every season) |
-| `/prediction/[id]` | `predictions/race/:id` + `races/:id` + `predictions/race/:id/friday-pace` | Historical GP prediction: contribution breakdown, radar compare, Friday pace, in-browser what-if lab |
+| `/prediction/[id]` | `predictions/race/:id` + `races/:id` | Historical GP prediction: contribution breakdown, radar compare, in-browser what-if lab |
 | `/prediction/sprint/[id]` | `sprint/race/:id` + `sprint/race/:id/detail` | Sprint prediction detail: same feature set, sprint model |
 | `/prediction/recap[/year]` | - | 301 → `/prediction?tab=scorecard[&year=N]` (`src/middleware.ts`) |
 | `/races` | `GET /api/races?year=N` | Race calendar: filter (ALL/SPRINT/GP), sort (ASC/DESC), sprint weekends as two cards |
-| `/races/[id]` | `races/:id` + `predictions/race/:id` + `races/circuit/:key` + `strategy` + race-control/overtakes/team-radio | GP results, qualifying, laps, strategy, race events, circuit; links to race story + telemetry |
+| `/races/[id]` | `races/:id` + `predictions/race/:id` + `races/:id/long-runs` + `races/circuit/:key` + `strategy` + race-control/overtakes/team-radio | GP results, qualifying, practice long runs, laps, strategy, race events, circuit; links to race story + telemetry |
 | `/races/[id]/sprint` | `sprint/race/:id/detail` + `races/circuit/:key` + `strategy` + race events (`session=sprint`) | Sprint results, SQ grid, sprint lap chart, conditions |
 | `/races/[id]/race-story` | `races/:id` + `races/:id/race-story` | Gap/position charts, battles, weather; `?session=sprint` for the sprint |
 | `/races/[id]/telemetry` | `races/:id` + `races/:id/telemetry?session=&a=&b=` | Two-lap qualifying comparison; drivers picked with a plain GET form |
@@ -659,9 +659,9 @@ apps/e2e/
 │       ├── sidebar.spec.ts         # Season/Explore groups, active destination, collapse persists across reloads
 │       ├── home-hub.spec.ts        # /: exactly three blocks: next race (schedule, circuit), last race recap, championship
 │       ├── global-search.spec.ts   # Cmd/Ctrl+K opens, shows results, Escape closes (client-side fetch)
-│       ├── prediction.spec.ts      # /prediction tabs + Scorecard, recap URL redirect, /prediction/1 Friday pace
+│       ├── prediction.spec.ts      # /prediction tabs + Scorecard, recap URL redirect
 │       ├── sprint-prediction.spec.ts # /prediction/sprint/2: sprint prediction detail page
-│       ├── race-detail.spec.ts     # /races/1: results, qualifying, prediction, incidents, overtakes tabs
+│       ├── race-detail.spec.ts     # /races/1: results, qualifying, prediction, long runs, incidents, overtakes tabs
 │       ├── race-sprint.spec.ts     # /races/2/sprint: sprint results + prediction panel + GP ⇄ sprint links
 │       ├── race-story.spec.ts      # /races/1/race-story: gap/position/battles, weather with rain spells
 │       ├── telemetry.spec.ts       # /races/1 → telemetry: two qualifying laps picked in a plain GET form
@@ -878,7 +878,7 @@ data-engine/
 | `ingest_race` | `--year --round` | Race results + per-lap timing + conditions + race story (traces, battles, weather): 2018+ |
 | `ingest_race_legacy` | `--year --round` | Race results only via Ergast: pre-2018; run via `scripts/run_backfill.py` (not a `main.py` job) |
 | `ingest_sprint_qualifying` | `--year --round` | SQ session → sprint_results (sq1/sq2/sq3 + sector times + speed); date guard rejects future rounds |
-| `ingest_fp2` | `--year --round` | Practice long-run stints → `fp2_long_run_times` (FP2 primary, FP1 fallback on sprint weekends); shown as the Friday pace table |
+| `ingest_fp2` | `--year --round` | Practice long-run stints → `fp2_long_run_times` (FP2 primary, FP1 fallback on sprint weekends); shown on the race page's Long Runs tab |
 | `ingest_sprint` | `--year --round` | Sprint results + sprint_lap_times + sprint conditions; sprint weekends only |
 | `ingest_race_control` | `--year --round [--session]` | OpenF1 flags/SC/VSC/incident messages: completed races only, 2023+ (no OpenF1 coverage before; 2018–2022 backfilled from FastF1), gated past OpenF1's live window |
 | `ingest_overtakes` | `--year --round [--session]` | OpenF1 on-track overtakes: same 2023+/completed/live-window gating; skips rows whose driver number can't be resolved |

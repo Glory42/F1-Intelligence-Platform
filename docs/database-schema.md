@@ -421,7 +421,8 @@ Per-lap data for sprint races: mirrors `lap_times` structure. 2018+ only.
 ---
 
 ### `fp2_long_run_times`
-FP2 long-run stint data per driver per race. Populated by `ingest_fp2`. 2018+ only.
+FP2 long-run stint data per driver per race. Populated by `ingest_fp2`. 2018+ only. Served by
+`GET /api/races/:id/long-runs` for the race page; not a weighted-v4 feature.
 
 | Column | Type | Notes |
 |--------|------|-------|

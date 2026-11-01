@@ -6,7 +6,7 @@ import type {
   TeamDetailResponse, DriverStanding,
   FeatureInfo, GpFeatureKey, SprintFeatureKey, SprintFeatures, DriverSprintPrediction, SprintPredictionResponse,
   SprintResult, SprintDetailResponse, RaceControlMessage, RaceOvertake, TeamRadioClip,
-  StrategyResponse, FridayPaceRow, PitCrewRanking, TeamStanding, TitleOddsResponse,
+  StrategyResponse, LongRunRow, PitCrewRanking, TeamStanding, TitleOddsResponse,
   RacecraftRow, TeammateBattle, RaceStoryResponse, TelemetryResponse, LapTelemetrySamples,
   HistoryRecords, HistoryMilestones, ConstructorLineage, DriverHistory, TeamHistory, RaceRecap, OnThisDay, TeamPitStop, CircuitTelemetry,
   GlobalSearchResponse,
@@ -357,7 +357,7 @@ export const raceStrategyResponse: StrategyResponse = {
   ],
 };
 
-export const fridayPaceRows: FridayPaceRow[] = [
+export const longRunRows: LongRunRow[] = [
   { driver: driverB, compound: 'MEDIUM', sessionType: 'FP2', medianLapMs: 84120, stintLength: 9, deltaToFastestMs: 0 },
   { driver, compound: 'HARD', sessionType: 'FP2', medianLapMs: 84350, stintLength: 11, deltaToFastestMs: 230 },
 ];

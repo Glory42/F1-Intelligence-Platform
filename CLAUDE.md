@@ -234,6 +234,7 @@ GET /api/races/:id/team-radio?session=race|sprint
 GET /api/races/:id/strategy?session=race|sprint
 GET /api/races/:id/race-story?session=race|sprint
 GET /api/races/:id/telemetry?session=Q|SQ&a=CODE&b=CODE
+GET /api/races/:id/long-runs
 
 GET /api/drivers?year=N&team_id=N
 GET /api/drivers/standings?year=N
@@ -258,7 +259,6 @@ GET /api/predictions/history?year=N
 GET /api/predictions/standings?year=N
 GET /api/predictions/title-odds?year=N
 GET /api/predictions/race/:race_id
-GET /api/predictions/race/:race_id/friday-pace
 
 GET /api/sprint/upcoming
 GET /api/sprint/race/:race_id
@@ -296,9 +296,9 @@ All queries use Drizzle joins. Never fetch a list then loop-query for each item.
 |-------|--------|------------|
 | `/` | BaseLayout | Season progress strip + three fixed blocks: next race (schedule, circuit, model top 3), last race (podium + Recap), championship top 5 with title odds |
 | `/prediction` | BaseLayout | `GET /api/predictions/upcoming` (+ sprint, model standings); `?tab=scorecard` fetches `predictions/history` + `accuracy` |
-| `/prediction/[id]` · `/prediction/sprint/[id]` | BaseLayout | `GET /api/predictions/race/:id` (+ friday pace) · `GET /api/sprint/race/:id` |
+| `/prediction/[id]` · `/prediction/sprint/[id]` | BaseLayout | `GET /api/predictions/race/:id` · `GET /api/sprint/race/:id` |
 | `/races` | BaseLayout | `GET /api/races?year=N` |
-| `/races/[id]` · `/races/[id]/sprint` | BaseLayout | `GET /api/races/:id` (+ strategy, race events per tab) · `GET /api/sprint/race/:id/detail` |
+| `/races/[id]` · `/races/[id]/sprint` | BaseLayout | `GET /api/races/:id` (+ practice long runs, strategy, race events per tab) · `GET /api/sprint/race/:id/detail` |
 | `/races/[id]/race-story` | BaseLayout | `GET /api/races/:id/race-story` (`?session=sprint` for the sprint) |
 | `/races/[id]/telemetry` | BaseLayout | `GET /api/races/:id/telemetry`: drivers picked with a plain GET form, so no client fetch |
 | `/circuits` · `/circuits/[key]` | BaseLayout | `GET /api/races/circuits` · `GET /api/races/circuit/:key` (+ `/telemetry` tab) |

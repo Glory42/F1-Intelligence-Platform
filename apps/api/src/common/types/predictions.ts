@@ -102,15 +102,6 @@ export type IntelStandingRow = {
   championshipPoints: string;
 };
 
-export type FridayPaceRow = {
-  driver: Driver;
-  compound: string;
-  sessionType: string;
-  medianLapMs: number;
-  stintLength: number | null;
-  deltaToFastestMs: number;
-};
-
 type OddsFields = { titleProbability: number; expectedPoints: number; pointsP10: number; pointsP90: number };
 
 export type TitleOddsResponse = {

@@ -1,7 +1,7 @@
 import { api } from '@/lib/api';
 import { unwrapSettled } from '@/lib/utils';
 import { sprintQualifyingGrid, type SessionConditions } from './raceView';
-import type { Driver, LapSummary, QualifyingResult, Race, RaceResult, RaceSession } from '@/types';
+import type { Driver, LapSummary, LongRunRow, QualifyingResult, Race, RaceResult, RaceSession } from '@/types';
 
 export type RacePageKind = 'gp' | 'sprint';
 
@@ -28,6 +28,7 @@ export interface SessionData {
   qualifying: QualifyingResult[];
   laps: LapSummary[];
   prediction: RacePagePrediction | null;
+  longRuns: LongRunRow[];
 }
 
 // Everything that differs between a grand prix page and its sprint page; the rest of the loader is shared.
@@ -65,18 +66,22 @@ function gpStatus(race: Race): StatusBadge {
 }
 
 async function loadGrandPrix(raceId: number): Promise<SessionData> {
-  const [detail, prediction] = await Promise.allSettled([api.getRaceById(raceId), api.getPredictionByRace(raceId)]);
+  const [detail, prediction, longRuns] = await Promise.allSettled([
+    api.getRaceById(raceId), api.getPredictionByRace(raceId), api.getLongRuns(raceId),
+  ]);
   if (detail.status === 'rejected') throw detail.reason;
-  return { ...detail.value, prediction: unwrapSettled(prediction, null) };
+  return { ...detail.value, prediction: unwrapSettled(prediction, null), longRuns: unwrapSettled(longRuns, []) };
 }
 
 // Sprint qualifying is stored on the sprint rows, so grid-only rows feed the SQ grid but not the result.
+// Practice long runs belong to the whole weekend, so only the GP page shows them.
 async function loadSprint(raceId: number): Promise<SessionData> {
   const { race, prediction, results, laps } = await api.getSprintDetail(raceId);
   return {
     race,
     prediction,
     laps,
+    longRuns: [],
     results: results.filter((r) => r.status !== 'grid_set'),
     qualifying: sprintQualifyingGrid(results),
   };

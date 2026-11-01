@@ -1,12 +1,12 @@
 import { and, asc, eq, isNotNull } from 'drizzle-orm';
 import type { Db } from '../../config/database';
 import { drivers, fp2LongRunTimes, teams } from '../../db/schema';
-import type { FridayPaceRow } from '../../common/types';
+import type { LongRunRow } from '../../common/types';
 import { toDriver } from '../../common/mappers';
 
-export class FridayPaceService {
-  // The Long Run Pace feature's raw input: each driver's quickest practice long run.
-  async findFridayPace(db: Db, raceId: number): Promise<FridayPaceRow[]> {
+export class LongRunsService {
+  // Each driver's quickest practice long run (FP2, else FP1), ranked by median lap.
+  async findLongRuns(db: Db, raceId: number): Promise<LongRunRow[]> {
     const rows = await db
       .select({ run: fp2LongRunTimes, driver: drivers, team: teams })
       .from(fp2LongRunTimes)

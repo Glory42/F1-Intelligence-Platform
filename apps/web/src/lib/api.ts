@@ -4,7 +4,7 @@ import type {
   PredictionHistoryItem, IntelStandingRow, CircuitDetailResponse, RaceControlMessage, RaceOvertake, TeamRadioClip,
   DriverYearStats, TeamYearStats, SeasonSummary,
   SprintPredictionResponse, SprintDetailResponse, ModelInfo, SeasonAccuracy,
-  QualityReport, RaceSession, StrategyResponse, PitCrewRanking, FridayPaceRow,
+  QualityReport, RaceSession, StrategyResponse, PitCrewRanking, LongRunRow,
   TitleOddsResponse, TeammateBattle, RacecraftRow, RaceStoryResponse, TelemetryResponse, QualifyingSession,
   HistoryRecords, HistoryMilestones, ConstructorLineage, DriverHistory, TeamHistory, RaceRecap, OnThisDay,
  TeamPitStop, CircuitTelemetry, GlobalSearchResponse } from '@/types';
@@ -55,9 +55,9 @@ export const api = {
   },
   getStrategy: (raceId: number, session: RaceSession = 'race') =>
     get<StrategyResponse>(`/api/races/${raceId}/strategy${sessionQuery(session)}`),
+  getLongRuns: (raceId: number) => get<LongRunRow[]>(`/api/races/${raceId}/long-runs`),
   getPitCrewRankings: (year: number) => get<PitCrewRanking[]>(`/api/teams/pit-stops?year=${year}`),
   getTeamPitStops: (teamId: number, year: number) => get<TeamPitStop[]>(`/api/teams/${teamId}/pit-stops?year=${year}`),
-  getFridayPace: (raceId: number) => get<FridayPaceRow[]>(`/api/predictions/race/${raceId}/friday-pace`),
   getTitleOdds: (year: number) => get<TitleOddsResponse>(`/api/predictions/title-odds?year=${year}`),
   getTeammateBattle: (driverId: number, year: number) =>
     get<TeammateBattle>(`/api/drivers/${driverId}/teammate-battle?year=${year}`),

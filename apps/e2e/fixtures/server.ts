@@ -6,7 +6,7 @@ import {
   globalSearchResponse,
   teamsListResponse, teamBDetailResponse, teamBCareer,
   sprintPredictionResponse, sprintDetailResponse, sprintWeekendRaceDetailResponse,
-  sprintRaceControlMessages, raceStrategyResponse, fridayPaceRows, pitCrewRankings, teamStandingsResponse, race2026DetailResponse,
+  sprintRaceControlMessages, raceStrategyResponse, longRunRows, pitCrewRankings, teamStandingsResponse, race2026DetailResponse,
   races2026, titleOddsResponse, racecraftRows, teammateBattle, raceStoryResponse, telemetryResponse,
   historyRecords, historyMilestones, constructorLineages, driverHistory, teamHistory, lastRaceRecap, lastRaceDetailResponse, onThisDay,
 } from './data';
@@ -67,10 +67,10 @@ Bun.serve({
     if (url.pathname === '/api/races/1/overtakes') return ok(raceOvertakes);
     if (url.pathname === '/api/races/1/team-radio') return ok(teamRadioClips);
     if (url.pathname === '/api/races/1/strategy') return ok(raceStrategyResponse);
+    if (url.pathname === '/api/races/1/long-runs') return ok(longRunRows);
     if (url.pathname === '/api/races/1/race-story') return ok(raceStoryResponse);
     if (url.pathname === '/api/races/1/telemetry') return ok(telemetryResponse);
     if (url.pathname === '/api/predictions/race/1') return ok(predictionResponse);
-    if (url.pathname === '/api/predictions/race/1/friday-pace') return ok(fridayPaceRows);
     if (url.pathname === '/api/races/circuits') return ok([circuit, pastCircuit]);
     if (url.pathname === '/api/races/circuit/monza') return ok(circuitDetailResponse);
     if (url.pathname === '/api/races/circuit/monza/telemetry') return ok(circuitTelemetry);

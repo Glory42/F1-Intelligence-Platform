@@ -2,7 +2,7 @@ import { api } from '@/lib/api';
 import type { Weights } from '@/lib/f1/predictionMath';
 import { edgeBreakdown, fieldScaled, termsOf, type FeatureEdge } from '@/lib/f1/predictionTerms';
 import { GP_ACCENT, SPRINT_ACCENT, type PredictionAccent, type PredictionDriverVM, type FeatureMeta, type PredictionPageKind } from './types';
-import type { Race, Driver, FeatureInfo, FeatureTerm, FridayPaceRow, GpFeatures, PredictionOf, SprintFeatures } from '@/types';
+import type { Race, Driver, FeatureInfo, FeatureTerm, GpFeatures, PredictionOf, SprintFeatures } from '@/types';
 
 interface RawResultRow {
   driver: { id: number; fullName: string };
@@ -56,8 +56,6 @@ interface PredictionBehaviour {
   fetchDetail: (raceId: number) => Promise<RawDetail>;
   accent: PredictionAccent;
   dateField: (race: Race) => string;
-  // Sprint weekends have no FP2 session, so only the GP page shows Friday long-run pace.
-  fetchFridayPace: ((raceId: number) => Promise<FridayPaceRow[]>) | null;
 }
 
 const PREDICTION_BEHAVIOUR: Record<PredictionPageKind, PredictionBehaviour> = {
@@ -66,14 +64,12 @@ const PREDICTION_BEHAVIOUR: Record<PredictionPageKind, PredictionBehaviour> = {
     fetchDetail: api.getRaceById,
     accent: GP_ACCENT,
     dateField: (race) => race.raceDate,
-    fetchFridayPace: api.getFridayPace,
   },
   sprint: {
     fetchPrediction: async (raceId) => toView(await api.getSprintByRaceId(raceId), SPRINT_PACE),
     fetchDetail: api.getSprintDetail,
     accent: SPRINT_ACCENT,
     dateField: (race) => race.sprintDate ?? race.raceDate,
-    fetchFridayPace: null,
   },
 };
 
@@ -92,7 +88,6 @@ export interface PredictionPageData {
   weights: Weights;
   featureMeta: FeatureMeta;
   accent: PredictionAccent;
-  fridayPace: FridayPaceRow[];
 }
 
 export async function buildPredictionPageData(kind: PredictionPageKind, raceId: number): Promise<PredictionPageData> {
@@ -102,10 +97,9 @@ export async function buildPredictionPageData(kind: PredictionPageKind, raceId: 
   let detail: RawDetail | null = null;
   let predictionFailed = false;
 
-  const [predResult, detailResult, fridayPaceResult] = await Promise.allSettled([
+  const [predResult, detailResult] = await Promise.allSettled([
     behaviour.fetchPrediction(raceId),
     behaviour.fetchDetail(raceId),
-    behaviour.fetchFridayPace ? behaviour.fetchFridayPace(raceId) : Promise.resolve([]),
   ]);
 
   if (predResult.status === 'fulfilled') prediction = predResult.value;
@@ -139,6 +133,5 @@ export async function buildPredictionPageData(kind: PredictionPageKind, raceId: 
     weights: Object.fromEntries(info.map((f) => [f.key, f.importance])),
     featureMeta: Object.fromEntries(info.map((f) => [f.key, { label: f.label, weight: f.importance }])),
     accent: behaviour.accent,
-    fridayPace: fridayPaceResult.status === 'fulfilled' ? fridayPaceResult.value : [],
   };
 }
