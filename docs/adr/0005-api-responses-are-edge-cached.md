@@ -12,3 +12,6 @@ The Cache API only works on a custom domain; on `*.workers.dev` it is a silent n
 must be attached to a custom domain (and `PUBLIC_API_URL` pointed at it) before this saves anything.
 The cache is per data centre and honours `max-age`, so active-weekend routes (`max-age=30`) refresh
 quickly while completed races are kept for a day.
+
+The API moved to `f1-api.gorkemkaryol.dev` in November 2026, which turned this cache on. Behind it, a
+versioned Workers KV cache (ADR 0012) keeps answers across data centres until the data changes.
