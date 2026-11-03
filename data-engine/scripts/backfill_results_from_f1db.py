@@ -3,6 +3,7 @@ codes, adds missing drivers/teams (stand-ins, drivers lost to the old "NAN" code
 result and removes ones filed under the wrong driver. Dry run unless --apply. Local only.
 Usage: python scripts/backfill_results_from_f1db.py --from 1980 --to 2017 [--apply] [--version V | --f1db-dir DIR]"""
 import argparse
+import atexit
 import json
 import sys
 import tempfile
@@ -19,6 +20,7 @@ from src.db.client import get_conn
 from src.utils.f1db_backfill import SeasonInput, SeasonPlan, plan_season
 from src.utils.storage_guard import read_storage_tier
 from src.utils.upsert import upsert
+from src.utils.api_cache import bump_data_version
 
 LAST_LEGACY_YEAR = 2017
 
@@ -127,6 +129,7 @@ def apply(conn, season_id: int, plan: SeasonPlan) -> None:
 
 
 if __name__ == "__main__":
+    atexit.register(bump_data_version)  # the API's KV cache re-reads Neon after this script's writes
     parser = argparse.ArgumentParser()
     parser.add_argument("--from", dest="start", type=int, required=True)
     parser.add_argument("--to", dest="end", type=int, required=True)

@@ -39,17 +39,20 @@ unknown `session` 400 `INVALID_SESSION`, and an unknown race, driver or team 404
 
 ### `GET /api/health`
 
-Checks API and DB connectivity.
+Answers without touching the DB, so uptime checks never wake Neon.
 
 ```json
 {
   "data": {
     "status": "ok",
-    "db": "connected",
     "timestamp": "2026-06-04T12:00:00.000Z"
   }
 }
 ```
+
+### `GET /api/health/db`
+
+Checks DB connectivity (`"db": "connected"`), or 503 `DB_ERROR`. Wakes Neon: not for uptime monitors.
 
 ---
 

@@ -5,6 +5,7 @@ results only before 2018, full OpenF1 + Jolpica timing from 2023; 2018–2022 is
 (ADR 0011). Sprint format began 2021."""
 
 import argparse
+import atexit
 import sys
 
 sys.path.insert(0, ".")
@@ -13,6 +14,7 @@ import src.config as _config  # triggers FastF1 cache + env setup
 from src.db.client import get_conn
 from src.session_kind import ResultsIngest, is_sprint_weekend, results_ingest_for
 from src.weekend_pipeline import RaceRunContext, prediction_steps
+from src.utils.api_cache import bump_data_version
 
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
@@ -164,4 +166,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    atexit.register(bump_data_version)  # the API's KV cache re-reads Neon after this script's writes
     main()

@@ -5,6 +5,7 @@ paces requests itself.
 Usage: python scripts/backfill_openf1.py ingest_stints 2023 2026 [--session Sprint] [--refresh]
 Telemetry (~41 requests a race, ~90 s paced): backfill_openf1.py ingest_qualifying_telemetry 2023 2026"""
 import argparse
+import atexit
 import sys
 
 sys.path.insert(0, ".")
@@ -13,6 +14,7 @@ from src.db.client import get_conn
 from src.enrichment_coverage import backfill_allowed, read_coverage, step_name
 from src.session_kind import Source, source_for
 from src.weekend_pipeline import JOBS, RACE_EVENT_JOBS, RaceRunContext
+from src.utils.api_cache import bump_data_version
 
 JOB_CHOICES = (*RACE_EVENT_JOBS, "ingest_qualifying_telemetry")
 
@@ -39,6 +41,7 @@ def storage_allows_backfill() -> bool:
 
 
 if __name__ == "__main__":
+    atexit.register(bump_data_version)  # the API's KV cache re-reads Neon after this script's writes
     parser = argparse.ArgumentParser()
     parser.add_argument("job", choices=JOB_CHOICES)
     parser.add_argument("start", type=int, nargs="?", default=2023)

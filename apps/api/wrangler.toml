@@ -4,6 +4,18 @@ compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 keep_vars = true
 
+# The edge cache (src/common/edge-cache.ts) only works on a custom domain, never on *.workers.dev.
+# One level under the zone: Universal SSL doesn't cover deeper names like api.f1.gorkemkaryol.dev.
+routes = [
+  { pattern = "f1-api.gorkemkaryol.dev", custom_domain = true },
+]
+
+# The read cache in front of Neon (src/common/kv-cache.ts, ADR 0012). The data engine bumps its
+# data version through Cloudflare's API, so CF_KV_NAMESPACE_ID on Render must be this same id.
+[[kv_namespaces]]
+binding = "API_CACHE"
+id = "881f1f8ed3fa4b478ce2982f4cd61660"
+
 # DATABASE_URL is set via the Cloudflare dashboard (Variables and Secrets)
 # keep_vars = true prevents deploys from erasing dashboard-set variables
 # Never put secrets in this file

@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Optional, TypeVar
 
 import pandas as pd
@@ -9,7 +9,9 @@ from src.db.client import get_conn
 from src.enrichment_coverage import missing, read_coverage
 from src.jobs import sync_schedule
 from src.utils import openf1_client
+from src.utils.api_cache import bump_data_version, set_serve_stale
 from src.utils.logging_utils import log_job_failure, log_job_ok
+from src.utils.neon_usage import NeonUsage, fetch_neon_usage, project_usage
 from src.utils.schedule_window import race_weekend_window, RaceWeekendWindow
 from src.session_kind import is_sprint_weekend
 from src.utils.session_records import SessionNotReady
@@ -92,14 +94,21 @@ def _retry_missing_race_events(
     ctx = RaceRunContext(race_id=rows[0]["id"], year=year, round_number=round_number)
     settled = memo.settled if memo is not None else set()
     pending = [c.job for c in missing(rows[0]) if (ctx.race_id, c.job) not in settled]
+    filled = False
     for name in pending:
         log_func(f"[auto_runner] Race {ctx.race_id} is missing {name} data: retrying")
         if JobStep(name, optional=True).run(ctx):
             settled.add((ctx.race_id, name))
+            filled = True
+    if filled:
+        bump_data_version()
     return all((ctx.race_id, name) in settled for name in pending)
 
 
 ACTIVE_POLL_SECONDS = 20 * 60
+# Optional enrichment that keeps failing (an OpenF1 feed with gaps) is retried at this pace, not every
+# 20-min cycle: each retry wakes Neon for at least 5 min.
+RACE_EVENTS_RETRY = timedelta(hours=2)
 IDLE_POLL_SECONDS = 6 * 60 * 60
 
 
@@ -127,10 +136,14 @@ class WorkerMemo:
     tracked: Optional[TrackedRace] = None
     # (race_id, step name) that finished cleanly in _retry_missing_race_events.
     settled: set[tuple[int, str]] = field(default_factory=set)
+    # When unfinished race events are next retried: until then a cycle with nothing else due stays off Neon.
+    race_events_retry_at: Optional[datetime] = None
 
 
 def _quiet_action(memo: Optional[WorkerMemo], schedule: "pd.DataFrame", now_utc: datetime) -> Optional[Action]:
     if memo is None or memo.tracked is None:
+        return None
+    if memo.race_events_retry_at is not None and now_utc >= memo.race_events_retry_at:
         return None
     events = schedule[schedule["RoundNumber"] == memo.tracked.ctx.round_number]
     if events.empty:
@@ -162,6 +175,29 @@ def poll_interval_for_window(
     return IDLE_POLL_SECONDS
 
 
+def _guard_neon_budget(
+    log_func: Callable[[str], None], usage_provider: Callable[[], Optional[NeonUsage]], now_utc: datetime,
+) -> None:
+    """Past the budget the API answers from its KV cache, however old, instead of waking Neon."""
+    try:
+        usage = usage_provider()
+    except requests.RequestException as e:
+        log_func(f"[auto_runner] Neon usage unavailable ({e}); leaving the API cache mode as it is.")
+        return
+    if usage is None:
+        return
+    projection = project_usage(usage, now_utc)
+    if projection.over_budget or projection.on_pace_over_budget:
+        detail = "past the budget: API serves stale cache" if projection.over_budget else "on pace to pass the budget"
+        log_job_failure(
+            "neon_budget", RuntimeError(f"Neon Free usage {detail}"),
+            cu_hours_used=round(projection.cu_hours_used, 1),
+            cu_hours_projected=round(projection.cu_hours_projected, 1),
+            egress_gb_projected=round(projection.egress_gb_projected, 2),
+        )
+    set_serve_stale(projection.over_budget)
+
+
 def run_cycle(
     log_func: Callable[[str], None] = print,
     *,
@@ -169,11 +205,13 @@ def run_cycle(
     schedule_provider: Optional[Callable[[], "pd.DataFrame"]] = None,
     conn_factory: Callable[[], Any] = get_conn,
     memo: Optional[WorkerMemo] = None,
+    usage_provider: Callable[[], Optional[NeonUsage]] = fetch_neon_usage,
 ) -> CycleResult:
     log_func("[auto_runner] Waking up to check for pending F1 sessions...")
     openf1_client.reset_request_budget()
 
     now_utc = now_utc if now_utc is not None else datetime.now(timezone.utc)
+    _guard_neon_budget(log_func, usage_provider, now_utc)
     fetch = schedule_provider or (lambda: _default_schedule_fetcher(now_utc))
 
     try:
@@ -260,8 +298,9 @@ def run_cycle(
             log_func(f"[auto_runner] Unhandled status '{status}'. Exiting.")
             return CycleResult(window=window, schedule_available=schedule_available)
         if not action.ready:
-            if memo is not None and race_events_settled:
+            if memo is not None:
                 memo.tracked = TrackedRace(ctx=ctx, status=status, is_sprint=is_sprint)
+                memo.race_events_retry_at = None if race_events_settled else now_utc + RACE_EVENTS_RETRY
             ready_at_str = f"{action.ready_at:%Y-%m-%d %H:%MZ}" if action.ready_at else "unknown (session time missing from schedule)"
             log_func(
                 f"[auto_runner] {action.label} not finished yet or hasn't reached delay threshold "
@@ -278,6 +317,7 @@ def run_cycle(
             )
             raise outcome.error
         log_func(f"[auto_runner] {action.label} ingestion completed successfully.")
+        bump_data_version()
         return CycleResult(window=window, schedule_available=schedule_available)
 
     except NOT_READY as e:

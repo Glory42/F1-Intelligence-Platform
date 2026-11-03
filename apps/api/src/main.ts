@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { sql } from 'drizzle-orm';
 import { createDb } from './config/database';
+import { configureLocalNeonProxy } from './config/localNeonProxy';
 import circuitsModule from './modules/circuits/circuits.module';
 import racesModule from './modules/races/races.module';
 import raceEventsModule from './modules/race-events/race-events.module';
@@ -19,6 +20,7 @@ import searchModule from './modules/search/search';
 import qualityModule from './modules/quality/quality';
 import type { Bindings } from './common/types';
 import { edgeCache } from './common/edge-cache';
+import { kvCache } from './common/kv-cache';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -32,6 +34,7 @@ app.use('*', async (c, next) => {
         }
       }
     }
+    configureLocalNeonProxy(c.env.NEON_FETCH_ENDPOINT);
   }
   await next();
 });
@@ -47,8 +50,14 @@ app.use('*', cors({
   allowHeaders: ['Content-Type'],
 }));
 app.use('/api/*', edgeCache());
+app.use('/api/*', kvCache());
 
-app.get('/api/health', async (c) => {
+app.get('/robots.txt', (c) => c.text('User-agent: *\nDisallow: /\n'));
+
+// Uptime checks hit this one: it must not wake Neon (each wake bills at least 5 min of compute).
+app.get('/api/health', (c) => c.json({ data: { status: 'ok', timestamp: new Date().toISOString() }, error: null }));
+
+app.get('/api/health/db', async (c) => {
   try {
     await createDb(c.env.DATABASE_URL).execute(sql`SELECT 1`);
     return c.json({ data: { status: 'ok', db: 'connected', timestamp: new Date().toISOString() }, error: null });
