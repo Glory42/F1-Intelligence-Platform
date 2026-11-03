@@ -6,18 +6,7 @@ import { races } from '../../../src/db/schema';
 import { createSeason } from '../../support/factories/season.factory';
 import { createCircuit } from '../../support/factories/circuit.factory';
 import { createRace } from '../../support/factories/race.factory';
-
-class FakeEdgeCache {
-  readonly entries = new Map<string, Response>();
-
-  async match(request: Request): Promise<Response | undefined> {
-    return this.entries.get(request.url)?.clone();
-  }
-
-  async put(request: Request, response: Response): Promise<void> {
-    this.entries.set(request.url, response.clone());
-  }
-}
+import { FakeEdgeCache } from '../../support/cache/fake-edge-cache';
 
 type GlobalWithCaches = typeof globalThis & { caches?: { default: FakeEdgeCache } };
 

@@ -24,9 +24,12 @@ is read only on a real miss, and only once per URL after each bump.
   which doesn't wake the compute. Once 80 CU-h or 4 GB are actually used, it sets `serveStale` in KV,
   and every cached answer is served regardless of version. A month only projected past the budget
   is just logged: switching on a projection would hide fresh race results on a guess.
-- **KV Free limits are degraded around, not designed for.** It allows 100k reads and 1k writes a
-  day. A refused read falls through to Neon, and a refused write only means the next request
-  misses again.
+- **KV Free limits are degraded around.** It allows 100k reads and 1k writes a day. A refused read
+  falls through to Neon, and a refused write only means the next request misses again.
+- **A URL earns its KV write on its second miss.** On 2026-11-03 a crawler used 933 of the 1,000
+  daily writes on URLs it asked for once, while reads stayed under 3k. The first miss now only leaves
+  a marker in the edge cache, which has no quota. A URL already in KV is rewritten straight away
+  after a bump. Each new URL costs Neon one extra read, and one-off URLs stop using writes.
 - **The edge cache still sits in front.** The API moved to `f1-api.gorkemkaryol.dev`, so ADR 0005's
   cache now works too and absorbs repeats per data centre before they count as KV reads.
 - **Every writer must bump.** A writer that skips the bump leaves the site showing the old data

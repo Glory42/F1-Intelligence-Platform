@@ -59,7 +59,8 @@ apps/api/
 │   │   │                          #   the only "same driver / same team" rules; golden cases in docs/identity-cases.json (shared with Python)
 │   │   ├── cache.ts               # CACHE_COMPLETED/ACTIVE/REFERENCE + cacheControlForStatus(), cacheControlForYear(), cacheIfData()
 │   │   ├── edge-cache.ts          # edgeCache() middleware: serves repeat GETs from the Workers Cache API (custom domain only); skips errors/non-public responses
-│   │   ├── kv-cache.ts            # kvCache(): versioned read-through cache in Workers KV (ADR 0012); stale on 5xx, serveStale watchdog flag, off in development
+│   │   ├── kv-cache.ts            # kvCache(): versioned read-through cache in Workers KV (ADR 0012); stale on 5xx, serveStale watchdog flag, off in development;
+│   │   │                          #   a new URL is written on its second miss (edge-cache marker first) to save KV Free's 1k writes/day
 │   │   └── session.ts             # RACE_SESSION / QUALIFYING_SESSION: `?session=` param descriptors route.ts validates
 │   ├── config/database.ts         # createDb(): Drizzle over Neon HTTP driver
 │   ├── config/localNeonProxy.ts   # configureLocalNeonProxy(): points the Neon driver at a local proxy (tests, migrate, wrangler dev via NEON_FETCH_ENDPOINT)
@@ -182,7 +183,8 @@ apps/api/
 │   │   │   ├── predictions/       # accuracy, prediction-history, intel-standings helpers
 │   │   │   ├── race-events/       # openf1.mappers (race control, overtakes, team radio)
 │   │   │   └── quality/quality.test.ts # castSeverity()
-│   │   └── common/                # mappers, standings, feature-manifest, cache, identity (golden cases from docs/identity-cases.json)
+│   │   └── common/                # mappers, standings, feature-manifest, cache, identity (golden cases from docs/identity-cases.json),
+│   │                              #   kv-cache (second-miss write admission, fake KV + fake edge cache, no DB)
 │   ├── integration/                # bun test: real Hono `app.request()` against a LOCAL Postgres (docker-compose.test.yml behind
 │   │   │                           #   a Neon HTTP proxy; `bun run test:db:up`, config in .env.test): never Neon
 │   │   ├── races/races.test.ts     # list/filter/detail/circuit-history joins
@@ -217,6 +219,7 @@ apps/api/
 │   └── support/
 │       ├── app/request.ts          # apiRequest(): in-process app.request() with TEST_DATABASE_URL env
 │       ├── kv/fake-kv.ts           # FakeKv: in-memory Workers KV (get/getWithMetadata/put), failReads/failWrites
+│       ├── cache/fake-edge-cache.ts # FakeEdgeCache: in-memory Cache API (match/put), no expiry
 │       ├── db/test-db.ts           # getTestDb()/truncateAll(): refuses *.neon.tech hosts and TEST_DATABASE_URL === DATABASE_URL
 │       └── factories/              # one insert helper per table, FK chain: season → team/circuit → driver → race → results
 │                                   #   (+ prediction/sprint features, sprint lap times, OpenF1 events, stints/pit stops, race story, telemetry, title odds, history)
@@ -523,6 +526,8 @@ apps/web/
 │   │   ├── careerYear.ts          # resolveCareerYear(): requested year → current year → latest active season
 │   │   ├── sidebarState.ts        # Sidebar collapse cookie: isSidebarCollapsed() + sidebarCookie()
 │   │   ├── legacyRedirects.ts     # legacyRedirect(path, search): retired URLs (prediction recap, /records, /drivers|teams/compare) → their new home
+│   │   ├── canonicalHost.ts       # canonicalHostRedirect(): the production *.pages.dev address → 301 to the custom domain (previews stay)
+│   │   ├── pageCache.ts           # servePageCached(): rendered HTML kept 5 min in the edge Cache API, keyed by URL + sidebar cookie (Workers Free: 10 ms CPU)
 │   │   ├── utils.ts               # cn() (clsx + tailwind-merge), unwrapSettled(), formatMs/Probability/Date/StopSeconds/AgeFromDays
 │   │   └── f1/                    # F1 reference data + maths used across features
 │   │       ├── teamColors.ts      # team_key → official hex color map (fallback #6B7280)
@@ -534,7 +539,7 @@ apps/web/
 │   │       │                      #   whatIfProbabilities(): the "why" bar, radar and What-If Lab for both models
 │   │       ├── championshipMath.ts # titleContention() (mathematically out), remainingSessions(), formatTitleOdds()
 │   │       └── tyres.ts           # compoundToken(compound, year): tyre compound → colour token (2018 named compounds use the 2018 palette)
-│   ├── middleware.ts              # 301s retired URLs via legacyRedirect()
+│   ├── middleware.ts              # 301s the pages.dev alias and retired URLs; serves pages through servePageCached()
 │   ├── types/                     # Type-only re-exports of apps/api common/types/ (+ search.ts GlobalSearchResponse): seasons, circuits,
 │   │                              #   drivers, teams, races, race-events, strategy, race-story, telemetry, predictions,
 │   │                              #   sprint, history, quality: imported via the index.ts barrel as '@/types'
@@ -557,7 +562,7 @@ apps/web/
 │   │   ├── components/
 │   │   │   ├── layout/navLinks.test.ts       # pure: sidebar groups, utilities, active-destination matching
 │   │   │   └── data/                         # chartScale, labelLayout
-│   │   ├── lib/                              # pure, `node` env: pageTabs / sidebarState / legacyRedirects / utils
+│   │   ├── lib/                              # pure, `node` env: pageTabs / sidebarState / legacyRedirects / canonicalHost / pageCache / utils
 │   │   │   └── f1/                           # predictionMath (all exports), predictionTerms, championshipMath, teamColors, teamLogos, tyres
 │   │   ├── features/races/ · features/telemetry/  # calendar, raceView + raceEventTabs, gridPenalties, weatherSpells, raceEventDisplay · telemetryCompare, trackMap
 │   │   ├── features/predictions/

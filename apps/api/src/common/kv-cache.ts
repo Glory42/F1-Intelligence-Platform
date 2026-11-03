@@ -1,6 +1,7 @@
 import type { Context, MiddlewareHandler } from 'hono';
 import type { Bindings, KvStore } from './types';
 import { CACHE_ACTIVE } from './cache';
+import { defaultEdgeCache, type EdgeCache } from './edge-cache';
 
 type Ctx = Context<{ Bindings: Bindings }>;
 type CacheState = { version?: string; serveStale?: boolean };
@@ -8,6 +9,7 @@ type EntryMeta = { version: string | null; cacheControl: string };
 
 // Written by the data engine (data-engine/src/utils/api_cache.py) whenever Neon's data changes.
 const STATE_KEY = 'meta:state';
+const SEEN_FOR = 'public, max-age=86400';
 
 async function readState(kv: KvStore): Promise<CacheState> {
   const raw = await kv.get(STATE_KEY);
@@ -40,8 +42,20 @@ function runInBackground(c: Ctx, work: Promise<void>): Promise<void> | undefined
   }
 }
 
+// KV Free allows 1,000 writes a day and a crawler asks for most URLs once, so a new URL is only written
+// on its second miss in a data centre. The first leaves a marker in the edge cache, which has no quota.
+async function admit(doorkeeper: EdgeCache | undefined, url: string): Promise<boolean> {
+  if (!doorkeeper) return true;
+  const marker = new Request(`${new URL(url).origin}/__kv-seen/${encodeURIComponent(entryKey(url))}`);
+  if (await doorkeeper.match(marker)) return true;
+  await doorkeeper.put(marker, new Response('1', { headers: { 'Cache-Control': SEEN_FOR } }));
+  return false;
+}
+
 // Durable read-through cache in front of Neon: an entry stays valid until the data version changes.
-export function kvCache(): MiddlewareHandler<{ Bindings: Bindings }> {
+export function kvCache(
+  getDoorkeeper: () => EdgeCache | undefined = defaultEdgeCache,
+): MiddlewareHandler<{ Bindings: Bindings }> {
   return async (c, next) => {
     // wrangler dev simulates KV locally and nothing bumps it there: it would replay stale answers.
     const local = c.env?.ENVIRONMENT === 'development';
@@ -66,10 +80,17 @@ export function kvCache(): MiddlewareHandler<{ Bindings: Bindings }> {
     }
     const cacheControl = c.res.headers.get('Cache-Control') ?? '';
     if (c.res.status !== 200 || !cacheControl.includes('public')) return;
-    const body = await c.res.clone().text();
-    // A refused write (KV Free allows 1,000 a day) only means the next request misses again.
-    const put = kv.put(key, body, { metadata: { version, cacheControl } satisfies EntryMeta }).catch(() => undefined);
-    const pending = runInBackground(c, put);
+    const response = c.res.clone();
+    const knownUrl = entry.value !== null;
+    const store = (knownUrl ? Promise.resolve(true) : admit(getDoorkeeper(), c.req.url))
+      .then(async (admitted) => {
+        if (!admitted) return;
+        const body = await response.text();
+        await kv.put(key, body, { metadata: { version, cacheControl } satisfies EntryMeta });
+      })
+      // A refused write (KV Free allows 1,000 a day) only means the next request misses again.
+      .catch(() => undefined);
+    const pending = runInBackground(c, store);
     if (pending) await pending;
   };
 }

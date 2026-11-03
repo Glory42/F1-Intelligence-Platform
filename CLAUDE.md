@@ -135,6 +135,8 @@ Exceeding Neon's compute (100 CU-h/mo) or egress (5 GB/mo) suspends the DB until
 - No new polling or wake-ups: new ETL steps ride the existing worker cycle in `auto_runner.py`.
 - Whole-race data goes in one row per (race, session, driver) with arrays/JSONB, not row-per-lap.
 - Heavy API routes set `Cache-Control` via `src/common/cache.ts`; `edgeCache()` then `kvCache()` serve repeats.
+- Site pages are kept at the edge for 5 min (`apps/web/src/lib/pageCache.ts`): Workers Free cuts a render
+  off at 10 ms of CPU, and a typical page takes about that.
 - Backfills run locally in bounded chunks and check `storage_guard` first: never on Render.
 - Tests never touch Neon (see "Where tests live").
 Full rules and numbers: `docs/plans/intelligence-platform-roadmap.md` §1–§2.
