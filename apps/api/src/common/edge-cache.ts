@@ -1,13 +1,13 @@
 import type { MiddlewareHandler } from 'hono';
 
-interface EdgeCache {
+export interface EdgeCache {
   match(request: Request): Promise<Response | undefined>;
   put(request: Request, response: Response): Promise<void>;
 }
 
 // Cache-Control alone never caches a Worker's own response; only the Cache API does: and
 // only on a custom domain (a no-op on *.workers.dev). Each hit saves a Neon wake + egress.
-function defaultEdgeCache(): EdgeCache | undefined {
+export function defaultEdgeCache(): EdgeCache | undefined {
   return (globalThis as typeof globalThis & { caches?: { default?: EdgeCache } }).caches?.default;
 }
 
