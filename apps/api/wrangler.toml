@@ -9,6 +9,8 @@ keep_vars = true
 routes = [
   { pattern = "f1-api.gorkemkaryol.dev", custom_domain = true },
 ]
+# A `routes` entry turns *.workers.dev off by default, and apps/web still calls that URL.
+workers_dev = true
 
 # The read cache in front of Neon (src/common/kv-cache.ts, ADR 0012). The data engine bumps its
 # data version through Cloudflare's API, so CF_KV_NAMESPACE_ID on Render must be this same id.
