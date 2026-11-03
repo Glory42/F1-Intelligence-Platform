@@ -111,7 +111,8 @@ python -m src.main --job sync_season   --year 2025 --round 1
 2. Set build command: `bun run build`
 3. Set output directory: `dist`
 4. Set `PUBLIC_API_URL` in `apps/web/wrangler.toml`'s `[vars]` block (not the Pages dashboard:
-   see the Environment Variables section above) to your deployed API Worker's URL.
+   see the Environment Variables section above) to the API's custom domain, `https://f1-api.gorkemkaryol.dev`.
+   The `workers.dev` URL also works, but without the edge cache.
 5. Push to `master` to trigger the first deploy.
 
 ### 4. Data Engine (Render)
