@@ -45,7 +45,7 @@ it's Python, and its jobs run once and exit rather than being a long-running dev
   `apps/api/.env.test`). Never against Neon: the test setup refuses `*.neon.tech` hosts. Seeds its own
   fixtures per file via `tests/support/factories/` and truncates after (`tests/support/db/test-db.ts`).
   Covers every module except `quality` (dev-only): `races`, race events/story/strategy/telemetry, `drivers`, `teams`,
-  `seasons`, `search`, `predictions`, `sprint`, `history`: plus the `edgeCache` middleware, the route factories
+  `seasons`, `search`, `predictions`, `sprint`, `history`: plus the `edgeCache` and `kvCache` middleware, `/api/health`, the route factories
   (`integration/route/`) and per-kind GP/sprint reads (`integration/session-kind/`).
 - `apps/web/tests/unit/`: Vitest. Pure logic (`compareStats.ts`, compare configs, `lib/` lookups) runs under the default `node`
   environment. Hook/component tests (`useCompareController`, `useGlobalSearch`, `GlobalSearch`) opt into `jsdom`
@@ -127,10 +127,14 @@ Running any job twice must produce identical results, never duplicate rows.
 ### 6. Stay inside the free tiers (Neon Free, Render Free, OpenF1 free)
 Exceeding Neon's compute (100 CU-h/mo) or egress (5 GB/mo) suspends the DB until next month; a full
 1 GB blocks every write. Render Free has 512 MB RAM and 750 h/mo (already used by the one service).
+- API reads go through the versioned KV cache (`src/common/kv-cache.ts`, ADR 0012): anything that writes
+  Neon must end with `api_cache.bump_data_version()`, as the worker, the CLI and the backfill scripts
+  already do, or the site keeps showing the old data.
+- Local dev uses `docker-compose.dev.yml` (filled by `scripts/dev_snapshot.py`), never Neon.
 - Never hold a DB connection across HTTP calls (OpenF1/Jolpica/FastF1): connect late, close early.
 - No new polling or wake-ups: new ETL steps ride the existing worker cycle in `auto_runner.py`.
 - Whole-race data goes in one row per (race, session, driver) with arrays/JSONB, not row-per-lap.
-- Heavy API routes set `Cache-Control` via `src/common/cache.ts`; `edgeCache()` serves repeats.
+- Heavy API routes set `Cache-Control` via `src/common/cache.ts`; `edgeCache()` then `kvCache()` serve repeats.
 - Backfills run locally in bounded chunks and check `storage_guard` first: never on Render.
 - Tests never touch Neon (see "Where tests live").
 Full rules and numbers: `docs/plans/intelligence-platform-roadmap.md` §1–§2.
@@ -221,7 +225,8 @@ All endpoints return:
 
 ### Route structure
 ```
-GET /api/health
+GET /api/health                     # never touches the DB
+GET /api/health/db
 
 GET /api/races?year=N&status=S
 GET /api/races/circuits
@@ -348,6 +353,8 @@ python scripts/backfill_openf1.py ingest_stints 2023 2026 [--refresh]   # local 
 python scripts/backfill_race_story.py 2018 2022             # local only: FastF1 cache seasons
 python scripts/backfill_fastf1_enrichment.py 2018 2022 [--only stints,pits,race_control,telemetry] [--refresh]  # local only
 python scripts/backfill_title_odds.py 2018 2026             # local only: replays odds after every completed round
+python scripts/dev_snapshot.py                              # local only: one read-only Neon dump into docker-compose.dev.yml (needs PROD_DATABASE_URL)
+python scripts/neon_usage.py                                # Neon Free usage + month-end projection (control-plane API: no DB wake)
 python scripts/backtest_snapshot.py                         # local only: one read-only Neon dump into docker-compose.backtest.yml
 python scripts/backtest.py [--from 2018] [--to 2026] [--reference NAME] [--json]  # local snapshot only: walk-forward GP model vs baselines
 python scripts/fit_model_v4.py                              # local snapshot only: refit src/models/gp_v4.json after a validated change

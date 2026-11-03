@@ -1,0 +1,35 @@
+# Local copy of Neon for day-to-day development (wrangler dev, astro dev, CLI jobs): every query
+# against production spends Neon Free CU-hours, and each wake bills at least 5 min. Filled once by
+# data-engine/scripts/dev_snapshot.py; kept between runs. Writing production is an explicit opt-in.
+name: f1-intelligence-dev
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: f1
+      POSTGRES_PASSWORD: f1
+      POSTGRES_DB: f1_dev
+    ports:
+      - "5435:5432"
+    volumes:
+      - dev-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U f1 -d f1_dev"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+
+  # @neondatabase/serverless only speaks Neon's HTTP protocol: the proxy bridges it to Postgres.
+  db-proxy:
+    image: ghcr.io/timowilhelm/local-neon-http-proxy:main
+    environment:
+      PG_CONNECTION_STRING: postgres://f1:f1@postgres:5432/f1_dev
+    ports:
+      - "4446:4444"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  dev-data:

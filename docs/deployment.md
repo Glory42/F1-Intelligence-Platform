@@ -99,7 +99,10 @@ python -m src.main --job sync_season   --year 2025 --round 1
 1. Connect the `apps/api/` directory to a Cloudflare Worker via the GitHub integration in the
    Cloudflare dashboard (set "Root directory" to `apps/api`).
 2. In the Worker's dashboard, add `DATABASE_URL` as a Secret.
-3. Push to `master` to trigger the first deploy.
+3. Create a Workers KV namespace (Storage & Databases > KV), and put its id in `apps/api/wrangler.toml`'s
+   `API_CACHE` binding. It holds the read cache (ADR 0012).
+4. Push to `master` to trigger the first deploy. `wrangler.toml`'s `routes` attaches the custom domain
+   `f1-api.gorkemkaryol.dev`, which the edge cache needs: it does nothing on `*.workers.dev`.
 
 ### 3. Frontend (Cloudflare Pages)
 
@@ -114,7 +117,12 @@ python -m src.main --job sync_season   --year 2025 --round 1
 ### 4. Data Engine (Render)
 
 1. Create a new Render service from the `data-engine/` directory.
-2. Add `DATABASE_URL` and `DASHBOARD_PASSWORD` as environment variables.
+2. Add `DATABASE_URL` and `DASHBOARD_PASSWORD` as environment variables, plus the ones listed in
+   `render.yaml`:
+   - `CLOUDFLARE_API_TOKEN` (scope: Workers KV Storage: Edit only), `CLOUDFLARE_ACCOUNT_ID` and
+     `CF_KV_NAMESPACE_ID`, so jobs can expire the API's KV cache;
+   - `NEON_API_KEY` and `NEON_PROJECT_ID` for the budget watchdog.
+   Add the three Cloudflare ones as GitHub secrets too, for `f1db-import.yml`.
 3. Configure as a **Web Service** (not a cron job) to utilize the free tier.
 4. Set the Build Command: `pip install -r requirements.txt`
 5. Set the Start Command: `python -m src.server`
@@ -128,10 +136,23 @@ python -m src.main --job sync_season   --year 2025 --round 1
 ## Production Domain
 
 Frontend: `https://f1.gorkemkaryol.dev` (custom domain on Cloudflare Pages)
+API: `https://f1-api.gorkemkaryol.dev` (Workers custom domain)
 
 ---
 
 ## Local Development
+
+Local dev never reads Neon: it uses a local copy (`docker-compose.dev.yml`), filled once from Neon
+with one read-only dump:
+
+```bash
+cd data-engine && PROD_DATABASE_URL=postgresql://...neon.tech/... python scripts/dev_snapshot.py
+```
+
+Then point `apps/api/.dev.vars` at it (`DATABASE_URL=postgres://f1:f1@localhost:4446/f1_dev` and
+`NEON_FETCH_ENDPOINT=http://localhost:4446/sql`), and `data-engine/.env` at
+`postgresql://f1:f1@localhost:5435/f1_dev`. Scripts that must write production take
+`DATABASE_URL=$PROD_DATABASE_URL` explicitly.
 
 ```bash
 # All at once (from repo root)
