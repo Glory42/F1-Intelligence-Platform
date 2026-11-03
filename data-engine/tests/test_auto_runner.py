@@ -6,9 +6,11 @@ import pytest
 from src import auto_runner
 from src import enrichment_coverage as ec
 from src import weekend_pipeline as wp
+from src.utils.neon_usage import NeonUsage
 from src.utils.schedule_window import RaceWeekendWindow
 from src.weekend_pipeline import ActionKind
 from tests.support.fake_db import FakeConnection
+from tests.support.fake_kv_api import install_fake_kv_api
 
 
 def _utc(year, month, day, hour=0, minute=0):
@@ -476,7 +478,7 @@ class TestQuietCyclesBetweenSessions:
 
         assert spy.calls == 0
 
-    def test_keeps_checking_while_fp2_coverage_is_below_the_gate(self, monkeypatch):
+    def test_waits_two_hours_before_rechecking_fp2_coverage_below_the_gate(self, monkeypatch):
         _jobs(monkeypatch, ingest_fp2=lambda ctx: False)  # OpenF1 hasn't published practice yet
         race = _utc(2026, 3, 8, 4, 0)
         saturday_night = race - timedelta(hours=6)  # qualifying ingested, race not yet run
@@ -502,7 +504,7 @@ class TestQuietCyclesBetweenSessions:
             memo=memo,
         )
 
-        assert spy.calls == 2
+        assert spy.calls == 0
 
     def test_checks_the_database_when_the_schedule_has_no_time_for_the_pending_session(self):
         race = _utc(2026, 3, 8, 4, 0)
@@ -524,7 +526,7 @@ class TestQuietCyclesBetweenSessions:
 
         assert spy.calls == 2
 
-    def test_keeps_checking_while_the_windows_race_is_missing_race_events(self, monkeypatch):
+    def _missing_race_events_then(self, monkeypatch, later):
         _jobs(monkeypatch, ingest_race_control=lambda ctx: False)
         race = _utc(2026, 3, 8, 4, 0)
         next_race = race + timedelta(days=14)
@@ -542,11 +544,16 @@ class TestQuietCyclesBetweenSessions:
         )
         spy = _SpyConnFactory(FakeConnection([None, None]))
         auto_runner.run_cycle(
-            log_func=lambda *_: None, now_utc=sunday_evening + timedelta(minutes=20),
+            log_func=lambda *_: None, now_utc=sunday_evening + later,
             schedule_provider=lambda: schedule, conn_factory=spy, memo=memo,
         )
+        return spy.calls
 
-        assert spy.calls == 2
+    def test_waits_two_hours_before_retrying_the_windows_missing_race_events(self, monkeypatch):
+        assert self._missing_race_events_then(monkeypatch, timedelta(minutes=20)) == 0
+
+    def test_retries_the_windows_missing_race_events_after_two_hours(self, monkeypatch):
+        assert self._missing_race_events_then(monkeypatch, timedelta(hours=2)) == 2
 
 
 class TestCycleOpenF1Budget:
@@ -661,3 +668,101 @@ class TestConnectionsDuringJobs:
 
         with pytest.raises(ValueError, match="a real bug"):
             self._cycle(monkeypatch, bug)
+
+
+class TestApiCacheVersion:
+    """The API's KV cache only re-reads Neon after the worker says the data changed."""
+
+    def test_a_cycle_that_ran_its_due_action_bumps_the_api_cache_version(self, monkeypatch):
+        kv = install_fake_kv_api(monkeypatch)
+        _jobs(monkeypatch, **{name: (lambda ctx: None) for name in wp.JOBS})
+        race = _utc(2026, 3, 8, 4, 0)
+        sprint_qualifying_done = race - timedelta(days=2) + timedelta(hours=6)
+        conn = FakeConnection([None, _active_race_row()])
+
+        auto_runner.run_cycle(
+            log_func=lambda *_: None,
+            now_utc=sprint_qualifying_done,
+            schedule_provider=lambda: _schedule_with_race(1, race),
+            conn_factory=lambda: conn,
+        )
+
+        assert "version" in kv.state()
+
+    def test_a_cycle_that_filled_in_missing_race_events_bumps_the_api_cache_version(self, monkeypatch):
+        kv = install_fake_kv_api(monkeypatch)
+        _jobs(monkeypatch, ingest_race_control=lambda ctx: None)
+        race = _utc(2026, 3, 8, 4, 0)
+        schedule = pd.concat([_schedule_with_race(1, race), _schedule_with_race(2, race + timedelta(days=14))])
+        conn = FakeConnection([
+            {"id": 1, "status": "completed", "sprint_date": None, "ingest_race_control": False},
+            _active_race_row(race_id=2, round_number=2, status="scheduled", event_format="conventional"),
+        ])
+
+        auto_runner.run_cycle(
+            log_func=lambda *_: None, now_utc=race + timedelta(hours=8),
+            schedule_provider=lambda: schedule.reset_index(drop=True), conn_factory=lambda: conn,
+        )
+
+        assert "version" in kv.state()
+
+    def test_a_cycle_that_changed_nothing_leaves_the_api_cache_version_alone(self, monkeypatch):
+        kv = install_fake_kv_api(monkeypatch)
+        race = _utc(2026, 3, 8, 4, 0)
+        conn = FakeConnection([None, _active_race_row(status="scheduled", event_format="conventional")])
+
+        auto_runner.run_cycle(
+            log_func=lambda *_: None, now_utc=race - timedelta(days=2) + timedelta(hours=1),
+            schedule_provider=lambda: _schedule_with_race(1, race), conn_factory=lambda: conn,
+        )
+
+        assert kv.state() == {}
+
+
+class TestNeonBudgetWatchdog:
+    """Past the Neon budget the API serves its cached answers instead of waking Neon."""
+
+    MID_NOVEMBER = _utc(2026, 11, 16)
+
+    def _usage(self, cu_hours):
+        return NeonUsage(
+            compute_seconds=cu_hours * 3600, transfer_bytes=0,
+            period_start=_utc(2026, 11, 1), period_end=_utc(2026, 12, 1),
+        )
+
+    def _cycle(self, usage):
+        race = _utc(2026, 12, 6, 13, 0)  # weeks away: outside any race-weekend window
+        auto_runner.run_cycle(
+            log_func=lambda *_: None, now_utc=self.MID_NOVEMBER,
+            schedule_provider=lambda: _schedule_with_race(23, race), conn_factory=_SpyConnFactory(),
+            usage_provider=lambda: usage,
+        )
+
+    def test_asks_the_api_to_serve_stale_once_neon_usage_passes_the_budget(self, monkeypatch):
+        kv = install_fake_kv_api(monkeypatch)
+
+        self._cycle(self._usage(cu_hours=85))
+
+        assert kv.state()["serveStale"] is True
+
+    def test_keeps_reading_neon_while_usage_is_only_on_pace_to_pass_the_budget(self, monkeypatch):
+        kv = install_fake_kv_api(monkeypatch)
+
+        self._cycle(self._usage(cu_hours=60))
+
+        assert kv.state()["serveStale"] is False
+
+    def test_lets_the_api_read_neon_again_once_a_new_month_resets_usage(self, monkeypatch):
+        kv = install_fake_kv_api(monkeypatch)
+        self._cycle(self._usage(cu_hours=85))
+
+        self._cycle(self._usage(cu_hours=20))
+
+        assert kv.state()["serveStale"] is False
+
+    def test_leaves_the_api_alone_when_usage_is_unavailable(self, monkeypatch):
+        kv = install_fake_kv_api(monkeypatch)
+
+        self._cycle(None)
+
+        assert kv.state() == {}

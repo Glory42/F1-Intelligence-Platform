@@ -50,3 +50,11 @@ def get_conn() -> Any:
             return _PooledConnection(pool, conn)
         pool.putconn(conn, close=True)
     raise psycopg2.OperationalError("Could not obtain a live database connection")
+
+
+def close_pool() -> None:
+    """Called after every worker cycle: an idle socket between cycles is worth nothing, since Neon drops it anyway."""
+    global _pool
+    if _pool is not None:
+        _pool.closeall()
+        _pool = None

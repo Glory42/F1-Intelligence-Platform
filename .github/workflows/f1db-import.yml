@@ -15,6 +15,10 @@ jobs:
         working-directory: data-engine
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # Tells the API's KV cache the data changed; without them the import still runs.
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CF_KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
     steps:
       # Checkout first: the run defaults point into data-engine/, which only exists after it.
       - uses: actions/checkout@v5

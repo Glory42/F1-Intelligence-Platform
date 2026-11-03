@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, urlparse
 from src import auto_runner
 from src.auto_runner import run_cycle as auto_runner_run_cycle
 from src.dashboard import render_dashboard, render_login
+from src.db.client import close_pool
 from src.utils.logging_utils import log_job_failure
 
 DASHBOARD_USER = os.environ.get("DASHBOARD_USER", "admin")
@@ -174,6 +175,8 @@ def start_worker():
             memo.tracked = None
             STATE["status"] = "Error"
             STATE["last_error"] = str(e)
+        finally:
+            close_pool()
 
         if result is not None:
             sleep_seconds = auto_runner.poll_interval_for_window(
