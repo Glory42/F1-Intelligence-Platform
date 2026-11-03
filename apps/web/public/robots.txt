@@ -1,4 +1,9 @@
 User-agent: *
 Allow: /
+# Every page is server-rendered from Neon: the ?tab= and ?year= variants multiply each page many
+# times over for a crawler, and compare pairs are endless. The sitemap lists what's worth indexing.
+Disallow: /*?
+Disallow: /compare/
+Disallow: /health-quality
 
 Sitemap: https://f1.gorkemkaryol.dev/sitemap-index.xml
