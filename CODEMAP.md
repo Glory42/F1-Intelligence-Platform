@@ -526,6 +526,7 @@ apps/web/
 │   │   ├── careerYear.ts          # resolveCareerYear(): requested year → current year → latest active season
 │   │   ├── sidebarState.ts        # Sidebar collapse cookie: isSidebarCollapsed() + sidebarCookie()
 │   │   ├── legacyRedirects.ts     # legacyRedirect(path, search): retired URLs (prediction recap, /records, /drivers|teams/compare) → their new home
+│   │   ├── canonicalHost.ts       # canonicalHostRedirect(): the production *.pages.dev address → 301 to the custom domain (previews stay)
 │   │   ├── pageCache.ts           # servePageCached(): rendered HTML kept 5 min in the edge Cache API, keyed by URL + sidebar cookie (Workers Free: 10 ms CPU)
 │   │   ├── utils.ts               # cn() (clsx + tailwind-merge), unwrapSettled(), formatMs/Probability/Date/StopSeconds/AgeFromDays
 │   │   └── f1/                    # F1 reference data + maths used across features
@@ -538,7 +539,7 @@ apps/web/
 │   │       │                      #   whatIfProbabilities(): the "why" bar, radar and What-If Lab for both models
 │   │       ├── championshipMath.ts # titleContention() (mathematically out), remainingSessions(), formatTitleOdds()
 │   │       └── tyres.ts           # compoundToken(compound, year): tyre compound → colour token (2018 named compounds use the 2018 palette)
-│   ├── middleware.ts              # 301s retired URLs via legacyRedirect(); serves pages through servePageCached()
+│   ├── middleware.ts              # 301s the pages.dev alias and retired URLs; serves pages through servePageCached()
 │   ├── types/                     # Type-only re-exports of apps/api common/types/ (+ search.ts GlobalSearchResponse): seasons, circuits,
 │   │                              #   drivers, teams, races, race-events, strategy, race-story, telemetry, predictions,
 │   │                              #   sprint, history, quality: imported via the index.ts barrel as '@/types'
@@ -561,7 +562,7 @@ apps/web/
 │   │   ├── components/
 │   │   │   ├── layout/navLinks.test.ts       # pure: sidebar groups, utilities, active-destination matching
 │   │   │   └── data/                         # chartScale, labelLayout
-│   │   ├── lib/                              # pure, `node` env: pageTabs / sidebarState / legacyRedirects / pageCache / utils
+│   │   ├── lib/                              # pure, `node` env: pageTabs / sidebarState / legacyRedirects / canonicalHost / pageCache / utils
 │   │   │   └── f1/                           # predictionMath (all exports), predictionTerms, championshipMath, teamColors, teamLogos, tyres
 │   │   ├── features/races/ · features/telemetry/  # calendar, raceView + raceEventTabs, gridPenalties, weatherSpells, raceEventDisplay · telemetryCompare, trackMap
 │   │   ├── features/predictions/
