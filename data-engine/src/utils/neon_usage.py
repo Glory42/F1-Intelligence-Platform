@@ -32,7 +32,7 @@ class UsageProjection:
         return self.cu_hours_projected > CU_HOURS_BUDGET or self.egress_gb_projected > EGRESS_GB_BUDGET
 
 
-# Headroom under Neon Free's 100 CU-h and 5 GB: past these the API serves stale cache instead.
+# Headroom under Neon Free's 100 CU-h and 5 GB: the worker logs a failure past these.
 CU_HOURS_BUDGET = 80
 EGRESS_GB_BUDGET = 4
 # A pace measured over a few hours is noise: project from at least the first tenth (~3 days).

@@ -2,7 +2,6 @@
 """Backfill sprint race data for seasons with sprint weekends: re-sync schedule, then
 ingest + compute for every completed sprint round, then re-run season stats."""
 import argparse
-import atexit
 import sys
 
 sys.path.insert(0, ".")
@@ -10,7 +9,6 @@ import src.config as _config  # triggers FastF1 cache + env setup
 
 from src.db.client import get_conn
 from src.weekend_pipeline import ActionKind, RaceRunContext, followups, statuses_after
-from src.utils.api_cache import bump_data_version
 
 
 def get_completed_sprint_rounds(conn, year: int) -> list[tuple[int, int]]:
@@ -96,5 +94,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    atexit.register(bump_data_version)  # the API's KV cache re-reads Neon after this script's writes
     main()

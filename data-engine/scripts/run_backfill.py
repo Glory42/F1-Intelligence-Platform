@@ -2,7 +2,6 @@
 Each season goes to the jobs that can serve it (session_kind.results_ingest_for): the legacy Ergast jobs
 before 2018, the OpenF1 + Jolpica jobs from 2023; 2018–2022 is skipped, its stored rows stay (ADR 0011).
 Usage: python scripts/run_backfill.py 2023 2025"""
-import atexit
 import sys
 import traceback
 
@@ -17,7 +16,6 @@ from src.jobs.ingest_race import run as ingest_race
 from src.jobs.compute_season_stats import run as compute_season_stats
 from src.jobs.compute_features import run as compute_features
 from src.session_kind import OPENF1_FIRST_YEAR, ResultsIngest, results_ingest_for
-from src.utils.api_cache import bump_data_version
 
 # Round counts per year
 ROUND_COUNTS = {
@@ -114,7 +112,6 @@ def backfill_year(year: int) -> None:
 
 
 if __name__ == "__main__":
-    atexit.register(bump_data_version)  # the API's KV cache re-reads Neon after this script's writes
     start = int(sys.argv[1]) if len(sys.argv) > 1 else OPENF1_FIRST_YEAR
     end   = int(sys.argv[2]) if len(sys.argv) > 2 else start
 

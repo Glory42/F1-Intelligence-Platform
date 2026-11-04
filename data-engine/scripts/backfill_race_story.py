@@ -3,7 +3,6 @@ local cache (its timing needs F1TV since ADR 0011); OpenF1 seasons get theirs fr
 Writes nothing else. Run locally, never on Render (FastF1 loads need RAM and bandwidth).
 Usage: python scripts/backfill_race_story.py 2018 2022"""
 import argparse
-import atexit
 import sys
 
 sys.path.insert(0, ".")
@@ -15,7 +14,6 @@ from src.utils.driver_registry import season_drivers
 from src.utils.fastf1_session import get_session, lap_records, session_weather_trace
 from src.utils.ingest_runner import write_session_story
 from src.utils.race_story import session_story
-from src.utils.api_cache import bump_data_version
 
 
 
@@ -51,7 +49,6 @@ def backfill_session(race: dict, fastf1_session: str, tag: str) -> None:
 
 
 if __name__ == "__main__":
-    atexit.register(bump_data_version)  # the API's KV cache re-reads Neon after this script's writes
     parser = argparse.ArgumentParser()
     parser.add_argument("start", type=int, nargs="?", default=2018)
     parser.add_argument("end", type=int, nargs="?", default=2022)

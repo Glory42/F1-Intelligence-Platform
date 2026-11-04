@@ -99,9 +99,7 @@ python -m src.main --job sync_season   --year 2025 --round 1
 1. Connect the `apps/api/` directory to a Cloudflare Worker via the GitHub integration in the
    Cloudflare dashboard (set "Root directory" to `apps/api`).
 2. In the Worker's dashboard, add `DATABASE_URL` as a Secret.
-3. Create a Workers KV namespace (Storage & Databases > KV), and put its id in `apps/api/wrangler.toml`'s
-   `API_CACHE` binding. It holds the read cache (ADR 0012).
-4. Push to `master` to trigger the first deploy. `wrangler.toml`'s `routes` attaches the custom domain
+3. Push to `master` to trigger the first deploy. `wrangler.toml`'s `routes` attaches the custom domain
    `f1-api.gorkemkaryol.dev`, which the edge cache needs: it does nothing on `*.workers.dev`.
 
 ### 3. Frontend (Cloudflare Pages)
@@ -118,12 +116,8 @@ python -m src.main --job sync_season   --year 2025 --round 1
 ### 4. Data Engine (Render)
 
 1. Create a new Render service from the `data-engine/` directory.
-2. Add `DATABASE_URL` and `DASHBOARD_PASSWORD` as environment variables, plus the ones listed in
-   `render.yaml`:
-   - `CLOUDFLARE_API_TOKEN` (scope: Workers KV Storage: Edit only), `CLOUDFLARE_ACCOUNT_ID` and
-     `CF_KV_NAMESPACE_ID`, so jobs can expire the API's KV cache;
-   - `NEON_API_KEY` and `NEON_PROJECT_ID` for the budget watchdog.
-   Add the three Cloudflare ones as GitHub secrets too, for `f1db-import.yml`.
+2. Add `DATABASE_URL` and `DASHBOARD_PASSWORD` as environment variables, plus `NEON_API_KEY` and
+   `NEON_PROJECT_ID` (listed in `render.yaml`) for the budget watchdog.
 3. Configure as a **Web Service** (not a cron job) to utilize the free tier.
 4. Set the Build Command: `pip install -r requirements.txt`
 5. Set the Start Command: `python -m src.server`

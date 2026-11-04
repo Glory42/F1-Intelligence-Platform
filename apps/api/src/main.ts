@@ -20,7 +20,6 @@ import searchModule from './modules/search/search';
 import qualityModule from './modules/quality/quality';
 import type { Bindings } from './common/types';
 import { edgeCache } from './common/edge-cache';
-import { kvCache } from './common/kv-cache';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -50,7 +49,6 @@ app.use('*', cors({
   allowHeaders: ['Content-Type'],
 }));
 app.use('/api/*', edgeCache());
-app.use('/api/*', kvCache());
 
 app.get('/robots.txt', (c) => c.text('User-agent: *\nDisallow: /\n'));
 
