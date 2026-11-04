@@ -16,8 +16,8 @@ if __name__ == "__main__":
     print(f"Compute     {usage.compute_seconds / 3600:6.1f} CU-h used, {projection.cu_hours_projected:6.1f} projected (budget {CU_HOURS_BUDGET}, limit 100)")
     print(f"Egress      {usage.transfer_bytes / 1e9:6.2f} GB used,   {projection.egress_gb_projected:6.2f} projected (budget {EGRESS_GB_BUDGET}, limit 5)")
     if projection.over_budget:
-        print("Over budget: the API serves stale cache")
+        print("Over budget")
     elif projection.on_pace_over_budget:
-        print("On pace to pass the budget: the API still reads Neon until usage actually crosses it")
+        print("On pace to pass the budget")
     else:
         print("Within budget")

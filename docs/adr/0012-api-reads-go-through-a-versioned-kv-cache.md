@@ -1,5 +1,13 @@
 # API reads go through a versioned KV cache
 
+**Superseded on 2026-11-04: the KV cache is removed.** KV Free allows 1,000 writes a day. On 2026-11-03
+a crawler used nearly all of them, and second-miss admission (below) didn't stop it: the cap was hit
+again within 3 hours of the 2026-11-04 reset, and puts then fail for the rest of the day. A cache that
+stops writing for most of each day doesn't protect Neon, and the account's other Workers share the same
+limit. What stays in front of Neon now has no quota: the API's edge cache (ADR 0005), the site's 5-minute
+page cache (`apps/web/src/lib/pageCache.ts`) and the 301 from the `pages.dev` alias. The Neon budget
+watchdog stays, but it only logs. With no data version, cached answers expire by their `max-age`.
+
 In November 2026, Neon Free's 100 CU-h ran out around day 25 for the second month running. Neon's API
 showed the compute awake 77% of the time with ~85 wakes a day, most of them outside race weekends,
 when the worker never touches the database. Every SSR page view reached Neon: the edge cache

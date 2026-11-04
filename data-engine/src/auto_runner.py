@@ -9,7 +9,6 @@ from src.db.client import get_conn
 from src.enrichment_coverage import missing, read_coverage
 from src.jobs import sync_schedule
 from src.utils import openf1_client
-from src.utils.api_cache import bump_data_version, set_serve_stale
 from src.utils.logging_utils import log_job_failure, log_job_ok
 from src.utils.neon_usage import NeonUsage, fetch_neon_usage, project_usage
 from src.utils.schedule_window import race_weekend_window, RaceWeekendWindow
@@ -94,14 +93,10 @@ def _retry_missing_race_events(
     ctx = RaceRunContext(race_id=rows[0]["id"], year=year, round_number=round_number)
     settled = memo.settled if memo is not None else set()
     pending = [c.job for c in missing(rows[0]) if (ctx.race_id, c.job) not in settled]
-    filled = False
     for name in pending:
         log_func(f"[auto_runner] Race {ctx.race_id} is missing {name} data: retrying")
         if JobStep(name, optional=True).run(ctx):
             settled.add((ctx.race_id, name))
-            filled = True
-    if filled:
-        bump_data_version()
     return all((ctx.race_id, name) in settled for name in pending)
 
 
@@ -178,24 +173,23 @@ def poll_interval_for_window(
 def _guard_neon_budget(
     log_func: Callable[[str], None], usage_provider: Callable[[], Optional[NeonUsage]], now_utc: datetime,
 ) -> None:
-    """Past the budget the API answers from its KV cache, however old, instead of waking Neon."""
+    """Logs a failure once Neon Free usage passes, or is on pace to pass, the monthly budget."""
     try:
         usage = usage_provider()
     except requests.RequestException as e:
-        log_func(f"[auto_runner] Neon usage unavailable ({e}); leaving the API cache mode as it is.")
+        log_func(f"[auto_runner] Neon usage unavailable ({e}).")
         return
     if usage is None:
         return
     projection = project_usage(usage, now_utc)
     if projection.over_budget or projection.on_pace_over_budget:
-        detail = "past the budget: API serves stale cache" if projection.over_budget else "on pace to pass the budget"
+        detail = "past the budget" if projection.over_budget else "on pace to pass the budget"
         log_job_failure(
             "neon_budget", RuntimeError(f"Neon Free usage {detail}"),
             cu_hours_used=round(projection.cu_hours_used, 1),
             cu_hours_projected=round(projection.cu_hours_projected, 1),
             egress_gb_projected=round(projection.egress_gb_projected, 2),
         )
-    set_serve_stale(projection.over_budget)
 
 
 def run_cycle(
@@ -317,7 +311,6 @@ def run_cycle(
             )
             raise outcome.error
         log_func(f"[auto_runner] {action.label} ingestion completed successfully.")
-        bump_data_version()
         return CycleResult(window=window, schedule_available=schedule_available)
 
     except NOT_READY as e:

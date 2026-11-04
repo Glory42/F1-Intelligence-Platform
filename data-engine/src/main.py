@@ -8,7 +8,6 @@ from src.db.client import get_conn
 from src.enrichment_coverage import step_name
 from src.jobs.registry import JOBS, JobArgs, Needs
 from src.session_kind import BY_NAME
-from src.utils.api_cache import bump_data_version
 from src.utils.logging_utils import log_job_failure
 
 
@@ -77,7 +76,6 @@ def main() -> None:
     except Exception as e:
         log_job_failure(args.job, e, year=args.year, round=args.round_num, race_id=args.race_id)
         sys.exit(1)
-    bump_data_version()
 
 
 if __name__ == "__main__":

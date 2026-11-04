@@ -21,8 +21,8 @@ def _isolated_openf1_client(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _no_real_cloudflare_or_neon_api(monkeypatch):
-    """src.config's load_dotenv may bring real keys in from .env: a test must never bump the
-    production API cache or read real Neon usage. Tests that need them set fakes."""
-    for name in ("CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID", "CF_KV_NAMESPACE_ID", "NEON_API_KEY", "NEON_PROJECT_ID"):
+def _no_real_neon_api(monkeypatch):
+    """src.config's load_dotenv may bring real keys in from .env: a test must never read real
+    Neon usage. Tests that need them set fakes."""
+    for name in ("NEON_API_KEY", "NEON_PROJECT_ID"):
         monkeypatch.delenv(name, raising=False)

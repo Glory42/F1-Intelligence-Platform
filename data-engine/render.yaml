@@ -11,14 +11,6 @@ services:
         value: "3.12.8"
       - key: DATABASE_URL
         sync: false
-      # The API's KV cache (apps/api/src/common/kv-cache.ts): bumped after every job that writes Neon.
-      # Token scope: Account > Workers KV Storage > Edit, nothing else.
-      - key: CLOUDFLARE_API_TOKEN
-        sync: false
-      - key: CLOUDFLARE_ACCOUNT_ID
-        sync: false
-      - key: CF_KV_NAMESPACE_ID
-        sync: false
       # Neon budget watchdog: read from Neon's control-plane API, which never wakes the database.
       - key: NEON_API_KEY
         sync: false

@@ -41,7 +41,7 @@ Must use `@neondatabase/serverless` (HTTP driver): no TCP in Workers.
 ```
 apps/api/
 ├── src/
-│   ├── main.ts                    # Entry point: logger, CORS, edgeCache() + kvCache() on /api/*, /robots.txt, /api/health (no DB), /api/health/db, mounts every module
+│   ├── main.ts                    # Entry point: logger, CORS, edgeCache() on /api/*, /robots.txt, /api/health (no DB), /api/health/db, mounts every module
 │   ├── common/                    # Only what several modules share: module-only logic lives in that module's *.helpers.ts
 │   │   ├── types/                 # Response types per domain (api, seasons, circuits, drivers, teams, races, race-events,
 │   │   │                          #   strategy, race-story, telemetry, predictions, sprint, history, quality) + index.ts barrel
@@ -59,8 +59,6 @@ apps/api/
 │   │   │                          #   the only "same driver / same team" rules; golden cases in docs/identity-cases.json (shared with Python)
 │   │   ├── cache.ts               # CACHE_COMPLETED/ACTIVE/REFERENCE + cacheControlForStatus(), cacheControlForYear(), cacheIfData()
 │   │   ├── edge-cache.ts          # edgeCache() middleware: serves repeat GETs from the Workers Cache API (custom domain only); skips errors/non-public responses
-│   │   ├── kv-cache.ts            # kvCache(): versioned read-through cache in Workers KV (ADR 0012); stale on 5xx, serveStale watchdog flag, off in development;
-│   │   │                          #   a new URL is written on its second miss (edge-cache marker first) to save KV Free's 1k writes/day
 │   │   └── session.ts             # RACE_SESSION / QUALIFYING_SESSION: `?session=` param descriptors route.ts validates
 │   ├── config/database.ts         # createDb(): Drizzle over Neon HTTP driver
 │   ├── config/localNeonProxy.ts   # configureLocalNeonProxy(): points the Neon driver at a local proxy (tests, migrate, wrangler dev via NEON_FETCH_ENDPOINT)
@@ -183,8 +181,7 @@ apps/api/
 │   │   │   ├── predictions/       # accuracy, prediction-history, intel-standings helpers
 │   │   │   ├── race-events/       # openf1.mappers (race control, overtakes, team radio)
 │   │   │   └── quality/quality.test.ts # castSeverity()
-│   │   └── common/                # mappers, standings, feature-manifest, cache, identity (golden cases from docs/identity-cases.json),
-│   │                              #   kv-cache (second-miss write admission, fake KV + fake edge cache, no DB)
+│   │   └── common/                # mappers, standings, feature-manifest, cache, identity (golden cases from docs/identity-cases.json)
 │   ├── integration/                # bun test: real Hono `app.request()` against a LOCAL Postgres (docker-compose.test.yml behind
 │   │   │                           #   a Neon HTTP proxy; `bun run test:db:up`, config in .env.test): never Neon
 │   │   ├── races/races.test.ts     # list/filter/detail/circuit-history joins
@@ -199,7 +196,6 @@ apps/api/
 │   │   ├── hub/hub.test.ts         # race recap (winner, model pick, fastest stop, longest battle) + on-this-day races
 │   │   ├── history/history.test.ts # leaders w/ flags + active, strike-rate min starts, chases, milestones, lineages, on-this-day fallback
 │   │   ├── edge-cache/edge-cache.test.ts # edge hits skip the DB; never caches errors/non-public; per-request CORS origin
-│   │   ├── kv-cache/kv-cache.test.ts # KV hits until a version bump, completed races survive bumps, stale on DB failure, serveStale, KV limits
 │   │   ├── health/health.test.ts   # /api/health without the DB, /api/health/db, API robots.txt
 │   │   ├── drivers/drivers.test.ts # list/filter/standings/detail
 │   │   ├── drivers/career.test.ts  # career + search link a person's seasons across name variants
@@ -218,13 +214,12 @@ apps/api/
 │   │   └── teams/career.test.ts    # a team's career follows its constructor across rebrands
 │   └── support/
 │       ├── app/request.ts          # apiRequest(): in-process app.request() with TEST_DATABASE_URL env
-│       ├── kv/fake-kv.ts           # FakeKv: in-memory Workers KV (get/getWithMetadata/put), failReads/failWrites
 │       ├── cache/fake-edge-cache.ts # FakeEdgeCache: in-memory Cache API (match/put), no expiry
 │       ├── db/test-db.ts           # getTestDb()/truncateAll(): refuses *.neon.tech hosts and TEST_DATABASE_URL === DATABASE_URL
 │       └── factories/              # one insert helper per table, FK chain: season → team/circuit → driver → race → results
 │                                   #   (+ prediction/sprint features, sprint lap times, OpenF1 events, stints/pit stops, race story, telemetry, title odds, history)
 ├── eslint.config.js               # Flat config: tiered `max-lines` (controller 80 / module 50 / service+helpers 200 / common 150 / default 150; schema+seed+types.ts+tests off), run via `bun run lint`
-├── wrangler.toml                  # CF Workers config: keep_vars = true, custom domain f1-api.gorkemkaryol.dev, API_CACHE KV binding
+├── wrangler.toml                  # CF Workers config: keep_vars = true, custom domain f1-api.gorkemkaryol.dev
 ├── drizzle.config.ts              # schema: src/db/schema, out: drizzle/migrations
 ├── tsconfig.json                  # CF Workers target: excludes Node-only files (drizzle.config, seed)
 ├── tsconfig.node.json             # Node target for drizzle.config.ts + seed.ts (@types/node)
@@ -763,7 +758,6 @@ data-engine/
 │       │                          # constructor_row(), constructor_seasons(): F1DB release → history_* rows
 │       ├── f1db_results.py        # match_f1db_driver(), race_row(), qualifying_row(): F1DB record → our rows
 │       ├── f1db_backfill.py       # plan_season(): pure diff of one season vs F1DB (codes, new drivers, merges, rows)
-│       ├── api_cache.py           # bump_data_version(), set_serve_stale(): the API's KV cache state via Cloudflare's REST API (no-op without env)
 │       ├── neon_usage.py          # fetch_neon_usage() (control-plane API, no DB wake), project_usage(): used/projected CU-h + egress vs budget
 │       ├── openf1_client.py       # paced, budgeted HTTP only: find_weekend_session_key(), fetch_session_data(), fetch_lap_samples()
 │       │                          # over one shared _get(): paced + per-cycle request budget (OpenF1BudgetExceeded), free tier only
@@ -819,7 +813,6 @@ data-engine/
 │   ├── conftest.py                 # Placeholder DATABASE_URL so importing job modules doesn't need a real .env
 │   ├── support/
 │   │   ├── fake_db.py              # FakeCursor/FakeConnection: scripted RealDictCursor-shaped rows, no real DB
-│   │   ├── fake_kv_api.py          # FakeKvApi: Cloudflare's KV REST values endpoint in memory (api_cache's boundary)
 │   │   ├── race_history.py         # sample_history(): a small in-memory RaceHistory for the v4 feature, model and job tests
 │   │   ├── f1db_fixtures.py        # Loads tests/fixtures/f1db/*.json (trimmed real F1DB records)
 │   │   ├── fake_openf1.py          # FakeOpenF1 at openf1_client._get (spends the real budget), weekend() /sessions builder
@@ -849,10 +842,8 @@ data-engine/
 │   ├── test_schedule_window.py     # race_weekend_window + RaceWeekendWindow.contains
 │   ├── test_auto_runner.py         # run_cycle() schedule gate, revert-on-failure, poll_interval_for_window (jobs swapped in weekend_pipeline.JOBS),
 │   │                                #   per-table retry reruns, memo settling, budget-limited telemetry stays pending,
-│   │                                #   API cache version bumps, 2 h race-event retry, Neon budget watchdog
-│   ├── test_api_cache.py           # version bumps, serveStale kept, no-op without env, Cloudflare failures never fail a job
+│   │                                #   2 h race-event retry, Neon budget watchdog (logs only)
 │   ├── test_neon_usage.py          # month-end projection, over budget on actual usage only
-│   ├── test_main_cache_bump.py     # the CLI bumps the API cache version after a successful job only
 │   ├── test_ingest_runner.py       # run_ingest_job + run_qualifying_ingest_job (fake_db + monkeypatched readers); run_openf1_job end to end with fake_openf1 (session lookup, key cache, guards)
 │   ├── test_ingest_fp2.py          # FP2 vs FP1 choice, long_run_rows() (runs split at pit visits, best median per compound)
 │   ├── test_ingest_race_control.py # _to_rows() pure-function shaping + run() config-wiring check
@@ -958,7 +949,7 @@ data-engine/
 | `testing.md` | The five suites (pytest, api unit/integration, web vitest, e2e Playwright): what each covers, how to run, CI jobs |
 | `feature-weights.json` | Canonical GP importances + labels, sprint weights + labels and `sprint_softmax_temperature`: checked by `test_weights.py` (GP importances against `gp_v4.json`) and the API's `feature-manifest.test.ts` (labels, importances, sprint weights, temperature) |
 | `plans/intelligence-platform-roadmap.md` | Intelligence-platform roadmap + free-tier budget rules (Neon, Render, OpenF1) |
-| `adr/0000`–`0012` | Legacy decisions; apps/ layout; DNF incl. DSQ/DNS; local-Postgres integration tests; OpenF1 pacing/budget; edge-cached responses; race events `session_type`; Plackett-Luce title odds; telemetry as resampled JSONB; drivers unique per person + pre-2018 results from F1DB; GP model as a fitted conditional logit; live ingest from OpenF1 + Jolpica; versioned KV read cache |
+| `adr/0000`–`0012` | Legacy decisions; apps/ layout; DNF incl. DSQ/DNS; local-Postgres integration tests; OpenF1 pacing/budget; edge-cached responses; race events `session_type`; Plackett-Luce title odds; telemetry as resampled JSONB; drivers unique per person + pre-2018 results from F1DB; GP model as a fitted conditional logit; live ingest from OpenF1 + Jolpica; versioned KV read cache (superseded: KV Free's write cap) |
 
 ---
 

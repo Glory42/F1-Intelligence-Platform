@@ -6,7 +6,6 @@ left to the live job, which uses the committed fit (src/models/gp_v4.json).
 Sprint (sprint-v2): recomputed race by race as before.
 Usage: python scripts/backfill_all_predictions.py [--from 2018] [--skip-sprint]"""
 import argparse
-import atexit
 import datetime
 import sys
 import time
@@ -18,7 +17,6 @@ from src.jobs import compute_features, compute_sprint_features
 from src.utils.gp_model_v4 import TRAIN_FROM_YEAR, fit, history_start, load_committed, predict, training_races
 from src.utils.race_history import load_history
 from src.utils.storage_guard import read_storage_tier
-from src.utils.api_cache import bump_data_version
 
 
 def backfill_gp(start_year: int) -> list[tuple[int, str]]:
@@ -94,5 +92,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    atexit.register(bump_data_version)  # the API's KV cache re-reads Neon after this script's writes
     main()

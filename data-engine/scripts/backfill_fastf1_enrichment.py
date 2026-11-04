@@ -6,7 +6,6 @@ load is a few hundred MB).
 Usage: python scripts/backfill_fastf1_enrichment.py 2018 2022 [--only stints,pits,race_control,telemetry] [--refresh]
 --refresh rewrites the chosen parts even where rows exist (after a converter fix)."""
 import argparse
-import atexit
 import sys
 
 sys.path.insert(0, ".")
@@ -25,7 +24,6 @@ from src.utils.fastf1_session import (
 from src.utils.session_records import pit_stop_rows, race_control_rows, stint_rows
 from src.utils.telemetry import build_lap_telemetry, telemetry_samples
 from src.utils.upsert import upsert
-from src.utils.api_cache import bump_data_version
 
 import fastf1
 
@@ -111,7 +109,6 @@ def backfill_telemetry(race: dict, drivers: SeasonDrivers) -> None:
 
 
 if __name__ == "__main__":
-    atexit.register(bump_data_version)  # the API's KV cache re-reads Neon after this script's writes
     parser = argparse.ArgumentParser()
     parser.add_argument("start", type=int, nargs="?", default=2018)
     parser.add_argument("end", type=int, nargs="?", default=2022)

@@ -1,6 +1,5 @@
 """Backfills FP2 long-run data for all completed races OpenF1 serves (2023+, ADR 0011).
 Failures are logged and skipped: FP2 data availability varies."""
-import atexit
 import sys
 import time
 import psycopg2
@@ -10,7 +9,6 @@ sys.path.insert(0, ".")
 from src.config import DATABASE_URL
 from src.jobs.ingest_fp2 import run as ingest_fp2
 from src.session_kind import OPENF1_FIRST_YEAR
-from src.utils.api_cache import bump_data_version
 
 
 def get_conn():
@@ -56,5 +54,4 @@ def main():
 
 
 if __name__ == "__main__":
-    atexit.register(bump_data_version)  # the API's KV cache re-reads Neon after this script's writes
     main()

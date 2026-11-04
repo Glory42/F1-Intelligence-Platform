@@ -2,14 +2,12 @@
 Rows are tiny (one per contender per round) and the simulation is seeded, so re-running is a no-op.
 Usage: python scripts/backfill_title_odds.py 2018 2026"""
 import argparse
-import atexit
 import sys
 
 sys.path.insert(0, ".")
 
 from src.db.client import get_conn
 from src.jobs.compute_title_odds import run
-from src.utils.api_cache import bump_data_version
 
 
 def completed_rounds(start: int, end: int) -> list[tuple[int, int]]:
@@ -28,7 +26,6 @@ def completed_rounds(start: int, end: int) -> list[tuple[int, int]]:
 
 
 if __name__ == "__main__":
-    atexit.register(bump_data_version)  # the API's KV cache re-reads Neon after this script's writes
     parser = argparse.ArgumentParser()
     parser.add_argument("start", type=int, nargs="?", default=2018)
     parser.add_argument("end", type=int, nargs="?", default=2026)

@@ -13,5 +13,5 @@ must be attached to a custom domain (and `PUBLIC_API_URL` pointed at it) before 
 The cache is per data centre and honours `max-age`, so active-weekend routes (`max-age=30`) refresh
 quickly while completed races are kept for a day.
 
-The API moved to `f1-api.gorkemkaryol.dev` in November 2026, which turned this cache on. Behind it, a
-versioned Workers KV cache (ADR 0012) keeps answers across data centres until the data changes.
+The API moved to `f1-api.gorkemkaryol.dev` in November 2026, which turned this cache on. A versioned
+Workers KV cache behind it (ADR 0012) was removed a day later: KV Free's write cap ran out within hours.
