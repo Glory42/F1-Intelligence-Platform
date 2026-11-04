@@ -12,12 +12,6 @@ routes = [
 # A `routes` entry turns *.workers.dev off by default, and apps/web still calls that URL.
 workers_dev = true
 
-# The read cache in front of Neon (src/common/kv-cache.ts, ADR 0012). The data engine bumps its
-# data version through Cloudflare's API, so CF_KV_NAMESPACE_ID on Render must be this same id.
-[[kv_namespaces]]
-binding = "API_CACHE"
-id = "881f1f8ed3fa4b478ce2982f4cd61660"
-
 # DATABASE_URL is set via the Cloudflare dashboard (Variables and Secrets)
 # keep_vars = true prevents deploys from erasing dashboard-set variables
 # Never put secrets in this file
