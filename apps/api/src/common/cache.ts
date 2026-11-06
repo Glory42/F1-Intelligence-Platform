@@ -1,7 +1,8 @@
 // A completed race's results/predictions never change (idempotent ETL): safe to cache long
-// and immutable. Anything still in progress can change as the weekend progresses.
+// and immutable. Anything still in progress changes only when the ETL runs: 10 minutes late is
+// harmless, while a shorter TTL kept Neon awake all day (it sleeps after 5 quiet minutes).
 export const CACHE_COMPLETED = 'public, max-age=86400, immutable';
-export const CACHE_ACTIVE = 'public, max-age=30';
+export const CACHE_ACTIVE = 'public, max-age=600';
 // Seasons, circuits, the search index and the model version change only when the ETL runs: an
 // hour of staleness is harmless and saves a Neon wake on nearly every page view.
 export const CACHE_REFERENCE = 'public, max-age=3600';

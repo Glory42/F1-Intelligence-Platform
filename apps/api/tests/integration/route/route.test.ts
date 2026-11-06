@@ -10,7 +10,7 @@ import { createRacePitStop } from '../../support/factories/racePitStop.factory';
 import { createRaceControlMessage } from '../../support/factories/raceControlMessage.factory';
 
 const IMMUTABLE = 'public, max-age=86400, immutable';
-const SHORT = 'public, max-age=30';
+const SHORT = 'public, max-age=600';
 
 type ErrorBody = { data: null; error: { code: string; message: string } };
 

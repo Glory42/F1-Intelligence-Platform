@@ -69,6 +69,6 @@ describe('race story (integration)', () => {
   it('only briefly caches a completed race whose story has not been backfilled yet', async () => {
     const res = await apiRequest(`/api/races/${notBackfilledId}/race-story`);
 
-    expect(res.headers.get('Cache-Control')).toBe('public, max-age=30');
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=600');
   });
 });
