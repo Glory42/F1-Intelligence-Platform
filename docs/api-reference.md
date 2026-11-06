@@ -22,13 +22,13 @@ No authentication. All endpoints are read-only GET.
 parameter (`apps/api/src/common/route.ts`, rules in `common/cache.ts`):
 
 - **Race-scoped** routes (`/api/races/:id/*`, `/api/predictions/race/:raceId*`, `/api/sprint/race/:raceId*`):
-  `public, max-age=86400, immutable` once the race is `completed`, otherwise `public, max-age=30`.
+  `public, max-age=86400, immutable` once the race is `completed`, otherwise `public, max-age=600`.
 - **Season-scoped** routes (`?year=N` lists, and `/api/drivers/:id*` / `/api/teams/:id*`, whose ids belong
-  to one season): immutable for a past season, 30 s for the current one. For the `:id` routes the
+  to one season): immutable for a past season, 10 min for the current one. For the `:id` routes the
   season is the driver's/team's own: `?year=` never changes the lifetime. Careers use their newest season.
 - **Reference data** (`/api/seasons`, `/api/search`, `/api/races/circuits`, `/api/races/circuit/:key`,
   `/api/predictions/model-info`): `public, max-age=3600`.
-- An empty answer (no rows yet, enrichment not backfilled) is always cached for 30 s only.
+- An empty answer (no rows yet, enrichment not backfilled) is always cached for 10 min only.
 
 A non-numeric `:id` / `:raceId` answers 400 `INVALID_ID`, a non-numeric `year` 400 `INVALID_YEAR`, an
 unknown `session` 400 `INVALID_SESSION`, and an unknown race, driver or team 404 `NOT_FOUND`.
