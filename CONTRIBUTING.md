@@ -78,3 +78,9 @@ Scopes: `web`, `api`, `db`, `etl`, `navbar`, `prediction`, `races`, `drivers`, `
 - [`apps/api/README.md`](apps/api/README.md): API setup, routes, and migration workflow
 - [`apps/web/README.md`](apps/web/README.md): frontend setup and pages
 - [`data-engine/README.md`](data-engine/README.md): ETL jobs and cron schedule
+
+## Community
+
+- [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md): expected behaviour in issues, PRs and discussions
+- [`SECURITY.md`](SECURITY.md): report vulnerabilities privately, never in a public issue
+- Issues use the templates under [`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE/); PRs get [`.github/pull_request_template.md`](.github/pull_request_template.md) automatically

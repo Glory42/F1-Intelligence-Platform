@@ -9,6 +9,8 @@ F1-prediction/
 ├── CLAUDE.md              # Agent guidelines, constraints, and project conventions
 ├── CODEMAP.md             # This file: codebase structure reference
 ├── CONTRIBUTING.md        # Contribution guidelines
+├── CODE_OF_CONDUCT.md     # Contributor Covenant 2.1
+├── SECURITY.md            # Supported versions, private vulnerability reporting, scope
 ├── CONTEXT.md             # Domain glossary: ubiquitous language for the project
 ├── README.md              # Project overview and getting started
 ├── LICENSE                # GPL-3.0
@@ -19,6 +21,8 @@ F1-prediction/
 ├── docker-compose.dev.yml # Local Postgres 17 (:5435) + Neon HTTP proxy (:4446) for day-to-day dev, filled by scripts/dev_snapshot.py
 ├── .github/workflows/test.yml # CI: pytest, api (test:db:up + test/typecheck/lint), web, e2e Playwright
 ├── .github/workflows/f1db-import.yml # Weekly (Wed 06:00 UTC) + manual F1DB import; skips without a DATABASE_URL secret
+├── .github/ISSUE_TEMPLATE/ # Issue forms: bug report, data issue, feature request; config.yml disables blank issues
+├── .github/pull_request_template.md # PR summary, areas touched, CI + critical-constraint checklist
 ├── preview/               # README screenshots
 ├── docs/                  # Project documentation (see Docs section below)
 │   ├── adr/               # Numbered architectural decision records, 0000–0010

@@ -1,0 +1,45 @@
+name: Feature request
+description: Suggest a new page, stat, chart or model improvement.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The project runs entirely on free tiers (Neon, Render, Cloudflare, OpenF1). Ideas that need a paid
+        service, a login-gated data source or constant polling are unlikely to land.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Races
+        - Championship / standings
+        - Predictions / model
+        - Circuits
+        - Compare
+        - History
+        - Data coverage
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you want to see or answer
+      description: The question you'd like the site to answer, or what's missing today.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How it could look or work. Sketches welcome.
+
+  - type: textarea
+    id: data-source
+    attributes:
+      label: Data source
+      description: If it needs data the site doesn't show yet, where could it come from?

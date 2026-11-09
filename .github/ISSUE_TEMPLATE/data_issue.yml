@@ -1,0 +1,62 @@
+name: Data issue
+description: A result, lap time, pit stop, standing or other race data is wrong or missing.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Data comes from OpenF1 and Jolpica (2023 on), FastF1 (2018–2022) and F1DB (all-time history).
+        A link to an official source for the correct value makes this much quicker to fix.
+
+  - type: dropdown
+    id: data-type
+    attributes:
+      label: What kind of data
+      options:
+        - Race or sprint result
+        - Qualifying result
+        - Lap times / race story
+        - Tyre strategy / pit stops
+        - Race control, overtakes or team radio
+        - Qualifying telemetry
+        - Driver or constructor standings
+        - Title odds
+        - All-time history (F1DB)
+        - Driver, team or circuit details
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: race
+    attributes:
+      label: Race or page
+      description: Season and round, or the page URL.
+      placeholder: 2025 round 14, or https://f1.gorkemkaryol.dev/races/1234
+    validations:
+      required: true
+
+  - type: dropdown
+    id: session
+    attributes:
+      label: Session
+      options:
+        - Grand Prix
+        - Sprint
+        - Qualifying
+        - Sprint qualifying
+        - Practice
+        - Not session-specific
+
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What is wrong or missing
+    validations:
+      required: true
+
+  - type: textarea
+    id: correct
+    attributes:
+      label: Correct value and source
+      description: What it should be, and where that comes from (FIA document, formula1.com, Wikipedia...).

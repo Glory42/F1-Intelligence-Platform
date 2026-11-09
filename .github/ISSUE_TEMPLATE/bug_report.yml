@@ -1,0 +1,61 @@
+name: Bug report
+description: Something on the site or the API is broken or behaves wrongly.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Wrong or missing race data (a result, lap time, pit stop) has its own template: **Data issue**.
+        Security problems go through a private advisory, never a public issue: see `SECURITY.md`.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Website (apps/web)
+        - API (apps/api)
+        - Data engine / ETL (data-engine)
+        - Predictions
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: url
+    attributes:
+      label: Page or endpoint
+      description: The URL where it happens.
+      placeholder: https://f1.gorkemkaryol.dev/races/1234?tab=strategy
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Include any error message. Screenshots help for layout problems.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. See ...
+
+  - type: input
+    id: environment
+    attributes:
+      label: Browser and device
+      placeholder: Firefox 140, Arch Linux / Safari, iPhone 15
