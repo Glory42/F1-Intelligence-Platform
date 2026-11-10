@@ -8,8 +8,17 @@ export interface PageCache {
 export type RunInBackground = (work: Promise<unknown>) => void;
 
 // Workers Free cuts a render off at 10 ms of CPU and a typical page takes about that, so a page
-// rendered once is served from the edge for a few minutes. The data only moves when the ETL runs.
-const STORED_FOR = 'public, max-age=300';
+// rendered once is served from the edge. The data only moves when the ETL runs.
+const STORED_FOR_RACE_WEEKEND = 'public, max-age=300';
+const STORED_FOR_QUIET = 'public, max-age=3600';
+
+// Same window as the API's isIngestWindow (apps/api/src/common/cache.ts): every session ends
+// Friday to Sunday UTC and the worker's ingests finish by Monday morning.
+export function pageCacheControl(now: Date): string {
+  const day = now.getUTCDay();
+  const raceWeekend = day === 5 || day === 6 || day === 0 || (day === 1 && now.getUTCHours() < 12);
+  return raceWeekend ? STORED_FOR_RACE_WEEKEND : STORED_FOR_QUIET;
+}
 
 // The Cache API only works on a custom domain: on *.pages.dev and in astro dev this is a no-op.
 export function defaultPageCache(): PageCache | undefined {
@@ -46,6 +55,7 @@ export async function servePageCached(
   render: () => Promise<Response>,
   cache: PageCache | undefined,
   runInBackground: RunInBackground,
+  now: Date = new Date(),
 ): Promise<Response> {
   if (!cache || request.method !== 'GET') return render();
   const key = pageCacheKey(new URL(request.url), request.headers.get('Cookie'));
@@ -55,7 +65,7 @@ export async function servePageCached(
   const res = await render();
   if (!isCacheablePage(res)) return res;
   const stored = new Response(res.clone().body, { status: res.status, headers: new Headers(res.headers) });
-  stored.headers.set('Cache-Control', STORED_FOR);
+  stored.headers.set('Cache-Control', pageCacheControl(now));
   runInBackground(cache.put(key, stored).catch(() => undefined));
   return res;
 }

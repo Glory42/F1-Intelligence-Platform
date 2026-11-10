@@ -4,7 +4,7 @@ import { createDb } from '../../config/database';
 import { PredictionsService } from './predictions.service';
 import { TitleOddsService } from './title-odds.service';
 import { raceRoute, seasonRoute } from '../../common/route';
-import { CACHE_ACTIVE, CACHE_REFERENCE, cacheControlForStatus } from '../../common/cache';
+import { CACHE_REFERENCE, cacheControlForActive, cacheControlForStatus } from '../../common/cache';
 import { GP } from '../../common/session-kind';
 import { findPrediction, findUpcomingPrediction } from '../../common/session-reads';
 
@@ -40,7 +40,7 @@ export const PredictionsController = {
     const data = await service.findAccuracyBySeason(createDb(c.env.DATABASE_URL));
     // Response spans every season, and the most recent one is almost always still in
     // progress: cache short rather than trying to reason about which years are final.
-    c.header('Cache-Control', CACHE_ACTIVE);
+    c.header('Cache-Control', cacheControlForActive());
     return c.json({ data, error: null });
   },
 

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { pageCacheKey, servePageCached, type PageCache } from '@/lib/pageCache';
+import { pageCacheControl, pageCacheKey, servePageCached, type PageCache } from '@/lib/pageCache';
 
 class FakePageCache implements PageCache {
   readonly entries = new Map<string, Response>();
@@ -76,6 +76,28 @@ describe('page cache', () => {
     await visit(render);
 
     expect(renders).toBe(2);
+  });
+
+  it.each([
+    ['Thursday night', '2026-06-18T23:59:00Z', 'public, max-age=3600'],
+    ['Friday morning', '2026-06-19T00:00:00Z', 'public, max-age=300'],
+    ['Sunday night', '2026-06-21T23:00:00Z', 'public, max-age=300'],
+    ['Monday morning', '2026-06-22T11:59:00Z', 'public, max-age=300'],
+    ['Monday noon', '2026-06-22T12:00:00Z', 'public, max-age=3600'],
+  ])('keeps a page rendered on %s for %s', (_label, iso, expected) => {
+    expect(pageCacheControl(new Date(iso))).toBe(expected);
+  });
+
+  it('stores the edge copy with the lifetime for the moment it was rendered', async () => {
+    const wednesday = new Date('2026-06-17T12:00:00Z');
+    await servePageCached(new Request('https://f1.example/drivers'), page(), cache, (work) => {
+      pending.push(work);
+    }, wednesday);
+    await Promise.all(pending);
+
+    const [stored] = cache.entries.values();
+
+    expect(stored.headers.get('Cache-Control')).toBe('public, max-age=3600');
   });
 
   it('always renders when no edge cache is available (astro dev, *.pages.dev)', async () => {
