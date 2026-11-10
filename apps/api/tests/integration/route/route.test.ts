@@ -8,9 +8,11 @@ import { createCircuit } from '../../support/factories/circuit.factory';
 import { createRace } from '../../support/factories/race.factory';
 import { createRacePitStop } from '../../support/factories/racePitStop.factory';
 import { createRaceControlMessage } from '../../support/factories/raceControlMessage.factory';
+import { CACHE_COMPLETED, cacheControlForActive } from '../../../src/common/cache';
 
-const IMMUTABLE = 'public, max-age=86400, immutable';
-const SHORT = 'public, max-age=600';
+const IMMUTABLE = CACHE_COMPLETED;
+// In-progress data is cached briefly on race weekends and for an hour between them.
+const SHORT = cacheControlForActive();
 
 type ErrorBody = { data: null; error: { code: string; message: string } };
 

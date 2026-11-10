@@ -61,8 +61,8 @@ apps/api/
 │   │   │                          #   Prediction; mapGpFeatures()/mapSprintFeatures(): both models as {value, contribution}
 │   │   ├── identity.ts            # personKey(), isSamePerson(), f1dbPersonKey(), constructorKey()/constructorTeamKeys(), f1dbConstructorId():
 │   │   │                          #   the only "same driver / same team" rules; golden cases in docs/identity-cases.json (shared with Python)
-│   │   ├── cache.ts               # CACHE_COMPLETED/ACTIVE/REFERENCE + cacheControlForStatus(), cacheControlForYear(), cacheIfData()
-│   │   ├── edge-cache.ts          # edgeCache() middleware: serves repeat GETs from the Workers Cache API (custom domain only); skips errors/non-public responses
+│   │   ├── cache.ts               # CACHE_COMPLETED/ACTIVE/QUIET/REFERENCE + isIngestWindow() (Fri–Mon noon UTC), cacheControlForActive/Status/Year(), cacheIfData()
+│   │   ├── edge-cache.ts          # edgeCache() middleware: serves repeat GETs from the Workers Cache API (custom domain only); skips errors/non-public responses; keeps copies 30 days past max-age and serves a lapsed one when the refresh 5xxs
 │   │   └── session.ts             # RACE_SESSION / QUALIFYING_SESSION: `?session=` param descriptors route.ts validates
 │   ├── config/database.ts         # createDb(): Drizzle over Neon HTTP driver
 │   ├── config/localNeonProxy.ts   # configureLocalNeonProxy(): points the Neon driver at a local proxy (tests, migrate, wrangler dev via NEON_FETCH_ENDPOINT)
@@ -185,7 +185,7 @@ apps/api/
 │   │   │   ├── predictions/       # accuracy, prediction-history, intel-standings helpers
 │   │   │   ├── race-events/       # openf1.mappers (race control, overtakes, team radio)
 │   │   │   └── quality/quality.test.ts # castSeverity()
-│   │   └── common/                # mappers, standings, feature-manifest, cache, identity (golden cases from docs/identity-cases.json)
+│   │   └── common/                # mappers, standings, feature-manifest, cache, edge-cache (stale-if-error), identity (golden cases from docs/identity-cases.json)
 │   ├── integration/                # bun test: real Hono `app.request()` against a LOCAL Postgres (docker-compose.test.yml behind
 │   │   │                           #   a Neon HTTP proxy; `bun run test:db:up`, config in .env.test): never Neon
 │   │   ├── races/races.test.ts     # list/filter/detail/circuit-history joins
