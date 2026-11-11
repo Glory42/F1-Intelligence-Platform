@@ -3,18 +3,22 @@ name: build
 description: Build and verify the web and API. Use when the user says "build", "check build", "verify", or after making code changes to confirm nothing is broken.
 ---
 
-# Build Skill: F1 Prediction
+# Build Skill: F1 Intelligence Platform
 
-Verify the web frontend and API compile correctly after changes.
+Verify the web frontend and API compile, lint and test cleanly after changes. These are the same checks CI runs
+(`.github/workflows/test.yml`); the pre-commit hook (`lint-staged.config.mjs`) runs typecheck + lint per app.
 
 ## Web (Astro: `apps/web/`)
 
 ```bash
 cd /home/glory42/Projects/side-projects/F1-prediction/apps/web
-bun run build
+bun run build        # astro build
+bun run typecheck    # astro check
+bun run lint         # eslint, includes the max-lines budgets
+bun run test         # vitest
 ```
 
-**Success output:**
+**Build success output:**
 ```
 [build] Server built in X.XXs
 [build] Complete!
@@ -22,16 +26,32 @@ bun run build
 
 ## API (Hono: `apps/api/`)
 
-TypeScript type-check only (no build step needed for Workers):
+No build step for Workers: type-check, lint and test:
 
 ```bash
 cd /home/glory42/Projects/side-projects/F1-prediction/apps/api
-bun run typecheck
+bun run typecheck         # tsc --noEmit, expected to pass with zero errors
+bun run lint              # eslint, includes the max-lines budgets
+bun run test:unit         # no DB needed
+bun run test:db:up        # local Postgres (docker-compose.test.yml), never Neon
+bun run test:integration
 ```
 
-Expected pre-existing errors (ignore these):
-- `drizzle.config.ts`: `process` not found (node types missing, not our code)
-- `src/db/seed.ts`: same
+## E2E (`apps/e2e/`)
+
+```bash
+cd /home/glory42/Projects/side-projects/F1-prediction/apps/e2e
+bun run typecheck    # fixtures are typed against the API response types
+bun run test         # Playwright smoke tests (or `bun run test:e2e` from the repo root)
+```
+
+## Data Engine (`data-engine/`)
+
+```bash
+cd /home/glory42/Projects/side-projects/F1-prediction/data-engine
+source venv/bin/activate
+pytest
+```
 
 ## Local Dev
 
@@ -46,17 +66,21 @@ cd apps/web && bun run dev
 cd apps/api && bun run dev
 ```
 
+Local dev reads the `docker-compose.dev.yml` DB (filled by `data-engine/scripts/dev_snapshot.py`), never Neon.
+
 ## Rules
 
 - **Never run `bun run deploy` or `wrangler deploy`**: user pushes to GitHub, Cloudflare deploys automatically
-- Always build the web after frontend changes to catch TypeScript errors before committing
-- API type errors in `drizzle.config.ts` and `seed.ts` are pre-existing: only fail on NEW errors in `src/modules/` or `src/common/`
+- Always build the web after frontend changes to catch errors before committing
+- Any new type or lint error is a failure: there is no known-error baseline
+- A `max-lines` failure means extract (into `features/*/components`, `*.helpers.ts` or `common/`), not raise the limit
 
 ## DB Schema Changes
 
-If schema changed, push to Neon before building:
+The DB is migrate-tracked: generate a migration and apply it, never `db:push`:
 
 ```bash
 cd apps/api
-DATABASE_URL=$(cat .env | grep DATABASE_URL | cut -d'=' -f2-) bunx drizzle-kit push
+bun run db:generate   # SQL from schema changes -> apps/api/drizzle/migrations/
+bun run db:migrate    # applies to whatever DATABASE_URL points at
 ```

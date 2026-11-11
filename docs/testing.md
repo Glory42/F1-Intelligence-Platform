@@ -59,6 +59,9 @@ pytest, config in `pyproject.toml` (`pythonpath = ["."]`, `testpaths = ["tests"]
   `missing`, compound normalisation from either source; the coverage query through the
   fake DB), and the FastF1 adapter (`test_fastf1_session.py`: stint,
   pit-stop and race-control rows over plain records, telemetry input reshaping).
+- **The live ingest adapter runs against recorded responses**: `test_openf1_session.py` feeds
+  `openf1_session` (OpenF1 + Jolpica → ingest rows) the Bahrain 2026 responses in `tests/fixtures/openf1/`
+  and `tests/fixtures/jolpica/`, checked against the official results and what FastF1 ingested.
 - **DB-touching functions are tested through a fake double**: `tests/support/fake_db.py` provides
   `FakeCursor` / `FakeConnection`, shaped like psycopg2's `RealDictCursor`. `FakeConnection` takes a
   list of result sets and hands one out per `with conn.cursor()` block, in call order. This covers
@@ -133,9 +136,10 @@ suite never touches Neon.
 - **Covered**: `races` (incl. practice long runs, circuit outline + circuit telemetry), `race-events`, `race-story`,
   `strategy`, `telemetry`, `drivers` (incl. career, racecraft, teammate battle), `teams` (incl. pit
   stops), `seasons`, `search`, `predictions` (incl. title odds), `sprint`, `history`,
-  the home hub's on-this-day query, the `edgeCache` middleware (`common/edge-cache.ts`), and the route
+  the home hub's on-this-day query, `/api/health` (never wakes the DB) and `/api/health/db`, the `edgeCache`
+  middleware (`common/edge-cache.ts`, against `tests/support/cache/fake-edge-cache.ts`), the per-kind GP/sprint reads (`session-kind/`), and the route
   factories (`route/route.test.ts`: 400/404 answers and Cache-Control derived from the data's race
-  status or season, never from `?year=`). Not yet: `quality`.
+  status or season, never from `?year=`). Not yet: `quality` (dev-only).
 
 ## Web unit (`apps/web/tests/unit/`)
 
@@ -206,6 +210,10 @@ Four jobs, on every push to `master` and every PR:
 
 The `api` job runs the integration suite against the same `docker-compose.test.yml` stack: CI never
 spends Neon CU-hours, and no `TEST_DATABASE_URL` secret is needed any more.
+
+Locally, a husky `pre-commit` hook runs `lint-staged` (`lint-staged.config.mjs`): staged files under
+`apps/api/` or `apps/web/` trigger that app's `bun run typecheck` and `bun run lint` (including the
+`max-lines` budget). Tests are not part of the hook.
 
 ## Adding a test
 

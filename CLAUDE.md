@@ -314,6 +314,8 @@ All queries use Drizzle joins. Never fetch a list then loop-query for each item.
 | `/teams/[id]` | BaseLayout | `GET /api/teams/:id` (+ pit crew, history tabs) |
 | `/compare/drivers` · `/compare/teams` | BaseLayout | season lists in frontmatter; the compare island fetches the pair client-side (§3 exception) |
 | `/history` | BaseLayout | `GET /api/history/records`; `?tab=milestones`/`on-this-day` (`&date=MM-DD`)/`lineage` each fetch their own route |
+| `/docs` · `/docs/[slug]` | BaseLayout | prerendered from the repo's `docs/*.md` (Astro content collection, ADRs and plans excluded): no API |
+| `/health-quality` | BaseLayout | dev-only: `GET /api/quality`; 404s in production |
 
 ### Navigation and page tabs
 - Collapsible sidebar (`components/layout/Sidebar.astro`) with two groups: Season (home, calendar, drivers,
@@ -412,8 +414,7 @@ Use structured logging: `{"job": "ingest_race", "round": 14, "status": "failed",
 ```bash
 cd apps/api
 bun run db:generate   # generate SQL from schema changes -> apps/api/drizzle/migrations/
-bun run db:push       # apply to Neon (dev)
-bun run db:migrate    # apply via migration files (prod)
+bun run db:migrate    # apply via migration files (Neon is migrate-tracked: never db:push it)
 ```
 
 ### Schema conventions
@@ -542,3 +543,5 @@ Applying the DB schema is covered under [Drizzle ORM](#drizzle-orm-appsapidrizzl
 - Only comment WHY when it's non-obvious (a hidden constraint, a workaround)
 - Comments must be at most 2 lines. Only go longer if it's genuinely unavoidable: that should be rare
 - No console.log in production code: use structured logging patterns
+- ESLint `max-lines` budgets (CI + pre-commit): web pages 300 / components 250 / lib 200; API controller 80 /
+  module 50 / service+helpers 200 / common 150. Over budget: extract, never raise the limit

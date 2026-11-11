@@ -42,7 +42,7 @@ _Avoid_: Treating DSQ/DNS as excluded from "DNF", in this codebase they are not 
 A continuous run of laps on a single tyre Compound between pit stops. Long Run Pace (the Friday pace table) and Short Run Pace (Sprint model) are both derived from stint-level lap data: "long" vs "short" describes the session the stint came from (FP2/FP1 practice vs. Sprint Qualifying), not the stint's length.
 
 **Race Event**:
-A timestamped, race-scoped happening sourced from OpenF1's event endpoints: race-control messages (flags/SC/VSC), Overtakes, and Team Radio clips. Matches the `apps/api/src/modules/race-events/` module name; all three are ingested only once a Race is `completed` and past OpenF1's live-data window (2023+ only: OpenF1 has no earlier coverage).
+A timestamped, race-scoped happening: race-control messages (flags/SC/VSC), Overtakes, and Team Radio clips, each tagged with a `session_type` (`race`/`sprint`). Matches the `apps/api/src/modules/race-events/` module name. Live ingest reads OpenF1's event endpoints only once a Race is `completed` and past OpenF1's live-data window, so Overtakes and Team Radio are 2023+ only; race-control messages for 2018–2022 come from a local FastF1 backfill.
 _Avoid_: Confusing with Classification or Race Status, a Race Event is an incident/moment within a session, not a pipeline state or finishing result.
 
 **Recap**:

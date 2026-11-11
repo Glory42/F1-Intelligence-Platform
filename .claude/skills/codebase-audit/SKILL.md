@@ -1,11 +1,11 @@
 ---
 name: codebase-audit
-description: Full health audit of the F1 Prediction codebase, critical-constraint violations (TCP drivers in apps/api/, inline schema, client-side data fetching), ETL idempotency gaps, schema/migration drift, missing "any" types, and stale race-status flow handling. Use when the user says "audit the codebase", "health check", "/codebase-audit", or before a season backfill or after a long feature sprint.
+description: Full health audit of the F1 Intelligence Platform codebase, critical-constraint violations (TCP drivers in apps/api/, inline schema, client-side data fetching), ETL idempotency gaps, schema/migration drift, missing "any" types, and stale race-status flow handling. Use when the user says "audit the codebase", "health check", "/codebase-audit", or before a season backfill or after a long feature sprint.
 ---
 
-# Codebase Audit: F1 Prediction
+# Codebase Audit: F1 Intelligence Platform
 
-A structured health check across `apps/api/`, `apps/web/`, `data-engine/`, and `db/`. Run before a big backfill, before a release, or when the codebase feels like it's accumulated debt. Reports issues grouped by severity; does not auto-fix anything unless the user asks.
+A structured health check across `apps/api/` (including its Drizzle schema and migrations), `apps/web/`, and `data-engine/`. Run before a big backfill, before a release, or when the codebase feels like it's accumulated debt. Reports issues grouped by severity; does not auto-fix anything unless the user asks.
 
 ## Scope
 
@@ -26,9 +26,10 @@ These are hard rules: treat any hit as Critical, not Warning:
   grep -rn "from 'pg'\|from \"pg\"\|require('pg')\|from 'postgres'" apps/api/src
   ```
 - **Inline schema definitions**: grep route/controller/service files in `apps/api/src/modules/` for `pgTable(`, schema must live only in `apps/api/src/db/schema/`.
-- **Client-side data fetching**: grep `apps/web/src` for `client:load`, `client:idle`, `client:visible` directives combined with a `.tsx` island that calls `fetch(`. CLAUDE.md mandates all data fetching happens in Astro frontmatter, never in `client:*` islands.
-- **API write endpoints**: grep `apps/api/src/modules/*/controller.ts` (or `*.controller.ts`) for `app.post(`, `app.put(`, `app.delete(`, `app.patch(`. The API is documented as read-only: Python writes directly to Neon. Any write route is a constraint violation unless the user has explicitly changed this rule.
-- **Non-idempotent ETL writes**: grep `data-engine/src/jobs/*.py` for raw `INSERT INTO` strings that don't go through `upsert()` (`data-engine/src/utils/upsert.py`) and don't contain `ON CONFLICT`. Every job must be safe to re-run.
+- **Client-side data fetching**: grep `apps/web/src` for `client:load`, `client:idle`, `client:visible` directives combined with a `.tsx` island that fetches (calls `api.*` from `src/lib/api.ts` or `fetch(`). CLAUDE.md mandates all data fetching happens in Astro frontmatter, never in `client:*` islands. The only sanctioned exceptions are `GlobalSearch.tsx`, `DriverCompareTool.tsx` and `TeamCompareTool.tsx` (CLAUDE.md §3); `CircuitsGrid` is an island but doesn't fetch. Any other fetching island is Critical.
+- **API write endpoints**: grep `apps/api/src/modules/` (`*.module.ts`, plus the single-file `seasons.ts`/`search.ts`/`quality.ts`) and `apps/api/src/main.ts` for `.post(`, `.put(`, `.delete(`, `.patch(`. The API is documented as read-only: Python writes directly to Neon. Any write route is a constraint violation unless the user has explicitly changed this rule.
+- **Non-idempotent ETL writes**: grep `data-engine/src/jobs/*.py`, `data-engine/src/utils/` and `data-engine/scripts/` for raw `INSERT INTO` strings that don't go through `upsert()` (`data-engine/src/utils/upsert.py`) and don't contain `ON CONFLICT`. Every job must be safe to re-run.
+- **Free-tier rules (CLAUDE.md §6)**: flag any use of Workers KV (ADR 0012, superseded: Free's write cap). Flag a DB connection held open across an OpenF1/Jolpica/FastF1 HTTP call, any new polling loop outside `auto_runner.py`'s worker cycle, and new row-per-lap tables (whole-race data goes in one row per race/session/driver).
 
 ### 2. Schema / migration drift
 Cross-check `apps/api/src/db/schema/*.ts` table definitions against `apps/api/drizzle/migrations/*.sql`. For each column defined in a schema file, confirm a corresponding `ADD COLUMN` or `CREATE TABLE` exists in some migration. A column present in schema but absent from any migration means `drizzle-kit generate` was skipped after a schema edit.
@@ -39,7 +40,7 @@ cat apps/api/drizzle/migrations/meta/_journal.json
 Also flag any `.sql` file in `apps/api/drizzle/migrations/` whose tag doesn't appear in `meta/_journal.json`: an untracked migration that won't run.
 
 ### 3. Race status flow consistency
-CLAUDE.md documents two status flows (conventional: `scheduled → qualifying_done → completed`; sprint: `scheduled → sprint_qualifying_done → sprint_done → qualifying_done → completed`). Grep `apps/api/src` and `data-engine/src/jobs` for string literals matching race statuses (`'scheduled'`, `'qualifying_done'`, `'sprint_done'`, etc.) and confirm no code branches on a status string not in either documented flow: a typo'd status silently breaks the ETL cron chain or an API filter.
+CLAUDE.md documents two status flows (conventional: `scheduled → qualifying_done → completed`; sprint: `scheduled → sprint_qualifying_done → sprint_done → qualifying_done → completed`). `data-engine/src/weekend_pipeline.py` is the only place that maps a Race Status to the jobs due next: flag any job, script or worker code that branches on a status to decide what runs instead of asking it. Grep `apps/api/src` and `data-engine/src` for string literals matching race statuses (`'scheduled'`, `'qualifying_done'`, `'sprint_done'`, etc.) and confirm no code uses a status string not in either documented flow: a typo'd status silently stalls the worker's weekend chain or an API filter.
 ```bash
 grep -rn "'scheduled'\|'qualifying_done'\|'sprint_qualifying_done'\|'sprint_done'\|'completed'" apps/api/src data-engine/src --include="*.ts" --include="*.py"
 ```
@@ -48,20 +49,20 @@ grep -rn "'scheduled'\|'qualifying_done'\|'sprint_qualifying_done'\|'sprint_done
 ```bash
 grep -rn ": any\b\|<any>\|as any" apps/api/src apps/web/src --include="*.ts" --include="*.tsx"
 ```
-Group by file. Known existing spots as of this audit's baseline: `apps/api/src/main.ts` (env passthrough), `apps/api/src/common/mappers.ts` (globalThis process access), `apps/api/src/modules/races/races.service.ts` (era/dominance aggregation types). Flag any *new* `any` beyond a previously-reported baseline as the priority; long-standing ones can be listed as existing debt.
+Group by file. The baseline is zero `any` in `apps/api/src` and `apps/web/src`, so every hit is new. Types belong in the app's `types/` folder (API: `apps/api/src/common/types/`, one file per domain behind `index.ts`; web: `apps/web/src/types/` re-exports them type-only).
 
-### 5. Oversized files (informational: no hard limit documented)
-CLAUDE.md doesn't set a line-count ceiling for this repo, so don't treat this as a rule violation: just flag outliers for the user to judge:
+### 5. File-size budgets
+`apps/web` and `apps/api` enforce ESLint `max-lines` (blank lines and comments don't count) in CI and pre-commit: web pages/layouts 300, components 250, other `.ts`/`.tsx` 200; API controllers 80, modules 50, services/helpers 200, `common/` 150 (`eslint.config.js` in each app). Run `bun run lint` in both apps: any failure is a Warning, and the fix is to extract (`features/*/components`, `*.helpers.ts`, `common/`), never to raise the limit. `data-engine/` has no budget: just flag outliers there for the user to judge:
 ```bash
-find apps/api/src apps/web/src data-engine/src -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.astro" -o -name "*.py" \) | xargs wc -l | sort -rn | head -15
+find data-engine/src -type f -name "*.py" | xargs wc -l | sort -rn | head -10
 ```
-Note which layer each large file is in (service vs. page vs. ETL job): a large `.astro` page with a lot of markup is normal; a large `.service.ts` doing several unrelated things is worth a mention.
 
 ### 6. Structured logging in ETL jobs
-CLAUDE.md requires ETL failures use structured logging (`{"job": ..., "status": "failed", "error": ...}`) and jobs exit with code 1 on failure. Check each `data-engine/src/jobs/*.py` file:
-- Does it wrap its body in `try/except` and call `sys.exit(1)` (or raise, letting `main.py` exit non-zero) on failure?
-- Does the failure path log a structured dict, or a bare `print(f"error: {e}")`? Flag bare prints in the failure path: success-path `print(f"[job_name] ...")` progress logs (as seen in `compute_features.py`) are fine and match existing convention.
-- Grep for `sleep(` / `time.sleep(`: CLAUDE.md explicitly forbids this inside jobs due to Render's job timeout.
+CLAUDE.md requires ETL failures use structured logging (`{"job": ..., "status": "failed", "error": ...}`) and jobs exit with code 1 on failure. Jobs raise and `src/main.py` logs the failure through `log_job_failure` (`src/utils/logging_utils.py`) and exits 1. Check each `data-engine/src/jobs/*.py` file:
+- Does it raise on failure, rather than swallowing the exception or calling `sys.exit` itself?
+- A source that hasn't published the session yet must raise `SessionNotReady` (`src/utils/session_records.py`): the worker retries only that, a spent OpenF1 budget and network errors.
+- Does any failure path use a bare `print(f"error: {e}")` instead? Success-path `print(f"[job_name] ...")` progress logs (as seen in `compute_features.py`) are fine and match existing convention.
+- Grep for `sleep(` / `time.sleep(`: CLAUDE.md forbids waiting for data inside jobs (retry on the next worker cycle instead); the only sanctioned waits are `openf1_client`'s request pacing/backoff (ADR 0004).
 ```bash
 grep -rn "time.sleep\|sleep(" data-engine/src/jobs
 ```
@@ -75,8 +76,10 @@ grep -rn "TODO\|FIXME\|HACK\|XXX" apps/api/src apps/web/src data-engine/src --in
 ```
 Group by area. Distinguish `TODO` (intentional deferral) from `FIXME`/`HACK` (known broken/workaround, needs resolution).
 
-### 9. Softmax temperature / weight integrity
-`compute_features.py` and `compute_sprint_features.py` hardcode `WEIGHTS` dicts that must each sum to 1.00, and both call `softmax(..., temperature=0.3)`. Read both `WEIGHTS` dicts and sum the values: flag if either doesn't sum to 1.00 (within floating point tolerance) or if `T` was changed from `0.3` anywhere (CLAUDE.md: "Do not increase T").
+### 9. Model weight integrity
+- **GP (weighted-v4)**: weights are fitted, not hand-set. They live only in `data-engine/src/models/gp_v4.json` (written by `scripts/fit_model_v4.py`), the probability is a plain softmax (T = 1), and `utils/gp_model_v4.py` is the only path to a GP Prediction. Flag hand-edited weights, a reintroduced temperature, a second prediction path, or a feature in `utils/gp_features_v4.py` that reads the race being predicted or later ones.
+- **Sprint (sprint-v2)**: `SPRINT_FEATURES` in `data-engine/src/utils/feature_manifest.py` must sum to 1.00 and `SPRINT_SOFTMAX_TEMPERATURE` must stay `0.3`.
+- Both must match `docs/feature-weights.json` and the API's `apps/api/src/common/feature-manifest.ts`: run `pytest tests/test_weights.py` in `data-engine/` and `bun test tests/unit/common/feature-manifest.test.ts` in `apps/api/`.
 
 ---
 
@@ -84,11 +87,11 @@ Group by area. Distinguish `TODO` (intentional deferral) from `FIXME`/`HACK` (kn
 
 Group findings by severity:
 
-**Critical**: violates a documented "Critical Constraint" (TCP driver, inline schema, client-side fetch, write endpoint, non-idempotent job), broken status-flow handling, or a `WEIGHTS`/temperature integrity break
+**Critical**: violates a documented "Critical Constraint" (TCP driver, inline schema, client-side fetch, write endpoint, non-idempotent job), broken status-flow handling, or a model weight/temperature integrity break
 
-**Warning**: schema/migration drift, new `any` types, missing structured logging on a failure path, `sleep()` in a job
+**Warning**: schema/migration drift, new `any` types, `max-lines` lint failures, missing structured logging on a failure path, `sleep()` in a job
 
-**Info**: oversized files, unresolved TODOs, existing/known `any` debt
+**Info**: oversized `data-engine/` files, unresolved TODOs
 
 For each finding: file path (with line number where applicable), one-sentence description of the issue, and the fix action needed.
 

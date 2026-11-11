@@ -1,11 +1,11 @@
-# F1 Prediction: Code Map
+# F1 Intelligence Platform: Code Map
 
 Complete directory structure and file reference for the codebase.
 
 ## Project Structure
 
 ```
-F1-prediction/
+f1-intelligence/
 ├── CLAUDE.md              # Agent guidelines, constraints, and project conventions
 ├── CODEMAP.md             # This file: codebase structure reference
 ├── CONTRIBUTING.md        # Contribution guidelines
@@ -14,19 +14,19 @@ F1-prediction/
 ├── CONTEXT.md             # Domain glossary: ubiquitous language for the project
 ├── README.md              # Project overview and getting started
 ├── LICENSE                # GPL-3.0
-├── package.json           # Root orchestration: dev/build/install:all via plain `cd` scripts (no workspaces), husky
+├── package.json           # Root orchestration (name `f1-intelligence`): dev/build/install:all/test:e2e via plain `cd` scripts (no workspaces), husky
 ├── lint-staged.config.mjs # Pre-commit: typecheck + lint apps/api and apps/web on staged changes
 ├── .husky/pre-commit      # Runs lint-staged
 ├── docker-compose.test.yml# Local Postgres 16 + Neon HTTP proxy (:4445) for apps/api integration tests
-├── docker-compose.dev.yml # Local Postgres 17 (:5435) + Neon HTTP proxy (:4446) for day-to-day dev, filled by scripts/dev_snapshot.py
-├── .github/workflows/test.yml # CI: pytest, api (test:db:up + test/typecheck/lint), web, e2e Playwright
+├── docker-compose.dev.yml # Local Postgres 17 (:5435) + Neon HTTP proxy (:4446) for day-to-day dev, filled by data-engine/scripts/dev_snapshot.py
+├── .github/workflows/test.yml # CI: pytest (Python 3.11), api (test:db:up + test/typecheck/lint), web (build/test/typecheck/lint), e2e (typecheck + Playwright)
 ├── .github/workflows/f1db-import.yml # Weekly (Wed 06:00 UTC) + manual F1DB import; skips without a DATABASE_URL secret
 ├── .github/ISSUE_TEMPLATE/ # Issue forms: bug report, data issue, feature request; config.yml disables blank issues
 ├── .github/pull_request_template.md # PR summary, areas touched, CI + critical-constraint checklist
 ├── preview/               # README screenshots
 ├── docs/                  # Project documentation (see Docs section below)
-│   ├── adr/               # Numbered architectural decision records, 0000–0010
-│   └── plans/             # intelligence-platform-roadmap.md: roadmap + free-tier budget rules
+│   ├── adr/               # Numbered architectural decision records, 0000–0012
+│   └── plans/             # intelligence-platform-roadmap.md (roadmap + free-tier budget rules), architecture-deepening.md
 ├── apps/                  # JS/Bun-only convention: orchestrated by root package.json, no workspaces
 │   ├── api/               # Hono REST API: Cloudflare Workers; also owns Drizzle schema + migrations
 │   ├── web/               # Astro SSR frontend: Cloudflare Pages
@@ -51,7 +51,7 @@ apps/api/
 │   │   │                          #   strategy, race-story, telemetry, predictions, sprint, history, quality) + index.ts barrel
 │   │   ├── constants.ts           # SPRINT_FORMATS: single source of truth shared by all services
 │   │   ├── mappers.ts             # toDriver(), toTeam(), toRace(), toCircuit(), toRaceResult(), toQualifyingResult(), toSprintResult(): canonical row→DTO mappers used by all services
-│   │   ├── standings.ts           # resolveSeason(), buildStandings(), buildCareerStats(), sortByChampionshipStanding(): shared standings/career-stats pipeline for drivers, teams, predictions; drivers/teams pass a StatsAdapter
+│   │   ├── standings.ts           # resolveSeason(), buildStandings(), buildCareerStats(), championshipPoints(), sortByChampionshipStanding(): shared standings/career-stats pipeline for drivers, teams, predictions; drivers/teams pass a StatsAdapter
 │   │   ├── session-kind.ts        # GP / SPRINT descriptors: prediction, feature, lap and result tables, date column, upcoming/done
 │   │   │                          #   statuses typed against the race status enum, grid sheet, mapFeatures(); isDone()
 │   │   ├── session-reads.ts       # findPrediction(), findUpcomingPrediction(), findLapSummaries(): one read per kind, GP and sprint alike
@@ -108,7 +108,7 @@ apps/api/
 │       │   └── races.module.ts    # GET /, /:id, /:id/long-runs
 │       ├── circuits/              # Mounted at /api/races ahead of races' /:id (URLs predate the module)
 │       │   ├── circuits.service.ts        # Circuit list, circuit details (history, eras, stats, outline), circuit telemetry (pole lap)
-│       │   ├── circuit-era.helpers.ts     # Pure era bucketing: Era/EraMap/ERAS, aggregateEraWins(), buildDominanceByEra(), normalizeTeamKey()
+│       │   ├── circuit-era.helpers.ts     # Pure era bucketing: Era/EraMap/ERAS, aggregateEraWins(), buildDominanceByEra()
 │       │   ├── circuit-stats.helpers.ts   # Pure per-response stats: buildCircuitHistory(), computeQualifyingImpactStats/WeatherStats/SafetyCarStats(), pickFastestLap()
 │       │   ├── circuit-headshots.helpers.ts # backfillDriverHeadshots(): the one DB-reading enrichment (latest driver profiles into per-era win entries; no writes)
 │       │   ├── track-outline.helpers.ts   # buildOutlinePath(): pole-lap x/y telemetry → closed SVG path for the circuit outline
@@ -223,13 +223,15 @@ apps/api/
 │       └── factories/              # one insert helper per table, FK chain: season → team/circuit → driver → race → results
 │                                   #   (+ prediction/sprint features, sprint lap times, OpenF1 events, stints/pit stops, race story, telemetry, title odds, history)
 ├── eslint.config.js               # Flat config: tiered `max-lines` (controller 80 / module 50 / service+helpers 200 / common 150 / default 150; schema+seed+types.ts+tests off), run via `bun run lint`
-├── wrangler.toml                  # CF Workers config: keep_vars = true, custom domain f1-api.gorkemkaryol.dev
+├── wrangler.toml                  # CF Workers config (name `f1-prediction-platform-api`): keep_vars = true, custom domain f1-api.gorkemkaryol.dev
+│                                  #   plus workers_dev = true, ENVIRONMENT var
 ├── drizzle.config.ts              # schema: src/db/schema, out: drizzle/migrations
-├── tsconfig.json                  # CF Workers target: excludes Node-only files (drizzle.config, seed)
+├── tsconfig.json                  # CF Workers target over src/ + tests/: excludes the Node-only seed.ts (drizzle.config.ts isn't included)
 ├── tsconfig.node.json             # Node target for drizzle.config.ts + seed.ts (@types/node)
-├── .env.example                   # DATABASE_URL (+ R2 vars)
+├── .env.example                   # DATABASE_URL (local dev: docker-compose.dev.yml proxy + NEON_FETCH_ENDPOINT) + R2 vars
 ├── .env.test                      # Committed: TEST_DATABASE_URL + NEON_FETCH_ENDPOINT for the local docker proxy
-└── package.json                   # test / test:unit / test:integration / test:db:up|down / db:* scripts
+├── README.md                      # Short API readme: stack, local dev, env vars
+└── package.json                   # dev / deploy / typecheck / lint / test / test:unit / test:integration / test:db:up|down / db:* scripts
 ```
 
 ### Module Pattern
@@ -321,12 +323,12 @@ apps/web/
 │   │   │   ├── index.astro        # Docs index: card grid of all docs
 │   │   │   └── [slug].astro       # Individual doc page: all-docs sidebar, content, on-this-page rail
 │   │   ├── circuits/
-│   │   │   ├── index.astro        # Circuits directory: tabs All circuits · This season (filters/sorting)
+│   │   │   ├── index.astro        # Circuits directory: tabs This season · All circuits (filters/sorting)
 │   │   │   └── [key].astro        # Circuit detail: tabs Overview · Winners · Dominance · Telemetry; weather forecast
 │   │   ├── races/
 │   │   │   ├── index.astro        # Race calendar: sprint-aware cards
 │   │   │   └── [id]/
-│   │   │       ├── index.astro    # GP detail: results, qualifying, laps, strategy, incidents, overtakes, team radio, circuit;
+│   │   │       ├── index.astro    # GP detail: results, qualifying, long runs, laps, strategy, incidents, overtakes, team radio, circuit;
 │   │   │       │                  #   links to race story + telemetry once completed
 │   │   │       ├── sprint.astro   # Sprint detail: same tab set over the sprint session (SQ grid, sprint laps, conditions)
 │   │   │       ├── race-story.astro # Gap-to-leader + position charts, battles, session weather (`?session=sprint` for the sprint)
@@ -484,7 +486,7 @@ apps/web/
 │   │   │   │   ├── CircuitsGrid.tsx      # React component for circuits grid (filters/sorting)
 │   │   │   │   ├── CircuitOverview.astro # Overview tab: track card, key stats, model insights, forecast, safety car, weather split
 │   │   │   │   ├── CircuitTrackCard.astro # Track photo with pole-lap outline fallback (+ broken-image script)
-│   │   │   │   ├── WeatherForecast.tsx   # React weather forecast widget (Open-Meteo API)
+│   │   │   │   ├── WeatherForecast.tsx   # Weather forecast widget, server-rendered (no client directive) from the page's Open-Meteo fetch
 │   │   │   │   ├── CircuitTelemetryProfile.astro # Telemetry tab: pole-lap tiles, speed trace, corners by apex speed
 │   │   │   │   ├── CircuitWinningFacts.astro # Winners tab sidebar: fastest lap record + how races here are won
 │   │   │   │   ├── CircuitWinnersTable.astro   # Recent-winners list for the circuit
@@ -526,7 +528,7 @@ apps/web/
 │   │   ├── sidebarState.ts        # Sidebar collapse cookie: isSidebarCollapsed() + sidebarCookie()
 │   │   ├── legacyRedirects.ts     # legacyRedirect(path, search): retired URLs (prediction recap, /records, /drivers|teams/compare) → their new home
 │   │   ├── canonicalHost.ts       # canonicalHostRedirect(): the production *.pages.dev address → 301 to the custom domain (previews stay)
-│   │   ├── pageCache.ts           # servePageCached(): rendered HTML kept 5 min in the edge Cache API, keyed by URL + sidebar cookie (Workers Free: 10 ms CPU)
+│   │   ├── pageCache.ts           # servePageCached(): rendered HTML kept in the edge Cache API (5 min Fri–Mon noon UTC, 1 h between), keyed by URL + sidebar cookie (Workers Free: 10 ms CPU)
 │   │   ├── utils.ts               # cn() (clsx + tailwind-merge), unwrapSettled(), formatMs/Probability/Date/StopSeconds/AgeFromDays
 │   │   └── f1/                    # F1 reference data + maths used across features
 │   │       ├── teamColors.ts      # team_key → official hex color map (fallback #6B7280)
@@ -574,11 +576,9 @@ apps/web/
 │   │   ├── features/drivers/
 │   │   │   └── teammateTally.test.ts         # pure, `node` env
 │   │   ├── features/circuits/
-│   │   │   └── winnerFacts.test.ts           # pure, `node` env
+│   │   │   └── winnerFacts.test.ts / circuitView.test.ts  # pure, `node` env
 │   │   ├── features/teams/
 │   │   │   └── teamTabs.test.ts              # pure, `node` env: driverStopSummaries, mergeTeamHistory
-│   │   ├── features/races/
-│   │   │   └── raceEventDisplay.test.ts      # pure, `node` env: timeOf(), dotColor()
 │   │   └── features/search/                  # jsdom: hook + component tests, MSW-mocked API
 │   │       ├── useGlobalSearch.test.ts
 │   │       └── GlobalSearch.test.tsx
@@ -588,11 +588,13 @@ apps/web/
 │                                   #   routes.ts: apiOk/apiError/recordApiRequests for loader tests
 ├── vitest.config.ts                # jsdom is opt-in per file via `// @vitest-environment jsdom`; default env is `node`
 ├── eslint.config.js              # Flat config: tiered `max-lines` (pages 300 / components 250 / lib 200), run via `bun run lint`
-├── wrangler.toml                  # CF Pages config: keep_vars = true, PUBLIC_API_URL
-├── astro.config.mjs               # output: 'server', Cloudflare adapter
+├── wrangler.toml                  # CF Pages config (name `f1-intelligence-web`): PUBLIC_API_URL (the API's custom domain f1-api.gorkemkaryol.dev) + Pages build vars
+├── astro.config.mjs               # site f1.gorkemkaryol.dev, output: 'server', Cloudflare adapter, React + sitemap (minus /health-quality)
 ├── tailwind.config.mjs
 ├── postcss.config.cjs
 ├── .env.example                   # PUBLIC_API_URL
+├── icon.svg                       # SVG Repo icon source (not referenced by the app; the site uses public/favicon.svg)
+├── README.md                      # Short web readme: stack, local dev, env vars
 ├── tsconfig.json
 └── package.json
 ```
@@ -694,7 +696,7 @@ apps/e2e/
 ## Data Engine (`data-engine/`)
 
 Python 3.12 (pinned via `.python-version` + `PYTHON_VERSION` in `render.yaml`) batch jobs. Fetches F1 data via
-OpenF1/Jolpica (FastF1 only for the calendar and backfills), computes predictions, writes directly to Neon via psycopg2.
+OpenF1/Jolpica (ADR 0011; FastF1 only for the calendar, the pre-2018 legacy jobs and local 2018–2022 backfills), computes predictions, writes directly to Neon via psycopg2.
 
 ```
 data-engine/
@@ -717,24 +719,24 @@ data-engine/
 │   │                              # auto_detect_round(job, year): the round in a status weekend_pipeline says the job is due in
 │   ├── config.py                  # FastF1 cache setup, environment loading
 │   ├── db/
-│   │   ├── client.py              # get_conn(): psycopg2 RealDictCursor connection
+│   │   ├── client.py              # get_conn(): pooled psycopg2 RealDictCursor connection (close() returns it to the pool); close_pool()
 │   │   └── __init__.py
 │   ├── jobs/
 │   │   ├── sync_schedule.py            # Populate races table: includes sprint_date, event_format; renumber-safe (matches by event name)
 │   │   ├── sync_season.py              # Populate teams + drivers from a round's OpenF1 entry list
-│   │   ├── ingest_qualifying.py        # Q1/Q2/Q3 + sector times: 2018+; date guard rejects future rounds
+│   │   ├── ingest_qualifying.py        # Q1/Q2/Q3 + sector times via run_qualifying_ingest_job (OpenF1 + Jolpica, 2023+); date guard rejects future rounds
 │   │   ├── ingest_qualifying_legacy.py # Qualifying from Ergast: pre-2018
-│   │   ├── ingest_race.py              # Race results + lap times + conditions + race story (traces/battles/weather): 2018+
+│   │   ├── ingest_race.py              # Race results + lap times + conditions + race story (traces/battles/weather) via run_ingest_job (OpenF1 + Jolpica, 2023+)
 │   │   ├── ingest_race_story.py        # Race story alone (traces/battles/weather): worker retry when ingest_race skipped it under the storage tier
-│   │   ├── ingest_race_control.py      # OpenF1 race-control messages → race_control_messages; _to_rows() over run_openf1_job (ingest_runner.py)
-│   │   ├── ingest_overtakes.py         # OpenF1 overtakes → race_overtakes; _to_rows() resolves driver_number via the driver_map run_openf1_job passes in
-│   │   ├── ingest_team_radio.py        # OpenF1 team radio → team_radio_clips; same driver_number resolution, empty/partial results are normal
-│   │   ├── ingest_stints.py            # OpenF1 /stints → race_stints over run_openf1_job
-│   │   ├── ingest_pit_stops.py         # OpenF1 /pit → race_pit_stops over run_openf1_job (stationary time from 2024 US GP on)
+│   │   ├── ingest_race_control.py      # OpenF1 race-control messages → race_control_messages: one CONFIG (OpenF1JobConfig) over run_openf1_job (ingest_runner.py)
+│   │   ├── ingest_overtakes.py         # OpenF1 overtakes → race_overtakes: CONFIG pairs openf1_session.overtakes with session_records.overtake_rows
+│   │   ├── ingest_team_radio.py        # OpenF1 team radio → team_radio_clips: same CONFIG shape, empty/partial results are normal
+│   │   ├── ingest_stints.py            # OpenF1 /stints → race_stints: CONFIG over run_openf1_job
+│   │   ├── ingest_pit_stops.py         # OpenF1 /pit → race_pit_stops: CONFIG over run_openf1_job (stationary time from 2024 US GP on)
 │   │   ├── ingest_qualifying_telemetry.py # OpenF1 laps/car_data/location → qualifying_lap_telemetry (fastest Q/SQ lap per driver);
 │   │   │                              #   resumable across cycles under the OpenF1 request budget, storage-guarded; run() returns False while unfinished
 │   │   ├── ingest_race_legacy.py       # Race results from Ergast (no laps): pre-2018
-│   │   ├── ingest_sprint_qualifying.py # SQ session → sq1/sq2/sq3 + sector times + speed; messages=True; date guard
+│   │   ├── ingest_sprint_qualifying.py # SQ session → sq1/sq2/sq3 + sector times + speed via run_qualifying_ingest_job; date guard
 │   │   ├── ingest_fp2.py               # Practice long-run stint data → fp2_long_run_times (FP2 primary; FP1 fallback on sprint weekends)
 │   │   ├── ingest_sprint.py            # Sprint results + sprint_lap_times + sprint conditions
 │   │   ├── compute_season_stats.py     # Aggregate driver/team stats including sprint aggregates
@@ -757,7 +759,8 @@ data-engine/
 │       ├── math_utils.py          # normalize_minmax(), softmax(), bayesian_win_rate(), clamp(), weighted_sum()
 │       ├── upsert.py              # upsert(conn, table, rows, conflict_cols, exclude_update=[])
 │       ├── driver_registry.py     # register_session_drivers(): adds a session's missing drivers/teams; season_drivers(): one resolver by car number or code
-│       ├── session_records.py     # the adapter interface: Stint, PitStop, RaceControlMessage, Overtake, RadioClip, Car/PositionSample + one row mapper per table
+│       ├── session_records.py     # the adapter interface: Stint, PitStop, RaceControlMessage, Overtake, RadioClip, Car/PositionSample + one row mapper per table;
+│       │                          # SessionNotReady (source hasn't published the session yet: the worker retries only that)
 │       ├── f1db.py                # normalize_person_name() (join key with apps/api common/identity.ts f1dbPersonKey), career_milestones(), driver_row(),
 │       │                          # constructor_row(), constructor_seasons(): F1DB release → history_* rows
 │       ├── f1db_results.py        # match_f1db_driver(), race_row(), qualifying_row(): F1DB record → our rows
@@ -777,8 +780,7 @@ data-engine/
 │       ├── race_history.py        # RaceHistory + load_history(conn, since, until): the in-memory slice the v4 features read
 │       ├── identity.py            # person_key(), is_same_person(), constructor_key(): mirrors apps/api common/identity.ts
 │       ├── season_aggregates.py   # Driver/team season aggregates, optionally as of a race date (season stats + sprint features)
-│       ├── backtest.py            # race_metrics() (log loss, Brier, top-1/3), calibration_table(), GridWinRates baseline
-│       │                          #   for the sprint feature job; FeatureJobSpec is all a model supplies
+│       ├── backtest.py            # race_metrics() (log loss, Brier, top-1/3), summarize(), paired_difference(), calibration_table(), GridWinRates baseline
 │       ├── ingest_runner.py       # Three seams: run_ingest_job(...), shared headshot/results/lap-time/race-story/status logic for
 │       │                          # ingest_race + ingest_sprint; run_qualifying_ingest_job(...): shared logic for
 │       │                          # ingest_qualifying + ingest_sprint_qualifying (no weather/laps/headshots);
@@ -833,8 +835,8 @@ data-engine/
 │   ├── test_gp_model_v4.py         # gp_v4.json save/load, importance percentages, training set
 │   ├── test_identity.py            # person_key/is_same_person/constructor_key against docs/identity-cases.json
 │   ├── test_backtest.py            # race metrics, summarize, paired difference, calibration table, GridWinRates
-│   ├── test_main_cli.py            # CLI dispatch: --job wiring incl. ingest_race_story
-│   ├── test_feature_helpers_pure.py # car_rank, circuit_adj_start_pos
+│   ├── test_main_cli.py            # CLI dispatch over jobs/registry.py: session jobs, sprint auto-detect, race-scoped exit(1), every job a CLI choice + pipeline step
+│   ├── test_feature_helpers_pure.py # car_rank, circuit_adj_start_pos, blend_car_perf, compute_compressed_car_perf
 │   ├── test_feature_helpers_db.py  # same_person_rows (person, not code), compute_luck_score: via fake_db
 │   ├── test_circuit_perf.py        # compute_team_circuit_perf: category normalisation, min races, speed-trap blend
 │   ├── test_season_stats_db.py     # driver/team season aggregates incl. DNF rate, sprint points: via fake_db
@@ -850,11 +852,11 @@ data-engine/
 │   ├── test_neon_usage.py          # month-end projection, over budget on actual usage only
 │   ├── test_ingest_runner.py       # run_ingest_job + run_qualifying_ingest_job (fake_db + monkeypatched readers); run_openf1_job end to end with fake_openf1 (session lookup, key cache, guards)
 │   ├── test_ingest_fp2.py          # FP2 vs FP1 choice, long_run_rows() (runs split at pit visits, best median per compound)
-│   ├── test_ingest_race_control.py # _to_rows() pure-function shaping + run() config-wiring check
-│   ├── test_ingest_overtakes.py    # _to_rows() pure-function shaping incl. unknown-driver-number skipping + run() config-wiring check
-│   ├── test_ingest_team_radio.py   # _to_rows() pure-function shaping incl. unknown-driver-number skipping + run() config-wiring check
-│   ├── test_ingest_stints.py       # _to_rows() on recorded Monza 2024 stints + run() config wiring
-│   ├── test_ingest_pit_stops.py    # _to_rows() stationary ms (2025) vs none (pre-2024 US GP) + run() config wiring
+│   ├── test_ingest_race_control.py # raw OpenF1 rows through the job's CONFIG reader + row mapper: message shaping, missing optional fields
+│   ├── test_ingest_overtakes.py    # same CONFIG path: overtake shaping, unknown overtaking/overtaken driver numbers skipped
+│   ├── test_ingest_team_radio.py   # same CONFIG path: clip shaping, unknown driver numbers skipped
+│   ├── test_ingest_stints.py       # same CONFIG path on recorded Monza 2024 stints, unknown drivers skipped
+│   ├── test_ingest_pit_stops.py    # same CONFIG path: stationary ms (2025) vs none (pre-2024 US GP), unknown drivers skipped
 │   ├── test_ingest_qualifying_telemetry.py # fastest lap per driver, skip stored drivers, partial write on budget exhaustion
 │   ├── test_openf1_client.py       # find_weekend_session_key (meeting match, cancelled skipped), 404 = empty, pacing/budget/retries
 │   ├── test_race_story.py          # lap traces (gap to leader, interval, lapped cars, positions), battles, weather trace
@@ -876,12 +878,14 @@ data-engine/
 │   ├── test_f1db_backfill.py       # plan_season: stand-ins sharing a number, NAN codes, merges, wrong-driver deletes
 │   └── test_compute_sprint_features.py # sprint-v2 end to end (pinned scores, probabilities, winner, one transaction) + _short_run_pace
 ├── docker-compose.backtest.yml    # Local Postgres (:5434) holding the Neon snapshot scripts/backtest.py replays
-├── render.yaml                    # Render web service: `python -m src.server` (worker loop + dashboard), PYTHON_VERSION 3.12.8
+├── render.yaml                    # Render web service f1-data-engine: `python -m src.server` (worker loop + dashboard), PYTHON_VERSION 3.12.8,
+│                                  #   DATABASE_URL + Neon API env vars (NEON_API_KEY, NEON_PROJECT_ID)
 ├── .python-version                # 3.12.8
 ├── requirements.txt               # Python dependencies
 ├── requirements-dev.txt           # requirements.txt + pytest
 ├── pyproject.toml                 # pytest config (pythonpath, testpaths)
-└── .env.example                   # DATABASE_URL template
+├── README.md                      # Data-engine readme
+└── .env.example                   # DATABASE_URL (local dev DB, :5435) + PROD_DATABASE_URL, dashboard login, optional Neon API keys
 ```
 
 ### Jobs
@@ -890,9 +894,9 @@ data-engine/
 |-----|-------|---------|
 | `sync_schedule` | `--year` | Populates `races` table with sprint dates and event_format |
 | `sync_season` | `--year [--round]` | Populates `teams` and `drivers` from one round's OpenF1 entry list; ingests register later arrivals themselves |
-| `ingest_qualifying` | `--year --round` | Q1/Q2/Q3 times, sector times, grid positions: 2018+ |
+| `ingest_qualifying` | `--year --round` | Q1/Q2/Q3 times, sector times, grid positions from OpenF1 + Jolpica (2023+; stored 2018–2022 rows came from FastF1) |
 | `ingest_qualifying_legacy` | `--year --round` | Grid positions and Q times via Ergast: pre-2018; run via `scripts/run_backfill.py` (not a `main.py` job) |
-| `ingest_race` | `--year --round` | Race results + per-lap timing + conditions + race story (traces, battles, weather): 2018+ |
+| `ingest_race` | `--year --round` | Race results + per-lap timing + conditions + race story (traces, battles, weather) from OpenF1 + Jolpica (2023+; stored 2018–2022 rows came from FastF1) |
 | `ingest_race_legacy` | `--year --round` | Race results only via Ergast: pre-2018; run via `scripts/run_backfill.py` (not a `main.py` job) |
 | `ingest_sprint_qualifying` | `--year --round` | SQ session → sprint_results (sq1/sq2/sq3 + sector times + speed); date guard rejects future rounds |
 | `ingest_fp2` | `--year --round` | Practice long-run stints → `fp2_long_run_times` (FP2 primary, FP1 fallback on sprint weekends); shown on the race page's Long Runs tab |
@@ -929,7 +933,7 @@ data-engine/
 | `ingest_runner.py` | Three seams, matched to three different session shapes (see the module docstring for why they're not one). `run_ingest_job(year, round, IngestJobConfig)`: full race/sprint session (weather, SC/VSC, results, lap times, headshots, race story when storage allows); `IngestJobConfig.mark_status` writes the job's own `races` row, an optional `cross_table_hook` runs after it for effects on other tables (e.g. `ingest_race`'s `circuits.sc_probability` recompute). `run_qualifying_ingest_job(year, round, QualifyingJobConfig)`: qualifying-only session (just quali times, no weather/laps/headshots); `QualifyingJobConfig.rows_from_quali` is the per-job typed `session → rows` function used by `ingest_qualifying`/`ingest_sprint_qualifying`. `run_openf1_job(year, round, OpenF1JobConfig, session_name=...)`: the shared resolve-race/completed-guard/live-window-guard/storage-guard/upsert/commit shape behind the five OpenF1-sourced jobs; each job is an `OpenF1JobConfig`: the session `part` it reads, the `openf1_session` reader that turns it into `session_records`, and the `session_records` row mapper (`(rows, skipped)`, drivers resolved by `season_drivers`); the session is found once per weekend and its key cached on `races.openf1_{race,sprint}_session_key` (the race/sprint ingest caches it too) |
 | `openf1_client.py` | Paced, budgeted HTTP only: `find_weekend_session_key(year, race_date, names)`, `fetch_session_data(endpoint, key)`, `fetch_lap_samples(endpoint, key, number, start, end)` over one `_get()`; a per-cycle request budget raises `OpenF1BudgetExceeded` (ADR 0004). Only `openf1_session` calls it |
 | `race_story.py` | `build_lap_traces()` (gap to leader, interval, position, laps down), `find_battles()` (3+ laps within 1.0 s), `weather_trace()` |
-| `telemetry.py` | `fastest_laps()`, `build_lap_telemetry()`: resample a lap onto a 10 m grid for `qualifying_lap_telemetry` (ADR 0008); `telemetry_samples()` shapes the JSONB `samples` for both the OpenF1 job and the FastF1 backfill |
+| `telemetry.py` | `build_lap_telemetry()`: resample a lap (picked by `openf1_session.fastest_laps()` or the FastF1 adapter) onto a 10 m grid for `qualifying_lap_telemetry` (ADR 0008); `telemetry_samples()` shapes the JSONB `samples` for both the OpenF1 job and the FastF1 backfill |
 | `fastf1_session.py` | The FastF1 adapter for 2018–2022 and the legacy jobs: `stints()`, `pit_stops()` (pit-lane time only, visits over 120 s dropped as red-flag waits), `race_control_messages()`, `telemetry_inputs()` return the same `session_records` as `openf1_session`; plus `get_session()`, `ms_to_int()`, `lap_records()`, `session_weather_trace()` |
 | `title_odds.py` | `simulate_title_odds()`: Plackett-Luce finishing orders sampled from win probabilities, season totals summarised into title probability + P10/P90 points (ADR 0007) |
 | `storage_guard.py` | `read_storage_tier(conn)` → `StorageTier` (`allows_optional`, `allows_backfill`) against Neon Free's 1 GB: gates race story, OpenF1 enrichment, telemetry, F1DB import and backfills |
@@ -951,8 +955,10 @@ data-engine/
 | `frontend.md` | Astro SSR app: stack, server-only data-fetch rule + 3 exceptions, `components/` vs `features/`, routes, styling, file-size budget |
 | `deployment.md` | Env vars for all three platforms, CORS config, first-time setup, local dev |
 | `testing.md` | The five suites (pytest, api unit/integration, web vitest, e2e Playwright): what each covers, how to run, CI jobs |
+| `identity-cases.json` | Golden "same driver / same team" cases read by the API's `identity.test.ts` and pytest's `test_identity.py` / `test_f1db.py` |
 | `feature-weights.json` | Canonical GP importances + labels, sprint weights + labels and `sprint_softmax_temperature`: checked by `test_weights.py` (GP importances against `gp_v4.json`) and the API's `feature-manifest.test.ts` (labels, importances, sprint weights, temperature) |
 | `plans/intelligence-platform-roadmap.md` | Intelligence-platform roadmap + free-tier budget rules (Neon, Render, OpenF1) |
+| `plans/architecture-deepening.md` | Plan from the 2026-10-13 architecture review: nine deepening candidates + bugs, in three tracks (data engine, API, web) |
 | `adr/0000`–`0012` | Legacy decisions; apps/ layout; DNF incl. DSQ/DNS; local-Postgres integration tests; OpenF1 pacing/budget; edge-cached responses; race events `session_type`; Plackett-Luce title odds; telemetry as resampled JSONB; drivers unique per person + pre-2018 results from F1DB; GP model as a fitted conditional logit; live ingest from OpenF1 + Jolpica; versioned KV read cache (superseded: KV Free's write cap) |
 
 ---

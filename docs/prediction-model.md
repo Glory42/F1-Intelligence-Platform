@@ -65,7 +65,7 @@ Some inputs never change and are seeded once into the database or hardcoded in P
 | Value | Where stored | Changes? |
 |-------|-------------|---------|
 | Circuit overtake rate | `circuits.overtake_rate` | Never: seeded once per track |
-| Circuit SC probability | `circuits.sc_probability` | Never: seeded once per track |
+| Circuit SC probability | `circuits.sc_probability` | After every race ingest: share of the circuit's completed races with safety-car laps (`ingest_race._recompute_circuit_sc_probability`). Read by sprint-v2 only |
 | GP model weights | `data-engine/src/models/gp_v4.json` (fitted, written by `scripts/fit_model_v4.py`); importances + labels in `docs/feature-weights.json`, mirrored in the API's `GP_FEATURE_MANIFEST`, which serves them with every Prediction | On a deliberate, backtested refit |
 | Sprint model weights + labels | `feature_manifest.py` `SPRINT_FEATURES` (re-exported as `WEIGHTS` by `compute_sprint_features.py`); mirrored in the API's `SPRINT_FEATURE_MANIFEST`, same JSON check | Only when model is intentionally updated |
 | Sprint softmax temperature T=0.3 | `feature_manifest.py` / the API's `feature-manifest.ts` `SPRINT_SOFTMAX_TEMPERATURE`, checked against `sprint_softmax_temperature` in `docs/feature-weights.json`. The GP model has none (T = 1) | Only when model is intentionally updated |
@@ -122,6 +122,23 @@ See § Backtest below for the features, how they were chosen and how the model s
 driver's score is Σ weight × standardized feature, the weights are fitted to past winners
 (`utils/conditional_logit.py`, committed in `src/models/gp_v4.json`), and the stored row keeps every
 feature's value and contribution (`features` JSONB). `raw_weighted_score` is the summed contributions.
+`utils/gp_model_v4.py` is the only path to a GP Prediction (`training_races` → `fit(before=)` → `predict`):
+the live job, the backfill, the fit script and the backtest all use it. `compute_features` uses the committed
+fit and skips races inside it (`trained_on.to_date`), leaving their out-of-sample rows from the backfill.
+
+| Feature | Importance |
+|---------|-----------|
+| Grid Slot (`grid`) | 20% |
+| Driver Form (`driver_points`) | 18% |
+| Team Race Pace (`team_race_pace`) | 18% |
+| Grid × Hard-to-Pass Track (`grid_processional`) | 17% |
+| Team Qualifying Pace (`team_quali_pace`) | 12% |
+| Qualifying Pace (`quali_pace`) | 11% |
+| Teammate Edge (`teammate_edge`) | 4% |
+
+Importance is each feature's share of |weight per SD|, written to `docs/feature-weights.json` by
+`scripts/fit_model_v4.py` and mirrored in the API's `GP_FEATURE_MANIFEST`. Refit only after
+`scripts/backtest.py` validates the change.
 
 ## Sprint Model: `sprint-v2`, 8 Features
 
@@ -130,7 +147,7 @@ Intentionally different from the main race model. Sprint races are ~17 laps with
 | Feature | Weight | Source |
 |---------|--------|--------|
 | Car Performance | 25% | `team_season_stats.car_performance_score` |
-| Circuit-Adj. Starting Position | 25% | Same multiplier as GP: `start_pos × (1 + (1−overtake_rate)) × (1 − 0.3×sc_prob)` |
+| Circuit-Adj. Starting Position | 25% | `start_pos × (1 + (1−overtake_rate)) × (1 − 0.3×sc_prob)`, clamped to 1, with `start_pos = (21 − SQ grid) / 20` (the retired weighted-v3 GP used the same) |
 | Short Run Pace | 10% | Best SQ lap time (sq1/sq2/sq3_time_ms); falls back to main qualifying if SQ not yet ingested |
 | Driver Rating | 10% | Sprint-specific (`sprint_total_points / sprint_races / 8`) when ≥3 sprint races recorded; falls back to main race rating |
 | Weather Impact | 8% | Cross-season historical wet performance. Always neutral (0.5) for now: `races.sprint_weather` is only written after the sprint |
@@ -141,7 +158,7 @@ Intentionally different from the main race model. Sprint races are ~17 laps with
 ### Weighted Score
 
 `raw = weighted_sum(feature_values, WEIGHTS)`, same combination rule as the GP model. Sourced
-from `feature_manifest.py`'s `SPRINT_FEATURES`: see the GP model's note above.
+from `feature_manifest.py`'s `SPRINT_FEATURES` and checked against `docs/feature-weights.json`.
 
 Sprint driver rating and win rate use sprint-specific history when ≥3 sprint races are recorded, otherwise fall back to main race stats (scaled to match the 8-point sprint maximum vs 25-point race maximum).
 
@@ -234,13 +251,13 @@ Features (`utils/gp_features_v4.py`, from an in-memory `utils/race_history.py`) 
 per-race min-max, and form is a decayed average over each person's / outfit's last 12 races across seasons
 (identity: `utils/identity.py`, mirroring the API's `identity.ts`):
 
-| feature | meaning | weight per SD (fit on 2010–2026) |
+| feature | meaning | weight per SD (committed fit: 346 GPs, 2010 to 2026-10-11) |
 |---|---|---|
-| `grid` | −log(grid slot): pole vs P2 matters, P15 vs P16 barely | +0.64 |
-| `grid_processional` | `grid` × (1 − circuit overtake rate) | +0.52 |
+| `grid` | −log(grid slot): pole vs P2 matters, P15 vs P16 barely | +0.63 |
+| `grid_processional` | `grid` × (1 − circuit overtake rate) | +0.54 |
 | `team_race_pace` | outfit's decayed gap to the fastest clean race-lap median (2018+ laps) | +0.57 |
 | `driver_points` | decayed points per race, finish positions scored on the 2010+ table | +0.56 |
-| `team_quali_pace` | outfit's decayed best qualifying gap to pole | +0.40 |
+| `team_quali_pace` | outfit's decayed best qualifying gap to pole | +0.39 |
 | `quali_pace` | this weekend's gap to the fastest time in the deepest session reached | +0.36 |
 | `teammate_edge` | decayed qualifying gap to the team-mate | +0.14 |
 

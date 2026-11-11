@@ -100,15 +100,15 @@ src/
 │   ├── data/           data display: DataList/DataRow, StatTiles, RankCell, HeadToHead, LineChart (+ chartScale, labelLayout)
 │   ├── identity/       DriverIdentity, TeamIdentity
 │   └── ui/             Shadcn primitives (table, search-select)
-├── features/           domain UI, grouped by area (one per sidebar section, plus docs and search)
+├── features/           domain UI, grouped by area (one per sidebar section, plus docs, search, standings, telemetry)
 │   └── <area>/
 │       ├── components/ the area's .astro / .tsx pieces
 │       └── *.ts        pure logic, hooks and page-data loaders (compareStats, useCompareController, loadRacePageData, …)
 ├── lib/                app plumbing: api client, utils, site, pageTabs, careerYear, sidebarState, legacyRedirects
 │   └── f1/             F1 reference data and maths shared by features: teamColors, teamLogos, countryFlags,
-│                       championshipMath, predictionMath, tyres
+│                       championshipMath, predictionMath, predictionTerms, tyres
 ├── types/            API response types: each file re-exports apps/api common/types/ (type-only), index.ts barrel
-├── content/config.ts   Astro content collection for docs/ (globs ../../docs, minus adr/)
+├── content/config.ts   Astro content collection for docs/ (globs ../../docs, minus adr/ and plans/)
 └── styles/globals.css  Tailwind base + CSS custom properties
 ```
 
@@ -134,7 +134,8 @@ second unrelated feature needs it.
 - **Season picker**: `YearSelect` in `PageHeader`'s `aside` slot, `?year=` in the URL, default current season.
   Tabbed pages pass `hrefFor` built with `seasonTabHref`, so switching season keeps the open tab and the default
   tab keeps the plain URL.
-- **Retired URLs**: `/prediction/recap[/year]` 301s to the Predictions Scorecard tab (`src/middleware.ts`).
+- **Retired URLs**: `/prediction/recap[/year]` 301s to the Predictions Scorecard tab; `/compare`, `/drivers/compare`,
+  `/teams/compare` and `/records` 301 to their new pages, query string kept (`src/middleware.ts` + `lib/legacyRedirects.ts`).
 
 ## Routes
 
@@ -144,7 +145,7 @@ second unrelated feature needs it.
 | `/prediction` | Upcoming tab: `predictions/upcoming` + `sprint/upcoming` + `predictions/standings` · Scorecard tab: `predictions/history?year=` + `predictions/accuracy` |
 | `/prediction/[id]` | `predictions/race/:id` |
 | `/prediction/sprint/[id]` | `sprint/race/:id` |
-| `/races` · `/races/[id]` · `/races/[id]/sprint` | `races?year=` · `races/:id` + per tab `strategy` / `race-control` / `overtakes` / `team-radio` / `predictions/race/:id` / `races/circuit/:key` · `sprint/race/:id/detail` |
+| `/races` · `/races/[id]` · `/races/[id]/sprint` | `races?year=` · `races/:id` + `predictions/race/:id` + `races/:id/long-runs` (Long Runs tab) + `races/circuit/:key` + `strategy` / `race-control` / `overtakes` / `team-radio` (each tab shown only when it has data) · `sprint/race/:id/detail` |
 | `/races/[id]/race-story` | `races/:id/race-story` (`?session=sprint` for the sprint) |
 | `/races/[id]/telemetry` | `races/:id/telemetry?session=&a=&b=`: drivers picked with a plain GET form |
 | `/circuits` · `/circuits/[key]` | `races/circuits` · `races/circuit/:key` (Overview / Winners / Dominance tabs) + `races/circuit/:key/telemetry` (Telemetry tab) |
@@ -181,7 +182,7 @@ custom properties in `styles/globals.css`. `lib/f1/teamColors.ts` and `lib/f1/te
 ## File-size budget
 
 `eslint.config.js` enforces a tiered `max-lines` (`error`, blank lines and comments excluded), run
-via `bun run lint` and in CI:
+via `bun run lint`, in CI and in the pre-commit hook (`lint-staged`):
 
 | Glob | Budget |
 |---|---:|
@@ -191,7 +192,7 @@ via `bun run lint` and in CI:
 | `src/types/**`, `tests/**`, `*.config.*` | off |
 
 When a page or component grows past its budget, extract sections into `features/<area>/components/`
-rather than raising the limit. (`apps/api` has its own parallel budget: see the Testing doc and
+rather than raising the limit. (`apps/api` has its own parallel budget: see `apps/api/README.md` and
 `apps/api/eslint.config.js`.)
 
 ## Types

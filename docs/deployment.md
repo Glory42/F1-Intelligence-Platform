@@ -1,6 +1,6 @@
 ---
 title: "Deployment"
-description: "Cloudflare Pages, Workers, Render cron jobs, and environment variables"
+description: "Cloudflare Pages, Workers, the Render worker, and environment variables"
 order: 6
 ---
 
@@ -12,8 +12,8 @@ order: 6
 |-------|----------|----------------|
 | `apps/web/` | Cloudflare Pages | Push to `master` → GitHub integration auto-builds |
 | `apps/api/` | Cloudflare Workers | Push to `master` → GitHub integration auto-builds |
-| `data-engine/` | Render | Cron jobs triggered on schedule |
-| DB migrations | Neon | Manual: run locally via `drizzle-kit` |
+| `data-engine/` | Render | Web Service running the worker loop (`python -m src.server`) |
+| DB migrations | Neon | Manual: `bun run db:generate` + `bun run db:migrate` from `apps/api/` |
 
 **Never run `wrangler deploy` or `bun run deploy` from the CLI.** Push to GitHub and let Cloudflare pick it up automatically.
 
@@ -82,7 +82,7 @@ Configured in `apps/api/src/main.ts`. Only `GET` and `OPTIONS` methods are allow
 cd apps/api
 bun install
 # Set DATABASE_URL in your shell or .env
-bun run db:push    # applies schema to Neon
+bun run db:migrate   # applies drizzle/migrations/ to Neon (the DB is migrate-tracked: don't db:push)
 ```
 
 Then seed circuits and seasons:
@@ -122,16 +122,18 @@ python -m src.main --job sync_season   --year 2025 --round 1
 4. Set the Build Command: `pip install -r requirements.txt`
 5. Set the Start Command: `python -m src.server`
    - Python is pinned to **3.12** via `data-engine/.python-version` (and `PYTHON_VERSION` in `render.yaml`). Don't let Render use its newer default: `numpy`/`pandas`/`psycopg2-binary` have no wheels there, so pip builds them from source and OOMs the 512 MB free instance.
-6. **Important**: Since Render free tier web services spin down after 15 minutes of inactivity, set up an UptimeRobot HTTP monitor pointing to your Render URL (e.g. `https://f1-data-engine.onrender.com/`) to ping it every 5 minutes. This keeps the worker alive so it can check for new FastF1 data automatically. The root URL only responds to `HEAD` for the uptime ping: navigating to it in a browser redirects to `/login`, where the `DASHBOARD_USER`/`DASHBOARD_PASSWORD` credentials unlock the live HTML dashboard of the engine's activities and logs.
+6. **Important**: Since Render free tier web services spin down after 15 minutes of inactivity, set up an UptimeRobot HTTP monitor pointing to your Render URL (e.g. `https://f1-data-engine.onrender.com/`) to ping it every 5 minutes. This keeps the worker alive so it can check for newly published OpenF1/Jolpica session data automatically. The root URL only responds to `HEAD` for the uptime ping: navigating to it in a browser redirects to `/login`, where the `DASHBOARD_USER`/`DASHBOARD_PASSWORD` credentials unlock the live HTML dashboard of the engine's activities and logs.
 
-   The worker is **schedule-gated** to keep Neon compute inside the free tier: it derives the current/next Grand Prix's race-weekend window purely from the FastF1 calendar (no DB), polls `auto_runner` every ~20 min while inside that window, and every ~6 h otherwise. Outside a race weekend it never opens a Neon connection, so the database stays scaled to zero. See `src/utils/schedule_window.py` and `auto_runner.poll_interval_for_window()`.
+   The worker is **schedule-gated** to keep Neon compute inside the free tier: it derives the current/next Grand Prix's race-weekend window purely from the FastF1 event schedule (no DB), runs `auto_runner.run_cycle` every ~20 min while inside that window, and every ~6 h otherwise. Outside a race weekend it never opens a Neon connection, so the database stays scaled to zero. Which jobs are due is decided by `src/weekend_pipeline.py` from each race's status. See `src/utils/schedule_window.py` and `auto_runner.poll_interval_for_window()`.
 
 ---
 
 ## Production Domain
 
 Frontend: `https://f1.gorkemkaryol.dev` (custom domain on Cloudflare Pages)
-API: `https://f1-api.gorkemkaryol.dev` (Workers custom domain)
+API: `https://f1-api.gorkemkaryol.dev` (Workers custom domain, the only place the edge cache works).
+`workers_dev = true` keeps `https://f1-prediction-platform-api.gorkemkaryol03.workers.dev` up alongside it
+(without the edge cache); `apps/web/wrangler.toml`'s `PUBLIC_API_URL` points at the custom domain.
 
 ---
 
@@ -169,5 +171,5 @@ cd data-engine
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # add DATABASE_URL
+cp .env.example .env   # points at the local snapshot by default
 ```

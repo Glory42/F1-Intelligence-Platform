@@ -6,6 +6,8 @@ order: 5
 
 # API Reference
 
+The F1 Intelligence Platform's read-only API: Hono on Cloudflare Workers (`apps/api/`).
+
 **Base URL:** `https://f1-api.gorkemkaryol.dev` (also on `https://f1-prediction-platform-api.gorkemkaryol03.workers.dev`, without the edge cache)  
 **Local dev:** `http://localhost:8787`
 
@@ -28,10 +30,22 @@ parameter (`apps/api/src/common/route.ts`, rules in `common/cache.ts`):
   season is the driver's/team's own: `?year=` never changes the lifetime. Careers use their newest season.
 - **Reference data** (`/api/seasons`, `/api/search`, `/api/races/circuits`, `/api/races/circuit/:key`,
   `/api/predictions/model-info`): `public, max-age=3600`.
+- In-progress answers above are `public, max-age=600` from Friday to Monday 12:00 UTC, when the ETL ingests
+  (`isIngestWindow`), and `public, max-age=3600` between race weekends.
+- **Upcoming** (`/api/predictions/upcoming`, `/api/sprint/upcoming`): by the race's status, like race-scoped routes.
+  `/api/predictions/accuracy` spans every season, so it always uses the in-progress lifetime.
+- **History** (`/api/history/*`, `/api/drivers/:id/history`, `/api/teams/:id/history`): `public, max-age=86400`
+  (not immutable: F1DB updates after each race). `/api/races/circuit/:key/telemetry` follows the lap's season.
 - An empty answer (no rows yet, enrichment not backfilled) is always cached for 10 min only.
 
+`edgeCache()` (`common/edge-cache.ts`, the Cloudflare Cache API, ADR 0005) sits in front of every `/api/*`
+handler and stores any 200 whose `Cache-Control` is `public`, per data centre. It only works on the custom
+domain (a no-op on `*.workers.dev`). Each copy is kept 30 days past its `max-age`: a lapsed copy is refreshed
+from Neon, but still answers when that refresh fails with a 5xx (e.g. Neon Free suspended for the month).
+
 A non-numeric `:id` / `:raceId` answers 400 `INVALID_ID`, a non-numeric `year` 400 `INVALID_YEAR`, an
-unknown `session` 400 `INVALID_SESSION`, and an unknown race, driver or team 404 `NOT_FOUND`.
+unknown `session` 400 `INVALID_SESSION`, a bad `date` 400 `INVALID_DATE`, and an unknown race, driver or
+team 404 `NOT_FOUND`.
 
 ---
 
@@ -60,13 +74,13 @@ Checks DB connectivity (`"db": "connected"`), or 503 `DB_ERROR`. Wakes Neon: not
 
 ### `GET /api/seasons`
 
-Returns all seasons with data.
+Returns every season, newest first, with its number of races.
 
 ```json
 {
   "data": [
-    { "id": 1, "year": 2000 },
-    { "id": 27, "year": 2026 }
+    { "year": 2026, "raceCount": 24 },
+    { "year": 1980, "raceCount": 14 }
   ]
 }
 ```
@@ -82,17 +96,19 @@ Returns all seasons with data.
 | `year` | no | current year | |
 | `status` | no | all | `scheduled` \| `sprint_qualifying_done` \| `sprint_done` \| `qualifying_done` \| `completed` |
 
-Returns all races for the year. Each race includes `eventFormat`, `hasSprint`, `sprintDate`, and sprint condition fields for sprint weekends.
+Returns all races for the year (by `race_date`), oldest first; an unknown `status` is ignored. Each race includes `eventFormat`, `hasSprint`, `sprintDate`, and sprint condition fields for sprint weekends.
 
 ### `GET /api/races/:id`
 
-Returns a single race with circuit, results (if completed), qualifying, and lap summaries.
+Returns a single race: `{ race, results, qualifying, laps }` (`race` embeds its `circuit`; `results` is
+empty until the race is completed).
 
 `laps` (the same rule for the sprint detail's `laps`): one `{ driverId, driver, fastestLapMs, avgLapMs,
 totalLaps }` per driver, fastest first. Pit in/out laps and laps without a time are left out of all
 three numbers, so `totalLaps` counts clean timed laps only. All three are integers.
 
 The `Race` object includes:
+- `status`: the Race Status (`scheduled` … `completed`); `raceDateUtc`: the GP start time, or null
 - `eventFormat`: `conventional` | `sprint` | `sprint_qualifying` | `sprint_shootout`
 - `hasSprint`: boolean derived from eventFormat
 - `sprintDate` / `sprintQualifyingDate`: ISO strings, null for conventional weekends
@@ -182,11 +198,13 @@ Returns a list of all circuits in the database, ordered alphabetically by name.
 
 ### `GET /api/races/circuit/:circuitKey`
 
-Also returns `outlinePath`: an SVG path (1000×1000 viewBox) drawn from the latest stored pole lap's
-x/y at the circuit, or null before any telemetry exists (car data starts in 2018).
+Returns `{ circuit, history, fastestLap, dominance, weatherStats, qualifyingImpact, safetyCarStats,
+outlinePath }` for the circuit's completed races, or 404 for an unknown key. `history` is the 10 most
+recent races with their winner; each item includes `hasSprint: boolean`. `dominance` counts wins by
+constructor and driver per era (`all`, `modern`, `legacy`, `nineties`).
 
-
-Returns historical race results at a specific circuit across all years. Each item includes `hasSprint: boolean`.
+`outlinePath` is an SVG path (1000×1000 viewBox) drawn from the x/y of the fastest stored qualifying lap
+at the circuit's latest race, or null before any telemetry exists (car data starts in 2018).
 
 ### `GET /api/races/circuit/:circuitKey/telemetry`
 
@@ -237,11 +255,13 @@ driver's own season sets the cache lifetime.
 
 ### `GET /api/drivers/:id?year=N`
 
-Returns a single driver with their season stats for the given year.
+Returns `{ driver, seasonStats, recentResults }` (the last 5 results) for the driver's own season.
+`year` is accepted but ignored: `:id` is season-scoped, so the row already pins the season.
 
 ### `GET /api/drivers/:id/career`
 
-Returns a driver's stats across all seasons they have data in. `drivers` rows are season-scoped and
+Returns a driver's stats across all seasons they have data in, newest first: `[{ year, driverId,
+driverNumberThatYear, teamName, headshotUrl, stats }]`. `drivers` rows are season-scoped and
 FastF1's names vary by season, so seasons are linked by person (`common/identity.ts`, golden cases in `docs/identity-cases.json`): the same
 name ignoring accents and case, or the same code with one name extending the other ("Andrea Kimi
 Antonelli" / "Kimi Antonelli"). "Jr." still counts, so a father and son stay separate. `/api/search`
@@ -274,11 +294,12 @@ and lap order. Sprint stops and stops without a stationary time are left out.
 
 ### `GET /api/teams/:id?year=N`
 
-Returns a single team with season stats for the given year.
+Returns `{ team, seasonStats, drivers }` for the team's own season (`year` is accepted but ignored, as
+for drivers).
 
 ### `GET /api/teams/:id/career`
 
-Returns a team's stats across all seasons they have data in, following the outfit through its
+Returns a team's stats across all seasons they have data in (`[{ year, teamId, stats }]`, newest first), following the outfit through its
 rebrands (`constructorKey` in `common/identity.ts`): RB's career includes AlphaTauri and Toro Rosso,
 but never its sister team Red Bull. Each entry keeps its own season's `teamId`.
 
@@ -310,6 +331,7 @@ Returns the prediction for the next `qualifying_done` race with `race_date >= to
   "data": {
     "race": { "id": 200, "name": "Monaco Grand Prix", "raceDate": "2026-06-07", "hasSprint": false, ... },
     "predictedWinner": { "id": 42, "fullName": "Max Verstappen", ... },
+    "computedAt": "2026-06-06T22:00:00.000Z",
     "modelVersion": "weighted-v4",
     "featureInfo": [
       { "key": "grid", "label": "Grid Slot", "shortLabel": "Grid Slot", "importance": 20 },
@@ -348,7 +370,8 @@ sheet (sprint qualifying for sprint predictions), null when the driver has no ro
 
 ### `GET /api/predictions/race/:raceId`
 
-Returns the prediction for a specific grand prix by race ID. Same shape as `/upcoming`.
+Returns the prediction for a specific grand prix by race ID. Same shape as `/upcoming`. 404 when the race
+has no prediction.
 
 ### `GET /api/predictions/title-odds?year=N`
 
@@ -368,7 +391,7 @@ Latest Monte Carlo championship odds plus their per-round history (written by `c
 
 Returns all predictions for the year: both grand prix and sprint races merged and sorted by date descending. Includes actual results alongside predicted results for accuracy tracking.
 
-Each item includes `isSprint: boolean`. Sprint items link to `/races/:id/sprint`; main race items link to `/prediction/:id`.
+Each item includes `isSprint: boolean` and the race's `circuit`. The web links sprint items to `/prediction/sprint/:id` and main race items to `/prediction/:id`.
 
 `actualWinnerPredictedPosition` is the grid slot the model had put the actual winner in: non-null
 only once the race is decided; used by the frontend to show "model had them P4" on a missed call.
@@ -443,7 +466,9 @@ Returns the "Intelligence Standings": driver rankings by average prediction scor
 
 ### `GET /api/sprint/upcoming`
 
-Returns the sprint prediction for the next upcoming sprint weekend. Same envelope as the grand prix upcoming prediction but uses sprint model features and `modelVersion: "sprint-v2"`.
+Returns the sprint prediction for the next sprint weekend whose status is `sprint_qualifying_done`,
+`sprint_done` or `qualifying_done` and whose `sprint_date` is today or later; 404 when there is none. Same
+envelope as the grand prix upcoming prediction but uses sprint model features and `modelVersion: "sprint-v2"`.
 
 ### `GET /api/sprint/race/:raceId`
 
@@ -538,7 +563,8 @@ Returns all unique drivers (their latest profiles), teams, and circuits across a
         "overtakeRate": "0.320",
         "numberOfCorners": 14,
         "drsZones": 4,
-        "scProbability": "0.600"
+        "scProbability": "0.600",
+        "imageUrl": null
       }
     ]
   }
@@ -581,7 +607,7 @@ recurs (Renault, Sauber) repeats them. Active families first.
 
 `{ requested, date, races }`: up to 10 completed races (core DB, 1980+) held on that calendar
 day, newest first, with the winner. When the day has none, `date` is the nearest day that does.
-400 for a day that doesn't exist.
+`date` is required: missing or not a real day → 400 `INVALID_DATE`.
 
 ### `GET /api/drivers/:id/history`
 
@@ -596,7 +622,8 @@ The constructor's all-time totals plus chassis and engine per season, matched vi
 ### `GET /api/races/:id/recap`
 
 Home-hub summary: `{ winner, predictedWinner, predictionHit, fastestStop: { driver, stationaryMs },
-topBattle }`: the longest race battle. Each part is null when its data doesn't exist.
+topBattle }`: the longest race battle. Each part is null when its data doesn't exist. Cached by race status
+like the other race routes (30 s while there is no winner).
 
 ## Data Quality
 
@@ -639,7 +666,11 @@ Returns the latest data-quality audit report for a season (records produced by t
 
 | Code | HTTP | Meaning |
 |------|------|---------|
-| `NOT_FOUND` | 404 | Route doesn't exist |
-| `DB_ERROR` | 503 | Database unreachable |
+| `NOT_FOUND` | 404 | Route, race, driver, team, circuit or report doesn't exist |
+| `INVALID_ID` | 400 | `:id` / `:raceId` isn't a number |
+| `INVALID_YEAR` | 400 | `year` isn't a 4-digit number |
+| `INVALID_SESSION` | 400 | `session` isn't `race`/`sprint` (or `Q`/`SQ` for telemetry) |
+| `INVALID_DATE` | 400 | `date` isn't a real `MM-DD` day |
+| `DB_ERROR` | 503 | Database unreachable (`/api/health/db`) |
 | `INTERNAL_ERROR` | 500 | Unhandled server error |
 

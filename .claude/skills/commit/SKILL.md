@@ -1,9 +1,9 @@
 ---
 name: commit
-description: Commit code changes with conventional commit messages using F1 Prediction project scopes. Use when the user says "commit", "commit this", "save changes", or "/commit". ALWAYS use this skill for commits: never add Co-Authored-By lines.
+description: Commit code changes with conventional commit messages using F1 Intelligence Platform project scopes. Use when the user says "commit", "commit this", "save changes", or "/commit". ALWAYS use this skill for commits: never add Co-Authored-By lines.
 ---
 
-# Conventional Commit Skill: F1 Prediction
+# Conventional Commit Skill: F1 Intelligence Platform
 
 Create git commits following Conventional Commits with project-specific scopes.
 
@@ -35,7 +35,7 @@ Create git commits following Conventional Commits with project-specific scopes.
 | `api` | Hono API: modules, services, controllers, routes |
 | `db` | Drizzle schema, migrations, seed |
 | `etl` | Python data-engine: ingest, compute, sync jobs |
-| `navbar` | Navigation bar, mobile tab bar, car animation |
+| `navbar` | Sidebar, mobile nav drawer, nav links |
 | `prediction` | Prediction pages, model, standings, compare tool |
 | `races` | Race pages, calendar, results table |
 | `drivers` | Driver pages, standings, career stats |
@@ -79,9 +79,9 @@ EOF
 ```
 feat(prediction): aggregate season-wide features instead of last race only
 fix(web): add raceId to RaceResult type so recent results links work
-style(navbar): add driving car animation with nav tunnel effect
+style(navbar): highlight the active group in the collapsed sidebar
 refactor(api): add /api/seasons endpoint for dynamic year selector
-data(etl): backfill 2018-2020 race and qualifying data via FastF1
+data(etl): backfill 2023-2026 tyre stints from OpenF1
 chore(db): add 2018-2020 seasons and historical circuits to seed
 fix(drivers): use per-year driverId in career navigation links
 feat(ui): replace hardcoded year buttons with YearSelect dropdown

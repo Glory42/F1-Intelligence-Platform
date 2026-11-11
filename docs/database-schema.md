@@ -6,6 +6,8 @@ order: 3
 
 # Database Schema
 
+The F1 Intelligence Platform's database.
+
 **Provider:** Neon PostgreSQL  
 **ORM:** Drizzle  
 **Schema source:** `apps/api/src/db/schema/`  
@@ -16,9 +18,10 @@ order: 3
 ## Conventions
 
 - All primary keys are `SERIAL` (auto-increment integer)
-- All timestamps are `TIMESTAMPTZ DEFAULT now()`
+- All timestamps are `TIMESTAMPTZ DEFAULT now()`; most tables carry a `created_at` (stats tables `updated_at`,
+  prediction/odds tables `computed_at`), left out of the column tables below
 - Lap times stored as `INTEGER` milliseconds: never float
-- Feature scores stored as `NUMERIC(6,5)`: range 0.00000 to 1.00000
+- Sprint feature scores stored as `NUMERIC(6,5)`: range 0.00000 to 1.00000; GP features as one `features` JSONB
 - All natural keys have `UNIQUE` constraints
 
 ---
@@ -40,6 +43,8 @@ seasons
         └── race_lap_traces         (FK → drivers)  ← 2018+ (OpenF1 live, FastF1 before), int[] per lap
         └── race_battles            (2 FKs → drivers)
         └── race_weather_traces     (no driver FK)  ← per-minute weather arrays
+        └── qualifying_lap_telemetry (FK → drivers) ← fastest Q/SQ lap, JSONB samples
+        └── fp2_long_run_times      (FK → drivers)
         └── lap_times               (FK → drivers)
         └── driver_prediction_features (FK → drivers)
         └── race_predictions        (FK → drivers)
@@ -53,6 +58,8 @@ seasons
   └── team_season_stats    (FK → teams)
 
 circuits      (static, seeded once)
+history_drivers / history_constructors / history_constructor_seasons / history_constructor_lineage / f1db_imports
+              (F1DB all-time history: no FKs, joined by match_key / f1db id)
 data_quality_runs      (FK → races, race_id nullable for season aggregates)
   └── data_quality_issues  (FK → runs)
 ```
@@ -120,7 +127,8 @@ Season-scoped: a driver row exists per year they raced.
 | `last_name` | varchar(50) | |
 | `nationality` | varchar(50) | |
 | `headshot_url` | varchar(255) | From OpenF1 (FastF1 for seasons ingested before Oct 2026), 2019+ |
-| UNIQUE | `(season_id, driver_number)` | |
+| UNIQUE | `(season_id, first_name, last_name)` | One row per person per season (migration `0028`, ADR 0009) |
+| INDEX | `(season_id, driver_number)` | Not unique (`0027`): before 2014 a stand-in shared the regular driver's car number |
 
 ---
 
@@ -135,14 +143,15 @@ One row per race event. Sprint weekends have one race row (covering both the spr
 | `round_number` | integer | |
 | `name` | varchar(100) | e.g. `Monaco Grand Prix` |
 | `race_date` | date | Grand Prix date |
-| `qualifying_date` | date | Saturday qualifying date |
-| `sprint_date` | date | Sprint race date (sprint weekends only) |
-| `sprint_qualifying_date` | date | SQ session date (sprint weekends only) |
-| `event_format` | varchar(30) | `conventional` \| `sprint` \| `sprint_qualifying` \| `sprint_shootout` |
-| `status` | varchar(30) | See status flow below |
+| `race_date_utc` | timestamptz | Grand Prix start time; nullable |
+| `qualifying_date` | timestamptz | Saturday qualifying session time |
+| `sprint_date` | timestamptz | Sprint race session time (sprint weekends only) |
+| `sprint_qualifying_date` | timestamptz | SQ session time (sprint weekends only) |
+| `event_format` | varchar(30) | `conventional` (default) \| `sprint` \| `sprint_qualifying` \| `sprint_shootout` |
+| `status` | `race_status` enum | Default `scheduled`; see status flow below |
 | `weather` | varchar(30) | `dry` \| `wet` \| `mixed`: main race weather |
-| `safety_car_laps` | integer | 2018+ only |
-| `vsc_laps` | integer | 2018+ only |
+| `safety_car_laps` | integer | 2018+ only (default 0) |
+| `vsc_laps` | integer | 2018+ only (default 0) |
 | `air_temp_avg` | numeric(4,1) | 2018+ only |
 | `track_temp_avg` | numeric(4,1) | 2018+ only |
 | `humidity_avg` | numeric(4,1) | 2018+ only |
@@ -152,6 +161,7 @@ One row per race event. Sprint weekends have one race row (covering both the spr
 | `sprint_air_temp_avg` | numeric(4,1) | Sprint session air temp |
 | `sprint_track_temp_avg` | numeric(4,1) | Sprint session track temp |
 | `sprint_humidity_avg` | numeric(4,1) | Sprint session humidity |
+| `openf1_race_session_key` / `openf1_sprint_session_key` | integer | Cached OpenF1 session keys, so later jobs skip the `/sessions` lookup |
 | UNIQUE | `(season_id, round_number)` | |
 
 #### Race Status Flow
@@ -216,14 +226,14 @@ race control feed (`scripts/backfill_fastf1_enrichment.py`).
 |--------|------|-------|
 | `id` | serial PK | |
 | `race_id` | FK → races | |
-| `date` | timestamptz | Message timestamp, from OpenF1 |
+| `date` | timestamptz | Message timestamp (OpenF1, or FastF1 pre-2023) |
 | `category` | varchar(30) | `Flag`, `SafetyCar`, `Drs`, `SessionStatus`, `CarEvent`, `Other` |
 | `flag` | varchar(20) | e.g. `YELLOW`, `DOUBLE YELLOW`, `RED`, `GREEN`; null for non-flag messages |
 | `lap_number` | integer | Nullable |
 | `driver_number` | integer | Raw OpenF1 car number, not a `drivers` FK: no reliable per-season mapping stored here |
 | `scope` | varchar(20) | e.g. `Track`, `Sector`, `Driver`; nullable |
 | `sector` | integer | Nullable |
-| `message` | text | Raw OpenF1 message text |
+| `message` | text | Raw race-control message text |
 | `session_type` | varchar(10) | `race` (default) or `sprint`: both sessions of a sprint weekend share `race_id` |
 | UNIQUE | `(race_id, date, message)` | |
 
@@ -338,14 +348,14 @@ UNIQUE `(race_id, session_type, driver_id)`; also `lap_number`, `lap_time_ms`.
 Imported by `import_f1db`; separate from the season-scoped core tables that feed the model.
 
 - `history_drivers`: one row per F1DB driver: `f1db_id` (UNIQUE), `match_key` (normalised name,
-  indexed: the join to core drivers), bio (`date_of_birth`, `nationality`), career totals
+  indexed: the join to core drivers), bio (`abbreviation`, `date_of_birth`, `date_of_death`, `nationality`), career totals
   (`championships`, `race_starts`, `race_wins`, `podiums`, `pole_positions`, `fastest_laps`,
   `career_points`, `sprint_wins`, `grand_slams`) and `first_{race,podium,pole,win}_{date,name}`.
-- `history_constructors`: `f1db_id` (UNIQUE), name, country, career totals.
+- `history_constructors`: `f1db_id` (UNIQUE), `name`, `full_name`, `country`, career totals.
 - `history_constructor_seasons`: `(constructor_f1db_id, year)` UNIQUE; `chassis`, `engine` display names.
 - `history_constructor_lineage`: F1DB chronology: `(parent_f1db_id, position)` UNIQUE, member
   `constructor_f1db_id`, `year_from`/`year_to`.
-- `f1db_imports`: imported release `version` (UNIQUE), so a release is never imported twice.
+- `f1db_imports`: imported release `version` (UNIQUE) + `imported_at`, so a release is never imported twice.
 
 ---
 
@@ -358,7 +368,7 @@ One row per lap per driver: 2018+ only.
 | `race_id` | FK → races | |
 | `driver_id` | FK → drivers | |
 | `lap_number` | integer | |
-| `lap_time_ms` | integer | |
+| `lap_time_ms` | integer | Nullable (untimed laps) |
 | `sector1_ms` | integer | |
 | `sector2_ms` | integer | |
 | `sector3_ms` | integer | |
@@ -443,23 +453,29 @@ Aggregated after each race via `compute_season_stats`. Includes sprint-specific 
 
 | Column | Type | Notes |
 |--------|------|-------|
+| `id` | serial PK | |
 | `season_id` | FK → seasons | |
 | `driver_id` | FK → drivers | |
 | `races_entered` | integer | Grand prix count |
+| `races_finished` | integer | |
 | `wins` | integer | Grand prix wins |
 | `podiums` | integer | |
 | `poles` | integer | Grid position = 1 |
-| `total_points` | numeric | Grand prix points |
+| `total_points` | numeric(6,1) | Grand prix points |
 | `championship_position` | integer | Ranked by total_points + sprint_total_points (the championship counts sprints) |
+| `avg_finish_position` | numeric(4,2) | |
 | `win_rate` | numeric(5,4) | Bayesian smoothed |
 | `avg_position_gain` | numeric(4,2) | grid_position − finish_position avg |
+| `dnf_count` | integer | |
 | `dnf_rate` | numeric(4,3) | dnf_count / races_entered |
 | `avg_sector1/2/3_ms` | integer | Median: 2018+ only |
+| `top_speed_avg` | numeric(5,1) | |
 | `teammate_quali_delta` | numeric(6,4) | Mean delta vs teammate across season |
 | `sprint_races_entered` | integer | Sprint race count |
 | `sprint_wins` | integer | |
 | `sprint_podiums` | integer | |
-| `sprint_total_points` | numeric | Sprint points |
+| `sprint_total_points` | numeric(6,1) | Sprint points |
+| `sprint_avg_finish_position` | numeric(4,2) | |
 | `sprint_win_rate` | numeric(5,4) | Bayesian smoothed sprint win rate |
 | UNIQUE | `(season_id, driver_id)` | |
 
@@ -470,8 +486,16 @@ Aggregated after each race. Drives `car_performance_score` in sprint predictions
 
 | Column | Type | Notes |
 |--------|------|-------|
+| `id` | serial PK | |
 | `season_id` | FK → seasons | |
 | `team_id` | FK → teams | |
+| `races_completed` | integer | |
+| `wins` / `podiums` | integer | Grand prix |
+| `total_points` | numeric(6,1) | Grand prix points |
+| `avg_finish_position` | numeric(4,2) | |
+| `dnf_count` | integer | |
+| `sprint_wins` / `sprint_podiums` | integer | |
+| `sprint_total_points` | numeric(6,1) | Sprint points |
 | `car_performance_score` | numeric(5,4) | Blend of robust race pace (median finish) + qualifying pace (avg grid): `0.6·minmax(21−median) + 0.4·minmax(21−avg_grid)` |
 | `reliability_score` | numeric(5,4) | Normalized from 1 − dnf_rate |
 | `championship_position` | integer | Ranked by GP + sprint points |
@@ -506,6 +530,7 @@ One row per driver per grand prix race (`weighted-v4`). Written by `compute_feat
 
 | Column | Type | Notes |
 |--------|------|-------|
+| `id` | serial PK | |
 | `race_id` | FK → races | |
 | `driver_id` | FK → drivers | |
 | `features` | jsonb | Feature → `{value, contribution}` for the 7 fitted features (`grid`, `quali_pace`, `team_quali_pace`, `driver_points`, `teammate_edge`, `grid_processional`, `team_race_pace`). A refit with other features needs no migration |
@@ -527,6 +552,7 @@ One row per grand prix: the single predicted winner.
 | `predicted_winner_id` | FK → drivers | |
 | `computed_at` | timestamptz | |
 | `model_version` | varchar(20) | `weighted-v4` (default) |
+| `notes` | text | Nullable |
 
 ---
 
@@ -535,6 +561,7 @@ One row per driver per sprint weekend. Written by `compute_sprint_features` toge
 
 | Column | Type | Notes |
 |--------|------|-------|
+| `id` | serial PK | |
 | `race_id` | FK → races | |
 | `driver_id` | FK → drivers | |
 | `car_performance_score` | numeric(6,5) | 0–1 |
@@ -562,7 +589,7 @@ One row per sprint weekend: the single predicted sprint winner.
 | `race_id` | FK → races UNIQUE | |
 | `predicted_winner_id` | FK → drivers | |
 | `computed_at` | timestamptz | |
-| `model_version` | varchar(20) | `sprint-v2` |
+| `model_version` | varchar(20) | `sprint-v2` (default) |
 
 ---
 
@@ -577,6 +604,7 @@ One row per audit pass (season aggregate) or per-race audit. Written by `data_qu
 | `generated_at` | timestamptz | |
 | `health_score` | numeric(5,2) | 0–100, per-pass average |
 | `summary` | jsonb | `races_audited`, `issue_count`, `fixable_count`, `by_severity`, `by_table` |
+| UNIQUE | `(year) WHERE race_id IS NULL` | One season-aggregate run per year (migration `0013`) |
 
 ### `data_quality_issues`
 One row per flagged gap. Written by `data_quality_audit`.

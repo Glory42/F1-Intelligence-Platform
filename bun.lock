@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "f1-prediction",
+      "name": "f1-intelligence",
       "devDependencies": {
         "concurrently": "^9.2.1",
         "husky": "^9.1.7",
