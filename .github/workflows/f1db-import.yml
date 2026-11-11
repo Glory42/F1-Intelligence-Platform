@@ -17,11 +17,11 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
       # Checkout first: the run defaults point into data-engine/, which only exists after it.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Skip without a DATABASE_URL secret
         id: secret
         run: echo "present=$([ -n "$DATABASE_URL" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         if: steps.secret.outputs.present == 'true'
         with:
           python-version: "3.12"
