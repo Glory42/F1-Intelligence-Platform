@@ -192,7 +192,7 @@ See [docs/prediction-model.md](./docs/prediction-model.md) for full details.
 
 Never deploy from the CLI: push to `master` and let the integrations deploy.
 
-- **API**: Cloudflare Workers, on `f1-api.gorkemkaryol.dev` (the edge cache needs a custom domain) and `*.workers.dev`
+- **API**: Cloudflare Workers, on `f1-api.gorkemkaryol.dev` (the edge cache needs a custom domain; `*.workers.dev` is off)
 - **Frontend**: Cloudflare Pages, on `f1.gorkemkaryol.dev`
 - **Data Engine**: Render Web Service running one worker loop (`src/server.py`): every 20 min inside a race-weekend window, every 6 h outside it. `src/weekend_pipeline.py` decides which jobs are due from each race's status
 - **F1DB history**: weekly GitHub Action (`.github/workflows/f1db-import.yml`, needs the `DATABASE_URL` repo secret)

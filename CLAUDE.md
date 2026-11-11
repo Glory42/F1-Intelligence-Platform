@@ -203,7 +203,9 @@ apps/api/src/
 
 - **service**: DB queries (Drizzle, no Hono context)
 - **controller**: declares handlers with `raceRoute`/`seasonRoute`/`driverRoute`/`teamRoute` (`common/route.ts`),
-  which own id/year/session validation, the 404, Cache-Control and the response envelope
+  which own id/year/session validation, the 404, Cache-Control and the response envelope. Extra query params go in
+  the factory's `query: [...]` (typed); a hand-written handler is wrapped in `readsQuery([...], handler)`. The edge
+  cache keys on exactly those params, and a test fails if a route declares none
 - **module**: Hono sub-router that wires controller handlers to routes
 - **helpers**: pure functions; code moves to `common/` only once a second module needs it
 - GP vs Sprint differences are data in `common/session-kind.ts` (`GP`/`SPRINT`), read through `session-reads.ts`;
@@ -228,7 +230,7 @@ All endpoints return:
 ### Route structure
 ```
 GET /api/health                     # never touches the DB
-GET /api/health/db
+GET /api/health/db                  # dev-only: 404 in production
 
 GET /api/races?year=N&status=S
 GET /api/races/circuits
@@ -321,6 +323,8 @@ All queries use Drizzle joins. Never fetch a list then loop-query for each item.
 - Collapsible sidebar (`components/layout/Sidebar.astro`) with two groups: Season (home, calendar, drivers,
   teams, predictions) and Explore (circuits, compare, history); the same list is the mobile drawer.
   Collapse state is a cookie so the server renders the right width.
+- A page that reads a new query param adds it to `PAGE_QUERY_PARAMS` (`lib/pageQuery.ts`): the middleware 301s
+  any other param away (a test checks `src` against the list)
 - Each page leads with one main view; secondary views are server-rendered `?tab=` link tabs
   (`PageTabs.astro` + `lib/pageTabs.ts`), and each tab fetches only its own data.
 - Pages with tabs or fallbacks load through a page-data loader (`features/<area>/load*PageData.ts`,

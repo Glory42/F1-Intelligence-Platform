@@ -8,7 +8,7 @@ order: 5
 
 The F1 Intelligence Platform's read-only API: Hono on Cloudflare Workers (`apps/api/`).
 
-**Base URL:** `https://f1-api.gorkemkaryol.dev` (also on `https://f1-prediction-platform-api.gorkemkaryol03.workers.dev`, without the edge cache)  
+**Base URL:** `https://f1-api.gorkemkaryol.dev`  
 **Local dev:** `http://localhost:8787`
 
 All responses follow this envelope:
@@ -42,8 +42,10 @@ parameter (`apps/api/src/common/route.ts`, rules in `common/cache.ts`):
 handler and stores any 200 whose `Cache-Control` is `public`, per data centre. It only works on the custom
 domain (a no-op on `*.workers.dev`). Each copy is kept 30 days past its `max-age`: a lapsed copy is refreshed
 from Neon, but still answers when that refresh fails with a 5xx (e.g. Neon Free suspended for the month).
+The cache key is the path plus only the query params the route reads (`common/query-params.ts`), in a fixed
+order: `/api/races/7?utm=x` and `/api/races/7` share one copy.
 
-A non-numeric `:id` / `:raceId` answers 400 `INVALID_ID`, a non-numeric `year` 400 `INVALID_YEAR`, an
+A non-numeric `:id` / `:raceId` (or one with leading zeros) answers 400 `INVALID_ID`, a non-numeric `year` 400 `INVALID_YEAR`, an
 unknown `session` 400 `INVALID_SESSION`, a bad `date` 400 `INVALID_DATE`, and an unknown race, driver or
 team 404 `NOT_FOUND`.
 
@@ -67,6 +69,7 @@ Answers without touching the DB, so uptime checks never wake Neon.
 ### `GET /api/health/db`
 
 Checks DB connectivity (`"db": "connected"`), or 503 `DB_ERROR`. Wakes Neon: not for uptime monitors.
+Dev only: 404 in production.
 
 ---
 
@@ -630,7 +633,7 @@ like the other race routes (30 s while there is no winner).
 ### `GET /api/quality?year=N`
 
 Returns the latest data-quality audit report for a season (records produced by the
-`data_quality_audit` data-engine job). 404 when no report exists for the year yet.
+`data_quality_audit` data-engine job). 404 when no report exists for the year yet. Dev only: 404 in production.
 
 ```json
 {
