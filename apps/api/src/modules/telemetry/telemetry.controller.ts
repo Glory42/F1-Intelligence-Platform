@@ -7,6 +7,7 @@ const service = new TelemetryService();
 export const TelemetryController = {
   getComparison: raceRoute({
     session: QUALIFYING_SESSION,
+    query: ['a', 'b'],
     load: ({ db, race, session, query }) => service.findComparison(db, race.id, session, [query('a'), query('b')]),
     hasData: (data) => data.laps.length > 0,
   }),

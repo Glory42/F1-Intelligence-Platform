@@ -8,6 +8,7 @@ const longRuns = new LongRunsService();
 export const RacesController = {
   // Even a status=completed list grows during the season, so only a past season is final.
   getAll: seasonRoute({
+    query: ['status'],
     load: ({ db, year, query }) => service.findAll(db, year, query('status')),
   }),
 

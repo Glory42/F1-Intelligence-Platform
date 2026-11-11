@@ -35,20 +35,18 @@ Set this as a **Secret** (not plaintext) so it's encrypted at rest.
 
 | Variable | How to set | Notes |
 |----------|-----------|-------|
-| `PUBLIC_API_URL` | `[vars]` in `apps/web/wrangler.toml` | Full Worker URL |
+| `PUBLIC_API_URL` | `[vars]` in `apps/web/wrangler.toml` | The API's custom domain |
 
 **This is set in the committed `wrangler.toml`, not the Cloudflare Pages dashboard.** A Pages
 project's `wrangler.toml` `[vars]` block overrides whatever is set in Settings → Environment
 Variables: setting `PUBLIC_API_URL` in the dashboard has no effect while this file also sets it.
 (This is the opposite of `apps/api`, where secrets *are* dashboard-only: see below.)
 
-Get the real value from the API Worker's own deploy output (`wrangler deploy` prints the live
-URL), not from a copy-pasted example: it must match `apps/api/wrangler.toml`'s `name` field plus
-your Cloudflare account's `workers.dev` subdomain. Renaming the Worker in `apps/api/wrangler.toml`
-does **not** update this value automatically; it's a separate file that silently goes stale if you
-forget to update it too (this happened for real: the Worker was renamed
-`f1-intelligence-api` → `f1-prediction-platform-api` on 2026-06-01 and this file kept the old URL
-for months before anyone noticed the API calls were failing).
+It must match the custom domain in `apps/api/wrangler.toml`'s `routes`. The API's `workers.dev` address
+is turned off (`workers_dev = false`), so there is no second URL to fall back to. Changing the domain in
+`apps/api/wrangler.toml` does **not** update this value automatically; it's a separate file that silently
+goes stale if you forget it (this happened for real with an earlier Worker rename, which left the old URL
+here for months before anyone noticed the API calls were failing).
 
 Pages configs don't support `keep_vars` (and don't need it for *secrets*: Pages deployments never
 erase dashboard-set secrets), so `apps/web/wrangler.toml` omits it. `PUBLIC_API_URL` isn't a
@@ -71,6 +69,51 @@ secret, so it lives directly in this file instead of the dashboard either way.
 The API allows requests only from `https://f1.gorkemkaryol.dev` in production. `http://localhost:4321` and `http://localhost:8787` are only allowed when the `ENVIRONMENT` var is not `"production"`, `wrangler.toml` sets `ENVIRONMENT = "production"` for the deployed Worker, and `.dev.vars` overrides it to `"development"` for local `wrangler dev`.
 
 Configured in `apps/api/src/main.ts`. Only `GET` and `OPTIONS` methods are allowed.
+
+---
+
+## Security
+
+### Response headers
+
+- **Site** (`apps/web/src/lib/securityHeaders.ts`, applied in `src/middleware.ts` to every SSR response,
+  edge-cache hits and redirects included): HSTS, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`,
+  `Permissions-Policy`, and an enforced CSP limited to `frame-ancestors`, `base-uri`, `object-src` and
+  `form-action`. Script, style, font, image and connect sources are in `Content-Security-Policy-Report-Only`:
+  watch the browser console on each page type, and once it's clean for a week move them into the enforced
+  header. Prerendered `/docs` pages and static assets are served by Pages directly and don't get these headers.
+- **API** (`apps/api/src/main.ts`): `X-Content-Type-Options: nosniff` on every response.
+
+### Cache keys
+
+Neither cache keys on the raw URL, so padding a URL with extra params can't multiply Neon wakes or renders:
+- **API:** each handler declares the query params it reads (`query: [...]` on the `common/route.ts`
+  factories, `readsQuery([...], handler)` on hand-written ones). `edgeCache()` keys on those alone, in a fixed
+  order (`common/query-params.ts`). Ids with leading zeros are rejected with 400.
+- **Site:** a URL carrying a param no page reads (`PAGE_QUERY_PARAMS` in `apps/web/src/lib/pageQuery.ts`)
+  is redirected (301) to the same URL without it, and the page cache keys on the params in a fixed order.
+
+### Dev-only routes
+
+`GET /api/quality` and `GET /api/health/db` return 404 when `ENVIRONMENT = "production"`: both read Neon
+uncached on every hit. `/api/health` (no DB) stays public for uptime checks.
+
+### Rate limiting (Cloudflare dashboard, one-time)
+
+Cloudflare's Free plan includes one rate-limiting rule. It's what stops a single client from walking through
+cache misses (`/api/races/1`, `/api/races/2`, ...), which canonical keys can't. Set it up under the
+`gorkemkaryol.dev` zone → Security → WAF → Rate limiting rules:
+
+| Field | Value |
+|---|---|
+| Match | Hostname equals `f1-api.gorkemkaryol.dev` |
+| Characteristics | IP |
+| Rate | 100 requests per 10 seconds |
+| Action | Block for 10 seconds |
+
+The site's own server-side fetches come from Cloudflare's network, not a visitor's IP. Check the rule's
+analytics after a race weekend and raise the rate if SSR fetches are ever blocked. Bot Fight Mode is left
+off: it can challenge those same Worker-to-Worker requests.
 
 ---
 
@@ -110,7 +153,6 @@ python -m src.main --job sync_season   --year 2025 --round 1
 3. Set output directory: `dist`
 4. Set `PUBLIC_API_URL` in `apps/web/wrangler.toml`'s `[vars]` block (not the Pages dashboard:
    see the Environment Variables section above) to the API's custom domain, `https://f1-api.gorkemkaryol.dev`.
-   The `workers.dev` URL also works, but without the edge cache.
 5. Push to `master` to trigger the first deploy.
 
 ### 4. Data Engine (Render)
@@ -132,8 +174,8 @@ python -m src.main --job sync_season   --year 2025 --round 1
 
 Frontend: `https://f1.gorkemkaryol.dev` (custom domain on Cloudflare Pages)
 API: `https://f1-api.gorkemkaryol.dev` (Workers custom domain, the only place the edge cache works).
-`workers_dev = true` keeps `https://f1-prediction-platform-api.gorkemkaryol03.workers.dev` up alongside it
-(without the edge cache); `apps/web/wrangler.toml`'s `PUBLIC_API_URL` points at the custom domain.
+`workers_dev = false`: the old `*.workers.dev` address is off, since every request there skipped the edge
+cache and could wake Neon. `apps/web/wrangler.toml`'s `PUBLIC_API_URL` points at the custom domain.
 
 ---
 

@@ -45,7 +45,7 @@ Must use `@neondatabase/serverless` (HTTP driver): no TCP in Workers.
 ```
 apps/api/
 ├── src/
-│   ├── main.ts                    # Entry point: logger, CORS, edgeCache() on /api/*, /robots.txt, /api/health (no DB), /api/health/db, mounts every module
+│   ├── main.ts                    # Entry point: logger, CORS, nosniff, dev-only gate (/api/quality, /api/health/db 404 in production), edgeCache() on /api/*, /robots.txt, /api/health (no DB), mounts every module
 │   ├── common/                    # Only what several modules share: module-only logic lives in that module's *.helpers.ts
 │   │   ├── types/                 # Response types per domain (api, seasons, circuits, drivers, teams, races, race-events,
 │   │   │                          #   strategy, race-story, telemetry, predictions, sprint, history, quality) + index.ts barrel
@@ -62,7 +62,8 @@ apps/api/
 │   │   ├── identity.ts            # personKey(), isSamePerson(), f1dbPersonKey(), constructorKey()/constructorTeamKeys(), f1dbConstructorId():
 │   │   │                          #   the only "same driver / same team" rules; golden cases in docs/identity-cases.json (shared with Python)
 │   │   ├── cache.ts               # CACHE_COMPLETED/ACTIVE/QUIET/REFERENCE + isIngestWindow() (Fri–Mon noon UTC), cacheControlForActive/Status/Year(), cacheIfData()
-│   │   ├── edge-cache.ts          # edgeCache() middleware: serves repeat GETs from the Workers Cache API (custom domain only); skips errors/non-public responses; keeps copies 30 days past max-age and serves a lapsed one when the refresh 5xxs
+│   │   ├── edge-cache.ts          # edgeCache() middleware: serves repeat GETs from the Workers Cache API (custom domain only); skips errors/non-public responses; keeps copies 30 days past max-age and serves a lapsed one when the refresh 5xxs; keys on the route's declared query params (query-params.ts)
+│   │   ├── query-params.ts        # readsQuery() tags a handler with the query params it reads; canonicalCacheUrl() keys the edge cache on only those, sorted
 │   │   └── session.ts             # RACE_SESSION / QUALIFYING_SESSION: `?session=` param descriptors route.ts validates
 │   ├── config/database.ts         # createDb(): Drizzle over Neon HTTP driver
 │   ├── config/localNeonProxy.ts   # configureLocalNeonProxy(): points the Neon driver at a local proxy (tests, migrate, wrangler dev via NEON_FETCH_ENDPOINT)
@@ -185,7 +186,8 @@ apps/api/
 │   │   │   ├── predictions/       # accuracy, prediction-history, intel-standings helpers
 │   │   │   ├── race-events/       # openf1.mappers (race control, overtakes, team radio)
 │   │   │   └── quality/quality.test.ts # castSeverity()
-│   │   └── common/                # mappers, standings, feature-manifest, cache, edge-cache (stale-if-error), identity (golden cases from docs/identity-cases.json)
+│   │   └── common/                # mappers, standings, feature-manifest, cache, edge-cache (stale-if-error), identity (golden cases from docs/identity-cases.json),
+│   │                              #   query-params (canonical keys; every GET route declares its params; hand-written handlers read only declared ones)
 │   ├── integration/                # bun test: real Hono `app.request()` against a LOCAL Postgres (docker-compose.test.yml behind
 │   │   │                           #   a Neon HTTP proxy; `bun run test:db:up`, config in .env.test): never Neon
 │   │   ├── races/races.test.ts     # list/filter/detail/circuit-history joins
@@ -199,8 +201,8 @@ apps/api/
 │   │   ├── telemetry/telemetry.test.ts # lists everyone with telemetry, samples only for the two requested / two fastest
 │   │   ├── hub/hub.test.ts         # race recap (winner, model pick, fastest stop, longest battle) + on-this-day races
 │   │   ├── history/history.test.ts # leaders w/ flags + active, strike-rate min starts, chases, milestones, lineages, on-this-day fallback
-│   │   ├── edge-cache/edge-cache.test.ts # edge hits skip the DB; never caches errors/non-public; per-request CORS origin
-│   │   ├── health/health.test.ts   # /api/health without the DB, /api/health/db, API robots.txt
+│   │   ├── edge-cache/edge-cache.test.ts # edge hits skip the DB; never caches errors/non-public; per-request CORS origin; padded/reordered params share a copy
+│   │   ├── health/health.test.ts   # /api/health without the DB, /api/health/db, dev-only routes 404 in production, API robots.txt
 │   │   ├── drivers/drivers.test.ts # list/filter/standings/detail
 │   │   ├── drivers/career.test.ts  # career + search link a person's seasons across name variants
 │   │   ├── drivers/racecraft.test.ts   # net GP overtakes ranking, sprint passes excluded
@@ -528,7 +530,9 @@ apps/web/
 │   │   ├── sidebarState.ts        # Sidebar collapse cookie: isSidebarCollapsed() + sidebarCookie()
 │   │   ├── legacyRedirects.ts     # legacyRedirect(path, search): retired URLs (prediction recap, /records, /drivers|teams/compare) → their new home
 │   │   ├── canonicalHost.ts       # canonicalHostRedirect(): the production *.pages.dev address → 301 to the custom domain (previews stay)
-│   │   ├── pageCache.ts           # servePageCached(): rendered HTML kept in the edge Cache API (5 min Fri–Mon noon UTC, 1 h between), keyed by URL + sidebar cookie (Workers Free: 10 ms CPU)
+│   │   ├── pageCache.ts           # servePageCached(): rendered HTML kept in the edge Cache API (5 min Fri–Mon noon UTC, 1 h between), keyed by path + sorted page params + sidebar cookie (Workers Free: 10 ms CPU)
+│   │   ├── pageQuery.ts           # PAGE_QUERY_PARAMS (every ?param a page reads) + strayQueryRedirect(): unknown params 301 away
+│   │   ├── securityHeaders.ts     # securityHeaders(apiOrigin) + withSecurityHeaders(): HSTS, nosniff, frame/CSP (script sources report-only)
 │   │   ├── utils.ts               # cn() (clsx + tailwind-merge), unwrapSettled(), formatMs/Probability/Date/StopSeconds/AgeFromDays
 │   │   └── f1/                    # F1 reference data + maths used across features
 │   │       ├── teamColors.ts      # team_key → official hex color map (fallback #6B7280)
@@ -540,7 +544,7 @@ apps/web/
 │   │       │                      #   whatIfProbabilities(): the "why" bar, radar and What-If Lab for both models
 │   │       ├── championshipMath.ts # titleContention() (mathematically out), remainingSessions(), formatTitleOdds()
 │   │       └── tyres.ts           # compoundToken(compound, year): tyre compound → colour token (2018 named compounds use the 2018 palette)
-│   ├── middleware.ts              # 301s the pages.dev alias and retired URLs; serves pages through servePageCached()
+│   ├── middleware.ts              # 301s the pages.dev alias, retired URLs and unknown query params; serves pages through servePageCached(); adds security headers to every response
 │   ├── types/                     # Type-only re-exports of apps/api common/types/ (+ search.ts GlobalSearchResponse): seasons, circuits,
 │   │                              #   drivers, teams, races, race-events, strategy, race-story, telemetry, predictions,
 │   │                              #   sprint, history, quality: imported via the index.ts barrel as '@/types'
@@ -563,7 +567,7 @@ apps/web/
 │   │   ├── components/
 │   │   │   ├── layout/navLinks.test.ts       # pure: sidebar groups, utilities, active-destination matching
 │   │   │   └── data/                         # chartScale, labelLayout
-│   │   ├── lib/                              # pure, `node` env: pageTabs / sidebarState / legacyRedirects / canonicalHost / pageCache / utils
+│   │   ├── lib/                              # pure, `node` env: pageTabs / sidebarState / legacyRedirects / canonicalHost / pageCache / pageQuery / securityHeaders / utils
 │   │   │   └── f1/                           # predictionMath (all exports), predictionTerms, championshipMath, teamColors, teamLogos, tyres
 │   │   ├── features/races/ · features/telemetry/  # calendar, raceView + raceEventTabs, gridPenalties, weatherSpells, raceEventDisplay · telemetryCompare, trackMap
 │   │   ├── features/predictions/
@@ -669,6 +673,7 @@ apps/e2e/
 │   └── smoke/
 │       ├── branding.spec.ts        # /: dashboard title carries the brand exactly once
 │       ├── sidebar.spec.ts         # Season/Explore groups, active destination, collapse persists across reloads
+│       ├── security.spec.ts        # security headers on pages; unknown query params 301 to the plain page
 │       ├── home-hub.spec.ts        # /: exactly three blocks: next race (schedule, circuit), last race recap, championship
 │       ├── global-search.spec.ts   # Cmd/Ctrl+K opens, shows results, Escape closes (client-side fetch)
 │       ├── prediction.spec.ts      # /prediction tabs + Scorecard, recap URL redirect

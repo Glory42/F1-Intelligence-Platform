@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { desc, eq } from 'drizzle-orm';
+import { readsQuery } from '../../common/query-params';
 import type { Bindings, Driver } from '../../common/types';
 import { createDb, type Db } from '../../config/database';
 import { drivers, teams, circuits, seasons } from '../../db/schema';
@@ -53,10 +54,10 @@ async function getGlobalSearchData(db: Db) {
 
 const searchModule = new Hono<{ Bindings: Bindings }>();
 
-searchModule.get('/', async (c) => {
+searchModule.get('/', readsQuery([], async (c) => {
   const data = await getGlobalSearchData(createDb(c.env.DATABASE_URL));
   c.header('Cache-Control', CACHE_REFERENCE);
   return c.json({ data, error: null });
-});
+}));
 
 export default searchModule;

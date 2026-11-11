@@ -66,6 +66,13 @@ describe('page cache', () => {
     expect(tab).not.toBe(season);
   });
 
+  it('keys the same tab and season in either param order as one page', () => {
+    const one = pageCacheKey(new URL('https://f1.example/drivers?year=2024&tab=racecraft'), null).url;
+    const other = pageCacheKey(new URL('https://f1.example/drivers?tab=racecraft&year=2024'), null).url;
+
+    expect(one).toBe(other);
+  });
+
   it.each([
     ['a missing page', page({}, 404)],
     ['a page that sets a cookie', page({ 'Set-Cookie': 'a=b' })],

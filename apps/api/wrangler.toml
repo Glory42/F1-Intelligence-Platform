@@ -9,8 +9,9 @@ keep_vars = true
 routes = [
   { pattern = "f1-api.gorkemkaryol.dev", custom_domain = true },
 ]
-# A `routes` entry turns *.workers.dev off by default, and apps/web still calls that URL.
-workers_dev = true
+# Off: on *.workers.dev the edge cache is a no-op, so every request there could wake Neon.
+# apps/web calls the custom domain (apps/web/wrangler.toml PUBLIC_API_URL).
+workers_dev = false
 
 # DATABASE_URL is set via the Cloudflare dashboard (Variables and Secrets)
 # keep_vars = true prevents deploys from erasing dashboard-set variables
