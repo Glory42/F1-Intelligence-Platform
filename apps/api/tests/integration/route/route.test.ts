@@ -133,6 +133,7 @@ describe('route policy (integration)', () => {
     ['/api/races/abc/long-runs', 'id must be a number'],
     ['/api/drivers/abc/career', 'id must be a number'],
     ['/api/teams/99999999999', 'id must be a number'],
+    ['/api/races/0007', 'id must be a number'],
   ])('rejects the id in %s with 400 INVALID_ID', async (path, message) => {
     const res = await apiRequest(path);
 

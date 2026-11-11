@@ -5,6 +5,7 @@ import { createDb, type Db } from '../config/database';
 import { circuits, drivers, races, seasons, teams } from '../db/schema';
 import { cacheControlForStatus, cacheControlForYear, cacheIfData } from './cache';
 import type { SessionParam } from './session';
+import { readsQuery } from './query-params';
 
 type Ctx = Context<{ Bindings: Bindings }>;
 type RaceRow = typeof races.$inferSelect;
@@ -14,8 +15,10 @@ type TeamRow = typeof teams.$inferSelect;
 
 type Failure = { status: 400 | 404; code: string; message: string };
 
-interface Spec<Req, T> {
+interface Spec<Req, T, Q extends string = never> {
   load: (req: Req) => Promise<T | null>;
+  // Query params `load` reads beyond the factory's own (year, session): the edge cache keys on them.
+  query?: readonly Q[];
   // Empty answers are cached briefly so a later backfill shows up; default: an empty array is empty.
   hasData?: (data: T) => boolean;
   // 404 message when `load` finds nothing; called with the route's id (or year).
@@ -29,12 +32,12 @@ interface SeasonScopedSpec<Req, T> extends Spec<Req, T> {
 
 export type DriverRequest = { db: Db; driver: DriverRow; team: TeamRow; year: number };
 export type TeamRequest = { db: Db; team: TeamRow; year: number };
-export type SeasonRequest = { db: Db; year: number; query: (name: string) => string | undefined };
-export type RaceRequest<S = undefined> = {
-  db: Db; race: RaceRow; circuit: CircuitRow; session: S; query: (name: string) => string | undefined;
+export type SeasonRequest<Q extends string = never> = { db: Db; year: number; query: (name: Q) => string | undefined };
+export type RaceRequest<S = undefined, Q extends string = never> = {
+  db: Db; race: RaceRow; circuit: CircuitRow; session: S; query: (name: Q) => string | undefined;
 };
 
-interface RaceSpec<S, T> extends Spec<RaceRequest<S>, T> {
+interface RaceSpec<S, T, Q extends string> extends Spec<RaceRequest<S, Q>, T, Q> {
   param?: 'id' | 'raceId';
   session?: SessionParam<S>;
 }
@@ -45,8 +48,9 @@ export function newestSeason(rows: { year: number }[]): number {
 
 const INT4_MAX = 2_147_483_647;
 
-function parseId(value: string | undefined): number | null {
-  if (!value || !/^\d+$/.test(value)) return null;
+// No leading zeros: /races/7 and /races/007 would be two cache keys for one race.
+export function parseId(value: string | undefined): number | null {
+  if (!value || !/^(0|[1-9]\d*)$/.test(value)) return null;
   const id = Number(value);
   return id <= INT4_MAX ? id : null;
 }
@@ -61,8 +65,8 @@ function isNonEmpty(data: unknown): boolean {
   return !Array.isArray(data) || data.length > 0;
 }
 
-async function respond<Req, T>(
-  c: Ctx, spec: Spec<Req, T>, req: Req, missing: string, cacheFor: (data: T) => string,
+async function respond<Req, T, Q extends string>(
+  c: Ctx, spec: Spec<Req, T, Q>, req: Req, missing: string, cacheFor: (data: T) => string,
 ) {
   const data = await spec.load(req);
   if (data == null) return fail(c, notFound(missing));
@@ -73,10 +77,11 @@ async function respond<Req, T>(
 const NO_SESSION: SessionParam<undefined> = { parse: () => undefined, error: { code: '', message: '' } };
 
 // Loads the race once: its existence decides the 404 and its status the cache lifetime.
-export function raceRoute<T, S = undefined>(spec: RaceSpec<S, T>) {
+export function raceRoute<T, S = undefined, const Q extends string = never>(spec: RaceSpec<S, T, Q>) {
   const param = spec.param ?? 'id';
   const sessionParam = (spec.session ?? NO_SESSION) as SessionParam<S>;
-  return async (c: Ctx) => {
+  const own = spec.session ? ['session'] : [];
+  return readsQuery([...own, ...(spec.query ?? [])], async (c: Ctx) => {
     const id = parseId(c.req.param(param));
     if (id == null) return fail(c, { status: 400, code: 'INVALID_ID', message: `${param} must be a number` });
     const session = sessionParam.parse(c.req.query('session'));
@@ -89,10 +94,10 @@ export function raceRoute<T, S = undefined>(spec: RaceSpec<S, T>) {
       .where(eq(races.id, id))
       .limit(1);
     if (!found) return fail(c, notFound(`Race ${id} not found`));
-    const req = { db, ...found, session, query: (name: string) => c.req.query(name) };
+    const req = { db, ...found, session, query: (name: Q) => c.req.query(name) };
     const missing = spec.missing?.(id) ?? `Race ${id} not found`;
     return respond(c, spec, req, missing, () => cacheControlForStatus(found.race.status));
-  };
+  });
 }
 
 function parseYear(value: string | undefined): number | null {
@@ -101,14 +106,14 @@ function parseYear(value: string | undefined): number | null {
 }
 
 // The answer is that season's data, so the requested season is the data's own season.
-export function seasonRoute<T>(spec: Spec<SeasonRequest, T>) {
-  return async (c: Ctx) => {
+export function seasonRoute<T, const Q extends string = never>(spec: Spec<SeasonRequest<Q>, T, Q>) {
+  return readsQuery(['year', ...(spec.query ?? [])], async (c: Ctx) => {
     const year = parseYear(c.req.query('year'));
     if (year == null) return fail(c, { status: 400, code: 'INVALID_YEAR', message: 'year must be a number' });
-    const req = { db: createDb(c.env.DATABASE_URL), year, query: (name: string) => c.req.query(name) };
+    const req = { db: createDb(c.env.DATABASE_URL), year, query: (name: Q) => c.req.query(name) };
     const missing = spec.missing?.(year) ?? `Nothing for ${year}`;
     return respond(c, spec, req, missing, () => cacheControlForYear(year));
-  };
+  });
 }
 
 // Driver and team ids are season-scoped, so the row's own season decides the cache lifetime.
@@ -117,7 +122,7 @@ function seasonScopedRoute<Found extends { year: number }, T>(
   find: (db: Db, id: number) => Promise<Found | undefined>,
   spec: SeasonScopedSpec<Found & { db: Db }, T>,
 ) {
-  return async (c: Ctx) => {
+  return readsQuery([], async (c: Ctx) => {
     const id = parseId(c.req.param('id'));
     if (id == null) return fail(c, { status: 400, code: 'INVALID_ID', message: 'id must be a number' });
     const db = createDb(c.env.DATABASE_URL);
@@ -126,7 +131,7 @@ function seasonScopedRoute<Found extends { year: number }, T>(
     const missing = spec.missing?.(id) ?? `${label} ${id} not found`;
     return respond(c, spec, { db, ...found }, missing, (data) =>
       cacheControlForYear(spec.seasonOf?.(data) ?? found.year));
-  };
+  });
 }
 
 export function driverRoute<T>(spec: SeasonScopedSpec<DriverRequest, T>) {

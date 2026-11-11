@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type MiddlewareHandler } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { sql } from 'drizzle-orm';
@@ -20,6 +20,7 @@ import searchModule from './modules/search/search';
 import qualityModule from './modules/quality/quality';
 import type { Bindings } from './common/types';
 import { edgeCache } from './common/edge-cache';
+import { readsQuery } from './common/query-params';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -48,21 +49,30 @@ app.use('*', cors({
   allowMethods: ['GET', 'OPTIONS'],
   allowHeaders: ['Content-Type'],
 }));
+app.use('*', async (c, next) => {
+  await next();
+  c.header('X-Content-Type-Options', 'nosniff');
+});
+// Dev tooling that reads Neon uncached on every hit: in production any visitor could keep it awake.
+const devOnly: MiddlewareHandler<{ Bindings: Bindings }> = async (c, next) =>
+  c.env.ENVIRONMENT === 'production' ? c.notFound() : next();
+app.use('/api/quality', devOnly);
+app.use('/api/health/db', devOnly);
 app.use('/api/*', edgeCache());
 
 app.get('/robots.txt', (c) => c.text('User-agent: *\nDisallow: /\n'));
 
 // Uptime checks hit this one: it must not wake Neon (each wake bills at least 5 min of compute).
-app.get('/api/health', (c) => c.json({ data: { status: 'ok', timestamp: new Date().toISOString() }, error: null }));
+app.get('/api/health', readsQuery([], (c) => c.json({ data: { status: 'ok', timestamp: new Date().toISOString() }, error: null })));
 
-app.get('/api/health/db', async (c) => {
+app.get('/api/health/db', readsQuery([], async (c) => {
   try {
     await createDb(c.env.DATABASE_URL).execute(sql`SELECT 1`);
     return c.json({ data: { status: 'ok', db: 'connected', timestamp: new Date().toISOString() }, error: null });
   } catch {
     return c.json({ data: null, error: { code: 'DB_ERROR', message: 'Database unreachable' } }, 503);
   }
-});
+}));
 
 app.route('/api/races', circuitsModule);
 app.route('/api/races', racesModule);

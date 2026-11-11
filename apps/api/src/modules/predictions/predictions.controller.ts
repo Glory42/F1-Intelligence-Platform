@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import type { Bindings } from '../../common/types';
+import { readsQuery } from '../../common/query-params';
 import { createDb } from '../../config/database';
 import { PredictionsService } from './predictions.service';
 import { TitleOddsService } from './title-odds.service';
@@ -12,14 +13,14 @@ const service = new PredictionsService();
 const titleOdds = new TitleOddsService();
 
 export const PredictionsController = {
-  getUpcoming: async (c: Context<{ Bindings: Bindings }>) => {
+  getUpcoming: readsQuery([], async (c: Context<{ Bindings: Bindings }>) => {
     const data = await findUpcomingPrediction(createDb(c.env.DATABASE_URL), GP);
     if (!data) {
       return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'No upcoming prediction available' } }, 404);
     }
     c.header('Cache-Control', cacheControlForStatus(data.race.status));
     return c.json({ data, error: null });
-  },
+  }),
 
   getTitleOdds: seasonRoute({
     load: ({ db, year }) => titleOdds.findTitleOdds(db, year),
@@ -36,21 +37,21 @@ export const PredictionsController = {
     load: ({ db, year }) => service.findHistory(db, year),
   }),
 
-  getAccuracy: async (c: Context<{ Bindings: Bindings }>) => {
+  getAccuracy: readsQuery([], async (c: Context<{ Bindings: Bindings }>) => {
     const data = await service.findAccuracyBySeason(createDb(c.env.DATABASE_URL));
     // Response spans every season, and the most recent one is almost always still in
     // progress: cache short rather than trying to reason about which years are final.
     c.header('Cache-Control', cacheControlForActive());
     return c.json({ data, error: null });
-  },
+  }),
 
   getIntelStandings: seasonRoute({
     load: ({ db, year }) => service.findIntelStandings(db, year),
   }),
 
-  getModelInfo: async (c: Context<{ Bindings: Bindings }>) => {
+  getModelInfo: readsQuery([], async (c: Context<{ Bindings: Bindings }>) => {
     const data = await service.getModelInfo(createDb(c.env.DATABASE_URL));
     c.header('Cache-Control', CACHE_REFERENCE);
     return c.json({ data, error: null });
-  },
+  }),
 };

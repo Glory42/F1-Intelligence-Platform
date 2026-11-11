@@ -17,6 +17,7 @@ export const DriversController = {
   }),
 
   getAll: seasonRoute({
+    query: ['team_id'],
     load: ({ db, year, query }) => {
       const teamId = query('team_id');
       return service.findAll(db, year, teamId ? Number(teamId) : undefined);

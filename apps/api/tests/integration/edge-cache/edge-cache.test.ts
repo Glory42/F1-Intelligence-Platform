@@ -83,4 +83,25 @@ describe('edge cache (integration)', () => {
 
     expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
   });
+
+  it('answers a request padded with params the route never reads from the same copy', async () => {
+    const nameOf = async (res: Response) => ((await res.json()) as { data: { race: { name: string } } }).data.race.name;
+    const cached = await nameOf(await apiRequest(`/api/races/${completedRaceId}`));
+    await db.update(races).set({ name: 'Padded Grand Prix' }).where(eq(races.id, completedRaceId));
+
+    const padded = await nameOf(await apiRequest(`/api/races/${completedRaceId}?utm_source=x&session=sprint`));
+
+    expect(padded).toBe(cached);
+  });
+
+  it('keeps one copy per value of a param the route reads, whatever the param order', async () => {
+    await apiRequest('/api/races?year=2099&status=completed');
+    await apiRequest('/api/races?status=completed&year=2099&page=2');
+    await apiRequest('/api/races?year=2098&status=completed');
+
+    expect([...edge.entries.keys()].map((url) => new URL(url).search).sort()).toEqual([
+      '?status=completed&year=2098',
+      '?status=completed&year=2099',
+    ]);
+  });
 });

@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import type { Bindings } from '../../common/types';
+import { readsQuery } from '../../common/query-params';
 import { createDb } from '../../config/database';
 import { SprintService } from './sprint.service';
 import { cacheControlForStatus } from '../../common/cache';
@@ -10,14 +11,14 @@ import { findPrediction, findUpcomingPrediction } from '../../common/session-rea
 const service = new SprintService();
 
 export const SprintController = {
-  getUpcoming: async (c: Context<{ Bindings: Bindings }>) => {
+  getUpcoming: readsQuery([], async (c: Context<{ Bindings: Bindings }>) => {
     const data = await findUpcomingPrediction(createDb(c.env.DATABASE_URL), SPRINT);
     if (!data) {
       return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'No upcoming sprint prediction available' } }, 404);
     }
     c.header('Cache-Control', cacheControlForStatus(data.race.status));
     return c.json({ data, error: null });
-  },
+  }),
 
   getByRaceId: raceRoute({
     param: 'raceId',

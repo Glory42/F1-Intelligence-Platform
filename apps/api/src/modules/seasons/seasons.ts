@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { desc, count, eq } from 'drizzle-orm';
+import { readsQuery } from '../../common/query-params';
 import type { Bindings } from '../../common/types';
 import { createDb, type Db } from '../../config/database';
 import { seasons, races } from '../../db/schema';
@@ -18,10 +19,10 @@ async function findAllSeasons(db: Db): Promise<{ year: number; raceCount: number
 
 const seasonsModule = new Hono<{ Bindings: Bindings }>();
 
-seasonsModule.get('/', async (c) => {
+seasonsModule.get('/', readsQuery([], async (c) => {
   const data = await findAllSeasons(createDb(c.env.DATABASE_URL));
   c.header('Cache-Control', CACHE_REFERENCE);
   return c.json({ data, error: null });
-});
+}));
 
 export default seasonsModule;

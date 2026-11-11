@@ -1,4 +1,5 @@
 import type { MiddlewareHandler } from 'hono';
+import { canonicalCacheUrl, declaredQueryParams } from './query-params';
 
 export interface EdgeCache {
   match(request: Request): Promise<Response | undefined>;
@@ -61,7 +62,8 @@ export function edgeCache(
     const cache = c.req.method === 'GET' ? getCache() : undefined;
     if (!cache) return next();
 
-    const key = new Request(c.req.url, { method: 'GET' });
+    const url = canonicalCacheUrl(c.req.url, declaredQueryParams(c), (name) => c.req.query(name));
+    const key = new Request(url, { method: 'GET' });
     const hit = await cache.match(key);
     if (hit && isFresh(hit, clock())) return forClient(hit);
 
