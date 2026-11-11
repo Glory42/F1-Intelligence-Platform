@@ -1,4 +1,5 @@
 import { SIDEBAR_COOKIE, isSidebarCollapsed } from '@/lib/sidebarState';
+import { canonicalPageSearch } from '@/lib/pageQuery';
 
 export interface PageCache {
   match(request: Request): Promise<Response | undefined>;
@@ -27,7 +28,7 @@ export function defaultPageCache(): PageCache | undefined {
 
 // The sidebar cookie is the only request input a page renders from, so it is part of the key.
 export function pageCacheKey(url: URL, cookieHeader: string | null): Request {
-  const key = new URL(url);
+  const key = new URL(url.pathname + canonicalPageSearch(url), url.origin);
   const collapsed = isSidebarCollapsed(readCookie(cookieHeader, SIDEBAR_COOKIE));
   key.searchParams.set('__sidebar', collapsed ? 'collapsed' : 'expanded');
   return new Request(key, { method: 'GET' });
