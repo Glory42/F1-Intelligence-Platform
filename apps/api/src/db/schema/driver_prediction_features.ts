@@ -15,6 +15,8 @@ export const driverPredictionFeatures = pgTable('driver_prediction_features', {
   rawWeightedScore: numeric('raw_weighted_score', { precision: 8, scale: 6 }).notNull(),
   winProbability: numeric('win_probability', { precision: 6, scale: 5 }).notNull(),
   predictedPosition: integer('predicted_position'),
+  // P(top 3) from the win probabilities (data-engine utils/finishing_order.py); null before it existed.
+  podiumProbability: numeric('podium_probability', { precision: 6, scale: 5 }),
 
   computedAt: timestamp('computed_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [

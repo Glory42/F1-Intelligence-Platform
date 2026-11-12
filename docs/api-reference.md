@@ -346,6 +346,7 @@ Returns the prediction for the next `qualifying_done` race with `race_date >= to
       {
         "predictedPosition": 1,
         "winProbability": "0.61200",
+        "podiumProbability": "0.88412",
         "gridPosition": 1,
         "driver": { "id": 42, "code": "VER", "fullName": "Max Verstappen", "team": { ... } },
         "features": {
@@ -517,6 +518,7 @@ conventional (non-sprint) weekend.
         {
           "predictedPosition": 1,
           "winProbability": "0.29000",
+          "podiumProbability": null,
           "gridPosition": 1,
           "driver": { ... },
           "features": {

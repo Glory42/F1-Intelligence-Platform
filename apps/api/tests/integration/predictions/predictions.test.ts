@@ -30,7 +30,10 @@ describe('predictions (integration)', () => {
       roundNumber: 1, name: 'Upcoming GP', raceDate: '2099-03-01', status: 'qualifying_done',
     });
     await createRacePrediction(db, upcoming.id, winner.id);
-    await createDriverPredictionFeatures(db, upcoming.id, winner.id, { winProbability: '0.55000', predictedPosition: 1 });
+    await createDriverPredictionFeatures(db, upcoming.id, winner.id, {
+      winProbability: '0.55000', predictedPosition: 1,
+      podiumProbability: '0.81000',
+    });
     await createDriverPredictionFeatures(db, upcoming.id, other.id, { winProbability: '0.20000', predictedPosition: 2 });
 
     // Completed prior round with a correct prediction: feeds history + accuracy.
@@ -59,7 +62,7 @@ describe('predictions (integration)', () => {
     const { data } = (await res.json()) as {
       data: {
         predictedWinner: { code: string }; modelVersion: string; race: { status: string };
-        drivers: Array<{ features: Record<string, { value: number; contribution: number }> }>;
+        drivers: Array<{ features: Record<string, { value: number; contribution: number }>; podiumProbability: string | null }>;
       };
     };
     expect(data.predictedWinner.code).toBe('AAA');
@@ -67,6 +70,8 @@ describe('predictions (integration)', () => {
     expect(data.race.status).toBe('qualifying_done');
     expect(data.drivers).toHaveLength(2);
     expect(data.drivers[0].features.teamRacePace).toEqual({ value: -0.15, contribution: 0.35 });
+    expect(data.drivers[0].podiumProbability).toBe('0.81000');
+    expect(data.drivers[1].podiumProbability).toBeNull();
   });
 
   it('returns a prediction by race id', async () => {

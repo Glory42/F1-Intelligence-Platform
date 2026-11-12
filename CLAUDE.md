@@ -165,7 +165,7 @@ Full rules and numbers: `docs/plans/intelligence-platform-roadmap.md` §1–§2.
 - `qualifying_lap_telemetry`: each driver's fastest Q/SQ lap (2018+: OpenF1 from 2023, FastF1 before), resampled every 10 m into one JSONB row (~11 KB)
 - `history_drivers` / `history_constructors` / `history_constructor_seasons` / `history_constructor_lineage` / `f1db_imports`: all-time history from F1DB (CC-BY-4.0, credit it wherever shown); joined to core drivers by `match_key` (`normalize_person_name`) and to teams via `f1dbConstructorId(team_key)`
 - `driver_season_stats` / `team_season_stats`: aggregated after each race (includes sprint aggregates)
-- `driver_prediction_features`: weighted-v4 features per driver per GP (`features` JSONB: value + contribution)
+- `driver_prediction_features`: weighted-v4 features per driver per GP (`features` JSONB: value + contribution) + `podium_probability`
 - `race_predictions`: one predicted GP winner per race
 - `driver_sprint_features`: 8 sprint-specific feature scores per driver per sprint weekend
 - `sprint_predictions`: one predicted sprint winner per sprint weekend
@@ -366,9 +366,10 @@ python scripts/backfill_title_odds.py 2018 2026             # local only: replay
 python scripts/dev_snapshot.py                              # local only: one read-only Neon dump into docker-compose.dev.yml (needs PROD_DATABASE_URL)
 python scripts/neon_usage.py                                # Neon Free usage + month-end projection (control-plane API: no DB wake)
 python scripts/backtest_snapshot.py                         # local only: one read-only Neon dump into docker-compose.backtest.yml
-python scripts/backtest.py [--from 2018] [--to 2026] [--reference NAME] [--json]  # local snapshot only: walk-forward GP model vs baselines
+python scripts/backtest.py [--from 2018] [--to 2026] [--reference NAME] [--places] [--json]  # local snapshot only: walk-forward GP model vs baselines
 python scripts/fit_model_v4.py                              # local snapshot only: refit src/models/gp_v4.json after a validated change
 python scripts/backfill_all_predictions.py [--from 2018]    # local only, writes Neon: regenerate predictions (GP fitted per season, out-of-sample)
+python scripts/backfill_podium_probability.py [--refresh]   # local only, writes Neon: podium chance from stored win probabilities
 python scripts/import_f1db.py [--version vYYYY.RR.M]         # weekly GitHub Action (f1db-import.yml) or local: download, verify sha256, import
 python scripts/audit_results_vs_f1db.py [--modern-plan]      # local only: read-only results check vs F1DB
 python scripts/backfill_results_from_f1db.py --from 1980 --to 2017 [--apply]  # local only: ADR 0009

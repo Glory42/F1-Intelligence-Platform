@@ -17,6 +17,7 @@ test("the next race block counts down and names the model's favourite", async ({
   const next = page.getByRole('region', { name: 'Next race' });
   await expect(next).toContainText('Italian Grand Prix');
   await expect(next).toContainText('VER');
+  await expect(next).toContainText('podium 88%');
   await expect(next.getByRole('link', { name: /prediction/i })).toHaveAttribute('href', '/prediction');
 });
 

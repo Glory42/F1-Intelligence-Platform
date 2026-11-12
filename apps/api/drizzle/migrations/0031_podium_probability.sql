@@ -1,0 +1,1 @@
+ALTER TABLE "driver_prediction_features" ADD COLUMN "podium_probability" numeric(6, 5);

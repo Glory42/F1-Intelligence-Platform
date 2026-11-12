@@ -19,6 +19,8 @@ export interface PredictionDriverVM {
     team: { teamKey: string };
   };
   winProbability: string;
+  // GP only; null for sprints and for predictions stored before the podium forecast.
+  podiumProbability: string | null;
   gridPosition: number | null;
   terms: Terms;
   // Each feature 0–1 within this field, for the radar.

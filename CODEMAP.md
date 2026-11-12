@@ -176,10 +176,10 @@ apps/api/
 │                                   #   exports castSeverity() for its own test
 ├── drizzle/
 │   └── migrations/                # Generated SQL migration files + Drizzle metadata
-│       ├── 0000_glamorous_galactus.sql … 0030_gp_features_jsonb.sql  # 31 migrations: initial schema, sprint,
+│       ├── 0000_glamorous_galactus.sql … 0031_podium_probability.sql  # 32 migrations: initial schema, sprint,
 │       │                                #   circuits, data quality, OpenF1, stints/pit stops, title odds, race story,
 │       │                                #   weather traces, qualifying telemetry, F1DB history, per-person drivers,
-│       │                                #   weighted-v4 (v3 score columns dropped, features JSONB)
+│       │                                #   weighted-v4 (v3 score columns dropped, features JSONB), podium probability
 │       └── meta/                        # Drizzle migration metadata (_journal.json, snapshots)
 ├── tests/
 │   ├── unit/                      # bun test: mirrors src/, one *.test.ts per file
@@ -785,6 +785,7 @@ data-engine/
 │       ├── telemetry.py           # build_lap_telemetry(): resample either adapter's car/position samples onto a 10 m distance grid; telemetry_samples(): JSONB shape
 │       ├── fastf1_session.py      # the FastF1 adapter (local 2018–2022 backfills + legacy jobs): same session_records as OpenF1, lap_records(), get_session()
 │       ├── title_odds.py          # Plackett-Luce finishing-order sampling + season simulation → title odds (ADR 0007)
+│       ├── finishing_order.py     # place_probabilities() (Plackett–Luce + Henery discount), podium_probabilities() (PODIUM_DISCOUNT 0.8), podium_updates() for the backfill
 │       ├── storage_guard.py       # storage_tier()/read_storage_tier(): Neon Free 1 GB tiers gating optional writes + backfills
 │       ├── logging_utils.py       # log_job_failure(), log_job_ok(), peak_rss_mb(): structured JSON job logs
 │       ├── conditional_logit.py   # LogitModel + fit_conditional_logit(): softmax over coef · standardized features, fitted by max likelihood
@@ -793,7 +794,8 @@ data-engine/
 │       ├── race_history.py        # RaceHistory + load_history(conn, since, until): the in-memory slice the v4 features read
 │       ├── identity.py            # person_key(), is_same_person(), constructor_key(): mirrors apps/api common/identity.ts
 │       ├── season_aggregates.py   # Driver/team season aggregates, optionally as of a race date (season stats + sprint features)
-│       ├── backtest.py            # race_metrics() (log loss, Brier, top-1/3), summarize(), paired_difference(), calibration_table(), GridWinRates baseline
+│       ├── backtest.py            # race_metrics() (log loss, Brier, top-1/3), summarize(), paired_difference(), calibration_table(), GridWinRates baseline,
+│       │                          #   place_metrics() + GridPlaceRates (P(top k | grid slot)) for --places
 │       ├── ingest_runner.py       # Three seams: run_ingest_job(...), shared headshot/results/lap-time/race-story/status logic for
 │       │                          # ingest_race + ingest_sprint; run_qualifying_ingest_job(...): shared logic for
 │       │                          # ingest_qualifying + ingest_sprint_qualifying (no weather/laps/headshots);
@@ -816,8 +818,9 @@ data-engine/
 │   ├── backfill_title_odds.py     # Replay title odds after every completed round for a year range (default 2018–2026)
 │   ├── backfill_race_story.py     # Backfill race_lap_traces/battles/weather for completed 2018–2022 races: FastF1 cache, local only
 │   ├── backfill_all_predictions.py # Regenerate GP (weighted-v4, fitted per season on earlier seasons) + sprint-v2 predictions: local only
+│   ├── backfill_podium_probability.py # Fill podium_probability from stored win probabilities (no refit): local only, writes Neon
 │   ├── backfill_historical.sh     # Shell loop over sync_schedule/ingest/compute for OpenF1 seasons (2023+)
-│   ├── backtest.py                # Walk-forward GP backtest on the local snapshot: CANDIDATES vs grid-history/uniform baselines
+│   ├── backtest.py                # Walk-forward GP backtest on the local snapshot: CANDIDATES vs grid-history/uniform baselines; --places scores P(podium)/P(points)
 │   ├── backtest_snapshot.py       # Copy Neon into the local backtest Postgres (docker-compose.backtest.yml); read-only on Neon
 │   ├── dev_snapshot.py            # Copy Neon into the local dev Postgres (docker-compose.dev.yml); read-only on Neon
 │   ├── neon_snapshot.py           # copy_neon_into(): shared pg_dump/pg_restore of the two snapshot scripts

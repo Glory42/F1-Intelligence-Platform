@@ -3,9 +3,11 @@ import math
 import pytest
 
 from src.utils.backtest import (
+    GridPlaceRates,
     GridWinRates,
     calibration_table,
     paired_difference,
+    place_metrics,
     race_metrics,
     summarize,
 )
@@ -109,3 +111,32 @@ class TestGridWinRates:
         rates.record([(0, True), (None, False), (30, False)])
 
         assert rates.slot(0) == rates.slot(None) == rates.slot(30) == GridWinRates.BACK_SLOT
+
+
+class TestPlaceMetrics:
+    def test_averages_each_driver_s_binary_log_loss_and_brier(self):
+        metrics = place_metrics({"a": 0.9, "b": 0.5, "c": 0.1}, placed={"a", "b"})
+
+        assert metrics["log_loss"] == pytest.approx(-(math.log(0.9) + math.log(0.5) + math.log(0.9)) / 3)
+        assert metrics["brier"] == pytest.approx((0.1 ** 2 + 0.5 ** 2 + 0.1 ** 2) / 3)
+
+    def test_a_certain_miss_costs_a_finite_log_loss(self):
+        assert math.isfinite(place_metrics({"a": 1.0}, placed=set())["log_loss"])
+
+
+class TestGridPlaceRates:
+    def test_learns_how_often_each_slot_finishes_in_the_top_k(self):
+        rates = GridPlaceRates(places=3)
+        rates.record([(1, 1), (2, 4), (1, 2), (2, 3)])
+
+        probs = rates.probabilities({"pole": 1, "second": 2, "unknown": 9})
+
+        assert probs["pole"] == pytest.approx(2.5 / 3)
+        assert probs["second"] == pytest.approx(1.5 / 3)
+        assert probs["unknown"] == pytest.approx(0.5)
+
+    def test_a_non_finisher_never_counts_as_placed(self):
+        rates = GridPlaceRates(places=3)
+        rates.record([(1, None)])
+
+        assert rates.probabilities({"pole": 1})["pole"] == pytest.approx(0.5 / 2)

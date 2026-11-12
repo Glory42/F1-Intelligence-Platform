@@ -40,6 +40,8 @@ function toView<F extends Record<string, FeatureTerm>>(prediction: PredictionOf<
     drivers: prediction.drivers.map((d, i) => ({
       driver: d.driver,
       winProbability: d.winProbability,
+      // Cached API copies from before the field existed lack it entirely.
+      podiumProbability: d.podiumProbability ?? null,
       gridPosition: d.gridPosition,
       terms: terms[i],
       radar: radar[i],

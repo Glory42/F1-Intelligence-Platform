@@ -30,6 +30,7 @@ export interface AnySessionKind {
 export interface SessionKind<TFeatures extends FeatureTable, TScores> extends AnySessionKind {
   features: TFeatures;
   mapFeatures: (row: TFeatures['$inferSelect']) => TScores;
+  podiumProbability: (row: TFeatures['$inferSelect']) => string | null;
   featureInfo: FeatureInfo<Extract<keyof TScores, string>>[];
 }
 
@@ -38,6 +39,7 @@ export const GP: SessionKind<typeof driverPredictionFeatures, GpFeatures> = {
   predictions: racePredictions,
   features: driverPredictionFeatures,
   mapFeatures: (row) => mapGpFeatures(row.features),
+  podiumProbability: (row) => row.podiumProbability,
   featureInfo: featureInfo(GP_FEATURE_MANIFEST),
   results: raceResults,
   laps: lapTimes,
@@ -52,6 +54,8 @@ export const SPRINT: SessionKind<typeof driverSprintFeatures, SprintFeatures> = 
   predictions: sprintPredictions,
   features: driverSprintFeatures,
   mapFeatures: mapSprintFeatures,
+  // The sprint model has no finishing-order forecast.
+  podiumProbability: () => null,
   featureInfo: featureInfo(SPRINT_FEATURE_MANIFEST),
   results: sprintResults,
   laps: sprintLapTimes,

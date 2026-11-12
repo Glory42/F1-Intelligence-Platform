@@ -69,6 +69,7 @@ async function assemblePrediction<TF extends FeatureTable, TS>(
       driver: toDriver(r.driver, r.team),
       winProbability: r.feature.winProbability,
       predictedPosition: r.feature.predictedPosition,
+      podiumProbability: kind.podiumProbability(r.feature as TF['$inferSelect']),
       gridPosition: r.gridPosition,
       features: kind.mapFeatures(r.feature as TF['$inferSelect']),
     })),

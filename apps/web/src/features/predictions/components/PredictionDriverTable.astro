@@ -77,6 +77,9 @@ const cols = hasResults
             <div class="w-full h-0.5 bg-white/[0.06] mt-1">
               <div class="h-full bar-fill" style={`width:${pct}%;background:${accent.hex}`} />
             </div>
+            {d.podiumProbability !== null && (
+              <div class="mt-1 font-mono text-[8px] text-muted-foreground">podium {Math.round(Number(d.podiumProbability) * 100)}%</div>
+            )}
           </div>
           <div class="font-mono text-[9px] text-muted-foreground text-center hidden sm:block">{d.pace}</div>
           <div class="font-mono text-[9px] text-muted-foreground text-center hidden sm:block">{grid}</div>

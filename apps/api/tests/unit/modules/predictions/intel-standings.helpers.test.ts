@@ -32,6 +32,7 @@ function featureRow(
   const f: typeof driverPredictionFeatures.$inferSelect = {
     id: 1, raceId: 1, driverId: d.id, features: storedGpFeatures(),
     rawWeightedScore: raw, winProbability: '0.20000', predictedPosition: 1,
+    podiumProbability: null,
     computedAt: new Date('2025-01-01T00:00:00Z'),
     ...overrides,
   };

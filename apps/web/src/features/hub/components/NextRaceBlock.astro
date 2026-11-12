@@ -88,6 +88,9 @@ const facts = race
                   <span class="block h-full" style={`width: ${(Number(f.winProbability) / leaderProbability) * 100}%; background: ${getTeamColor(f.driver.team.teamKey)}`} />
                 </span>
                 <span class="w-10 text-right font-mono tabular-nums text-[#a855f7]">{Math.round(Number(f.winProbability) * 100)}%</span>
+                {f.podiumProbability != null && (
+                  <span class="w-16 text-right font-mono tabular-nums text-[10px] text-muted-foreground">podium {Math.round(Number(f.podiumProbability) * 100)}%</span>
+                )}
               </li>
             ))}
           </ol>
