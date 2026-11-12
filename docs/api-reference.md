@@ -347,6 +347,7 @@ Returns the prediction for the next `qualifying_done` race with `race_date >= to
         "predictedPosition": 1,
         "winProbability": "0.61200",
         "podiumProbability": "0.88412",
+        "preQualiProbability": "0.32069",
         "gridPosition": 1,
         "driver": { "id": 42, "code": "VER", "fullName": "Max Verstappen", "team": { ... } },
         "features": {
@@ -391,6 +392,32 @@ Latest Monte Carlo championship odds plus their per-round history (written by `c
 
 `history` has one entry per contender per completed round (2018–2026 replayed by
 `scripts/backfill_title_odds.py`). 404 if no odds exist for the season yet.
+
+### `GET /api/predictions/pre-quali/upcoming`
+
+The forecast before qualifying (`pre-quali-v1`, ADR 0015) for the next race still before it: status
+`scheduled`, `sprint_qualifying_done` or `sprint_done`, and `race_date >= today`. It's written once the previous
+race is ingested, from that race's lineup and four features qualifying can't set, so it stands all week. 404
+`NOT_FOUND` ("No forecast before qualifying") otherwise, e.g. before a season opener or after the finale. Cached
+like any in-progress answer.
+
+```json
+{
+  "data": {
+    "race": { "id": 290, "name": "Las Vegas Grand Prix", "raceDate": "2026-11-21", "status": "scheduled", ... },
+    "computedAt": "2026-11-12T14:20:00.000Z",
+    "modelVersion": "pre-quali-v1",
+    "drivers": [
+      { "predictedPosition": 1, "winProbability": "0.32069", "driver": { "code": "VER", ... } },
+      { "predictedPosition": 2, "winProbability": "0.22667", "driver": { "code": "ANT", ... } }
+    ]
+  },
+  "error": null
+}
+```
+
+Once qualifying is in, the GP prediction keeps it per driver as `preQualiProbability` (null for sprints and
+drivers who weren't in the forecast's lineup), so the page can show how qualifying moved each chance.
 
 ### `GET /api/predictions/history?year=N`
 

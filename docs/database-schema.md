@@ -586,6 +586,26 @@ One row per sprint weekend: the single predicted sprint winner.
 
 ---
 
+### `pre_quali_predictions`
+A GP's forecast before qualifying (`pre-quali-v1`, ADR 0015): one row per driver of the lineup of the season's
+previous race, written by `compute_pre_quali` once that race is ingested. Kept after qualifying, so the GP
+prediction can show how each driver's chance moved. Migration `0033`.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | serial PK | |
+| `race_id` | FK → races | The race forecast |
+| `driver_id` | FK → drivers | |
+| `features` | jsonb | Feature → `{value, contribution}` for the 4 pre-qualifying features (`driver_points`, `team_race_pace`, `team_quali_pace`, `teammate_edge`) |
+| `raw_weighted_score` | numeric(8,6) | Sum of the contributions |
+| `win_probability` | numeric(6,5) | Softmax over the lineup: sums to 1.0 per race |
+| `predicted_position` | integer | 1 = favourite |
+| `model_version` | varchar(20) | `pre-quali-v1` |
+| `computed_at` | timestamptz | |
+| UNIQUE | `(race_id, driver_id)` | |
+
+---
+
 ### `data_quality_runs`
 One row per audit pass (season aggregate) or per-race audit. Written by `data_quality_audit`.
 

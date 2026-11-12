@@ -169,6 +169,7 @@ Full rules and numbers: `docs/plans/intelligence-platform-roadmap.md` §1–§2.
 - `race_predictions`: one predicted GP winner per race
 - `driver_sprint_features`: sprint-v3 features per driver per sprint weekend (`features` JSONB, the GP's shape); sprint-v2's `*_score` columns are legacy
 - `sprint_predictions`: one predicted sprint winner per sprint weekend
+- `pre_quali_predictions`: a GP's forecast before qualifying (pre-quali-v1), one row per driver of the previous race's lineup; kept after qualifying
 
 ### Race Status Flow
 ```
@@ -266,6 +267,7 @@ GET /api/teams/:id?year=N
 GET /api/predictions/model-info
 GET /api/predictions/accuracy
 GET /api/predictions/upcoming
+GET /api/predictions/pre-quali/upcoming   # the next race's forecast before qualifying
 GET /api/predictions/history?year=N
 GET /api/predictions/standings?year=N
 GET /api/predictions/title-odds?year=N
@@ -306,7 +308,7 @@ All queries use Drizzle joins. Never fetch a list then loop-query for each item.
 | Route | Layout | Data source |
 |-------|--------|------------|
 | `/` | BaseLayout | Season progress strip + three fixed blocks: next race (schedule, circuit, model top 3), last race (podium + Recap), championship top 5 with title odds |
-| `/prediction` | BaseLayout | `GET /api/predictions/upcoming` (+ sprint, model standings); `?tab=scorecard` fetches `predictions/history` + `accuracy` |
+| `/prediction` | BaseLayout | `GET /api/predictions/upcoming` (+ sprint, model standings; before qualifying `predictions/pre-quali/upcoming`); `?tab=scorecard` fetches `predictions/history` + `accuracy` |
 | `/prediction/[id]` · `/prediction/sprint/[id]` | BaseLayout | `GET /api/predictions/race/:id` · `GET /api/sprint/race/:id` |
 | `/races` | BaseLayout | `GET /api/races?year=N` |
 | `/races/[id]` · `/races/[id]/sprint` | BaseLayout | `GET /api/races/:id` (+ practice long runs, strategy, race events per tab) · `GET /api/sprint/race/:id/detail` |
@@ -356,6 +358,7 @@ cd data-engine
 python -m src.main --job ingest_race --year 2025 --round 14
 python -m src.main --job ingest_qualifying --year 2025 --round 14
 python -m src.main --job compute_features --race_id 42
+python -m src.main --job compute_pre_quali --race_id 42          # forecasts the race after 42, before its qualifying
 python -m src.main --job compute_season_stats --year 2025
 python -m src.main --job compute_title_odds --year 2025
 python -m src.main --job ingest_race_story --year 2026 --round 9 --session Sprint
@@ -368,8 +371,8 @@ python scripts/neon_usage.py                                # Neon Free usage + 
 python scripts/backtest_snapshot.py                         # local only: one read-only Neon dump into docker-compose.backtest.yml
 python scripts/backtest.py [--from 2018] [--to 2026] [--reference NAME] [--places] [--json]  # local snapshot only: walk-forward GP model vs baselines
 python scripts/backtest_sprint.py [--train-from 2010] [--reference NAME]  # local snapshot only: walk-forward sprint models vs baselines
-python scripts/fit_model_v4.py                              # local snapshot only: refit src/models/gp_v4.json after a validated change
-python scripts/backfill_all_predictions.py [--from 2018] [--skip-gp] [--skip-sprint]  # local only, writes Neon: GP + sprint predictions, fitted per season (out-of-sample)
+python scripts/fit_model_v4.py [--pre-quali]                # local snapshot only: refit src/models/gp_v4.json (or gp_v4_prequali.json) after a validated change
+python scripts/backfill_all_predictions.py [--from 2018] [--skip-gp] [--skip-sprint] [--skip-pre-quali]  # local only, writes Neon: GP, sprint and pre-quali predictions, fitted per season (out-of-sample)
 python scripts/backfill_podium_probability.py [--refresh]   # local only, writes Neon: podium chance from stored win probabilities
 python scripts/import_f1db.py [--version vYYYY.RR.M]         # weekly GitHub Action (f1db-import.yml) or local: download, verify sha256, import
 python scripts/audit_results_vs_f1db.py [--modern-plan]      # local only: read-only results check vs F1DB
@@ -385,13 +388,13 @@ Typical action timing:
 
 **Conventional weekend:**
 - **Saturday 22:00 UTC**: `ingest_qualifying` → `compute_features`
-- **Sunday 18:00 UTC**: `ingest_race` → `compute_season_stats`
+- **Sunday 18:00 UTC**: `ingest_race` → `compute_season_stats` → `compute_pre_quali` (the next race's forecast)
 
 **Sprint weekend:**
 - **Friday 22:00 UTC**: `ingest_sprint_qualifying` → `compute_sprint_features`
 - **Saturday 16:00 UTC**: `ingest_sprint` → `compute_season_stats`
 - **Saturday 22:00 UTC**: `ingest_qualifying` → `compute_features`
-- **Sunday 18:00 UTC**: `ingest_race` → `compute_season_stats`
+- **Sunday 18:00 UTC**: `ingest_race` → `compute_season_stats` → `compute_pre_quali` (the next race's forecast)
 
 ### Session data (OpenF1 + Jolpica)
 F1 put FastF1's source behind F1TV logins (FastF1 3.9, Oct 2026) and the project pays for nothing,
@@ -475,6 +478,15 @@ real units and only use races before the one predicted:
   the API serves them with the GP manifest. No podium chance for sprints (validated on GPs only).
 - `scripts/backtest_sprint.py` chose it (ADR 0014): 0.97 log loss over 30 sprints against sprint-v2's 2.17; refitting
   on sprints or pooling them with GPs gained only noise. Rerun it before any GP refit.
+
+### Before qualifying (pre-quali-v1)
+- v4's code with only the four features qualifying can't set (`gp_features_v4.PRE_QUALI_FEATURES`), over the lineup
+  of the season's last completed race (`previous_lineup`; a season opener gets none). Its own fit:
+  `fit_model_v4.py --pre-quali` → `src/models/gp_v4_prequali.json`.
+- `compute_pre_quali` runs in the race chain and forecasts the next race, so it stands all week; it's kept in
+  `pre_quali_predictions` after qualifying, and GP prediction rows carry `preQualiProbability`.
+- `scripts/backtest.py` (ADR 0015): 1.52 log loss against v4's 1.21 after qualifying; FP2 long runs made it worse,
+  and driver form alone scores within noise of it.
 
 ### Static / Hardcoded inputs
 - `circuits.overtake_rate`: seeded once per circuit, never changes

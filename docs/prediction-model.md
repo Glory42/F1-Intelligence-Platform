@@ -216,6 +216,38 @@ races (190 GPs, 2018–2026, binary log loss per driver, lower is better):
 `scripts/backfill_podium_probability.py` fills the column for stored predictions from their stored win
 probabilities (no refit).
 
+## Before qualifying (`pre-quali-v1`)
+
+Until qualifying is ingested, weighted-v4 has nothing to score: three of its seven features (grid slot,
+grid × hard-to-pass track, qualifying pace) come from qualifying. The other four only read races already run,
+so `compute_pre_quali` fits them as their own model and forecasts the **next** race as soon as the previous one
+is ingested (ADR 0015). The forecast stands all week and stays stored after qualifying, so the prediction
+page shows how qualifying moved each driver's chance (`preQualiProbability`).
+
+- **Features:** `gp_features_v4.PRE_QUALI_FEATURES`: driver form, team race pace, team qualifying pace, team-mate
+  edge. Plain softmax, weights fitted separately (`scripts/fit_model_v4.py --pre-quali` →
+  `src/models/gp_v4_prequali.json`); no importances on the page, so `docs/feature-weights.json` is unchanged.
+- **Field:** `previous_lineup`, the drivers and teams of the season's last completed race. A season opener has no
+  earlier race and gets no forecast; a mid-season swap shows up one race late.
+- **Storage:** `pre_quali_predictions`, one row per driver (`features` JSONB, `win_probability`, rank).
+
+`scripts/backtest.py` replays it over the 190 GPs from 2018 to 2026, each from races before it only:
+
+| model | log loss | Brier | top-1 | top-3 |
+|---|---|---|---|---|
+| weighted-v4 (after qualifying) | 1.2084 | 0.5655 | 60.0% | 90.0% |
+| **pre-quali** | **1.5187** | **0.6704** | 47.9% | 78.9% |
+| pre-quali + FP2 long runs | 1.5308 | 0.6781 | 45.3% | 76.8% |
+| driver form only | 1.5585 | 0.6733 | 46.3% | 77.4% |
+| P(win \| grid slot), after qualifying | 1.4527 | 0.6425 | 55.3% | 87.9% |
+| equal chances | 2.9997 | 0.9502 | 5.0% | 14.9% |
+
+- Paired per race, pre-quali beats equal chances by 1.481 ± 0.152 log loss.
+- **FP2 long runs make it worse,** as they did for v4, so practice data stays out.
+- **It can't be told apart from driver form alone** (−0.040 ± 0.047). It ships because it reuses v4's own
+  features and code and is nominally best on every metric.
+- Qualifying is worth about 0.31 log loss (1.519 → 1.208).
+
 ---
 
 ## Data Availability by Era

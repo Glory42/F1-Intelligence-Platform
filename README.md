@@ -3,7 +3,7 @@
 ![F1 Intelligence Platform](./preview/Preview-homePage.webp)
 
 An F1 analysis platform: race breakdowns, championship odds, all-time history and race-winner
-predictions, built on OpenF1, Jolpica and F1DB. A conditional logit with 7 fitted features (applied to the sprint grid for sprints) gives every driver a win probability after qualifying, and a Monte Carlo simulation turns those into championship odds after each round.
+predictions, built on OpenF1, Jolpica and F1DB. A conditional logit with 7 fitted features (applied to the sprint grid for sprints) gives every driver a win probability after qualifying (and a forecast before it, from four of the same features), and a Monte Carlo simulation turns those into championship odds after each round.
 
 - **Home:** season progress, the next race (schedule, circuit, model top 3), the last race's podium and recap, and the championship top 5 with title odds
 - **Races:** results, qualifying, lap chart, practice long runs, tyre strategy, race control, overtakes and team radio, plus a race story (gap to leader, positions, battles, weather) and a two-lap qualifying telemetry comparison, all from 2018 on
@@ -186,6 +186,9 @@ GP since 2010 by `scripts/fit_model_v4.py`. Importance is each feature's share o
 
 The sprint model (`sprint-v3`) applies the same weights to the sprint's own grid and SQ times: refitting on
 sprints gained nothing, and the hand-weighted sprint-v2 it replaced scored far worse (ADR 0014).
+
+Before qualifying, a forecast from four of those features (form and team pace, `pre-quali-v1`) stands from the
+previous race until qualifying is in, and the page shows how qualifying moved each driver's chance (ADR 0015).
 
 See [docs/prediction-model.md](./docs/prediction-model.md) for full details.
 
