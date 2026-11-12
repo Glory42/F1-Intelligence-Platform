@@ -21,6 +21,20 @@ test("the Scorecard grades the model's season race by race", async ({ page }) =>
   await expect(scorecard.getByRole('list', { name: 'Race by race' }).getByRole('link', { name: /Italian Grand Prix/ })).toBeVisible();
 });
 
+test('the Scorecard grades the whole field against the pole and equal-chances baselines', async ({ page }) => {
+  await page.goto('/prediction?tab=scorecard&year=2025');
+
+  const scorecard = page.getByRole('region', { name: 'Scorecard' });
+  await expect(scorecard.getByText('Brier (GP)', { exact: true }).locator('..')).toContainText('0.071');
+  await expect(scorecard.getByRole('img', { name: /Model calibration/ })).toBeVisible();
+  const scores = scorecard.getByRole('table', { name: 'Forecast scores' });
+  for (const value of ['0.071', '0.083', '0.950', '1.512']) {
+    await expect(scores.getByRole('row', { name: /2025/ })).toContainText(value);
+  }
+  await expect(scores.getByRole('row', { name: /2024/ })).toContainText('0.091');
+  await expect(scorecard).toContainText('Pole gives the pole-sitter 42%');
+});
+
 test('the old season recap URL lands on that season’s Scorecard', async ({ page }) => {
   await page.goto('/prediction/recap/2025');
 

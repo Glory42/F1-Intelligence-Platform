@@ -1,0 +1,58 @@
+---
+import type { ForecastScore, SeasonAccuracy } from '@/types';
+
+interface Props {
+  seasonAccuracy: SeasonAccuracy[];
+  year: number;
+}
+
+const { seasonAccuracy, year } = Astro.props;
+const scored = seasonAccuracy.flatMap((s) => (s.calibration ? [{ year: s.year, ...s.calibration }] : []));
+const poleWinRate = scored[0]?.poleWinRate ?? 0;
+
+type Metric = keyof ForecastScore;
+const METRICS: { key: Metric; label: string }[] = [{ key: 'brier', label: 'Brier' }, { key: 'logLoss', label: 'Log loss' }];
+const beatsBoth = (s: (typeof scored)[number], metric: Metric) =>
+  s.model[metric] < s.pole[metric] && s.model[metric] < s.uniform[metric];
+---
+
+{scored.length > 0 && (
+  <div>
+    <p class="mb-3 font-mono text-[9px] uppercase tracking-[0.25em]" style="color: rgba(168,85,247,0.55)">./forecast scores · GP</p>
+    <div class="overflow-x-auto border border-white/[0.06]">
+      <table aria-label="Forecast scores" class="w-full min-w-[440px] font-mono text-[10px]">
+        <thead>
+          <tr class="border-b border-white/[0.06] text-[8px] uppercase tracking-widest text-muted-foreground">
+            <th scope="col" class="py-2.5 pl-5 text-left font-normal">Season</th>
+            {METRICS.map((m) => (
+              <>
+                <th scope="col" class="px-2 py-2.5 text-right font-normal">{m.label}</th>
+                <th scope="col" class="px-2 py-2.5 text-right font-normal">Pole</th>
+                <th scope="col" class="px-2 py-2.5 text-right font-normal last:pr-5">Equal</th>
+              </>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {scored.map((s, i) => (
+            <tr class={`${i !== 0 ? 'border-t border-white/[0.04]' : ''} ${s.year === year ? 'bg-white/[0.03]' : ''}`}>
+              <th scope="row" class="py-2.5 pl-5 text-left font-sans text-[13px] font-semibold">{s.year}</th>
+              {METRICS.map((m) => (
+                <>
+                  <td class={`px-2 py-2.5 text-right font-bold ${beatsBoth(s, m.key) ? 'text-[#a855f7]' : ''}`}>{s.model[m.key].toFixed(3)}</td>
+                  <td class="px-2 py-2.5 text-right text-muted-foreground">{s.pole[m.key].toFixed(3)}</td>
+                  <td class="px-2 py-2.5 text-right text-muted-foreground last:pr-5">{s.uniform[m.key].toFixed(3)}</td>
+                </>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <p class="mt-2 font-mono text-[8px] text-muted-foreground">
+      Lower is better, averaged per race over the whole field. Pole gives the pole-sitter
+      {Math.round(poleWinRate * 100)}% (how often pole has won) and splits the rest evenly; equal gives every
+      driver the same chance. Purple: the model beat both.
+    </p>
+  </div>
+)}

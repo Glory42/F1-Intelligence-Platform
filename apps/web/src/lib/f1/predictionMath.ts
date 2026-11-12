@@ -2,53 +2,6 @@ export type Weights = Record<string, number>;
 
 type HistoryOutcome = { winProbability: string; correct: boolean | null };
 
-export function brierScore(items: HistoryOutcome[]): number | null {
-  const completed = items.filter((i) => i.correct !== null);
-  if (completed.length === 0) return null;
-  const sum = completed.reduce((acc, i) => {
-    const outcome = i.correct ? 1 : 0;
-    return acc + (Number(i.winProbability) - outcome) ** 2;
-  }, 0);
-  return sum / completed.length;
-}
-
-export type CalibrationBucket = {
-  lo: number;
-  hi: number;
-  count: number;
-  meanPredicted: number;
-  actualRate: number;
-};
-
-export function calibrationBuckets(items: HistoryOutcome[], size = 0.2): CalibrationBucket[] {
-  const binCount = Math.round(1 / size);
-  const bins: HistoryOutcome[][] = Array.from({ length: binCount }, () => []);
-  for (const item of items) {
-    if (item.correct === null) continue;
-    const p = Number(item.winProbability);
-    const index = Math.min(binCount - 1, Math.floor(p / size + 1e-9));
-    bins[index].push(item);
-  }
-  return bins
-    .map((bucket, index) => {
-      const lo = round6(index * size);
-      const predictedSum = bucket.reduce((acc, i) => acc + Number(i.winProbability), 0);
-      const correctCount = bucket.filter((i) => i.correct).length;
-      return {
-        lo,
-        hi: round6(lo + size),
-        count: bucket.length,
-        meanPredicted: bucket.length ? predictedSum / bucket.length : 0,
-        actualRate: bucket.length ? correctCount / bucket.length : 0,
-      };
-    })
-    .filter((bucket) => bucket.count > 0);
-}
-
-function round6(value: number): number {
-  return Math.round(value * 1e6) / 1e6;
-}
-
 type TippedRace = {
   raceId: number;
   raceName: string;

@@ -8,6 +8,7 @@ import type { PredictionHistoryItem, IntelStandingRow, ModelInfo, SeasonAccuracy
 import { resolveSeason } from '../../common/standings';
 import { GP, SPRINT, isDone, type AnySessionKind } from '../../common/session-kind';
 import { aggregateAccuracyBySeason } from './accuracy.helpers';
+import { CalibrationService } from './calibration.service';
 import {
   buildHistoryItems,
   buildProbPosMaps,
@@ -18,6 +19,8 @@ import {
   type HistoryWinnerRow,
 } from './prediction-history.helpers';
 import { aggregateSeasonScores, buildIntelStandingRows } from './intel-standings.helpers';
+
+const calibration = new CalibrationService();
 
 export class PredictionsService {
   // The Scorecard: GP and sprint predictions side by side. `year` omitted spans every season
@@ -106,8 +109,8 @@ export class PredictionsService {
   }
 
   async findAccuracyBySeason(db: Db): Promise<SeasonAccuracy[]> {
-    const allHistory = await this.findHistory(db);
-    return aggregateAccuracyBySeason(allHistory);
+    const [allHistory, gpCalibration] = await Promise.all([this.findHistory(db), calibration.findGpCalibration(db)]);
+    return aggregateAccuracyBySeason(allHistory, gpCalibration);
   }
 
   async findIntelStandings(db: Db, year: number): Promise<IntelStandingRow[]> {

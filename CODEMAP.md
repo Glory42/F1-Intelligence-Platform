@@ -150,7 +150,9 @@ apps/api/
 │       │   └── teams.module.ts    # GET /standings, /pit-stops, /, /:id/career, /:id/pit-stops, /:id/history (HistoryController), /:id
 │       ├── predictions/
 │       │   ├── predictions.service.ts # Upcoming (date-guarded), by race, history (incl. sprint), accuracy-by-season, standings, model-info
-│       │   ├── accuracy.helpers.ts    # aggregateAccuracyBySeason(): per-season gp/sprint/overall accuracy buckets
+│       │   ├── accuracy.helpers.ts    # aggregateAccuracyBySeason(): per-season gp/sprint/overall accuracy buckets + GP calibration
+│       │   ├── calibration.service.ts # findGpCalibration(): every decided GP's field probabilities, winner and pole (3 flat reads)
+│       │   ├── calibration.helpers.ts # calibrationBySeason(): whole-field Brier/log loss vs pole + equal-chances baselines, 10-point bins
 │       │   ├── prediction-history.helpers.ts # buildHistoryItems(), buildWinnerMap(), buildProbPosMaps(), mergeHistoryByDateDesc()
 │       │   ├── intel-standings.helpers.ts # aggregateSeasonScores() (per-person average raw score + win probability) + buildIntelStandingRows() (rank + min-max normalise + sprint totals) for findIntelStandings()
 │       │   ├── title-odds.service.ts  # findTitleOdds(): latest round's driver/team title odds + per-round history for charting
@@ -185,7 +187,7 @@ apps/api/
 │   │   │   ├── circuits/          # circuit-era + circuit-stats helpers, track-outline (viewBox, y flip), track-profile (throttle, braking, corners, thinTrace)
 │   │   │   ├── drivers/           # classification (finishes vs DNF/DSQ/DNS), qualifying-gap (deepest shared session, median)
 │   │   │   ├── history/           # history.helpers (buildCoreLinks, nearestMonthDay, buildChases, groupLineages)
-│   │   │   ├── predictions/       # accuracy, prediction-history, intel-standings helpers
+│   │   │   ├── predictions/       # accuracy, calibration (hand-computed scores), prediction-history, intel-standings helpers
 │   │   │   ├── race-events/       # openf1.mappers (race control, overtakes, team radio)
 │   │   │   └── quality/quality.test.ts # castSeverity()
 │   │   └── common/                # mappers, standings, feature-manifest, cache (write windows), edge-cache (stale-if-error), snapshot-store, identity (golden cases from docs/identity-cases.json),
@@ -387,6 +389,7 @@ apps/web/
 │   │   │   │                          #   view-model assembly both prediction/[id].astro and prediction/sprint/[id].astro
 │   │   │   │                          #   call; returns facts + a slim PREDICTION_BEHAVIOUR axis (fetchers, weights, meta, date field)
 │   │   │   ├── predictionCopy.ts       # PREDICTION_COPY[kind]: all GP-vs-sprint wording (titles, kicker, labels, headings, blurbs); the views own it
+│   │   │   ├── calibration.ts          # combineCalibration(): sums the API's per-season bins into one all-seasons chart
 │   │   │   └── components/
 │   │   │       ├── PredictionPageBody.astro        # Full page body (header→banner→table→radar→WhatIfLab); both
 │   │   │       │                                   #   [id].astro routes reduce to a fetch + <PredictionPageBody data={data} copy={copy} />
@@ -399,8 +402,9 @@ apps/web/
 │   │   │       ├── ModelWeightsGrid.astro          # Feature-weight grid (rendered xl + mobile per page)
 │   │   │       ├── ModelRatingsTable.astro         # /prediction: season-average model rating per driver
 │   │   │       ├── WhatIfLab.astro                 # Re-weight sliders scale each feature's term; whatIfProbabilities() in-browser
-│   │   │       ├── Scorecard.astro                 # Scorecard tab: hit rates, Brier, best call/worst miss/streak, race by race, seasons
-│   │   │       ├── CalibrationChart.astro          # Predicted vs actual win-rate scatter + perfect-calibration diagonal
+│   │   │       ├── Scorecard.astro                 # Scorecard tab: hit rates, season GP Brier, best call/worst miss/streak, race by race, seasons
+│   │   │       ├── CalibrationChart.astro          # Whole-field predicted vs actual win rate (every season, GP) + perfect-calibration diagonal
+│   │   │       ├── ForecastScores.astro            # Per-season GP Brier + log loss next to the pole and equal-chances baselines
 │   │   │       └── UpcomingPredictionPanel.astro   # /prediction hero panel (GP + sprint share it)
 │   │   ├── races/
 │   │   │   ├── loadRacePageData.ts    # loadRacePageData(kind, id): one loader for the GP and sprint race pages
@@ -542,7 +546,7 @@ apps/web/
 │   │       ├── teamColors.ts      # team_key → official hex color map (fallback #6B7280)
 │   │       ├── teamLogos.ts       # team_key → /teams/<file> static logo path (null if no logo)
 │   │       ├── countryFlags.ts    # country/nationality/driver code → emoji flag + display name helpers
-│   │       ├── predictionMath.ts  # softmax, confidenceTier, brierScore, calibrationBuckets, driverPredictionRecord,
+│   │       ├── predictionMath.ts  # softmax, confidenceTier, driverPredictionRecord,
 │   │       │                      #   bestCall/worstMiss/longestStreak (no model metadata: the API serves featureInfo)
 │   │       ├── predictionTerms.ts # termsOf(): each driver's served contributions; edgeBreakdown(), fieldScaled(),
 │   │       │                      #   whatIfProbabilities(): the "why" bar, radar and What-If Lab for both models
@@ -575,7 +579,7 @@ apps/web/
 │   │   │   └── f1/                           # predictionMath (all exports), predictionTerms, championshipMath, teamColors, teamLogos, tyres
 │   │   ├── features/races/ · features/telemetry/  # calendar, raceView + raceEventTabs, gridPenalties, weatherSpells, raceEventDisplay · telemetryCompare, trackMap
 │   │   ├── features/predictions/
-│   │   │   └── buildPredictionPageData.test.ts / predictionCopy.test.ts  # GP + sprint page data, copy table
+│   │   │   └── buildPredictionPageData.test.ts / predictionCopy.test.ts / calibration.test.ts  # GP + sprint page data, copy table, all-season bins
 │   │   ├── features/{drivers,teams,races,history}/load*PageData.test.ts  # page-data loaders, `node` env, MSW-stubbed API
 │   │   ├── features/history/
 │   │   │   └── historyView.test.ts / f1dbCountries.test.ts  # pure, `node` env: bars, holders, rates, chases, month-day, lineage, flags

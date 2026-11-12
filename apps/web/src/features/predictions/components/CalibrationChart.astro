@@ -1,16 +1,12 @@
 ---
-import { calibrationBuckets, brierScore } from '@/lib/f1/predictionMath';
+import type { CalibrationPoint } from '@/features/predictions/calibration';
 
 interface Props {
-  items: { winProbability: string; correct: boolean | null }[];
-  bucketSize?: number;
+  points: CalibrationPoint[];
+  races: number;
 }
 
-const { items, bucketSize = 0.2 } = Astro.props;
-
-const buckets = calibrationBuckets(items, bucketSize);
-const completed = items.filter((i) => i.correct !== null).length;
-const brier = brierScore(items);
+const { points, races } = Astro.props;
 
 const W = 460;
 const H = 300;
@@ -22,21 +18,22 @@ const x = (p: number) => PAD.left + p * plotW;
 const y = (r: number) => PAD.top + (1 - r) * plotH;
 
 const gridTicks = [0, 0.25, 0.5, 0.75, 1];
-const dots = buckets.map((b) => ({
-  cx: x(b.meanPredicted),
-  cy: y(b.actualRate),
-  r: Math.min(11, 3 + Math.sqrt(b.count) * 2.4),
-  label: `${Math.round(b.meanPredicted * 100)}% predicted → ${Math.round(b.actualRate * 100)}% actual (${b.count} race${b.count === 1 ? '' : 's'})`,
+// Log scale: the lowest band holds most of the field, the top ones a handful of favourites.
+const dots = points.map((p) => ({
+  cx: x(p.meanPredicted),
+  cy: y(p.actualRate),
+  r: Math.min(11, 3 + Math.log10(p.predictions) * 2.5),
+  label: `${Math.round(p.meanPredicted * 100)}% predicted → ${Math.round(p.actualRate * 100)}% won (${p.predictions} driver${p.predictions === 1 ? '' : 's'})`,
 }));
 const trend = dots.map((d) => `${d.cx},${d.cy}`).join(' ');
 ---
 
-{buckets.length === 0 ? (
+{dots.length === 0 ? (
   <p class="font-mono text-[9px] text-muted-foreground px-4 py-6">Not enough completed races to plot calibration.</p>
 ) : (
   <div class="w-full">
     <div>
-      <svg viewBox={`0 0 ${W} ${H}`} style={`width:100%;height:auto;max-width:${W}px;margin:0 auto;display:block`} aria-label="Model calibration: predicted vs actual win rate">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" style={`width:100%;height:auto;max-width:${W}px;margin:0 auto;display:block`} aria-label="Model calibration: predicted vs actual win rate">
         {gridTicks.map((t) => (
           <g>
             <line x1={x(t)} y1={y(0)} x2={x(t)} y2={y(1)} stroke="rgba(255,255,255,0.05)" stroke-width="1" />
@@ -65,9 +62,7 @@ const trend = dots.map((d) => `${d.cx},${d.cy}`).join(' ');
         <text x={12} y={PAD.top + plotH / 2} text-anchor="middle" font-family="monospace" font-size="8" fill="rgba(255,255,255,0.3)" letter-spacing="0.1em" transform={`rotate(-90, 12, ${PAD.top + plotH / 2})`}>ACTUAL WIN %</text>
       </svg>
       <p class="font-mono text-[8px] text-muted-foreground mt-2 text-center">
-        {completed} completed {completed === 1 ? 'race' : 'races'}
-        {brier !== null && <> · Brier {brier.toFixed(3)}</>}
-        · dot size ∝ races · dashed line = perfect calibration
+        every driver in {races} completed {races === 1 ? 'GP' : 'GPs'} · dot size ∝ drivers (log) · dashed line = perfect calibration
       </p>
     </div>
   </div>

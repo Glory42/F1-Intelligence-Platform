@@ -1,5 +1,5 @@
 import {
-  predictionResponse, raceDetailResponse, raceControlMessages, raceOvertakes, teamRadioClips, predictionHistory, predictionHistory2026, intelStandings,
+  predictionResponse, raceDetailResponse, raceControlMessages, raceOvertakes, teamRadioClips, predictionHistory, predictionHistory2026, seasonAccuracy, intelStandings,
   seasons, modelInfo, circuit, pastCircuit, circuitDetailResponse, circuitTelemetry,
   driverCareer, driverBCareer, driverDetailResponse, driverBDetailResponse,
   teamCareer, teamPitStops, teamDetailResponse, driverStandingsResponse, driversListResponse,
@@ -41,6 +41,7 @@ Bun.serve({
       return ok(url.searchParams.get('year') === '2026' ? predictionHistory2026 : predictionHistory);
     }
     if (url.pathname === '/api/predictions/standings') return ok(intelStandings);
+    if (url.pathname === '/api/predictions/accuracy') return ok(seasonAccuracy);
     if (url.pathname === '/api/seasons') return ok(seasons);
     if (url.pathname === '/api/history/records') return ok(historyRecords);
     if (url.pathname === '/api/history/milestones') return ok(historyMilestones);
