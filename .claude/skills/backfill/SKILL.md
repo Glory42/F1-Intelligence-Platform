@@ -115,4 +115,5 @@ conn.close()
   (`src/utils/storage_guard.py`) first and watch the free-tier budget (`python scripts/neon_usage.py`)
 - `safe()` in `scripts/run_backfill.py` retries each step and continues past per-round failures
 - Pre-2018 qualifying sessions may return 0 drivers (Ergast coverage is sparse): this is expected
-- Do NOT deploy to Cloudflare after backfill: DB writes are live immediately
+- Do NOT deploy to Cloudflare after backfill. Neon has the data at once, but the API's R2 snapshot store
+  holds old answers until the next race weekend: bump `SNAPSHOT_VERSION` in the Worker's dashboard variables

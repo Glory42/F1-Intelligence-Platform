@@ -135,6 +135,8 @@ Exceeding Neon's compute (100 CU-h/mo) or egress (5 GB/mo) suspends the DB until
 - Whole-race data goes in one row per (race, session, driver) with arrays/JSONB, not row-per-lap.
 - Heavy API routes set `Cache-Control` via `src/common/cache.ts`; `edgeCache()` serves repeats per data centre,
   and a lapsed copy when Neon errors (ADR 0005). In-progress data is cached 10 min on race weekends, 1 h between.
+- Behind it, `snapshotStore()` keeps one global copy per URL in R2, held until the next write window (race
+  weekend or Wednesday's F1DB import; ADR 0013). A manual write to Neon outside those needs a `SNAPSHOT_VERSION` bump.
 - Site pages are kept at the edge for 5 min on race weekends and 1 h between (`apps/web/src/lib/pageCache.ts`):
   Workers Free cuts a render off at 10 ms of CPU, and a typical page takes about that.
 - Backfills run locally in bounded chunks and check `storage_guard` first: never on Render.
