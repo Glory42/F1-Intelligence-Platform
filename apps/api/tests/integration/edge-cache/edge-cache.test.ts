@@ -100,8 +100,8 @@ describe('edge cache (integration)', () => {
     await apiRequest('/api/races?year=2098&status=completed');
 
     expect([...edge.entries.keys()].map((url) => new URL(url).search).sort()).toEqual([
-      '?status=completed&year=2098',
-      '?status=completed&year=2099',
+      '?status=completed&year=2098&__v=1',
+      '?status=completed&year=2099&__v=1',
     ]);
   });
 });

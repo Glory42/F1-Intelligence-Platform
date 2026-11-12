@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from 'hono';
 import { maxAgeSeconds } from './cache';
-import { cacheKeyUrl } from './query-params';
+import { cacheKeyUrl, cacheVersion } from './query-params';
 
 export interface EdgeCache {
   match(request: Request): Promise<Response | undefined>;
@@ -59,7 +59,9 @@ export function edgeCache(
     const cache = c.req.method === 'GET' ? getCache() : undefined;
     if (!cache) return next();
 
-    const key = new Request(cacheKeyUrl(c), { method: 'GET' });
+    const url = new URL(cacheKeyUrl(c));
+    url.searchParams.set('__v', cacheVersion(c));
+    const key = new Request(url.toString(), { method: 'GET' });
     const hit = await cache.match(key);
     if (hit && isFresh(hit, clock())) return forClient(hit);
 

@@ -18,7 +18,7 @@ workers_dev = false
 # Never put secrets in this file
 
 # Global copy of every public answer behind the per-data-centre edge cache (ADR 0013). The bucket is
-# private, with a 90-day lifecycle rule; SNAPSHOT_VERSION is a dashboard variable (docs/deployment.md).
+# private, with a 90-day lifecycle rule. SNAPSHOT_VERSION ([vars] below) versions both caches.
 [[r2_buckets]]
 binding = "SNAPSHOTS"
 bucket_name = "f1-api-snapshots"
@@ -27,6 +27,9 @@ bucket_name = "f1-api-snapshots"
 # Gates which CORS origins are allowed: see main.ts. Local dev overrides
 # this to "development" via .dev.vars so localhost origins keep working.
 ENVIRONMENT = "production"
+# Part of every edge-cache and R2 key: bump it after a manual Neon write (a backfill) or a change to a
+# response's shape, and the next deploy starts both caches empty. 2: podium chance and sprint-v3 (#92).
+SNAPSHOT_VERSION = "2"
 
 # Cloudflare's Build watch path for this Worker was a bare "apps/api" for weeks,
 # which never matched any nested file, so every push silently built zero times:

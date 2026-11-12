@@ -2,7 +2,7 @@ import type { SnapshotBucket } from '../snapshot-store';
 
 export type Bindings = {
   DATABASE_URL: string;
-  // R2 bucket f1-api-snapshots (wrangler.toml). Bump SNAPSHOT_VERSION after a backfill: see docs/deployment.md.
+  // R2 bucket f1-api-snapshots and the cache version, both in wrangler.toml (see docs/deployment.md).
   SNAPSHOTS?: SnapshotBucket;
   SNAPSHOT_VERSION?: string;
   R2_PUBLIC_URL?: string;
