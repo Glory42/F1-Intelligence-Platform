@@ -6,7 +6,7 @@ import json
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence
 
 import numpy as np
 
@@ -93,9 +93,12 @@ class DriverPrediction:
         return sum(self.contributions.values())
 
 
-def predict(history: RaceHistory, race_id: int, model: LogitModel) -> list[DriverPrediction]:
-    """Every driver on the race's qualifying sheet, most likely winner first."""
-    field = gp_features(history, race_id)
+def predict(
+    history: RaceHistory, race_id: int, model: LogitModel, field_of: Callable[[RaceHistory, int], Field] = gp_features,
+) -> list[DriverPrediction]:
+    """Every driver on the race's grid sheet (qualifying's, or the sprint's with sprint_features), most likely
+    winner first."""
+    field = field_of(history, race_id)
     probabilities = model.probabilities(field)
     ranked = sorted(field, key=lambda d: probabilities[d], reverse=True)
     return [

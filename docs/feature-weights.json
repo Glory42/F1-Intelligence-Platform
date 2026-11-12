@@ -1,5 +1,4 @@
 {
-  "sprint_softmax_temperature": 0.3,
   "gp": {
     "grid": {
       "importance": 20,
@@ -28,40 +27,6 @@
     "team_race_pace": {
       "importance": 18,
       "label": "Team Race Pace"
-    }
-  },
-  "sprint": {
-    "car_performance": {
-      "weight": 25,
-      "label": "Car Performance"
-    },
-    "circuit_adj_start_pos": {
-      "weight": 25,
-      "label": "Circuit-Adj. Starting Position"
-    },
-    "short_run_pace": {
-      "weight": 10,
-      "label": "Short Run Pace"
-    },
-    "driver_rating": {
-      "weight": 10,
-      "label": "Driver Rating"
-    },
-    "weather_impact": {
-      "weight": 8,
-      "label": "Weather Impact"
-    },
-    "win_rate": {
-      "weight": 8,
-      "label": "Win Rate"
-    },
-    "luck_factor": {
-      "weight": 8,
-      "label": "Luck Factor"
-    },
-    "sq_qualifying_delta": {
-      "weight": 6,
-      "label": "SQ vs Teammate"
     }
   }
 }

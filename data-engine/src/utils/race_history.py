@@ -22,6 +22,8 @@ class RaceHistory:
     team_of: dict[int, int]                    # driver row id → its team row id
     # Per-race summaries the features reuse across many target races (see gp_features_v4).
     memo: dict[Any, Any] = field(default_factory=dict)
+    # race id → driver_id, team_id, grid_position, q1/q2/q3_time_ms: the sprint's grid sheet, SQ1–3 as q1–q3.
+    sprint_grid: dict[int, list[dict[str, Any]]] = field(default_factory=dict)
 
     def completed_before(self, race_date: date) -> list[int]:
         """Completed race ids before `race_date`, most recent first."""
@@ -79,6 +81,14 @@ def load_history(conn: Any, since: date, until: Optional[date] = None) -> RaceHi
             window,
         )
         sprints = _group(cur.fetchall())
+        cur.execute(
+            "SELECT sr.race_id, sr.driver_id, d.team_id, sr.grid_position, "
+            "       sr.sq1_time_ms AS q1_time_ms, sr.sq2_time_ms AS q2_time_ms, sr.sq3_time_ms AS q3_time_ms "
+            "FROM sprint_results sr JOIN drivers d ON d.id = sr.driver_id JOIN races r ON r.id = sr.race_id "
+            "WHERE r.race_date BETWEEN %s AND %s",
+            window,
+        )
+        sprint_grid = _group(cur.fetchall())
         # Laps slower than 107% of the race's median are safety-car, traffic or damage laps, not pace.
         cur.execute(
             """
@@ -115,4 +125,5 @@ def load_history(conn: Any, since: date, until: Optional[date] = None) -> RaceHi
     return RaceHistory(
         races=races, results=results, quali=quali, long_runs=long_runs, sprints=sprints, race_pace=race_pace,
         person=person_ids(drivers), outfit=outfit, team_of={d["id"]: d["team_id"] for d in drivers},
+        sprint_grid=sprint_grid,
     )
