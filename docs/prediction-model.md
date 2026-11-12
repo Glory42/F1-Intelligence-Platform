@@ -280,6 +280,11 @@ The predictions stored for 2018–2026 are fitted per season on earlier seasons 
 (`scripts/backfill_all_predictions.py`), and score log loss 1.207 / top-1 58.9% / top-3 90.0%: as good as
 refitting before every race. Upcoming races use the committed fit.
 
+The site's Scorecard (`/prediction?tab=scorecard`) runs the same check live on those stored predictions
+(`GET /api/predictions/accuracy` → `calibration`): a whole-field calibration chart over every season, and each
+season's Brier and log loss next to two forecasts with no model, "the pole-sitter at the historical pole
+win rate" and "equal chances".
+
 ## Rejected: measured overtake rate (2026-10-10)
 
 Idea: replace the hand-seeded `circuits.overtake_rate` with one measured from `race_overtakes`

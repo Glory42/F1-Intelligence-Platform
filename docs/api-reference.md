@@ -43,7 +43,8 @@ handler and stores any 200 whose `Cache-Control` is `public`, per data centre. I
 domain (a no-op on `*.workers.dev`). Each copy is kept 30 days past its `max-age`: a lapsed copy is refreshed
 from Neon, but still answers when that refresh fails with a 5xx (e.g. Neon Free suspended for the month).
 The cache key is the path plus only the query params the route reads (`common/query-params.ts`), in a fixed
-order: `/api/races/7?utm=x` and `/api/races/7` share one copy.
+order: `/api/races/7?utm=x` and `/api/races/7` share one copy. Behind it, `snapshotStore()` keeps one global
+copy per key in R2 until the next write window (ADR 0013); answers from it carry `x-snapshot: hit`.
 
 A non-numeric `:id` / `:raceId` (or one with leading zeros) answers 400 `INVALID_ID`, a non-numeric `year` 400 `INVALID_YEAR`, an
 unknown `session` 400 `INVALID_SESSION`, a bad `date` 400 `INVALID_DATE`, and an unknown race, driver or
@@ -440,6 +441,14 @@ comparison as `/history`, aggregated per year and split into `gp`/`sprint`/`over
 A season with no decided races yet (e.g. it's just started) is omitted entirely. `accuracyPct`
 is `null` when a bucket has zero races (e.g. `sprint` for a season with no sprint weekends).
 
+`calibration` grades the GP model's **whole field**, not just its pick: every driver's stored win
+probability in every completed GP, against who won. It is `null` for a season with no scored GP.
+- `bins`: the probabilities in 10-point bands (`from` to `from` + 0.1), with how many drivers sat in each,
+  how many of them won, and the sum of their probabilities (mean = `probabilitySum / predictions`).
+- `model`, `pole`, `uniform`: average per race, lower is better. Brier is Σ over the field of (p − won)²;
+  log loss is −ln p(winner), with p floored at 0.00001. `uniform` gives every driver 1/n. `pole` gives the
+  pole-sitter `poleWinRate` (the share of all scored races won from pole) and splits the rest evenly.
+
 ```json
 {
   "data": [
@@ -447,13 +456,25 @@ is `null` when a bucket has zero races (e.g. `sprint` for a season with no sprin
       "year": 2026,
       "gp": { "races": 12, "correct": 7, "accuracyPct": 58 },
       "sprint": { "races": 5, "correct": 3, "accuracyPct": 60 },
-      "overall": { "races": 17, "correct": 10, "accuracyPct": 59 }
+      "overall": { "races": 17, "correct": 10, "accuracyPct": 59 },
+      "calibration": {
+        "races": 12,
+        "poleWinRate": 0.4211,
+        "bins": [
+          { "from": 0, "predictions": 205, "wins": 2, "probabilitySum": 4.1123 },
+          { "from": 0.5, "predictions": 6, "wins": 4, "probabilitySum": 3.4512 }
+        ],
+        "model": { "brier": 0.0712, "logLoss": 1.1514 },
+        "pole": { "brier": 0.0821, "logLoss": 1.6012 },
+        "uniform": { "brier": 0.95, "logLoss": 2.9957 }
+      }
     },
     {
       "year": 2025,
       "gp": { "races": 24, "correct": 13, "accuracyPct": 54 },
       "sprint": { "races": 6, "correct": 3, "accuracyPct": 50 },
-      "overall": { "races": 30, "correct": 16, "accuracyPct": 53 }
+      "overall": { "races": 30, "correct": 16, "accuracyPct": 53 },
+      "calibration": null
     }
   ]
 }
