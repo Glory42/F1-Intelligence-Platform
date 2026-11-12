@@ -21,6 +21,7 @@ type PredictionBody = {
     featureInfo: Array<{ key: string; label: string; importance: number }>;
     drivers: Array<{
       driver: { code: string }; winProbability: string; predictedPosition: number | null; gridPosition: number | null;
+      podiumProbability: string | null;
       features: Record<string, unknown>;
     }>;
   };
@@ -47,7 +48,7 @@ describe('a prediction for a GP and a sprint (integration)', () => {
     await createSprintPrediction(db, race.id, winner.id);
     // Inserted runner-up first, so the order has to come from the predicted position.
     await createDriverPredictionFeatures(db, race.id, runnerUp.id, { winProbability: '0.30000', predictedPosition: 2 });
-    await createDriverPredictionFeatures(db, race.id, winner.id, { winProbability: '0.60000', predictedPosition: 1 });
+    await createDriverPredictionFeatures(db, race.id, winner.id, { winProbability: '0.60000', predictedPosition: 1, podiumProbability: '0.85000' });
     await createDriverSprintFeatures(db, race.id, runnerUp.id, { winProbability: '0.30000', predictedPosition: 2 });
     await createDriverSprintFeatures(db, race.id, winner.id, { winProbability: '0.60000', predictedPosition: 1 });
     // Each session's grid comes from its own sheet: the winner starts the GP 3rd but the sprint 1st.
@@ -61,12 +62,12 @@ describe('a prediction for a GP and a sprint (integration)', () => {
   });
 
   it.each([
-    ['grand prix', '/api/predictions', 'weighted-v4', [3, 1], 'teamRacePace', { value: -0.15, contribution: 0.35 }, 7],
+    ['grand prix', '/api/predictions', 'weighted-v4', [3, 1], 'teamRacePace', { value: -0.15, contribution: 0.35 }, 7, '0.85000'],
     // sprint-v2 is served in the GP's shape: the 0–1 score and weight × score / T, its log-odds term.
-    ['sprint', '/api/sprint', 'sprint-v2', [1, null], 'shortRunPace', { value: 0.65, contribution: (0.1 * 0.65) / 0.3 }, 8],
+    ['sprint', '/api/sprint', 'sprint-v2', [1, null], 'shortRunPace', { value: 0.65, contribution: (0.1 * 0.65) / 0.3 }, 8, null],
   ])(
     'assembles the %s prediction: winner, model, ranked drivers, their grid and features',
-    async (_kind, base, model, grid, feature, expected, featureCount) => {
+    async (_kind, base, model, grid, feature, expected, featureCount, podium) => {
       const res = await apiRequest(`${base}/race/${raceId}`);
       const { data } = (await res.json()) as PredictionBody;
 
@@ -76,6 +77,8 @@ describe('a prediction for a GP and a sprint (integration)', () => {
         ['RUN', '0.30000', 2],
       ]);
       expect(data.drivers.map((d) => d.gridPosition)).toEqual(grid);
+      // The sprint model has no finishing-order forecast.
+      expect(data.drivers[0].podiumProbability).toBe(podium);
       expect(data.drivers[0].features[feature]).toEqual(expected);
       expect(data.featureInfo.map((f) => f.key)).toEqual(Object.keys(data.drivers[0].features));
       expect(data.featureInfo).toHaveLength(featureCount);

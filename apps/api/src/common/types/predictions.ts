@@ -42,6 +42,8 @@ export type DriverPredictionOf<TFeatures> = {
   driver: Driver;
   winProbability: string;
   predictedPosition: number | null;
+  // P(top 3) implied by the win probabilities: GP only, null for sprints and rows written before it.
+  podiumProbability: string | null;
   // From the session's qualifying (GP) or sprint qualifying (sprint) sheet.
   gridPosition: number | null;
   features: TFeatures;

@@ -41,6 +41,18 @@ class TestPredictionRows:
         expected = model.probabilities(gp_features(history, 3))
         assert {r["driver_id"]: r["win_probability"] for r in rows} == pytest.approx(expected, abs=1e-5)
 
+    def test_stores_each_driver_s_podium_chance_seeded_by_race_so_a_rerun_writes_the_same(self):
+        predictions = predict(sample_history(), 3, _model())
+
+        rows = compute_features.prediction_rows(3, predictions)
+        again = compute_features.prediction_rows(3, predictions)
+
+        podium = [r["podium_probability"] for r in rows]
+        assert podium == [r["podium_probability"] for r in again]
+        # Four drivers, three podium places: the chances add up to 3, each at least the win chance.
+        assert sum(podium) == pytest.approx(3, abs=1e-3)
+        assert all(r["podium_probability"] >= r["win_probability"] - 0.01 for r in rows)
+
 
 class _Writes:
     def __init__(self, monkeypatch):

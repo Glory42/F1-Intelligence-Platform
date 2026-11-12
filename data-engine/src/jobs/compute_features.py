@@ -4,15 +4,18 @@ winner), so a reader never sees features without probabilities or a field with a
 from datetime import datetime, timezone
 from typing import Any
 
+import numpy as np
 from psycopg2.extras import Json
 
 from src.db.client import get_conn
+from src.utils.finishing_order import podium_probabilities
 from src.utils.gp_model_v4 import GP_V4_MODEL_VERSION, DriverPrediction, history_start, load_committed, predict
 from src.utils.race_history import load_history
 from src.utils.upsert import upsert
 
 
 def prediction_rows(race_id: int, predictions: list[DriverPrediction]) -> list[dict[str, Any]]:
+    podium = podium_probabilities(np.array([p.probability for p in predictions]), seed=race_id)
     return [
         {
             "race_id": race_id,
@@ -22,9 +25,10 @@ def prediction_rows(race_id: int, predictions: list[DriverPrediction]) -> list[d
             }),
             "raw_weighted_score": round(p.score, 6),
             "win_probability": round(p.probability, 5),
+            "podium_probability": round(float(podium_p), 5),
             "predicted_position": p.position,
         }
-        for p in predictions
+        for p, podium_p in zip(predictions, podium)
     ]
 
 

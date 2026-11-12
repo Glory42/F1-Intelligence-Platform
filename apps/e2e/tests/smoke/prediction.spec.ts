@@ -41,3 +41,10 @@ test('the old season recap URL lands on that season’s Scorecard', async ({ pag
   await expect(page).toHaveURL(/\/prediction\?tab=scorecard&year=2025$/);
   await expect(page.getByRole('region', { name: 'Scorecard' })).toBeVisible();
 });
+
+test('each GP driver shows the podium chance their win chance implies', async ({ page }) => {
+  await page.goto('/prediction/1');
+
+  await expect(page.getByText('podium 88%')).toBeVisible();
+  await expect(page.getByText('podium 79%')).toBeVisible();
+});

@@ -43,8 +43,8 @@ function gpPrediction(predictedWinner = driver): PredictionResponse {
   return {
     race, predictedWinner, computedAt: '2025-09-06T20:00:00Z', modelVersion: 'weighted-v4', featureInfo: [],
     drivers: [
-      { driver: driverB, winProbability: '0.31000', predictedPosition: 2, gridPosition: 2, features },
-      { driver, winProbability: '0.46000', predictedPosition: 1, gridPosition: 1, features },
+      { driver: driverB, winProbability: '0.31000', podiumProbability: null, predictedPosition: 2, gridPosition: 2, features },
+      { driver, winProbability: '0.46000', podiumProbability: null, predictedPosition: 1, gridPosition: 1, features },
     ],
   };
 }
@@ -236,7 +236,7 @@ describe('loadRacePageData: sprint', () => {
     const upcoming: Race = { ...sprintRace, status: 'sprint_qualifying_done' };
     const prediction: SprintPredictionResponse = {
       race: upcoming, predictedWinner: driverB, computedAt: '2025-09-05T20:00:00Z', modelVersion: 'sprint-v2', featureInfo: [],
-      drivers: [{ driver: driverB, winProbability: '0.52000', predictedPosition: 1, gridPosition: 1, features: {} as SprintFeatures }],
+      drivers: [{ driver: driverB, winProbability: '0.52000', podiumProbability: null, predictedPosition: 1, gridPosition: 1, features: {} as SprintFeatures }],
     };
     sprintWeekend({ race: upcoming, prediction, results: [sprintRow(10, driver, null, 1, 'grid_set')], laps: [] });
 
