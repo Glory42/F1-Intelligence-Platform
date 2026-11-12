@@ -21,6 +21,8 @@ export interface PredictionDriverVM {
   winProbability: string;
   // GP only; null for sprints and for predictions stored before the podium forecast.
   podiumProbability: string | null;
+  // The chance before qualifying (GP only), to show how qualifying moved it.
+  preQualiProbability: string | null;
   gridPosition: number | null;
   terms: Terms;
   // Each feature 0–1 within this field, for the radar.

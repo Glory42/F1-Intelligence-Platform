@@ -4,6 +4,7 @@ import { readsQuery } from '../../common/query-params';
 import { createDb } from '../../config/database';
 import { PredictionsService } from './predictions.service';
 import { TitleOddsService } from './title-odds.service';
+import { PreQualiService } from './pre-quali.service';
 import { raceRoute, seasonRoute } from '../../common/route';
 import { CACHE_REFERENCE, cacheControlForActive, cacheControlForStatus } from '../../common/cache';
 import { GP } from '../../common/session-kind';
@@ -11,6 +12,7 @@ import { findPrediction, findUpcomingPrediction } from '../../common/session-rea
 
 const service = new PredictionsService();
 const titleOdds = new TitleOddsService();
+const preQuali = new PreQualiService();
 
 export const PredictionsController = {
   getUpcoming: readsQuery([], async (c: Context<{ Bindings: Bindings }>) => {
@@ -19,6 +21,15 @@ export const PredictionsController = {
       return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'No upcoming prediction available' } }, 404);
     }
     c.header('Cache-Control', cacheControlForStatus(data.race.status));
+    return c.json({ data, error: null });
+  }),
+
+  getUpcomingPreQuali: readsQuery([], async (c: Context<{ Bindings: Bindings }>) => {
+    const data = await preQuali.findUpcoming(createDb(c.env.DATABASE_URL));
+    if (!data) {
+      return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'No forecast before qualifying' } }, 404);
+    }
+    c.header('Cache-Control', cacheControlForActive());
     return c.json({ data, error: null });
   }),
 

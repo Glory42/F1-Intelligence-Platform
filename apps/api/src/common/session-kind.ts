@@ -1,5 +1,6 @@
 import {
-  driverPredictionFeatures, driverSprintFeatures, lapTimes, qualifyingResults, racePredictions, raceResults, races,
+  driverPredictionFeatures, driverSprintFeatures, lapTimes, preQualiPredictions, qualifyingResults, racePredictions,
+  raceResults, races,
   raceStatusEnum, sprintLapTimes, sprintPredictions, sprintResults,
 } from '../db/schema';
 import type { FeatureInfo, GpFeatures, RaceSession } from './types';
@@ -23,6 +24,8 @@ export interface AnySessionKind {
   upcoming: readonly RaceStatus[];
   // From these on the session has a classified winner to score the prediction against.
   done: readonly RaceStatus[];
+  // Where the forecast before qualifying lives: the GP's only.
+  preQuali: typeof preQualiPredictions | null;
 }
 
 // Each kind reads its own feature table into the one {value, contribution} shape both are served in.
@@ -46,6 +49,7 @@ export const GP: SessionKind<typeof driverPredictionFeatures, GpFeatures> = {
   date: races.raceDate,
   upcoming: ['qualifying_done'],
   done: ['completed'],
+  preQuali: preQualiPredictions,
 };
 
 export const SPRINT: SessionKind<typeof driverSprintFeatures, GpFeatures> = {
@@ -65,6 +69,7 @@ export const SPRINT: SessionKind<typeof driverSprintFeatures, GpFeatures> = {
   date: races.sprintDate,
   upcoming: ['sprint_qualifying_done', 'sprint_done', 'qualifying_done'],
   done: ['sprint_done', 'qualifying_done', 'completed'],
+  preQuali: null,
 };
 
 export function isDone(kind: AnySessionKind, status: string): boolean {

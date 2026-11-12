@@ -48,3 +48,9 @@ test('each GP driver shows the podium chance their win chance implies', async ({
   await expect(page.getByText('podium 88%')).toBeVisible();
   await expect(page.getByText('podium 79%')).toBeVisible();
 });
+
+test('a GP driver shows how qualifying moved their chance from the forecast before it', async ({ page }) => {
+  await page.goto('/prediction/1');
+
+  await expect(page.getByText('▲ 17 after qualifying')).toBeVisible();
+});

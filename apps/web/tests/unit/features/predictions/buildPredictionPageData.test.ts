@@ -68,8 +68,8 @@ function gpPrediction(predictedWinner: Driver = driver): PredictionResponse {
     race, predictedWinner, computedAt: '2025-09-07T12:00:00.000Z', modelVersion: 'weighted-v4',
     featureInfo: gpFeatureInfo as PredictionResponse['featureInfo'],
     drivers: [
-      { driver, winProbability: '0.62000', podiumProbability: '0.88000', predictedPosition: 1, gridPosition: 1, features: verFeatures },
-      { driver: driverB, winProbability: '0.38000', podiumProbability: '0.79000', predictedPosition: 2, gridPosition: 2, features: lecFeatures },
+      { driver, winProbability: '0.62000', podiumProbability: '0.88000', preQualiProbability: '0.45000', predictedPosition: 1, gridPosition: 1, features: verFeatures },
+      { driver: driverB, winProbability: '0.38000', podiumProbability: '0.79000', preQualiProbability: null, predictedPosition: 2, gridPosition: 2, features: lecFeatures },
     ],
   };
 }
@@ -87,8 +87,8 @@ function sprintPrediction(): SprintPredictionResponse {
     race, predictedWinner: driver, computedAt: '2025-09-06T12:00:00.000Z', modelVersion: 'sprint-v2',
     featureInfo: sprintFeatureInfo as SprintPredictionResponse['featureInfo'],
     drivers: [
-      { driver, winProbability: '0.55000', podiumProbability: null, predictedPosition: 1, gridPosition: 1, features: sprintFeatures },
-      { driver: driverB, winProbability: '0.45000', podiumProbability: null, predictedPosition: 2, gridPosition: null, features: sprintFeatures },
+      { driver, winProbability: '0.55000', podiumProbability: null, preQualiProbability: null, predictedPosition: 1, gridPosition: 1, features: sprintFeatures },
+      { driver: driverB, winProbability: '0.45000', podiumProbability: null, preQualiProbability: null, predictedPosition: 2, gridPosition: null, features: sprintFeatures },
     ],
   };
 }
@@ -142,6 +142,7 @@ describe('buildPredictionPageData: gp', () => {
     expect([ver.radar.teamRacePace, lec.radar.teamRacePace]).toEqual([1, 0]);
     expect([ver.pace, lec.pace, ver.gridPosition]).toEqual(['0.08%', '0.42%', 1]);
     expect([ver.podiumProbability, lec.podiumProbability]).toEqual(['0.88000', '0.79000']);
+    expect([ver.preQualiProbability, lec.preQualiProbability]).toEqual(['0.45000', null]);
   });
 
   test('a cached prediction from before the podium forecast shows no podium chance', async () => {

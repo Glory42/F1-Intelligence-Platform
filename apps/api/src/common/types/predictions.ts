@@ -44,6 +44,8 @@ export type DriverPredictionOf<TFeatures> = {
   predictedPosition: number | null;
   // P(top 3) implied by the win probabilities: GP only, null for sprints and rows written before it.
   podiumProbability: string | null;
+  // The same driver's chance in the forecast before qualifying (GP only): how qualifying moved it.
+  preQualiProbability: string | null;
   // From the session's qualifying (GP) or sprint qualifying (sprint) sheet.
   gridPosition: number | null;
   features: TFeatures;
@@ -137,4 +139,18 @@ export type TitleOddsResponse = {
   drivers: Array<{ driver: Driver } & OddsFields>;
   teams: Array<{ team: Team } & OddsFields>;
   history: Array<{ afterRound: number; driverId: number; titleProbability: number }>;
+};
+
+// pre-quali-v1: a GP's forecast before qualifying, over the lineup of the race before it.
+export type PreQualiDriver = {
+  driver: Driver;
+  winProbability: string;
+  predictedPosition: number | null;
+};
+
+export type PreQualiForecast = {
+  race: Race;
+  computedAt: string;
+  modelVersion: string;
+  drivers: PreQualiDriver[];
 };

@@ -28,8 +28,8 @@ bucket_name = "f1-api-snapshots"
 # this to "development" via .dev.vars so localhost origins keep working.
 ENVIRONMENT = "production"
 # Part of every edge-cache and R2 key: bump it after a manual Neon write (a backfill) or a change to a
-# response's shape, and the next deploy starts both caches empty. 2: podium chance and sprint-v3 (#92).
-SNAPSHOT_VERSION = "2"
+# response's shape, and the next deploy starts both caches empty. 3: GP rows' preQualiProbability (#92 C).
+SNAPSHOT_VERSION = "3"
 
 # Cloudflare's Build watch path for this Worker was a bare "apps/api" for weeks,
 # which never matched any nested file, so every push silently built zero times:

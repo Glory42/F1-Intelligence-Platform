@@ -4,7 +4,7 @@ import { configureLocalNeonProxy } from '../../../src/config/localNeonProxy';
 import {
   seasons, circuits, teams, drivers, races, raceResults, qualifyingResults,
   lapTimes, sprintResults, sprintLapTimes, driverSeasonStats, teamSeasonStats,
-  racePredictions, sprintPredictions, driverPredictionFeatures, driverSprintFeatures,
+  racePredictions, sprintPredictions, driverPredictionFeatures, preQualiPredictions, driverSprintFeatures,
   fp2LongRunTimes, dataQualityIssues, dataQualityRuns, raceControlMessages, raceOvertakes,
   teamRadioClips, raceStints, racePitStops, titleOddsDrivers, titleOddsTeams,
   raceLapTraces, raceBattles, raceWeatherTraces, qualifyingLapTelemetry,
@@ -65,7 +65,7 @@ const ALL_TABLES = [
   historyDrivers, historyConstructors, historyConstructorSeasons, historyConstructorLineage, f1dbImports,
   titleOddsDrivers, titleOddsTeams, raceLapTraces, raceBattles, raceWeatherTraces, qualifyingLapTelemetry,
   dataQualityIssues, dataQualityRuns,
-  driverPredictionFeatures, driverSprintFeatures,
+  driverPredictionFeatures, driverSprintFeatures, preQualiPredictions,
   racePredictions, sprintPredictions,
   fp2LongRunTimes, sprintLapTimes, lapTimes,
   sprintResults, raceResults, qualifyingResults,

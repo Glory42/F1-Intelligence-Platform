@@ -16,6 +16,7 @@ export * from './team_season_stats';
 export * from './race_predictions';
 export * from './sprint_predictions';
 export * from './driver_prediction_features';
+export * from './pre_quali_predictions';
 export * from './driver_sprint_features';
 export * from './fp2_long_run_times';
 export * from './data_quality_runs';
