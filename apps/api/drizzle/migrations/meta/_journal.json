@@ -225,6 +225,13 @@
       "when": 1794478134726,
       "tag": "0031_podium_probability",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794479421108,
+      "tag": "0032_sprint_v3_features",
+      "breakpoints": true
     }
   ]
 }

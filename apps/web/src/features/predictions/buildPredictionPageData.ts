@@ -2,7 +2,7 @@ import { api } from '@/lib/api';
 import type { Weights } from '@/lib/f1/predictionMath';
 import { edgeBreakdown, fieldScaled, termsOf, type FeatureEdge } from '@/lib/f1/predictionTerms';
 import { GP_ACCENT, SPRINT_ACCENT, type PredictionAccent, type PredictionDriverVM, type FeatureMeta, type PredictionPageKind } from './types';
-import type { Race, Driver, FeatureInfo, FeatureTerm, GpFeatures, PredictionOf, SprintFeatures } from '@/types';
+import type { Race, Driver, FeatureInfo, FeatureTerm, GpFeatures, PredictionOf } from '@/types';
 
 interface RawResultRow {
   driver: { id: number; fullName: string };
@@ -28,9 +28,9 @@ interface RawDetail {
 // the only model-specific thing left is the driver table's pace column.
 type Pace<F> = (features: F) => string;
 
-// teamRacePace is stored as minus the % gap to the fastest outfit's race pace.
-const GP_PACE: Pace<GpFeatures> = (f) => `${(-f.teamRacePace.value).toFixed(2)}%`;
-const SPRINT_PACE: Pace<SprintFeatures> = (f) => String(Math.round(f.carPerformance.value * 100));
+// teamRacePace is stored as minus the % gap to the fastest outfit's race pace. Missing only in a sprint-v2
+// response from an API that hasn't redeployed yet: the site and the API deploy separately.
+const GP_PACE: Pace<GpFeatures> = (f) => (f.teamRacePace ? `${(-f.teamRacePace.value).toFixed(2)}%` : '-');
 
 function toView<F extends Record<string, FeatureTerm>>(prediction: PredictionOf<F>, pace: Pace<F>): PredictionView {
   const terms = prediction.drivers.map((d) => termsOf(d.features));
@@ -68,7 +68,7 @@ const PREDICTION_BEHAVIOUR: Record<PredictionPageKind, PredictionBehaviour> = {
     dateField: (race) => race.raceDate,
   },
   sprint: {
-    fetchPrediction: async (raceId) => toView(await api.getSprintByRaceId(raceId), SPRINT_PACE),
+    fetchPrediction: async (raceId) => toView(await api.getSprintByRaceId(raceId), GP_PACE),
     fetchDetail: api.getSprintDetail,
     accent: SPRINT_ACCENT,
     dateField: (race) => race.sprintDate ?? race.raceDate,

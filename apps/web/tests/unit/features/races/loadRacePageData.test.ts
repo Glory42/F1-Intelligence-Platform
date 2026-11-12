@@ -6,7 +6,7 @@ import { circuit, driver, driverB } from '../../../support/msw/fixtures';
 import { loadRacePageData } from '@/features/races/loadRacePageData';
 import type {
   CircuitDetailResponse, LapSummary, LongRunRow, PredictionResponse, QualifyingResult, Race, RaceControlMessage, RaceDetailResponse,
-  RaceResult, Driver, SprintDetailResponse, SprintFeatures, SprintPredictionResponse, SprintResult,
+  RaceResult, Driver, SprintDetailResponse, GpFeatures, SprintPredictionResponse, SprintResult,
 } from '@/types';
 
 const NOW = new Date('2025-10-01T12:00:00Z');
@@ -236,7 +236,7 @@ describe('loadRacePageData: sprint', () => {
     const upcoming: Race = { ...sprintRace, status: 'sprint_qualifying_done' };
     const prediction: SprintPredictionResponse = {
       race: upcoming, predictedWinner: driverB, computedAt: '2025-09-05T20:00:00Z', modelVersion: 'sprint-v2', featureInfo: [],
-      drivers: [{ driver: driverB, winProbability: '0.52000', podiumProbability: null, predictedPosition: 1, gridPosition: 1, features: {} as SprintFeatures }],
+      drivers: [{ driver: driverB, winProbability: '0.52000', podiumProbability: null, predictedPosition: 1, gridPosition: 1, features: {} as GpFeatures }],
     };
     sprintWeekend({ race: upcoming, prediction, results: [sprintRow(10, driver, null, 1, 'grid_set')], laps: [] });
 

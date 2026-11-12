@@ -4,8 +4,8 @@ import { edgeBreakdown, fieldScaled, termsOf, whatIfProbabilities } from '../../
 
 describe('termsOf', () => {
   test('a driver\'s terms are the served contributions, one per feature, whichever model', () => {
-    expect(termsOf({ grid: { value: -1.1, contribution: 0.5 }, carPerformance: { value: 0.8, contribution: 0.67 } }))
-      .toEqual({ grid: 0.5, carPerformance: 0.67 });
+    expect(termsOf({ grid: { value: -1.1, contribution: 0.5 }, teamRacePace: { value: -0.2, contribution: 0.67 } }))
+      .toEqual({ grid: 0.5, teamRacePace: 0.67 });
   });
 });
 

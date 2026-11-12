@@ -53,11 +53,13 @@ describe('sprint (integration)', () => {
       data: { predictedWinner: { code: string }; modelVersion: string; race: { hasSprint: boolean }; drivers: Array<{ features: Record<string, unknown> }> };
     };
     expect(data.predictedWinner.code).toBe('AAA');
-    expect(data.modelVersion).toBe('sprint-v2');
+    expect(data.modelVersion).toBe('sprint-v3');
     expect(data.race.hasSprint).toBe(true);
     expect(data.drivers).toHaveLength(2);
-    expect(data.drivers[0].features).toHaveProperty('shortRunPace');
-    expect(data.drivers[0].features).toHaveProperty('sqQualifyingDelta');
+    // sprint-v3 serves weighted-v4's features: the GP's set, scored on the sprint grid.
+    expect(Object.keys(data.drivers[0].features)).toEqual([
+      'grid', 'qualiPace', 'teamQualiPace', 'driverPoints', 'teammateEdge', 'gridProcessional', 'teamRacePace',
+    ]);
   });
 
   it('returns a sprint prediction by race id', async () => {

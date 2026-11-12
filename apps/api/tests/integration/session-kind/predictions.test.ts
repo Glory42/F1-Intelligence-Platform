@@ -63,8 +63,8 @@ describe('a prediction for a GP and a sprint (integration)', () => {
 
   it.each([
     ['grand prix', '/api/predictions', 'weighted-v4', [3, 1], 'teamRacePace', { value: -0.15, contribution: 0.35 }, 7, '0.85000'],
-    // sprint-v2 is served in the GP's shape: the 0–1 score and weight × score / T, its log-odds term.
-    ['sprint', '/api/sprint', 'sprint-v2', [1, null], 'shortRunPace', { value: 0.65, contribution: (0.1 * 0.65) / 0.3 }, 8, null],
+    // sprint-v3 is weighted-v4 on the sprint grid: the same features, stored and served the same way.
+    ['sprint', '/api/sprint', 'sprint-v3', [1, null], 'teamRacePace', { value: -0.15, contribution: 0.35 }, 7, null],
   ])(
     'assembles the %s prediction: winner, model, ranked drivers, their grid and features',
     async (_kind, base, model, grid, feature, expected, featureCount, podium) => {

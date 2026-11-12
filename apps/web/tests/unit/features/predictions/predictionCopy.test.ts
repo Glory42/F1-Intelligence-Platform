@@ -27,8 +27,8 @@ describe('PREDICTION_COPY', () => {
     expect(c.actualLabel).toBe('actual sprint winner');
     expect(c.actualWinnerLabel).toBe('sprint winner');
     expect(c.gridColLabel).toBe('Grid');
-    expect(c.weightsHeading).toBe('./sprint weights');
-    expect(c.weightsNote).toContain('Grid position weighted higher');
+    expect(c.weightsHeading).toBe('./model weights');
+    expect(c.weightsNote).toContain('applied to the sprint grid');
     expect(c.sliderMax).toBe(35);
   });
 });
