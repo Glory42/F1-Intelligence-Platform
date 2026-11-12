@@ -45,7 +45,7 @@ Must use `@neondatabase/serverless` (HTTP driver): no TCP in Workers.
 ```
 apps/api/
 ├── src/
-│   ├── main.ts                    # Entry point: logger, CORS, nosniff, dev-only gate (/api/quality, /api/health/db 404 in production), edgeCache() on /api/*, /robots.txt, /api/health (no DB), mounts every module
+│   ├── main.ts                    # Entry point: logger, CORS, nosniff, dev-only gate (/api/quality, /api/health/db 404 in production), edgeCache() then snapshotStore() on /api/*, /robots.txt, /api/health (no DB), mounts every module
 │   ├── common/                    # Only what several modules share: module-only logic lives in that module's *.helpers.ts
 │   │   ├── types/                 # Response types per domain (api, seasons, circuits, drivers, teams, races, race-events,
 │   │   │                          #   strategy, race-story, telemetry, predictions, sprint, history, quality) + index.ts barrel
@@ -61,8 +61,10 @@ apps/api/
 │   │   │                          #   Prediction; mapGpFeatures()/mapSprintFeatures(): both models as {value, contribution}
 │   │   ├── identity.ts            # personKey(), isSamePerson(), f1dbPersonKey(), constructorKey()/constructorTeamKeys(), f1dbConstructorId():
 │   │   │                          #   the only "same driver / same team" rules; golden cases in docs/identity-cases.json (shared with Python)
-│   │   ├── cache.ts               # CACHE_COMPLETED/ACTIVE/QUIET/REFERENCE + isIngestWindow() (Fri–Mon noon UTC), cacheControlForActive/Status/Year(), cacheIfData()
+│   │   ├── cache.ts               # CACHE_COMPLETED/ACTIVE/QUIET/REFERENCE + isIngestWindow() (Fri–Mon noon UTC), cacheControlForActive/Status/Year(), cacheIfData();
+│   │   │                          #   isWriteWindow() (Fri–Mon, Wed 06–09 UTC) + snapshotFreshUntil() for the snapshot store
 │   │   ├── edge-cache.ts          # edgeCache() middleware: serves repeat GETs from the Workers Cache API (custom domain only); skips errors/non-public responses; keeps copies 30 days past max-age and serves a lapsed one when the refresh 5xxs; keys on the route's declared query params (query-params.ts)
+│   │   ├── snapshot-store.ts      # snapshotStore() middleware behind edgeCache(): one global copy per URL in R2 (SNAPSHOTS), held until the next write window; stale copy on a 5xx; skipped in local dev (ADR 0013)
 │   │   ├── query-params.ts        # readsQuery() tags a handler with the query params it reads; canonicalCacheUrl() keys the edge cache on only those, sorted
 │   │   └── session.ts             # RACE_SESSION / QUALIFYING_SESSION: `?session=` param descriptors route.ts validates
 │   ├── config/database.ts         # createDb(): Drizzle over Neon HTTP driver
@@ -186,7 +188,7 @@ apps/api/
 │   │   │   ├── predictions/       # accuracy, prediction-history, intel-standings helpers
 │   │   │   ├── race-events/       # openf1.mappers (race control, overtakes, team radio)
 │   │   │   └── quality/quality.test.ts # castSeverity()
-│   │   └── common/                # mappers, standings, feature-manifest, cache, edge-cache (stale-if-error), identity (golden cases from docs/identity-cases.json),
+│   │   └── common/                # mappers, standings, feature-manifest, cache (write windows), edge-cache (stale-if-error), snapshot-store, identity (golden cases from docs/identity-cases.json),
 │   │                              #   query-params (canonical keys; every GET route declares its params; hand-written handlers read only declared ones)
 │   ├── integration/                # bun test: real Hono `app.request()` against a LOCAL Postgres (docker-compose.test.yml behind
 │   │   │                           #   a Neon HTTP proxy; `bun run test:db:up`, config in .env.test): never Neon
@@ -202,6 +204,7 @@ apps/api/
 │   │   ├── hub/hub.test.ts         # race recap (winner, model pick, fastest stop, longest battle) + on-this-day races
 │   │   ├── history/history.test.ts # leaders w/ flags + active, strike-rate min starts, chases, milestones, lineages, on-this-day fallback
 │   │   ├── edge-cache/edge-cache.test.ts # edge hits skip the DB; never caches errors/non-public; per-request CORS origin; padded/reordered params share a copy
+│   │   ├── snapshot-store/snapshot-store.test.ts # completed race answered from R2 without the DB; lapsed copy while Neon is down; errors never stored; per-request CORS origin
 │   │   ├── health/health.test.ts   # /api/health without the DB, /api/health/db, dev-only routes 404 in production, API robots.txt
 │   │   ├── drivers/drivers.test.ts # list/filter/standings/detail
 │   │   ├── drivers/career.test.ts  # career + search link a person's seasons across name variants
@@ -221,11 +224,12 @@ apps/api/
 │   └── support/
 │       ├── app/request.ts          # apiRequest(): in-process app.request() with TEST_DATABASE_URL env
 │       ├── cache/fake-edge-cache.ts # FakeEdgeCache: in-memory Cache API (match/put), no expiry
+│       ├── cache/fake-snapshot-bucket.ts # FakeSnapshotBucket: in-memory R2 bucket (get/put + customMetadata), can be set failing
 │       ├── db/test-db.ts           # getTestDb()/truncateAll(): refuses *.neon.tech hosts and TEST_DATABASE_URL === DATABASE_URL
 │       └── factories/              # one insert helper per table, FK chain: season → team/circuit → driver → race → results
 │                                   #   (+ prediction/sprint features, sprint lap times, OpenF1 events, stints/pit stops, race story, telemetry, title odds, history)
 ├── eslint.config.js               # Flat config: tiered `max-lines` (controller 80 / module 50 / service+helpers 200 / common 150 / default 150; schema+seed+types.ts+tests off), run via `bun run lint`
-├── wrangler.toml                  # CF Workers config (name `f1-prediction-platform-api`): keep_vars = true, custom domain f1-api.gorkemkaryol.dev
+├── wrangler.toml                  # CF Workers config (name `f1-prediction-platform-api`): keep_vars = true, custom domain f1-api.gorkemkaryol.dev, workers.dev off, R2 binding SNAPSHOTS (f1-api-snapshots)
 │                                  #   plus workers_dev = true, ENVIRONMENT var
 ├── drizzle.config.ts              # schema: src/db/schema, out: drizzle/migrations
 ├── tsconfig.json                  # CF Workers target over src/ + tests/: excludes the Node-only seed.ts (drizzle.config.ts isn't included)
@@ -964,7 +968,7 @@ data-engine/
 | `feature-weights.json` | Canonical GP importances + labels, sprint weights + labels and `sprint_softmax_temperature`: checked by `test_weights.py` (GP importances against `gp_v4.json`) and the API's `feature-manifest.test.ts` (labels, importances, sprint weights, temperature) |
 | `plans/intelligence-platform-roadmap.md` | Intelligence-platform roadmap + free-tier budget rules (Neon, Render, OpenF1) |
 | `plans/architecture-deepening.md` | Plan from the 2026-10-13 architecture review: nine deepening candidates + bugs, in three tracks (data engine, API, web) |
-| `adr/0000`–`0012` | Legacy decisions; apps/ layout; DNF incl. DSQ/DNS; local-Postgres integration tests; OpenF1 pacing/budget; edge-cached responses; race events `session_type`; Plackett-Luce title odds; telemetry as resampled JSONB; drivers unique per person + pre-2018 results from F1DB; GP model as a fitted conditional logit; live ingest from OpenF1 + Jolpica; versioned KV read cache (superseded: KV Free's write cap) |
+| `adr/0000`–`0013` | Legacy decisions; apps/ layout; DNF incl. DSQ/DNS; local-Postgres integration tests; OpenF1 pacing/budget; edge-cached responses; race events `session_type`; Plackett-Luce title odds; telemetry as resampled JSONB; drivers unique per person + pre-2018 results from F1DB; GP model as a fitted conditional logit; live ingest from OpenF1 + Jolpica; versioned KV read cache (superseded: KV Free's write cap); R2 snapshot store behind the edge cache |
 
 ---
 

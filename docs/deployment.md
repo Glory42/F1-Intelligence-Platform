@@ -26,6 +26,7 @@ order: 6
 | Variable | How to set | Notes |
 |----------|-----------|-------|
 | `DATABASE_URL` | Workers → Settings → Variables and Secrets → **Secret** | Neon connection string |
+| `SNAPSHOT_VERSION` | Workers → Settings → Variables and Secrets → **Text** | Optional, defaults to `1`. Bump it to empty the snapshot store (below) |
 
 `keep_vars = true` is set in `apps/api/wrangler.toml` so deploys never erase dashboard-set variables.
 
@@ -92,6 +93,22 @@ Neither cache keys on the raw URL, so padding a URL with extra params can't mult
   order (`common/query-params.ts`). Ids with leading zeros are rejected with 400.
 - **Site:** a URL carrying a param no page reads (`PAGE_QUERY_PARAMS` in `apps/web/src/lib/pageQuery.ts`)
   is redirected (301) to the same URL without it, and the page cache keys on the params in a fixed order.
+
+### Snapshot store (R2)
+
+Behind the edge cache, `snapshotStore()` keeps one global copy of every public answer in the private R2
+bucket `f1-api-snapshots` (binding `SNAPSHOTS` in `apps/api/wrangler.toml`), so Neon is read once per URL
+per write window instead of once per data centre (ADR 0013). One-time setup, in R2 → `f1-api-snapshots`:
+- **Public access:** leave it off (no `r2.dev` URL, no custom domain). Only the Worker reads it.
+- **Settings → Object lifecycle rules → Add rule:** apply to the whole bucket, delete objects 90 days after
+  upload. This removes old versions and re-reads every completed answer once a quarter.
+
+**After a backfill, a manual job run or a manual F1DB import against Neon,** bump `SNAPSHOT_VERSION`
+(`1` → `2`, ...) under the Worker's Variables and Secrets. Scheduled writes (the worker's race weekends, the
+Wednesday F1DB import) need nothing: copies only hold until the next of those windows opens.
+
+R2 bills past its free allowance (1M writes, 10M reads, 10 GB a month) instead of refusing, so check
+R2 → Overview after the first weeks. Answers from the store carry `x-snapshot: hit`.
 
 ### Dev-only routes
 

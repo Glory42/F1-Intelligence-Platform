@@ -21,3 +21,4 @@ the month's compute is spent, and this keeps every answer a data centre has seen
 
 The API moved to `f1-api.gorkemkaryol.dev` in November 2026, which turned this cache on. A versioned
 Workers KV cache behind it (ADR 0012) was removed a day later: KV Free's write cap ran out within hours.
+Since then one global copy per answer sits behind this cache in R2 (ADR 0013).

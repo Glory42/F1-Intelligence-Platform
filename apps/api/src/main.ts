@@ -20,6 +20,7 @@ import searchModule from './modules/search/search';
 import qualityModule from './modules/quality/quality';
 import type { Bindings } from './common/types';
 import { edgeCache } from './common/edge-cache';
+import { snapshotStore } from './common/snapshot-store';
 import { readsQuery } from './common/query-params';
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -59,6 +60,7 @@ const devOnly: MiddlewareHandler<{ Bindings: Bindings }> = async (c, next) =>
 app.use('/api/quality', devOnly);
 app.use('/api/health/db', devOnly);
 app.use('/api/*', edgeCache());
+app.use('/api/*', snapshotStore());
 
 app.get('/robots.txt', (c) => c.text('User-agent: *\nDisallow: /\n'));
 
