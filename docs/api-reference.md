@@ -319,7 +319,7 @@ Returns the most recently computed model versions for GP and sprint predictions.
 {
   "data": {
     "gpVersion": "weighted-v4",
-    "sprintVersion": "sprint-v2"
+    "sprintVersion": "sprint-v3"
   }
 }
 ```
@@ -493,7 +493,8 @@ Returns the "Intelligence Standings": driver rankings by average prediction scor
 
 Returns the sprint prediction for the next sprint weekend whose status is `sprint_qualifying_done`,
 `sprint_done` or `qualifying_done` and whose `sprint_date` is today or later; 404 when there is none. Same
-envelope as the grand prix upcoming prediction but uses sprint model features and `modelVersion: "sprint-v2"`.
+envelope as the grand prix upcoming prediction, with `modelVersion: "sprint-v3"`: the same seven features and
+`featureInfo` as the GP model, scored on the sprint grid (ADR 0014). `podiumProbability` is always null.
 
 ### `GET /api/sprint/race/:raceId`
 
@@ -512,8 +513,8 @@ conventional (non-sprint) weekend.
     "race": { "id": 205, "name": "Chinese Grand Prix", "hasSprint": true, "sprintDate": "2026-03-15", ... },
     "prediction": {
       "predictedWinner": { "code": "ANT", ... },
-      "modelVersion": "sprint-v2",
-      "featureInfo": [{ "key": "carPerformance", "label": "Car Performance", "shortLabel": "Car Performance", "importance": 25 }, ...],
+      "modelVersion": "sprint-v3",
+      "featureInfo": [{ "key": "grid", "label": "Grid Slot", "shortLabel": "Grid Slot", "importance": 20 }, ...],
       "drivers": [
         {
           "predictedPosition": 1,
@@ -522,10 +523,9 @@ conventional (non-sprint) weekend.
           "gridPosition": 1,
           "driver": { ... },
           "features": {
-            "carPerformance": { "value": 0.88, "contribution": 0.73333 },
-            "circuitAdjStartPos": { "value": 1, "contribution": 0.83333 },
-            "shortRunPace": { "value": 0.91, "contribution": 0.30333 },
-            "...": "one per sprint-v2 Feature Score"
+            "grid": { "value": 0, "contribution": 1.70805 },
+            "qualiPace": { "value": 0, "contribution": 0.41112 },
+            "...": "one per GP feature: the same seven keys as /api/predictions"
           }
         }
       ]

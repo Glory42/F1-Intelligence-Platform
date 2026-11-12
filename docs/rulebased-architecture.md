@@ -1,22 +1,23 @@
 ---
 title: "RuleBased Architecture, Feature Inventory"
-description: "The hand-weighted (RuleBased) predictors: sprint-v2 today, and the retired GP model weighted-v3"
+description: "Historical record of the retired hand-weighted (RuleBased) predictors: sprint-v2 and the GP model weighted-v3"
 order: 4.5
 ---
 
 # RuleBased Architecture: Feature Inventory
 
-> **Mostly historical.** The 12-feature GP sections below record the retired `weighted-v3`, replaced by
-> the fitted `weighted-v4` ([ADR 0010](adr/0010-gp-model-is-a-fitted-conditional-logit.md)). For the
-> current GP and sprint models see [`prediction-model.md`](prediction-model.md); only `sprint-v2` here is live.
+> **Historical.** Nothing here runs any more. The 12-feature GP sections record the retired `weighted-v3`,
+> replaced by the fitted `weighted-v4` ([ADR 0010](adr/0010-gp-model-is-a-fitted-conditional-logit.md)); the
+> sprint notes record `sprint-v2`, replaced in November 2026 by `sprint-v3`, the same fitted weights on the
+> sprint grid ([ADR 0014](adr/0014-sprint-model-reuses-the-gp-weights.md)). For the current models see
+> [`prediction-model.md`](prediction-model.md).
 
-RuleBased means hand-picked weights. The only RuleBased model still in production is the
-sprint model `sprint-v2`. The GP model is `weighted-v4`, a conditional logit whose weights are
-fitted to past winners (ADR 0010; features and scores in [`prediction-model.md`](prediction-model.md) § Backtest).
+RuleBased means hand-picked weights. No RuleBased model is in production: both the GP model (`weighted-v4`)
+and the sprint model (`sprint-v3`) use weights fitted to past winners.
 
-The GP sections below are the record of the retired `weighted-v3`, kept because `sprint-v2`
-still shares six of its features (car performance, circuit-adjusted start, driver rating, win rate,
-luck, weather). Replayed
+The GP sections below are the record of `weighted-v3`. `sprint-v2` shared six of its features (car
+performance, circuit-adjusted start, driver rating, win rate, luck, weather); replayed, it scored 2.17 log
+loss per sprint against sprint-v3's 0.97 (ADR 0014). Replayed
 honestly, v3 picked 43.2% of winners over 190 races (2018–2026).
 
 ---
@@ -34,7 +35,7 @@ compute_sprint_features (after SQ)      ──► driver_sprint_features  (8 sco
 ```
 
 - **`compute_season_stats.py`**: running season aggregates after each completed race.
-- **`compute_sprint_features.py`**: the whole sprint-v2 model, per-driver feature scores (all 0–1)
+- **`compute_sprint_features.py`** (until sprint-v3): the whole sprint-v2 model, per-driver feature scores (all 0–1)
   + weighted sum + softmax (T=0.3) + winner, in one transaction, reading season aggregates as of the race
   date (`utils/season_aggregates.py`) and earlier races by person (`identity.person_ids`), never by code.
 
@@ -47,7 +48,7 @@ features stored as `features` JSONB, softmax at T=1. It is not RuleBased, so not
 
 Each feature was a `NUMERIC(6,5)` **0–1 score** per (race × driver). The raw score was the
 weighted sum; classification used softmax over the field. Migration `0029_drop_v3_feature_columns`
-dropped these columns. Sprint-v2's own weights are in `feature_manifest.py` `SPRINT_FEATURES`.
+dropped these columns. Sprint-v2's own weights were in `feature_manifest.py` `SPRINT_FEATURES` (removed with sprint-v2).
 
 ### Weights (were hardcoded in `compute_features.py`)
 
@@ -74,7 +75,7 @@ per circuit, never changes.
 ## Feature-by-feature: source, computation, usage
 
 As in weighted-v3. Long Run Pace, Tyre Degradation, Reliability, Qualifying Delta, Sector
-Strength and Position Gain no longer exist in code; the others live on in sprint-v2.
+Strength and Position Gain were dropped with v3; the others lived on in sprint-v2 until it was retired.
 
 ### 1. GP: Car Performance 0.20
 - **Table:** `team_season_stats.car_performance_score`, 1 per team per season.
@@ -82,7 +83,7 @@ Strength and Position Gain no longer exist in code; the others live on in sprint
   blend of the team's **median** finish position (robust: one DNF no longer drags a dominant car down)
   and its **average grid position** (raw one-lap car speed): `raw = 0.6·(21−median) + 0.4·(21−avg_grid)`,
   scored 50% min-max across the field + 50% absolute (`(raw − 1) / 19`), so top teams don't get runaway gaps.
-- **Usage:** `compute_sprint_features._car_performance` pulls the driver's team score, then **blends it
+- **Usage (sprint-v2):** `compute_sprint_features._car_performance` pulled the driver's team score, then **blended it
   with a circuit-category-specific score** (`compute_team_circuit_perf` via
   `blend_car_perf`): at race time the season score is nudged toward the driver's
   historical performance at this circuit's **track_category** (`circuits.track_category`),
@@ -90,7 +91,7 @@ Strength and Position Gain no longer exist in code; the others live on in sprint
   strong on a layout type (e.g. McLaren on high-downforce tracks) without inflating the
   season average.
 
-### Sprint model note: `compute_sprint_features` still applies this `blend_car_perf`
+### Sprint model note: sprint-v2's `compute_sprint_features` applied this `blend_car_perf`
 ### circuit-category blend to its car_performance feature (0.25 weight).
 
 ### 2. Long Run Pace: 0.15
@@ -162,7 +163,7 @@ Strength and Position Gain no longer exist in code; the others live on in sprint
 
 ## How it becomes a prediction
 
-weighted-v3 (now sprint-v2 in `compute_sprint_features.py`):
+weighted-v3 (and sprint-v2, until it was retired):
 ```
 raw = Σ (feature_score_i × weight_i)          -- per driver
 win_probability = softmax(raw, temperature=0.3)   -- softmax across field, one winner
@@ -193,7 +194,8 @@ selection is the bottleneck), the concrete signal gaps were:
 
 ## Reproduce / regenerate
 
-- Rule feature computation: `data-engine/src/jobs/compute_sprint_features.py` (helpers in `src/utils/feature_helpers.py`)
+- Rule feature computation: removed with sprint-v2 (`compute_sprint_features.py` now runs sprint-v3; `feature_helpers.py` is
+  gone). Recover it from git history before the sprint-v3 change if needed.
 - Backfill driver invoked via `src/main.py` (jobs: `compute_sprint_features`, `compute_season_stats`);
   every stored prediction is regenerated by `scripts/backfill_all_predictions.py`.
 - Benchmark eval: `data-engine/scripts/backtest.py`, a walk-forward replay of every completed GP from a

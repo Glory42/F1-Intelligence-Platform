@@ -37,7 +37,7 @@ All jobs live in `data-engine/src/jobs/`. They are invoked via `src/main.py --jo
 |-----|---------|
 | `ingest_sprint_qualifying` | Ingests SQ session: stores SQ1/SQ2/SQ3 times + sector times + speed in `sprint_results`; has a date guard |
 | `ingest_sprint` | Ingests sprint race results, sprint lap times, and sprint conditions (weather, SC/VSC, temps) |
-| `compute_sprint_features` | The `sprint-v2` Prediction: 8 Feature Scores, softmax (T=0.3), ranks and the predicted sprint winner, in one transaction |
+| `compute_sprint_features` | The `sprint-v3` Prediction: weighted-v4's committed weights on the sprint grid (`sprint_features`), stored like a GP with ranks and the predicted sprint winner, in one transaction; skips sprints inside the committed fit |
 | `data_quality_audit` | Measures per-table completeness/coverage across a season; writes `data_quality_runs` + `data_quality_issues` |
 | `data_quality_repair` | Re-ingests data for open, `fixable` issues reported by the audit, then recomputes the affected features/predictions/season-stats |
 

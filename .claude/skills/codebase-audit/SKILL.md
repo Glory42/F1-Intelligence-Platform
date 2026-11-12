@@ -78,8 +78,8 @@ Group by area. Distinguish `TODO` (intentional deferral) from `FIXME`/`HACK` (kn
 
 ### 9. Model weight integrity
 - **GP (weighted-v4)**: weights are fitted, not hand-set. They live only in `data-engine/src/models/gp_v4.json` (written by `scripts/fit_model_v4.py`), the probability is a plain softmax (T = 1), and `utils/gp_model_v4.py` is the only path to a GP Prediction. Flag hand-edited weights, a reintroduced temperature, a second prediction path, or a feature in `utils/gp_features_v4.py` that reads the race being predicted or later ones.
-- **Sprint (sprint-v2)**: `SPRINT_FEATURES` in `data-engine/src/utils/feature_manifest.py` must sum to 1.00 and `SPRINT_SOFTMAX_TEMPERATURE` must stay `0.3`.
-- Both must match `docs/feature-weights.json` and the API's `apps/api/src/common/feature-manifest.ts`: run `pytest tests/test_weights.py` in `data-engine/` and `bun test tests/unit/common/feature-manifest.test.ts` in `apps/api/`.
+- **Sprint (sprint-v3)**: no weights of its own. `compute_sprint_features.py` scores `gp_features_v4.sprint_features` with the committed `gp_v4.json` through `gp_model_v4.predict` (ADR 0014). Flag sprint-specific weights or a temperature creeping back, or a sprint feature that reads the sprint's own result.
+- The GP importances must match `docs/feature-weights.json` and the API's `apps/api/src/common/feature-manifest.ts`: run `pytest tests/test_weights.py` in `data-engine/` and `bun test tests/unit/common/feature-manifest.test.ts` in `apps/api/`.
 
 ---
 
