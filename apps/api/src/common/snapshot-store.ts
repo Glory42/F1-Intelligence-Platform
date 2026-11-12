@@ -1,7 +1,7 @@
 import type { Context, MiddlewareHandler } from 'hono';
 import type { Bindings } from './types';
 import { CACHE_ACTIVE, maxAgeSeconds, snapshotFreshUntil } from './cache';
-import { cacheKeyUrl } from './query-params';
+import { cacheKeyUrl, cacheVersion } from './query-params';
 
 // The subset of an R2 bucket binding the store uses, so tests can pass an in-memory one.
 export interface SnapshotObject {
@@ -67,7 +67,7 @@ export function snapshotStore(
     if (!bucket) return next();
 
     const { pathname, search } = new URL(cacheKeyUrl(c));
-    const key = `v${c.env?.SNAPSHOT_VERSION ?? '1'}${pathname}${search}`;
+    const key = `v${cacheVersion(c)}${pathname}${search}`;
     // An R2 outage only means Neon answers, as it did before the store existed.
     const stored = await read(bucket, key).catch(() => null);
     const now = clock();

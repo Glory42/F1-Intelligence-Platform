@@ -52,7 +52,7 @@ _Avoid_: "Recap" for a Season-level view of the model's performance, that is the
 ### Prediction Model
 
 **RuleBased (model)**:
-The `sprint-v2` approach (and the retired GP model `weighted-v3`): hand-weighted feature scores combined by a fixed formula and softmax, as opposed to a model that learns its weights from data, like the GP's `weighted-v4` (a fitted conditional logit, [ADR-0010](docs/adr/0010-gp-model-is-a-fitted-conditional-logit.md)). Not a synonym for "the prediction model."
+The approach of the retired `weighted-v3` (GP) and `sprint-v2` (sprint) models: hand-weighted feature scores combined by a fixed formula and softmax, as opposed to a model that learns its weights from data, like `weighted-v4` (a fitted conditional logit, [ADR-0010](docs/adr/0010-gp-model-is-a-fitted-conditional-logit.md)) and `sprint-v3`, which reuses its weights ([ADR-0014](docs/adr/0014-sprint-model-reuses-the-gp-weights.md)). No RuleBased model runs today. Not a synonym for "the prediction model."
 
 **Feature Score**:
 One of the 8 Sprint normalized 0.00000–1.00000 inputs to a Prediction (e.g. "Car Performance score," "Luck Factor score"). Combined by fixed weights into `raw_weighted_score`, then softmax'd into `win_probability`. The GP model's 7 features are in real units instead (e.g. Grid Slot, Driver Form): each is stored with its value and its contribution (fitted weight × standardized value), and the contributions sum to `raw_weighted_score`.
@@ -66,7 +66,7 @@ Starting Position scaled by the Circuit's overtake rate and safety-car probabili
 _Avoid_: "Starting Position" when the circuit-adjusted (weighted) version is meant, they are numerically different scores.
 
 **Model Version**:
-A string (`weighted-v4`, `sprint-v2`, ...) identifying exactly which weight/formula revision produced a given Prediction. GP and Sprint models version independently and intentionally: they iterate on separate schedules and are never expected to share a version number or ship together.
+A string (`weighted-v4`, `sprint-v3`, ...) identifying exactly which weight/formula revision produced a given Prediction. GP and Sprint models version independently: `sprint-v3` reuses `weighted-v4`'s weights, but a change to how either scores its grid gets its own version.
 
 **Prediction**:
 The full, race-scoped ranked list of drivers with win probabilities and feature breakdowns: assembled from `race_predictions` (predicted winner + model version) joined with `driver_prediction_features` (per-driver features). Not just the predicted winner.

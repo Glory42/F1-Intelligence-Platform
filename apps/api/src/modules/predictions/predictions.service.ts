@@ -172,7 +172,7 @@ export class PredictionsService {
     ]);
     return {
       gpVersion: gp[0]?.version ?? 'weighted-v4',
-      sprintVersion: sprint[0]?.version ?? 'sprint-v2',
+      sprintVersion: sprint[0]?.version ?? 'sprint-v3',
     };
   }
 }

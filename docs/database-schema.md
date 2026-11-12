@@ -558,26 +558,18 @@ One row per grand prix: the single predicted winner.
 ---
 
 ### `driver_sprint_features`
-One row per driver per sprint weekend. Written by `compute_sprint_features` together with the `sprint_predictions` row, in one transaction.
+One row per driver per sprint weekend. Written by `compute_sprint_features` (sprint-v3, ADR 0014) together with the `sprint_predictions` row, in one transaction.
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | serial PK | |
 | `race_id` | FK → races | |
 | `driver_id` | FK → drivers | |
-| `car_performance_score` | numeric(6,5) | 0–1 |
-| `starting_position_score` | numeric(6,5) | Raw SQ grid score (kept for display) |
-| `driver_rating_score` | numeric(6,5) | Sprint-specific when ≥3 sprint races recorded |
-| `track_overtake_score` | numeric(6,5) | **Deprecated**: always NULL in sprint-v2 |
-| `short_run_pace_score` | numeric(6,5) | Best SQ lap time, falls back to main qualifying |
-| `weather_impact_score` | numeric(6,5) | Based on sprint_weather field; cross-season |
-| `win_rate_score` | numeric(6,5) | Sprint-specific when ≥3 sprint races recorded |
-| `luck_factor_score` | numeric(6,5) | Rolling 5-race delta: cross-season |
-| `circuit_adj_start_pos_score` | numeric(6,5) | SQ grid scaled by overtake_rate × sc_probability |
-| `sq_qualifying_delta_score` | numeric(6,5) | Rolling 5-sprint SQ teammate delta |
-| `raw_weighted_score` | numeric(8,6) | |
-| `win_probability` | numeric(6,5) | After softmax |
+| `features` | jsonb | weighted-v4's 7 features on the sprint grid, feature → `{value, contribution}`, as in `driver_prediction_features`. Null only on rows from before migration `0032` until backfilled |
+| `raw_weighted_score` | numeric(8,6) | Sum of the contributions |
+| `win_probability` | numeric(6,5) | Softmax (T = 1) over the field |
 | `predicted_position` | integer | |
+| `car_performance_score` … `sq_qualifying_delta_score` | numeric(6,5) | sprint-v2's ten feature-score columns: legacy, nullable since `0032`, never written by sprint-v3; dropped by a later migration |
 | UNIQUE | `(race_id, driver_id)` | |
 
 ---
@@ -590,7 +582,7 @@ One row per sprint weekend: the single predicted sprint winner.
 | `race_id` | FK → races UNIQUE | |
 | `predicted_winner_id` | FK → drivers | |
 | `computed_at` | timestamptz | |
-| `model_version` | varchar(20) | `sprint-v2` (default) |
+| `model_version` | varchar(20) | `sprint-v3` (rows written before it say `sprint-v2`) |
 
 ---
 

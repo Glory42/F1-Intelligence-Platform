@@ -45,9 +45,10 @@ export const PREDICTION_COPY: Record<PredictionPageKind, PredictionCopy> = {
     actualLabel: 'actual sprint winner',
     actualWinnerLabel: 'sprint winner',
     gridColLabel: 'Grid',
-    paceColLabel: 'Car',
-    weightsHeading: './sprint weights',
-    weightsNote: 'Grid position weighted higher, since a ~17 lap sprint has no pit stop strategy.',
+    paceColLabel: 'Race Pace',
+    weightsHeading: './model weights',
+    weightsNote:
+      'The Grand Prix model\'s fitted weights, applied to the sprint grid: refitting on sprints alone scored no better.',
     sliderMax: 35,
     whatIfBlurb:
       'Drag the weights to see how the predicted sprint order shifts. Recomputed live in your browser: the model itself is unchanged.',

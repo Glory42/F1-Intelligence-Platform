@@ -134,25 +134,3 @@ def team_scores(team_aggs: list[dict[str, Any]]) -> dict[int, dict[str, float]]:
         for i, t in enumerate(team_aggs)
     }
 
-
-def driver_feature_stats(
-    race_aggs: list[dict[str, Any]], sprint_aggs: dict[int, dict[str, Any]]
-) -> dict[int, dict[str, Any]]:
-    """driver_id → the season fields the feature jobs read, shaped like a driver_season_stats row."""
-    out = {}
-    for d in race_aggs:
-        races_entered = int(d["races_entered"])
-        sprint = sprint_aggs.get(d["driver_id"])
-        out[d["driver_id"]] = {
-            "driver_id": d["driver_id"],
-            "team_id": d["team_id"],
-            "races_entered": races_entered,
-            "wins": int(d["wins"]),
-            "total_points": float(d["total_points"]),
-            "avg_position_gain": round(float(d["avg_gain"]), 2) if d["avg_gain"] is not None else None,
-            "dnf_rate": dnf_rate(races_entered, int(d["dnf_count"])),
-            "sprint_races_entered": int(sprint["sprint_races_entered"]) if sprint else 0,
-            "sprint_wins": int(sprint["sprint_wins"]) if sprint else 0,
-            "sprint_total_points": float(sprint["sprint_total_points"]) if sprint else 0.0,
-        }
-    return out

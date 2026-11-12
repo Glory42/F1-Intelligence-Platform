@@ -82,4 +82,13 @@ describe('edgeCache', () => {
 
     expect(res.status).toBe(404);
   });
+
+  test('bumping SNAPSHOT_VERSION misses every copy stored under the old version', async () => {
+    await appWith(cache, clock, fresh('v1')).request('/data', undefined, { SNAPSHOT_VERSION: '1' });
+
+    const same = await appWith(cache, clock, fresh('v2')).request('/data', undefined, { SNAPSHOT_VERSION: '1' });
+    const bumped = await appWith(cache, clock, fresh('v3')).request('/data', undefined, { SNAPSHOT_VERSION: '2' });
+
+    expect([await body(same), await body(bumped)]).toEqual(['v1', 'v3']);
+  });
 });

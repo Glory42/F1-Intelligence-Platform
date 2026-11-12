@@ -73,7 +73,7 @@ python -m src.main --job ingest_race_story --year 2026 --round 5 --session Sprin
 python -m src.main --job compute_season_stats --year 2026
 python -m src.main --job compute_title_odds --year 2026
 python -m src.main --job compute_features --race_id 42           # GP features + prediction (weighted-v4)
-python -m src.main --job compute_sprint_features --race_id 42    # sprint features + prediction (sprint-v2)
+python -m src.main --job compute_sprint_features --race_id 42    # sprint features + prediction (sprint-v3)
 ```
 
 Session enrichment jobs (`--session Race|Sprint`): `ingest_race_control`, `ingest_overtakes`, `ingest_team_radio`,
@@ -116,4 +116,4 @@ conn.close()
 - `safe()` in `scripts/run_backfill.py` retries each step and continues past per-round failures
 - Pre-2018 qualifying sessions may return 0 drivers (Ergast coverage is sparse): this is expected
 - Do NOT deploy to Cloudflare after backfill. Neon has the data at once, but the API's R2 snapshot store
-  holds old answers until the next race weekend: bump `SNAPSHOT_VERSION` in the Worker's dashboard variables
+  holds old answers until the next race weekend: bump `SNAPSHOT_VERSION` in `apps/api/wrangler.toml` and ship it

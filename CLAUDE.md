@@ -21,9 +21,9 @@ it's Python, and its jobs run once and exit rather than being a long-running dev
 `docs/adr/0001-apps-layout-scoped-to-js-bun.md`.
 
 ### Where tests live
-- `data-engine/tests/`: pytest. Pure functions (`math_utils.py`, pure `feature_helpers.py` helpers, model
-  `WEIGHTS` invariants) are tested directly. DB-touching functions (`compute_luck_score`, `same_person_rows`,
-  `compute_team_circuit_perf`, `season_drivers`) are tested via `tests/support/fake_db.py`: a scripted
+- `data-engine/tests/`: pytest. Pure functions (`math_utils.py`, `finishing_order.py`, the committed model's
+  weight invariants) are tested directly. DB-touching functions (`season_drivers`, the season aggregates) are
+  tested via `tests/support/fake_db.py`: a scripted
   `FakeCursor`/`FakeConnection` double shaped like psycopg2's `RealDictCursor`, no real DB. `ingest_runner.py`'s
   two shared runners (`run_ingest_job` for race/sprint, `run_qualifying_ingest_job` for qualifying/sprint-qualifying)
   are tested the same way. `upsert.py` and the two prediction jobs route their writes through
@@ -35,9 +35,9 @@ it's Python, and its jobs run once and exit rather than being a long-running dev
   (`tests/fixtures/openf1/`, `tests/fixtures/jolpica/`), checked against what FastF1 ingested.
   `weekend_pipeline` (Race Status → due jobs) and `enrichment_coverage` are tested pure; code that runs
   chains is tested by swapping entries in `weekend_pipeline.JOBS`, never by patching each job module.
-  The sprint job (`compute_sprint_features`, sprint-v2) is pinned end to end in `test_compute_sprint_features.py`; the GP job
-  (`compute_features`, weighted-v4) and its pure features run against an in-memory `RaceHistory`
-  (`tests/support/race_history.py`) in `test_compute_features.py` / `test_gp_features_v4.py`.
+  The GP job (`compute_features`, weighted-v4), the sprint job (`compute_sprint_features`, sprint-v3) and their pure
+  features run against an in-memory `RaceHistory` (`tests/support/race_history.py`) in `test_compute_features.py` /
+  `test_compute_sprint_features.py` / `test_gp_features_v4.py`.
 - `apps/api/tests/unit/`: `bun test`, mirrors `src/` by domain (e.g. `tests/unit/common/mappers.test.ts`
   tests `src/common/mappers.ts`). Covers the shared `src/common/` mapper/aggregation layer.
 - `apps/api/tests/integration/`: `bun test`, real Hono `app.request()` calls against a **local** Postgres
@@ -167,7 +167,7 @@ Full rules and numbers: `docs/plans/intelligence-platform-roadmap.md` §1–§2.
 - `driver_season_stats` / `team_season_stats`: aggregated after each race (includes sprint aggregates)
 - `driver_prediction_features`: weighted-v4 features per driver per GP (`features` JSONB: value + contribution) + `podium_probability`
 - `race_predictions`: one predicted GP winner per race
-- `driver_sprint_features`: 8 sprint-specific feature scores per driver per sprint weekend
+- `driver_sprint_features`: sprint-v3 features per driver per sprint weekend (`features` JSONB, the GP's shape); sprint-v2's `*_score` columns are legacy
 - `sprint_predictions`: one predicted sprint winner per sprint weekend
 
 ### Race Status Flow
@@ -367,8 +367,9 @@ python scripts/dev_snapshot.py                              # local only: one re
 python scripts/neon_usage.py                                # Neon Free usage + month-end projection (control-plane API: no DB wake)
 python scripts/backtest_snapshot.py                         # local only: one read-only Neon dump into docker-compose.backtest.yml
 python scripts/backtest.py [--from 2018] [--to 2026] [--reference NAME] [--places] [--json]  # local snapshot only: walk-forward GP model vs baselines
+python scripts/backtest_sprint.py [--train-from 2010] [--reference NAME]  # local snapshot only: walk-forward sprint models vs baselines
 python scripts/fit_model_v4.py                              # local snapshot only: refit src/models/gp_v4.json after a validated change
-python scripts/backfill_all_predictions.py [--from 2018]    # local only, writes Neon: regenerate predictions (GP fitted per season, out-of-sample)
+python scripts/backfill_all_predictions.py [--from 2018] [--skip-gp] [--skip-sprint]  # local only, writes Neon: GP + sprint predictions, fitted per season (out-of-sample)
 python scripts/backfill_podium_probability.py [--refresh]   # local only, writes Neon: podium chance from stored win probabilities
 python scripts/import_f1db.py [--version vYYYY.RR.M]         # weekly GitHub Action (f1db-import.yml) or local: download, verify sha256, import
 python scripts/audit_results_vs_f1db.py [--modern-plan]      # local only: read-only results check vs F1DB
@@ -435,8 +436,8 @@ bun run db:migrate    # apply via migration files (Neon is migrate-tracked: neve
 
 ## Prediction Model
 
-Two models: **GP model** (`weighted-v4`, fitted, 7 features) and **Sprint model** (`sprint-v2`, hand
-weights, 8 features). Full detail and backtest numbers in `docs/prediction-model.md`; why: ADR 0010.
+Two models: **GP model** (`weighted-v4`, fitted, 7 features) and **Sprint model** (`sprint-v3`: the same
+weights on the sprint grid). Full detail and backtest numbers in `docs/prediction-model.md`; why: ADRs 0010, 0014.
 
 ### GP model (weighted-v4)
 A conditional logit: P(win) = softmax over the field of Σ weight × standardized feature, with the weights
@@ -466,30 +467,21 @@ real units and only use races before the one predicted:
 - Every feature must be computable from races before the predicted one: the backtest replays history and
   a feature that peeks ahead makes it lie (the v3 numbers did, see ADR 0010).
 
-### Sprint Weights (sprint-v2)
-| Feature | Weight | Origin |
-|---------|--------|--------|
-| Car Performance | 25% | Race results → `team_season_stats.car_performance_score` |
-| Circuit-Adj. Starting Position | 25% | SQ grid × static circuit overtake rate |
-| Short Run Pace | 10% | SQ1/SQ2/SQ3 times → fallback: main qualifying |
-| Driver Rating | 10% | Sprint points / sprint races; fallback: main race rating |
-| Weather Impact | 8% | Sprint weather → historical wet-race finish avg |
-| Win Rate | 8% | Sprint wins; fallback: main race win rate |
-| Luck Factor | 8% | GP finish position vs expected, last 5 races |
-| SQ vs Teammate | 6% | SQ times → weighted teammate gap, last 5 sprint weekends |
+### Sprint model (sprint-v3)
+- weighted-v4's committed weights (`gp_v4.json`) on the sprint's own grid: `gp_features_v4.sprint_features` builds the
+  seven features from `sprint_results` (grid, SQ1–3 times; 2021–22 had no SQ, so qualifying's times stand in). The
+  sprint's own result is never a feature. No sprint weights, temperature or fit: refitting the GP refits it.
+- `compute_sprint_features` writes rows the GP's way (`features` JSONB) and skips sprints inside the committed fit;
+  the API serves them with the GP manifest. No podium chance for sprints (validated on GPs only).
+- `scripts/backtest_sprint.py` chose it (ADR 0014): 0.97 log loss over 30 sprints against sprint-v2's 2.17; refitting
+  on sprints or pooling them with GPs gained only noise. Rerun it before any GP refit.
 
 ### Static / Hardcoded inputs
 - `circuits.overtake_rate`: seeded once per circuit, never changes
 - `circuits.sc_probability`: **not static**: recomputed after every race ingest from `races.safety_car_laps`
   (`ingest_race._recompute_circuit_sc_probability`)
-- Sprint softmax temperature T=0.3: `SPRINT_SOFTMAX_TEMPERATURE` in `data-engine/src/utils/feature_manifest.py`
-  (applied by `compute_sprint_features.py`) and the API's `common/feature-manifest.ts` (to serve each sprint score's
-  contribution as weight × score / T, the GP model's shape). It applies to the
-  hand-weighted sprint model only.
-- Sprint weights: `SPRINT_FEATURES` in `feature_manifest.py`, re-exported as `WEIGHTS` by
-  `compute_sprint_features.py`, which also writes the probabilities and the predicted winner in one
-  transaction; weights, labels and the temperature are checked
-  against `docs/feature-weights.json` by the same three tests.
+- Podium chance: the Henery exponent `PODIUM_DISCOUNT = 0.8` in `data-engine/src/utils/finishing_order.py`, chosen
+  by `scripts/backtest.py --places` (GP only).
 
 ---
 

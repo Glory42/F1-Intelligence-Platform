@@ -13,6 +13,7 @@ from src.utils.gp_features_v4 import (
     neutralisation_rate,
     pace_gaps,
     quali_gaps,
+    sprint_features,
 )
 from src.utils.race_history import load_history
 from tests.support.fake_db import FakeConnection
@@ -149,6 +150,7 @@ class TestLoadHistory:
             [{"race_id": 1, **quali_row(1, 10, 1, 80000)}],
             [],
             [],
+            [{"race_id": 1, **quali_row(1, 10, 2, 81000)}],
             [{"race_id": 1, "driver_id": 1, "median_lap_ms": 90000}],
             [{"id": 1, "team_id": 10, "code": "VER", "first_name": "Max", "last_name": "Verstappen"}],
             [{"id": 10, "team_key": "red_bull_racing"}],
@@ -159,7 +161,40 @@ class TestLoadHistory:
         assert h.results[1][0]["finish_position"] == 1
         assert h.quali[1][0]["q1_time_ms"] == 80000
         assert h.race_pace[1][0]["median_lap_ms"] == 90000
+        assert h.sprint_grid[1][0]["grid_position"] == 2
         assert h.person == {1: "max verstappen"}
         assert h.outfit == {10: "red_bull_racing"}
         assert h.team_of == {1: 10}
         assert conn.cursors[0].executed[0][1] == (date(2023, 1, 1), date.max)
+
+
+class TestSprintFeatures:
+    def test_the_sprint_grid_and_sq_times_stand_in_for_qualifying(self):
+        h = sample_history(sprint_grid={3: [quali_row(1, 10, 2, 70500), quali_row(2, 10, 1, 70000), quali_row(3, 20, 3, 71000)]})
+
+        field = sprint_features(h, 3)
+
+        assert field[2]["grid"] == pytest.approx(0.0)
+        assert field[1]["grid"] == pytest.approx(-math.log(2))
+        assert field[1]["quali_pace"] == pytest.approx(-(70500 / 70000 - 1) * 100)
+        assert field[1]["driver_points"] == gp_features(h, 3)[1]["driver_points"]
+
+    def test_without_sq_times_qualifying_s_set_the_pace(self):
+        h = sample_history(sprint_grid={3: [quali_row(1, 10, 2), quali_row(2, 10, 1), quali_row(3, 20, 3)]})
+
+        field = sprint_features(h, 3)
+
+        assert field[1]["quali_pace"] == gp_features(h, 3)[1]["quali_pace"]
+        assert field[2]["grid"] == pytest.approx(0.0)
+
+    def test_the_sprint_s_own_result_is_never_a_feature(self):
+        h = sample_history(
+            sprint_grid={3: [quali_row(1, 10, 1, 70000), quali_row(2, 10, 2, 70100)]},
+            sprints={3: [{"driver_id": 1, "finish_position": 1, "status": "Finished"}]},
+        )
+
+        assert sprint_features(h, 3)[1]["sprint_result"] == 0.0
+
+    def test_a_race_without_a_sprint_grid_fails(self):
+        with pytest.raises(ValueError):
+            sprint_features(sample_history(), 3)

@@ -8,12 +8,12 @@ export type ModelInfo = {
   sprintVersion: string;
 };
 
-// One feature of a driver's Prediction, for either model. value: the feature in its own units (GP) or its
-// 0–1 Feature Score (sprint); contribution: its term in the driver's log-odds score, so a softmax over the
-// field of the summed contributions is the win probability.
+// One feature of a driver's Prediction, for either model. value: the feature in its own units; contribution:
+// its term in the driver's log-odds score, so a softmax over the field of the summed contributions is the
+// win probability.
 export type FeatureTerm = { value: number; contribution: number };
 
-// weighted-v4's features as stored by data-engine's compute_features (snake_case keys, the Python names).
+// weighted-v4's (and sprint-v3's) features as data-engine stores them (snake_case keys, the Python names).
 export type StoredGpFeatureTerm = FeatureTerm;
 export type StoredGpFeatures = Record<string, FeatureTerm>;
 
@@ -28,8 +28,8 @@ export type GpFeatureKey =
 
 export type GpFeatures = Record<GpFeatureKey, FeatureTerm>;
 
-// How a Prediction's page presents one feature. importance: the feature's share of the model in %
-// (GP: of the fitted |weight per SD|; sprint: its hand weight).
+// How a Prediction's page presents one feature. importance: the feature's share of the model in %, of the
+// fitted |weight per SD| (both models share weighted-v4's weights).
 export type FeatureInfo<TKey extends string = string> = {
   key: TKey;
   label: string;
@@ -37,7 +37,7 @@ export type FeatureInfo<TKey extends string = string> = {
   importance: number;
 };
 
-// GP and sprint predictions share one shape and differ only in which features they have.
+// GP and sprint predictions share one shape and one feature set; they differ in which grid they score.
 export type DriverPredictionOf<TFeatures> = {
   driver: Driver;
   winProbability: string;

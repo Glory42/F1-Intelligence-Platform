@@ -14,8 +14,8 @@ from src.utils.race_history import load_history
 from src.utils.upsert import upsert
 
 
-def prediction_rows(race_id: int, predictions: list[DriverPrediction]) -> list[dict[str, Any]]:
-    podium = podium_probabilities(np.array([p.probability for p in predictions]), seed=race_id)
+def model_rows(race_id: int, predictions: list[DriverPrediction]) -> list[dict[str, Any]]:
+    """The row shape both v4-based models store: each feature's value and contribution, score, probability, rank."""
     return [
         {
             "race_id": race_id,
@@ -25,28 +25,40 @@ def prediction_rows(race_id: int, predictions: list[DriverPrediction]) -> list[d
             }),
             "raw_weighted_score": round(p.score, 6),
             "win_probability": round(p.probability, 5),
-            "podium_probability": round(float(podium_p), 5),
             "predicted_position": p.position,
         }
-        for p, podium_p in zip(predictions, podium)
+        for p in predictions
     ]
 
 
-def write_prediction(conn: Any, race_id: int, predictions: list[DriverPrediction]) -> None:
-    upsert(conn, "driver_prediction_features", prediction_rows(race_id, predictions), ["race_id", "driver_id"],
-           commit=False)
+def prediction_rows(race_id: int, predictions: list[DriverPrediction]) -> list[dict[str, Any]]:
+    podium = podium_probabilities(np.array([p.probability for p in predictions]), seed=race_id)
+    return [{**row, "podium_probability": round(float(p), 5)} for row, p in zip(model_rows(race_id, predictions), podium)]
+
+
+def store_prediction(
+    conn: Any, race_id: int, rows: list[dict[str, Any]], tables: tuple[str, str], model_version: str,
+) -> None:
+    """(features table, predictions table): every driver's row and the predicted winner, one transaction."""
+    features_table, predictions_table = tables
+    upsert(conn, features_table, rows, ["race_id", "driver_id"], commit=False)
     with conn.cursor() as cur:
         cur.execute(
-            "DELETE FROM driver_prediction_features WHERE race_id = %s AND NOT (driver_id = ANY(%s))",
-            (race_id, [p.driver_id for p in predictions]),
+            f"DELETE FROM {features_table} WHERE race_id = %s AND NOT (driver_id = ANY(%s))",
+            (race_id, [r["driver_id"] for r in rows]),
         )
-    upsert(conn, "race_predictions", [{
+    upsert(conn, predictions_table, [{
         "race_id": race_id,
-        "predicted_winner_id": predictions[0].driver_id,
+        "predicted_winner_id": rows[0]["driver_id"],
         "computed_at": datetime.now(timezone.utc),
-        "model_version": GP_V4_MODEL_VERSION,
+        "model_version": model_version,
     }], ["race_id"], commit=False)
     conn.commit()
+
+
+def write_prediction(conn: Any, race_id: int, predictions: list[DriverPrediction]) -> None:
+    store_prediction(conn, race_id, prediction_rows(race_id, predictions),
+                     ("driver_prediction_features", "race_predictions"), GP_V4_MODEL_VERSION)
 
 
 def run(race_id: int) -> None:

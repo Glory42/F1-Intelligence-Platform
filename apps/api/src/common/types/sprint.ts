@@ -1,5 +1,5 @@
 import type { Driver } from './drivers';
-import type { DriverPredictionOf, FeatureTerm, PredictionOf } from './predictions';
+import type { DriverPredictionOf, GpFeatures, PredictionOf } from './predictions';
 import type { LapSummary, Race } from './races';
 
 export type SprintResult = {
@@ -21,22 +21,10 @@ export type SprintResult = {
   driver: Driver;
 };
 
-// sprint-v2's eight weighted Feature Scores.
-export type SprintFeatureKey =
-  | 'carPerformance'
-  | 'circuitAdjStartPos'
-  | 'shortRunPace'
-  | 'driverRating'
-  | 'weatherImpact'
-  | 'winRate'
-  | 'luckFactor'
-  | 'sqQualifyingDelta';
+// sprint-v3 scores the sprint grid with weighted-v4's features and weights.
+export type DriverSprintPrediction = DriverPredictionOf<GpFeatures>;
 
-export type SprintFeatures = Record<SprintFeatureKey, FeatureTerm>;
-
-export type DriverSprintPrediction = DriverPredictionOf<SprintFeatures>;
-
-export type SprintPredictionResponse = PredictionOf<SprintFeatures>;
+export type SprintPredictionResponse = PredictionOf<GpFeatures>;
 
 export type SprintDetailResponse = {
   race: Race;

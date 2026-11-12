@@ -26,7 +26,6 @@ order: 6
 | Variable | How to set | Notes |
 |----------|-----------|-------|
 | `DATABASE_URL` | Workers → Settings → Variables and Secrets → **Secret** | Neon connection string |
-| `SNAPSHOT_VERSION` | Workers → Settings → Variables and Secrets → **Text** | Optional, defaults to `1`. Bump it to empty the snapshot store (below) |
 
 `keep_vars = true` is set in `apps/api/wrangler.toml` so deploys never erase dashboard-set variables.
 
@@ -103,9 +102,10 @@ per write window instead of once per data centre (ADR 0013). One-time setup, in 
 - **Settings → Object lifecycle rules → Add rule:** apply to the whole bucket, delete objects 90 days after
   upload. This removes old versions and re-reads every completed answer once a quarter.
 
-**After a backfill, a manual job run or a manual F1DB import against Neon,** bump `SNAPSHOT_VERSION`
-(`1` → `2`, ...) under the Worker's Variables and Secrets. Scheduled writes (the worker's race weekends, the
-Wednesday F1DB import) need nothing: copies only hold until the next of those windows opens.
+**After a backfill, a manual job run or a manual F1DB import against Neon,** or a change to a response's
+shape, bump `SNAPSHOT_VERSION` in `apps/api/wrangler.toml` (`2` → `3`, ...) and let the change deploy. It is part
+of every edge-cache and R2 key, so the new deploy starts both caches empty. Scheduled writes (the worker's
+race weekends, the Wednesday F1DB import) need nothing: copies only hold until the next of those windows opens.
 
 R2 bills past its free allowance (1M writes, 10M reads, 10 GB a month) instead of refusing, so check
 R2 → Overview after the first weeks. Answers from the store carry `x-snapshot: hit`.

@@ -26,9 +26,9 @@ weekend still refreshes every 10 minutes, but once per URL worldwide instead of 
   `Cache-Control`), from every data centre, not only those that still had one. An R2 error falls through
   to Neon.
 - **Manual writes need a version bump.** A local backfill, a manual `python -m src.main` run or a manual F1DB
-  import outside the windows isn't seen until the next window. Bump `SNAPSHOT_VERSION` (a dashboard variable)
-  to start from an empty store; old versions are deleted by the bucket's 90-day lifecycle rule, which also
-  re-reads every completed answer once a quarter.
+  import outside the windows isn't seen until the next window. Bump `SNAPSHOT_VERSION` (`[vars]` in
+  `apps/api/wrangler.toml`, also part of every edge-cache key) to start both caches empty; old versions are
+  deleted by the bucket's 90-day lifecycle rule, which also re-reads every completed answer once a quarter.
 - **Local dev never uses it** (`ENVIRONMENT = "development"`): wrangler's simulated bucket wouldn't know when
   the dev database changes.
 - **Free tier, and why R2 rather than KV.** KV Free's 1,000 writes a day ran out within hours (ADR 0012).

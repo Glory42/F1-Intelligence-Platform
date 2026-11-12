@@ -34,3 +34,8 @@ export function canonicalCacheUrl(
 export function cacheKeyUrl(c: Context): string {
   return canonicalCacheUrl(c.req.url, declaredQueryParams(c), (name) => c.req.query(name));
 }
+
+// SNAPSHOT_VERSION (wrangler.toml) is in every cache key, so one bump empties the edge cache and the R2 store.
+export function cacheVersion(c: Context): string {
+  return (c.env as { SNAPSHOT_VERSION?: string } | undefined)?.SNAPSHOT_VERSION ?? '1';
+}

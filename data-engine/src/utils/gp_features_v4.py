@@ -64,11 +64,14 @@ def is_dnf(status: Optional[str]) -> bool:
     return not (status in ("Finished", "Lapped") or (status or "").startswith("+"))
 
 
+QUALI_TIME_COLS = ("q1_time_ms", "q2_time_ms", "q3_time_ms")
+
+
 def quali_gaps(rows: list[dict[str, Any]]) -> dict[int, float]:
     """% behind the fastest time in the deepest session each driver reached (Q3, else Q2, else Q1),
     capped; a driver with no time gets the cap."""
     fastest = {}
-    for col in ("q1_time_ms", "q2_time_ms", "q3_time_ms"):
+    for col in QUALI_TIME_COLS:
         times = [r[col] for r in rows if r[col]]
         if times:
             fastest[col] = min(times)
@@ -176,6 +179,25 @@ def gp_features(h: RaceHistory, race_id: int) -> dict[int, dict[str, float]]:
     rows = h.quali.get(race_id, [])
     if not rows:
         raise ValueError(f"No qualifying results for race {race_id}")
+    return _field_features(h, race_id, rows, h.sprints.get(race_id, []))
+
+
+def sprint_features(h: RaceHistory, race_id: int) -> dict[int, dict[str, float]]:
+    """The same features for the sprint, its grid sheet standing in for qualifying. In 2021–22 Friday
+    qualifying set the sprint grid and there was no SQ, so qualifying's times stand in for SQ's."""
+    rows = h.sprint_grid.get(race_id, [])
+    if not rows:
+        raise ValueError(f"No sprint grid for race {race_id}")
+    if not any(r[c] for r in rows for c in QUALI_TIME_COLS):
+        quali = {q["driver_id"]: q for q in h.quali.get(race_id, [])}
+        rows = [{**r, **{c: quali.get(r["driver_id"], {}).get(c) for c in QUALI_TIME_COLS}} for r in rows]
+    # The sprint's own result is what's being predicted, so it can't be a feature here.
+    return _field_features(h, race_id, rows, [])
+
+
+def _field_features(
+    h: RaceHistory, race_id: int, rows: list[dict[str, Any]], sprint_rows: list[dict[str, Any]],
+) -> dict[int, dict[str, float]]:
     driver_ids = [r["driver_id"] for r in rows]
     race = h.races[race_id]
     past = h.completed_before(race["race_date"])[:LOOKBACK_RACES]
@@ -185,7 +207,7 @@ def gp_features(h: RaceHistory, race_id: int) -> dict[int, dict[str, float]]:
     processional = 1 - float(race["overtake_rate"] if race["overtake_rate"] is not None else DEFAULT_OVERTAKE_RATE)
     sprint = {
         r["driver_id"]: 0.0 if is_dnf(r["status"]) else finish_points(r["finish_position"])
-        for r in h.sprints.get(race_id, [])
+        for r in sprint_rows
     }
     race_gap = {r["driver_id"]: _form(h, past, "team_race_gap", h.outfit.get(r["team_id"], "")) for r in rows}
     known_gap = [v for v in race_gap.values() if v is not None]

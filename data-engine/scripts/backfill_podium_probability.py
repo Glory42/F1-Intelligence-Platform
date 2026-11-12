@@ -1,6 +1,6 @@
 """Fills driver_prediction_features.podium_probability for stored GP predictions from their stored win
 probabilities: no refit, the numbers compute_features would write. Writes to Neon: local only, checks
-storage_guard first. Afterwards bump SNAPSHOT_VERSION (docs/deployment.md) so the API stops serving old copies.
+storage_guard first. Afterwards bump SNAPSHOT_VERSION in apps/api/wrangler.toml so the API stops serving old copies.
 Usage: python scripts/backfill_podium_probability.py [--refresh]"""
 import argparse
 import sys

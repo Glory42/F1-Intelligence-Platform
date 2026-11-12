@@ -45,11 +45,10 @@ cd apps/e2e && bun run test
 pytest, config in `pyproject.toml` (`pythonpath = ["."]`, `testpaths = ["tests"]`). Dev deps:
 `requirements-dev.txt` (= `requirements.txt` + `pytest`).
 
-- **Pure functions are tested directly**: `math_utils.py` (`normalize_minmax`, `softmax`,
-  `bayesian_win_rate`, …), pure `feature_helpers.py` helpers, the model weight invariants
-  (`test_weights.py`: sprint-v2's sum-to-1, positivity, weights, labels and softmax temperature against
-  `docs/feature-weights.json`; the committed `src/models/gp_v4.json` scores exactly the computed GP
-  features and its importances match the JSON), weighted-v4's pieces (`test_conditional_logit.py`: the fit
+- **Pure functions are tested directly**: `math_utils.py` (`normalize_minmax`, `bayesian_win_rate`,
+  `clamp`), `finishing_order.py`, the model weight invariants (`test_weights.py`: the committed
+  `src/models/gp_v4.json` scores exactly the computed GP features and its importances match
+  `docs/feature-weights.json`), weighted-v4's pieces (`test_conditional_logit.py`: the fit
   recovers known weights; `test_gp_features_v4.py`, over the in-memory history in
   `tests/support/race_history.py`; `test_gp_model_v4.py`: save/load, importances, training set;
   `test_identity.py`, against `docs/identity-cases.json`), the backtest scoring (`test_backtest.py`:
@@ -84,11 +83,9 @@ pytest, config in `pyproject.toml` (`pythonpath = ["."]`, `testpaths = ["tests"]
   (`test_upsert.py`, `test_compute_sprint_features.py`) monkeypatch `execute_batch` itself and assert on the
   params it receives, the same pattern `test_ingest_runner.py` already uses for its own `execute_batch`
   call, rather than extending `FakeCursor` to fake SQL rendering.
-- `test_compute_sprint_features.py` runs the sprint-v2 job end to end and pins every written score to the
-  rows sprint-v2 produced before it became one module, plus its probabilities, the predicted winner and the
-  person-keyed history reads. Its fake connection routes each read by a marker in its
-  SQL rather than call order (the reads are independent), and it reads the written rows back from
-  `execute_batch`'s params, naming columns from the composed INSERT.
+- `test_compute_sprint_features.py` runs the sprint-v3 job against an in-memory `RaceHistory` with a sprint
+  grid: the committed GP weights score `sprint_features`, rows are stored the GP's way with the predicted
+  winner in one transaction, sprints inside the committed fit are skipped and an unknown race fails.
 - `test_compute_features.py` covers the weighted-v4 GP job: each feature's value and contribution land in
   the `features` JSONB, a plain softmax of `raw_weighted_score` is the model's win probability, and `run`
   loads three seasons of history before the race and writes one row per driver.

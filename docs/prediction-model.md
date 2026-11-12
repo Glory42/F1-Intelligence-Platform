@@ -8,7 +8,7 @@ order: 4
 
 ## Overview
 
-Two separate models run per race weekend: one for the grand prix, one for the sprint (sprint weekends only). Both score each driver with a weighted sum of features and turn the field's scores into win probabilities with a softmax. The grand prix model (`weighted-v4`) has its weights fitted to every GP since 2010; the sprint model (`sprint-v2`) keeps hand-picked weights, since about 30 sprints are too few to fit (ADR 0010).
+Two separate models run per race weekend: one for the grand prix, one for the sprint (sprint weekends only). Both score each driver with a weighted sum of features and turn the field's scores into win probabilities with a softmax. The grand prix model (`weighted-v4`) has its weights fitted to every GP since 2010 (ADR 0010); the sprint model (`sprint-v3`) applies those same weights to the sprint's own grid, since refitting on about 30 sprints gained nothing (ADR 0014).
 
 **Prediction scorecard**
 
@@ -65,10 +65,9 @@ Some inputs never change and are seeded once into the database or hardcoded in P
 | Value | Where stored | Changes? |
 |-------|-------------|---------|
 | Circuit overtake rate | `circuits.overtake_rate` | Never: seeded once per track |
-| Circuit SC probability | `circuits.sc_probability` | After every race ingest: share of the circuit's completed races with safety-car laps (`ingest_race._recompute_circuit_sc_probability`). Read by sprint-v2 only |
+| Circuit SC probability | `circuits.sc_probability` | After every race ingest: share of the circuit's completed races with safety-car laps (`ingest_race._recompute_circuit_sc_probability`). No current model reads it (sprint-v2 did) |
 | GP model weights | `data-engine/src/models/gp_v4.json` (fitted, written by `scripts/fit_model_v4.py`); importances + labels in `docs/feature-weights.json`, mirrored in the API's `GP_FEATURE_MANIFEST`, which serves them with every Prediction | On a deliberate, backtested refit |
-| Sprint model weights + labels | `feature_manifest.py` `SPRINT_FEATURES` (re-exported as `WEIGHTS` by `compute_sprint_features.py`); mirrored in the API's `SPRINT_FEATURE_MANIFEST`, same JSON check | Only when model is intentionally updated |
-| Sprint softmax temperature T=0.3 | `feature_manifest.py` / the API's `feature-manifest.ts` `SPRINT_SOFTMAX_TEMPERATURE`, checked against `sprint_softmax_temperature` in `docs/feature-weights.json`. The GP model has none (T = 1) | Only when model is intentionally updated |
+| Sprint model weights | None of its own: sprint-v3 uses `gp_v4.json` and the API's `GP_FEATURE_MANIFEST` | With every GP refit |
 
 ---
 
@@ -140,27 +139,35 @@ Importance is each feature's share of |weight per SD|, written to `docs/feature-
 `scripts/fit_model_v4.py` and mirrored in the API's `GP_FEATURE_MANIFEST`. Refit only after
 `scripts/backtest.py` validates the change.
 
-## Sprint Model: `sprint-v2`, 8 Features
+## Sprint Model: `sprint-v3`, the GP weights on the sprint grid
 
-Intentionally different from the main race model. Sprint races are ~17 laps with no pit stops: track position and car dominance matter far more than long-run strategy or reliability.
+`compute_sprint_features` builds weighted-v4's seven features for the sprint (`gp_features_v4.sprint_features`)
+and scores them with the committed `gp_v4.json`, through the same `gp_model_v4.predict`:
 
-| Feature | Weight | Source |
-|---------|--------|--------|
-| Car Performance | 25% | `team_season_stats.car_performance_score` |
-| Circuit-Adj. Starting Position | 25% | `start_pos × (1 + (1−overtake_rate)) × (1 − 0.3×sc_prob)`, clamped to 1, with `start_pos = (21 − SQ grid) / 20` (the retired weighted-v3 GP used the same) |
-| Short Run Pace | 10% | Best SQ lap time (sq1/sq2/sq3_time_ms); falls back to main qualifying if SQ not yet ingested |
-| Driver Rating | 10% | Sprint-specific (`sprint_total_points / sprint_races / 8`) when ≥3 sprint races recorded; falls back to main race rating |
-| Weather Impact | 8% | Cross-season historical wet performance. Always neutral (0.5) for now: `races.sprint_weather` is only written after the sprint |
-| Win Rate | 8% | Sprint-specific when ≥3 sprint races recorded; falls back to main race win rate |
-| Luck Factor | 8% | Rolling 5-race delta from recent grand prix results: cross-season |
-| SQ vs Teammate | 6% | Recency-weighted (5→1) mean of SQ teammate gap across last 5 sprint weekends: cross-season |
+- **Grid Slot, Grid × Hard-to-Pass Track:** the sprint's grid (`sprint_results.grid_position`).
+- **Qualifying Pace:** the gap in SQ1–3. In 2021–22 Friday qualifying set the sprint grid and there was no SQ,
+  so qualifying's times stand in.
+- **Driver Form, Team Race / Qualifying Pace, Teammate Edge:** from races before the weekend, as for the GP.
+- The sprint's own result is never a feature (`sprint_result` is zeroed for a sprint target).
 
-### Weighted Score
+Rows are stored the GP's way (`driver_sprint_features.features` JSONB) and served with the GP manifest. The job
+skips sprints inside the committed fit, and `backfill_all_predictions.py` rebuilds past ones with weights fitted
+on the seasons before, so stored sprint predictions are out-of-sample.
 
-`raw = weighted_sum(feature_values, WEIGHTS)`, same combination rule as the GP model. Sourced
-from `feature_manifest.py`'s `SPRINT_FEATURES` and checked against `docs/feature-weights.json`.
+`scripts/backtest_sprint.py` replays every sprint from data before its weekend (ADR 0014):
 
-Sprint driver rating and win rate use sprint-specific history when ≥3 sprint races are recorded, otherwise fall back to main race stats (scaled to match the 8-point sprint maximum vs 25-point race maximum).
+| model (30 sprints, 2021–2026) | log loss | Brier | top-1 |
+|---|---|---|---|
+| sprint-v2 (hand weights, T = 0.3), as stored | 2.173 | 0.838 | 60% |
+| **v4 transfer (sprint-v3)** | **0.970** | **0.475** | 60% |
+| pooled: refit on GPs + earlier sprints | 0.955 | 0.470 | 60% |
+| sprint-only fit (20 sprints with 10+ before) | 1.028 | 0.529 | 65% |
+| P(win \| grid slot) | 1.041 | 0.515 | 70% |
+| equal chances | 3.010 | | |
+
+Paired per sprint, sprint-v3 beats sprint-v2 by 1.203 ± 0.230 log loss. Pooling gains 0.015 ± 0.016 (noise), so
+the simpler transfer ships, and its edge over the grid baseline (0.071 ± 0.239) is noise on 30 sprints. The
+eight hand-weighted sprint-v2 features are recorded in [`rulebased-architecture.md`](rulebased-architecture.md).
 
 ---
 
@@ -171,10 +178,9 @@ exp_s = np.exp(scores / T)
 win_probability = exp_s / exp_s.sum()
 ```
 
-- **GP (weighted-v4): T = 1.** The fitted weights already set how decisive the model is, so there is no
-  separate temperature to tune: the fit picks the scale that best matches who actually won.
-- **Sprint (sprint-v2): T = 0.3**, `SPRINT_SOFTMAX_TEMPERATURE` in `feature_manifest.py` and
-  the API's `feature-manifest.ts`. Its weights are hand-picked percentages, so it needs one.
+- **T = 1 for both models.** The fitted weights already set how decisive the model is, so there is no
+  separate temperature to tune: the fit picks the scale that best matches who actually won. sprint-v2's
+  hand-picked weights needed T = 0.3; sprint-v3 reuses the fitted ones.
 
 Probabilities sum to 1.0 across all drivers in a race.
 
@@ -205,7 +211,7 @@ races (190 GPs, 2018–2026, binary log loss per driver, lower is better):
 - **P(points) and expected points aren't served.** At no exponent did P(top 10) beat the grid baseline: win
   probabilities are near zero for most of the field, and so are the chances the chain gives those drivers for
   P8–P10, but they score points often. Expected points would inherit the same error.
-- Sprints have no podium chance: sprint-v2 is hand-weighted and was never validated this way.
+- Sprints have no podium chance: sprint-v3 was never validated for podiums.
 
 `scripts/backfill_podium_probability.py` fills the column for stored predictions from their stored win
 probabilities (no refit).
@@ -335,4 +341,4 @@ overtake data exist.
 Observed while building it: `circuit_adj_start_pos` multiplies the start-position score by up to ~1.95
 at low-overtake tracks and then clamps at 1.0, so at Monaco-like circuits the front of the grid all
 scores 1.0: pole and P2 become indistinguishable on that feature. weighted-v4's −log(grid) features fix
-this for the GP; sprint-v2 still has it.
+this for the GP, and sprint-v3 uses them too.

@@ -2,8 +2,8 @@ import {
   driverPredictionFeatures, driverSprintFeatures, lapTimes, qualifyingResults, racePredictions, raceResults, races,
   raceStatusEnum, sprintLapTimes, sprintPredictions, sprintResults,
 } from '../db/schema';
-import type { FeatureInfo, GpFeatures, RaceSession, SprintFeatures } from './types';
-import { featureInfo, GP_FEATURE_MANIFEST, mapGpFeatures, mapSprintFeatures, SPRINT_FEATURE_MANIFEST } from './feature-manifest';
+import type { FeatureInfo, GpFeatures, RaceSession } from './types';
+import { featureInfo, GP_FEATURE_MANIFEST, mapGpFeatures } from './feature-manifest';
 
 export type RaceStatus = (typeof raceStatusEnum.enumValues)[number];
 type FeatureTable = typeof driverPredictionFeatures | typeof driverSprintFeatures;
@@ -25,8 +25,7 @@ export interface AnySessionKind {
   done: readonly RaceStatus[];
 }
 
-// The two models store their features differently (GP: one JSONB object; sprint: a column per score),
-// so each kind reads its feature row into the one {value, contribution} shape both are served in.
+// Each kind reads its own feature table into the one {value, contribution} shape both are served in.
 export interface SessionKind<TFeatures extends FeatureTable, TScores> extends AnySessionKind {
   features: TFeatures;
   mapFeatures: (row: TFeatures['$inferSelect']) => TScores;
@@ -49,14 +48,17 @@ export const GP: SessionKind<typeof driverPredictionFeatures, GpFeatures> = {
   done: ['completed'],
 };
 
-export const SPRINT: SessionKind<typeof driverSprintFeatures, SprintFeatures> = {
+export const SPRINT: SessionKind<typeof driverSprintFeatures, GpFeatures> = {
   session: 'sprint',
   predictions: sprintPredictions,
   features: driverSprintFeatures,
-  mapFeatures: mapSprintFeatures,
+  mapFeatures: (row) => {
+    if (!row.features) throw new Error(`Sprint row for race ${row.raceId} predates sprint-v3: run the prediction backfill`);
+    return mapGpFeatures(row.features);
+  },
   // The sprint model has no finishing-order forecast.
   podiumProbability: () => null,
-  featureInfo: featureInfo(SPRINT_FEATURE_MANIFEST),
+  featureInfo: featureInfo(GP_FEATURE_MANIFEST),
   results: sprintResults,
   laps: sprintLapTimes,
   grid: sprintResults,

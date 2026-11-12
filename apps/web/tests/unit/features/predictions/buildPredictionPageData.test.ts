@@ -13,7 +13,7 @@ import { api } from '@/lib/api';
 import { buildPredictionPageData } from '@/features/predictions/buildPredictionPageData';
 import type {
   Circuit, Driver, Team, Race, RaceResult, RaceDetailResponse, PredictionResponse, GpFeatures,
-  SprintResult, SprintDetailResponse, SprintPredictionResponse, SprintFeatures, FeatureInfo,
+  SprintResult, SprintDetailResponse, SprintPredictionResponse, FeatureInfo,
 } from '@/types';
 
 const team: Team = { id: 1, seasonId: 2025, teamKey: 'red-bull', name: 'Red Bull Racing', nationality: 'Austrian' };
@@ -53,11 +53,7 @@ const lecFeatures: GpFeatures = {
   grid: term(-0.69, 0.1), qualiPace: term(-0.1, 0.2), teamQualiPace: term(-0.3, 0.1), driverPoints: term(19, 0.5),
   teammateEdge: term(0.1, 0.02), gridProcessional: term(-0.35, 0.2), teamRacePace: term(-0.42, 0.1),
 };
-const sprintFeatures: SprintFeatures = {
-  carPerformance: term(0.8, 0.67), circuitAdjStartPos: term(0.72, 0.6), shortRunPace: term(0.65, 0.22),
-  driverRating: term(0.75, 0.25), weatherImpact: term(0.5, 0.13), winRate: term(0.7, 0.19),
-  luckFactor: term(0.5, 0.13), sqQualifyingDelta: term(0.6, 0.12),
-};
+const sprintFeatures: GpFeatures = { ...verFeatures, grid: term(-0.69, 0.67), teamRacePace: term(-0.21, 0.4) };
 const info = (key: string, label: string, importance: number, shortLabel = label): FeatureInfo => ({ key, label, shortLabel, importance });
 const gpFeatureInfo: FeatureInfo[] = [
   info('grid', 'Grid Slot', 20), info('qualiPace', 'Qualifying Pace', 11, 'Quali Pace'),
@@ -65,7 +61,7 @@ const gpFeatureInfo: FeatureInfo[] = [
   info('teammateEdge', 'Teammate Edge', 4), info('gridProcessional', 'Grid × Hard-to-Pass Track', 17, 'Grid × Track'),
   info('teamRacePace', 'Team Race Pace', 18, 'Race Pace'),
 ];
-const sprintFeatureInfo: FeatureInfo[] = Object.keys(sprintFeatures).map((key) => info(key, key, 12.5));
+const sprintFeatureInfo = gpFeatureInfo;
 
 function gpPrediction(predictedWinner: Driver = driver): PredictionResponse {
   return {
@@ -238,20 +234,31 @@ describe('buildPredictionPageData: sprint', () => {
 
     expect(data.predictionFailed).toBe(false);
     expect(data.date).toBe(race.sprintDate);
-    expect(data.radarFeatures).toHaveLength(8);
+    expect(data.radarFeatures).toHaveLength(7);
     expect(data.correct).toBe(true);
-    expect(data.prediction!.drivers.map((d) => d.pace)).toEqual(['80', '80']);
+    expect(data.prediction!.drivers.map((d) => d.pace)).toEqual(['0.21%', '0.21%']);
   });
 
-  test('a sprint driver is shown through the contributions the API serves, pace from the car score', async () => {
+  test('a sprint driver is shown through the contributions the API serves, pace from team race pace', async () => {
     vi.mocked(api.getSprintByRaceId).mockResolvedValue(sprintPrediction());
     vi.mocked(api.getSprintDetail).mockResolvedValue(sprintDetail());
 
     const data = await buildPredictionPageData('sprint', 1);
 
     const [ver] = data.prediction!.drivers;
-    expect(ver.terms.carPerformance).toBe(0.67);
-    expect(ver.pace).toBe('80');
+    expect(ver.terms.grid).toBe(0.67);
+    expect(ver.pace).toBe('0.21%');
+  });
+
+  test('a sprint-v2 response from an API not yet redeployed shows no pace instead of failing', async () => {
+    const old = sprintPrediction();
+    for (const d of old.drivers) d.features = { carPerformance: { value: 0.8, contribution: 0.67 } } as unknown as GpFeatures;
+    vi.mocked(api.getSprintByRaceId).mockResolvedValue(old);
+    vi.mocked(api.getSprintDetail).mockResolvedValue(sprintDetail());
+
+    const data = await buildPredictionPageData('sprint', 1);
+
+    expect(data.prediction!.drivers.map((d) => d.pace)).toEqual(['-', '-']);
   });
 
   test('sprint fetch failure flags predictionFailed with no prediction', async () => {

@@ -164,6 +164,6 @@ describe('predictions (integration)', () => {
     expect(res.status).toBe(200);
     const { data } = (await res.json()) as { data: { gpVersion: string; sprintVersion: string } };
     expect(data.gpVersion).toBe('weighted-v4');
-    expect(data.sprintVersion).toBe('sprint-v2');
+    expect(data.sprintVersion).toBe('sprint-v3');
   });
 });

@@ -14,7 +14,7 @@ export async function createSprintPrediction(
     .values({
       raceId,
       predictedWinnerId,
-      modelVersion: 'sprint-v2',
+      modelVersion: 'sprint-v3',
       ...overrides,
     })
     .returning();
