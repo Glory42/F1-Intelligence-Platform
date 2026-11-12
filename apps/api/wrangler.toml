@@ -17,6 +17,12 @@ workers_dev = false
 # keep_vars = true prevents deploys from erasing dashboard-set variables
 # Never put secrets in this file
 
+# Global copy of every public answer behind the per-data-centre edge cache (ADR 0013). The bucket is
+# private, with a 90-day lifecycle rule; SNAPSHOT_VERSION is a dashboard variable (docs/deployment.md).
+[[r2_buckets]]
+binding = "SNAPSHOTS"
+bucket_name = "f1-api-snapshots"
+
 [vars]
 # Gates which CORS origins are allowed: see main.ts. Local dev overrides
 # this to "development" via .dev.vars so localhost origins keep working.

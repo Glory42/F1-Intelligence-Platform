@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   CACHE_ACTIVE, CACHE_COMPLETED, CACHE_QUIET,
   cacheControlForActive, cacheControlForStatus, cacheControlForYear, cacheIfData, isIngestWindow,
+  isWriteWindow, snapshotFreshUntil,
 } from '../../../src/common/cache';
 
 const WEDNESDAY = new Date('2026-06-17T12:00:00Z');
@@ -64,5 +65,46 @@ describe('cacheIfData', () => {
 
   test('an empty response is only cached briefly, so a later backfill or import shows up at once', () => {
     expect(cacheIfData(CACHE_COMPLETED, false)).toBe(CACHE_ACTIVE);
+  });
+});
+
+describe('isWriteWindow', () => {
+  test.each([
+    ['Thursday night', '2026-06-18T23:59:00Z', false],
+    ['Friday morning', '2026-06-19T00:00:00Z', true],
+    ['Monday evening, 24 h after a late Sunday race', '2026-06-22T23:59:00Z', true],
+    ['Tuesday', '2026-06-23T00:00:00Z', false],
+    ['Wednesday before the F1DB import', '2026-06-24T05:59:00Z', false],
+    ['Wednesday during the F1DB import', '2026-06-24T06:00:00Z', true],
+    ['Wednesday after a late-starting import', '2026-06-24T09:00:00Z', false],
+  ])('%s → %p', (_, iso, expected) => {
+    expect(isWriteWindow(new Date(iso))).toBe(expected);
+  });
+});
+
+describe('snapshotFreshUntil', () => {
+  const at = (iso: string) => new Date(iso);
+  const plus = (iso: string, seconds: number) => Date.parse(iso) + seconds * 1000;
+
+  test('between write windows a copy is held until the next one opens', () => {
+    expect(snapshotFreshUntil(CACHE_QUIET, at('2026-06-16T12:00:00Z'))).toBe(Date.parse('2026-06-17T06:00:00Z'));
+    expect(snapshotFreshUntil(CACHE_QUIET, at('2026-06-17T12:00:00Z'))).toBe(Date.parse('2026-06-19T00:00:00Z'));
+  });
+
+  test('a hold never ends before the max-age', () => {
+    expect(snapshotFreshUntil(CACHE_QUIET, at('2026-06-18T23:30:00Z'))).toBe(plus('2026-06-18T23:30:00Z', 3600));
+  });
+
+  test('inside a write window a copy lasts only its max-age', () => {
+    expect(snapshotFreshUntil(CACHE_ACTIVE, at('2026-06-20T12:00:00Z'))).toBe(plus('2026-06-20T12:00:00Z', 600));
+    expect(snapshotFreshUntil(CACHE_QUIET, at('2026-06-17T07:00:00Z'))).toBe(plus('2026-06-17T07:00:00Z', 3600));
+  });
+
+  test('a completed answer written between write windows never expires', () => {
+    expect(snapshotFreshUntil(CACHE_COMPLETED, at('2026-06-16T12:00:00Z'))).toBe(Infinity);
+  });
+
+  test('a completed answer written during a race weekend lasts its max-age, in case the weekend amends it', () => {
+    expect(snapshotFreshUntil(CACHE_COMPLETED, at('2026-06-21T18:00:00Z'))).toBe(plus('2026-06-21T18:00:00Z', 86400));
   });
 });

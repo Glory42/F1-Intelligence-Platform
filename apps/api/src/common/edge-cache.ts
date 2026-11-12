@@ -1,5 +1,6 @@
 import type { MiddlewareHandler } from 'hono';
-import { canonicalCacheUrl, declaredQueryParams } from './query-params';
+import { maxAgeSeconds } from './cache';
+import { cacheKeyUrl } from './query-params';
 
 export interface EdgeCache {
   match(request: Request): Promise<Response | undefined>;
@@ -20,10 +21,6 @@ export function defaultEdgeCache(): EdgeCache | undefined {
 
 function isCacheable(res: Response): boolean {
   return res.status === 200 && (res.headers.get('Cache-Control') ?? '').includes('public');
-}
-
-function maxAgeSeconds(cacheControl: string): number {
-  return Number(/max-age=(\d+)/.exec(cacheControl)?.[1] ?? 0);
 }
 
 // Entries stored before the stale window existed carry no marker: the Cache API already expires them.
@@ -62,8 +59,7 @@ export function edgeCache(
     const cache = c.req.method === 'GET' ? getCache() : undefined;
     if (!cache) return next();
 
-    const url = canonicalCacheUrl(c.req.url, declaredQueryParams(c), (name) => c.req.query(name));
-    const key = new Request(url, { method: 'GET' });
+    const key = new Request(cacheKeyUrl(c), { method: 'GET' });
     const hit = await cache.match(key);
     if (hit && isFresh(hit, clock())) return forClient(hit);
 

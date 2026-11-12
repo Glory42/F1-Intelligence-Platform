@@ -30,3 +30,7 @@ export function canonicalCacheUrl(
   }
   return key.toString();
 }
+
+export function cacheKeyUrl(c: Context): string {
+  return canonicalCacheUrl(c.req.url, declaredQueryParams(c), (name) => c.req.query(name));
+}
