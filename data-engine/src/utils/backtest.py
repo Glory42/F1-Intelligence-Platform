@@ -27,6 +27,19 @@ def _top_k_hit(probabilities: dict[Hashable, float], p_winner: float, k: int) ->
     return min(max((k - above) / max(tied, 1), 0.0), 1.0)
 
 
+def place_metrics(probabilities: dict[Hashable, float], placed: set[Hashable]) -> dict[str, float]:
+    """Each driver's P(finishing in the top k) against whether they did, as binary log loss and Brier
+    averaged over the field: a podium or points forecast is many yes/no calls, unlike the one winner."""
+    log_loss = brier = 0.0
+    for driver, p in probabilities.items():
+        outcome = driver in placed
+        p_outcome = p if outcome else 1.0 - p
+        log_loss -= math.log(max(p_outcome, _MIN_PROBABILITY))
+        brier += (p - (1.0 if outcome else 0.0)) ** 2
+    n = max(len(probabilities), 1)
+    return {"log_loss": log_loss / n, "brier": brier / n}
+
+
 def summarize(per_race: list[dict[str, float]]) -> dict[str, float]:
     if not per_race:
         return {"races": 0}
@@ -91,8 +104,27 @@ class GridWinRates:
             self._starts[s] += 1
             self._wins[s] += int(won)
 
-    def probabilities(self, grid: dict[Hashable, Optional[int]]) -> dict[Hashable, float]:
+    def rate(self, grid_position: Optional[int]) -> float:
         # Add-half smoothing keeps a never-won slot possible without inventing much signal.
-        rate = {d: (self._wins[self.slot(g)] + 0.5) / (self._starts[self.slot(g)] + 1) for d, g in grid.items()}
+        s = self.slot(grid_position)
+        return (self._wins[s] + 0.5) / (self._starts[s] + 1)
+
+    def probabilities(self, grid: dict[Hashable, Optional[int]]) -> dict[Hashable, float]:
+        rate = {d: self.rate(g) for d, g in grid.items()}
         total = sum(rate.values())
         return {d: r / total for d, r in rate.items()}
+
+
+class GridPlaceRates:
+    """Baseline for a top-k forecast: P(finishing in the top `places` | grid slot), learned only from
+    races recorded so far. Unlike GridWinRates it isn't normalised: k drivers finish in the top k."""
+
+    def __init__(self, places: int) -> None:
+        self.places = places
+        self._slots = GridWinRates()
+
+    def record(self, results: Iterable[tuple[Optional[int], Optional[int]]]) -> None:
+        self._slots.record((grid, finish is not None and finish <= self.places) for grid, finish in results)
+
+    def probabilities(self, grid: dict[Hashable, Optional[int]]) -> dict[Hashable, float]:
+        return {d: self._slots.rate(g) for d, g in grid.items()}

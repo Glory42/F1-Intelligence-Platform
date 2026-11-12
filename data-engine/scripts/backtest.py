@@ -2,7 +2,9 @@
 never Neon. Every race is predicted from races before it only: features come from race_history as of the
 race, and each candidate is refit before every test race on earlier races (from --train-from). Writes
 nothing. The v3 baseline numbers this replaced are in docs/prediction-model.md § Backtest.
-Usage: python scripts/backtest.py [--from 2018] [--to 2026] [--train-from 2010] [--reference NAME] [--json]"""
+--places also scores weighted-v4's P(podium) / P(points) (utils/finishing_order) at each PLACE_DISCOUNTS value
+against the grid baseline. Usage: python scripts/backtest.py [--from 2018] [--to 2026] [--train-from 2010]
+[--reference NAME] [--places] [--json]"""
 import argparse
 import datetime
 import json
@@ -13,15 +15,20 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
+import numpy as np
 import psycopg2
 import psycopg2.extras
 
 sys.path.insert(0, ".")
 
-from src.utils.backtest import GridWinRates, calibration_table, paired_difference, race_metrics, summarize
+from src.utils.backtest import (
+    GridPlaceRates, GridWinRates, calibration_table, paired_difference, place_metrics, race_metrics, summarize,
+)
+from src.utils.finishing_order import PODIUM_PLACES, finishing_order_forecast
 from src.utils.gp_features_v4 import GP_V4_FEATURES
 from src.utils.gp_model_v4 import DEFAULT_L2, eligible, fit, history_start, training_races
 from src.utils.race_history import RaceHistory, load_history
+from src.utils.title_odds import GP_POINTS
 
 BACKTEST_DATABASE_URL = os.environ.get(
     "BACKTEST_DATABASE_URL", "postgresql://f1:f1@localhost:5434/f1_backtest"
@@ -46,6 +53,9 @@ CANDIDATES: list[Candidate] = [
 ]
 # A fitted model needs some history before its first prediction.
 MIN_TRAINING_RACES = 20
+# Henery exponents tried for the places after the win; 1.0 is plain Plackett–Luce.
+PLACE_DISCOUNTS = (1.0, 0.9, 0.8, 0.7, 0.6, 0.4)
+PLACE_MODEL = "weighted-v4"
 
 
 def connect() -> Any:
@@ -66,13 +76,52 @@ def load(conn: Any, train_from: int) -> dict[str, Any]:
     return {"history": history, "stored": stored}
 
 
+def score_places(
+    out: dict[str, list], race: dict[str, Any], probs: Probabilities, grid: dict[int, Any], results: list[dict],
+    grid_rates: dict[str, GridPlaceRates],
+) -> None:
+    finish = {r["driver_id"]: r["finish_position"] for r in results}
+    placed = {
+        "podium": {d for d, f in finish.items() if f is not None and f <= PODIUM_PLACES},
+        "points": {d for d, f in finish.items() if f is not None and f <= len(GP_POINTS)},
+    }
+    drivers = list(probs)
+    win = np.array([probs[d] for d in drivers])
+
+    def add(name: str, forecasts: dict[str, dict[int, float]]) -> None:
+        for kind, p in forecasts.items():
+            out[f"{kind} {name}"].append(
+                {"race_id": race["id"], "pairs": [(p[d], d in placed[kind]) for d in drivers],
+                 **place_metrics(p, placed[kind])})
+
+    for discount in PLACE_DISCOUNTS:
+        fc = finishing_order_forecast(win, GP_POINTS, seed=race["id"], discount=discount)
+        add(f"v4 x{discount}", {"podium": dict(zip(drivers, fc.podium)), "points": dict(zip(drivers, fc.points_finish))})
+    add("grid", {kind: rates.probabilities({d: grid.get(d) for d in drivers}) for kind, rates in grid_rates.items()})
+
+
+def summarize_places(rows: dict[str, list]) -> dict[str, Any]:
+    return {
+        name: {
+            "races": len(r),
+            "log_loss": sum(x["log_loss"] for x in r) / len(r),
+            "brier": sum(x["brier"] for x in r) / len(r),
+            "calibration": calibration_table(p for x in r for p in x["pairs"]),
+        }
+        for name, r in rows.items() if r
+    }
+
+
 def run(
     data: dict[str, Any], years: range, train_from: int, candidates: list[Candidate], reference: str = "grid-history",
+    places: bool = False,
 ) -> dict[str, Any]:
     history: RaceHistory = data["history"]
     per_race: dict[str, list] = defaultdict(list)
     calibration: dict[str, list] = defaultdict(list)
     grid_rates = GridWinRates()
+    place_rates = {"podium": GridPlaceRates(PODIUM_PLACES), "points": GridPlaceRates(len(GP_POINTS))}
+    place_rows: dict[str, list] = defaultdict(list)
     weights: dict[str, Any] = {}
     training = training_races(history, from_year=train_from)
     scored = {t.race_id: t for t in training}
@@ -92,7 +141,10 @@ def run(
                 for c in candidates:
                     model = fit(training, before=race["race_date"], features=c.features, l2=c.l2)
                     weights[c.name] = model
-                    score(c.name, race, model.probabilities(target.field), target.winner)
+                    probs = model.probabilities(target.field)
+                    score(c.name, race, probs, target.winner)
+                    if places and c.name == PLACE_MODEL:
+                        score_places(place_rows, race, probs, grid, results, place_rates)
             score("grid-history", race, grid_rates.probabilities(grid), target.winner)
             score("uniform", race, {d: 1 / len(grid) for d in grid}, target.winner)
             stored = data["stored"].get(race["id"])
@@ -100,6 +152,8 @@ def run(
                 score("stored in DB", race, stored, target.winner)
         # Recorded after scoring, so the baseline only ever knows earlier races.
         grid_rates.record((r["grid_position"], r["finish_position"] == 1) for r in results)
+        for rates in place_rates.values():
+            rates.record((r["grid_position"], r["finish_position"]) for r in results)
 
     log_loss = {name: {r["race_id"]: r["log_loss"] for r in rows} for name, rows in per_race.items()}
     return {
@@ -116,6 +170,7 @@ def run(
         "weights": {
             name: {f: round(float(c), 3) for f, c in zip(m.features, m.coef)} for name, m in weights.items()
         },
+        "places": summarize_places(place_rows),
     }
 
 
@@ -148,6 +203,16 @@ def report(out: dict[str, Any], candidates: list[Candidate]) -> None:
         for f, c in sorted(coef.items(), key=lambda kv: -abs(kv[1])):
             print(f"  {f:<28} {c:+.3f}")
 
+    if out["places"]:
+        print(f"\n{'podium / points forecast':<26} {'races':>5} {'log loss':>9} {'Brier':>7}")
+        for name, s in out["places"].items():
+            print(f"{name:<26} {s['races']:>5} {s['log_loss']:>9.4f} {s['brier']:>7.4f}")
+        for name in ("podium v4 x1.0", "podium grid"):
+            print(f"\nCalibration, {name} (predicted P(podium) vs actual podium rate):")
+            for b in out["places"].get(name, {}).get("calibration", []):
+                print(f"  [{b['lo']:.2f}, {b['hi']:.2f})  n={b['n']:>5}  mean p={b['mean_p']:.3f}  "
+                      f"placed={b['win_rate']:.3f}")
+
     for name in [c.name for c in candidates]:
         print(f"\nCalibration, {name} (predicted p vs actual win rate):")
         for b in out["calibration"].get(name, []):
@@ -160,6 +225,7 @@ def main() -> None:
     parser.add_argument("--to", dest="end", type=int, default=datetime.date.today().year)
     parser.add_argument("--train-from", type=int, default=2010)
     parser.add_argument("--reference", default="grid-history", help="model the others are paired against")
+    parser.add_argument("--places", action="store_true", help="also score P(podium) / P(points) for weighted-v4")
     parser.add_argument("--json", action="store_true", help="also save the full result under cache/backtest/")
     args = parser.parse_args()
 
@@ -169,7 +235,7 @@ def main() -> None:
     finally:
         conn.close()
 
-    out = run(data, range(args.start, args.end + 1), args.train_from, CANDIDATES, args.reference)
+    out = run(data, range(args.start, args.end + 1), args.train_from, CANDIDATES, args.reference, args.places)
     report(out, CANDIDATES)
     if args.json:
         RESULTS_DIR.mkdir(parents=True, exist_ok=True)
