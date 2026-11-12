@@ -1,7 +1,7 @@
 import type {
   Circuit, Team, Driver, Race, RaceResult, QualifyingResult, LapSummary,
   GpFeatures, DriverPrediction, PredictionResponse, RaceDetailResponse,
-  PredictionHistoryItem, IntelStandingRow, SeasonSummary, ModelInfo, CircuitDetailResponse,
+  PredictionHistoryItem, SeasonAccuracy, IntelStandingRow, SeasonSummary, ModelInfo, CircuitDetailResponse,
   DriverSeasonStats, DriverYearStats, DriverDetailResponse, TeamSeasonStats, TeamYearStats,
   TeamDetailResponse, DriverStanding,
   FeatureInfo, GpFeatureKey, SprintFeatureKey, SprintFeatures, DriverSprintPrediction, SprintPredictionResponse,
@@ -141,6 +141,40 @@ export const predictionHistory2026: PredictionHistoryItem[] = [
   {
     ...predictionHistory[0], raceId: 30, roundNumber: 19, actualWinner: driverB, correct: false,
     actualWinnerPredictedPosition: 2,
+  },
+];
+
+// 2025: the model beats both baselines on Brier; 2024: it loses to the pole baseline.
+export const seasonAccuracy: SeasonAccuracy[] = [
+  {
+    year: 2025,
+    gp: { races: 1, correct: 1, accuracyPct: 100 },
+    sprint: { races: 0, correct: 0, accuracyPct: null },
+    overall: { races: 1, correct: 1, accuracyPct: 100 },
+    calibration: {
+      races: 24, poleWinRate: 0.42,
+      bins: [
+        { from: 0, predictions: 380, wins: 4, probabilitySum: 9.5 },
+        { from: 0.3, predictions: 40, wins: 13, probabilitySum: 13.6 },
+        { from: 0.6, predictions: 20, wins: 7, probabilitySum: 13.4 },
+      ],
+      model: { brier: 0.071, logLoss: 1.512 },
+      pole: { brier: 0.083, logLoss: 1.874 },
+      uniform: { brier: 0.95, logLoss: 2.996 },
+    },
+  },
+  {
+    year: 2024,
+    gp: { races: 24, correct: 11, accuracyPct: 46 },
+    sprint: { races: 6, correct: 2, accuracyPct: 33 },
+    overall: { races: 30, correct: 13, accuracyPct: 43 },
+    calibration: {
+      races: 24, poleWinRate: 0.42,
+      bins: [{ from: 0, predictions: 400, wins: 8, probabilitySum: 10.1 }],
+      model: { brier: 0.091, logLoss: 1.902 },
+      pole: { brier: 0.083, logLoss: 1.874 },
+      uniform: { brier: 0.95, logLoss: 2.996 },
+    },
   },
 ];
 

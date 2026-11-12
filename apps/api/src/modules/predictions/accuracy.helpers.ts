@@ -1,4 +1,4 @@
-import type { AccuracyBucket, PredictionHistoryItem, SeasonAccuracy } from '../../common/types';
+import type { AccuracyBucket, PredictionHistoryItem, SeasonAccuracy, SeasonCalibration } from '../../common/types';
 
 function toBucket(items: PredictionHistoryItem[]): AccuracyBucket {
   const decided = items.filter((i) => i.correct !== null);
@@ -12,7 +12,10 @@ function toBucket(items: PredictionHistoryItem[]): AccuracyBucket {
 
 // Year comes from raceDate's 'YYYY-MM-DD' prefix, not Date/getFullYear(), to sidestep
 // timezone ambiguity. Splits GP vs sprint so one doesn't skew the other's accuracy.
-export function aggregateAccuracyBySeason(items: PredictionHistoryItem[]): SeasonAccuracy[] {
+export function aggregateAccuracyBySeason(
+  items: PredictionHistoryItem[],
+  calibration: Map<number, SeasonCalibration> = new Map(),
+): SeasonAccuracy[] {
   const byYear = new Map<number, { gp: PredictionHistoryItem[]; sprint: PredictionHistoryItem[] }>();
 
   for (const item of items) {
@@ -28,6 +31,7 @@ export function aggregateAccuracyBySeason(items: PredictionHistoryItem[]): Seaso
       gp: toBucket(gp),
       sprint: toBucket(sprint),
       overall: toBucket([...gp, ...sprint]),
+      calibration: calibration.get(year) ?? null,
     }))
     // A season with predictions but no race run yet (overall.races === 0) has nothing to report.
     .filter((season) => season.overall.races > 0)

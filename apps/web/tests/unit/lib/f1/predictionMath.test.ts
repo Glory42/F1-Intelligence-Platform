@@ -2,8 +2,6 @@ import { describe, expect, test } from 'vitest';
 import {
   softmax,
   confidenceTier,
-  brierScore,
-  calibrationBuckets,
   driverPredictionRecord,
   bestCall,
   worstMiss,
@@ -59,79 +57,6 @@ describe('confidenceTier', () => {
 
   test('treats a missing runner-up as a lock', () => {
     expect(confidenceTier(0.9, undefined)).toBe('lock');
-  });
-});
-
-describe('brierScore', () => {
-  test('averages the squared error between win probability and outcome over completed races', () => {
-    const score = brierScore([
-      { winProbability: '0.6', correct: true },
-      { winProbability: '0.4', correct: false },
-    ]);
-    expect(score).toBeCloseTo(0.16, 10);
-  });
-
-  test('ignores races that have no result yet', () => {
-    const score = brierScore([
-      { winProbability: '0.6', correct: true },
-      { winProbability: '0.4', correct: false },
-      { winProbability: '0.9', correct: null },
-    ]);
-    expect(score).toBeCloseTo(0.16, 10);
-  });
-
-  test('is null when no race has a result', () => {
-    expect(brierScore([{ winProbability: '0.5', correct: null }])).toBeNull();
-  });
-
-  test('is null for an empty history', () => {
-    expect(brierScore([])).toBeNull();
-  });
-
-  test('a perfectly confident correct call scores 0', () => {
-    expect(brierScore([{ winProbability: '1', correct: true }])).toBe(0);
-  });
-});
-
-describe('calibrationBuckets', () => {
-  const history = [
-    { winProbability: '0.10', correct: false },
-    { winProbability: '0.15', correct: true },
-    { winProbability: '0.55', correct: false },
-    { winProbability: '0.65', correct: true },
-    { winProbability: '0.70', correct: true },
-    { winProbability: '0.90', correct: null },
-  ];
-
-  test('groups completed predictions into fixed-width probability bins', () => {
-    const buckets = calibrationBuckets(history, 0.2);
-    expect(buckets.map((b) => [b.lo, b.count])).toEqual([
-      [0, 2],
-      [0.4, 1],
-      [0.6, 2],
-    ]);
-  });
-
-  test('reports the mean predicted probability and actual hit rate per bin', () => {
-    const buckets = calibrationBuckets(history, 0.2);
-    const first = buckets.find((b) => b.lo === 0)!;
-    expect(first.meanPredicted).toBeCloseTo(0.125, 10);
-    expect(first.actualRate).toBeCloseTo(0.5, 10);
-    const top = buckets.find((b) => b.lo === 0.6)!;
-    expect(top.meanPredicted).toBeCloseTo(0.675, 10);
-    expect(top.actualRate).toBe(1);
-  });
-
-  test('places a probability of 1.0 in the final bin', () => {
-    const buckets = calibrationBuckets([{ winProbability: '1', correct: true }], 0.2);
-    expect(buckets).toHaveLength(1);
-    expect(buckets[0].lo).toBeCloseTo(0.8, 10);
-    expect(buckets[0].hi).toBeCloseTo(1, 10);
-  });
-
-  test('returns no buckets for an empty or all-pending history', () => {
-    expect(calibrationBuckets([], 0.2)).toEqual([]);
-    expect(calibrationBuckets([{ winProbability: '0.5', correct: null }], 0.2)).toEqual([]);
   });
 });
 

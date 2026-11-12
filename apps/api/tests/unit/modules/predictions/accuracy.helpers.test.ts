@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { aggregateAccuracyBySeason } from '../../../../src/modules/predictions/accuracy.helpers';
-import type { PredictionHistoryItem } from '../../../../src/common/types';
+import type { PredictionHistoryItem, SeasonCalibration } from '../../../../src/common/types';
 
 function item(overrides: Partial<PredictionHistoryItem>): PredictionHistoryItem {
   return {
@@ -68,5 +68,16 @@ describe('aggregateAccuracyBySeason', () => {
 
   test('empty input returns an empty array', () => {
     expect(aggregateAccuracyBySeason([])).toEqual([]);
+  });
+
+  test('attaches each season’s GP calibration, and null where the model scored no completed GP', () => {
+    const calibration = { races: 1 } as SeasonCalibration;
+
+    const result = aggregateAccuracyBySeason(
+      [item({ raceDate: '2025-03-01', correct: true }), item({ raceDate: '2024-03-01', correct: true })],
+      new Map([[2025, calibration]]),
+    );
+
+    expect(result.map((r) => [r.year, r.calibration])).toEqual([[2025, calibration], [2024, null]]);
   });
 });

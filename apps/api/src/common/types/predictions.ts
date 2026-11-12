@@ -82,11 +82,37 @@ export type AccuracyBucket = {
   accuracyPct: number | null;
 };
 
+// Every driver's GP win probability in one 10-point band (`from` to `from` + 0.1) and how many of them won.
+export type CalibrationBin = {
+  from: number;
+  predictions: number;
+  wins: number;
+  probabilitySum: number;
+};
+
+// Averaged per race. Brier: Σ over the field of (p − won)², 0 is perfect. Log loss: −ln p(winner).
+export type ForecastScore = {
+  brier: number;
+  logLoss: number;
+};
+
+export type SeasonCalibration = {
+  races: number;
+  // Share of every scored race won from pole: the pole baseline's chance for the pole-sitter.
+  poleWinRate: number;
+  bins: CalibrationBin[];
+  model: ForecastScore;
+  pole: ForecastScore;
+  uniform: ForecastScore;
+};
+
 export type SeasonAccuracy = {
   year: number;
   gp: AccuracyBucket;
   sprint: AccuracyBucket;
   overall: AccuracyBucket;
+  // GP model only; null until the season has a completed GP the model scored.
+  calibration: SeasonCalibration | null;
 };
 
 export type IntelStandingRow = {

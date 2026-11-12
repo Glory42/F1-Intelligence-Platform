@@ -2,8 +2,10 @@
 import { CheckCircle2, XCircle, Clock } from 'lucide-react';
 import StatTiles from '@/components/data/StatTiles.astro';
 import CalibrationChart from '@/features/predictions/components/CalibrationChart.astro';
+import ForecastScores from '@/features/predictions/components/ForecastScores.astro';
+import { combineCalibration } from '@/features/predictions/calibration';
 import { formatDate } from '@/lib/utils';
-import { brierScore, bestCall, worstMiss, longestStreak } from '@/lib/f1/predictionMath';
+import { bestCall, worstMiss, longestStreak } from '@/lib/f1/predictionMath';
 import type { PredictionHistoryItem, SeasonAccuracy } from '@/types';
 
 interface Props {
@@ -14,15 +16,13 @@ interface Props {
 
 const { history, seasonAccuracy, year } = Astro.props;
 
-// Calibration buckets are noise below a handful of decided races.
-const MIN_RACES_FOR_CALIBRATION = 5;
-
 const ordered = [...history].sort((a, b) => a.roundNumber - b.roundNumber);
 const decided = ordered.filter((h) => h.correct !== null);
 const share = (n: number) => (decided.length > 0 ? `${Math.round((n / decided.length) * 100)}%` : '-');
 const winnerWithin = (n: number) =>
   decided.filter((h) => h.actualWinnerPredictedPosition !== null && h.actualWinnerPredictedPosition <= n).length;
-const brier = brierScore(ordered);
+const seasonScores = seasonAccuracy.find((s) => s.year === year)?.calibration ?? null;
+const calibration = combineCalibration(seasonAccuracy);
 const best = bestCall(ordered);
 const worst = worstMiss(ordered);
 const streak = longestStreak(ordered);
@@ -36,7 +36,7 @@ const hrefFor = (h: PredictionHistoryItem) => (h.isSprint ? `/prediction/sprint/
     { label: 'P1 hit', value: share(decided.filter((h) => h.correct === true).length) },
     { label: 'Top 3 hit', value: share(winnerWithin(3)) },
     { label: 'Top 5 hit', value: share(winnerWithin(5)) },
-    { label: 'Brier', value: brier === null ? '-' : brier.toFixed(3) },
+    { label: 'Brier (GP)', value: seasonScores ? seasonScores.model.brier.toFixed(3) : '-' },
   ]} />
 
   {decided.length > 0 && (
@@ -98,11 +98,11 @@ const hrefFor = (h: PredictionHistoryItem) => (h.isSprint ? `/prediction/sprint/
   </div>
 
   <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-    {decided.length >= MIN_RACES_FOR_CALIBRATION && (
+    {calibration.points.length > 0 && (
       <div>
-        <p class="mb-3 font-mono text-[9px] uppercase tracking-[0.25em]" style="color: rgba(168,85,247,0.55)">./calibration</p>
+        <p class="mb-3 font-mono text-[9px] uppercase tracking-[0.25em]" style="color: rgba(168,85,247,0.55)">./calibration · every season, GP</p>
         <div class="border border-white/[0.06] p-5">
-          <CalibrationChart items={ordered} />
+          <CalibrationChart points={calibration.points} races={calibration.races} />
         </div>
       </div>
     )}
@@ -130,4 +130,6 @@ const hrefFor = (h: PredictionHistoryItem) => (h.isSprint ? `/prediction/sprint/
       </div>
     )}
   </div>
+
+  <ForecastScores seasonAccuracy={seasonAccuracy} year={year} />
 </section>

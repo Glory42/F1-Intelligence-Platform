@@ -7,6 +7,7 @@ import { createTeam } from '../../support/factories/team.factory';
 import { createDriver } from '../../support/factories/driver.factory';
 import { createRace } from '../../support/factories/race.factory';
 import { createRaceResult } from '../../support/factories/raceResult.factory';
+import { createQualifyingResult } from '../../support/factories/qualifying.factory';
 import { createRacePrediction } from '../../support/factories/prediction.factory';
 import { createDriverPredictionFeatures } from '../../support/factories/driverPredictionFeatures.factory';
 
@@ -41,6 +42,8 @@ describe('predictions (integration)', () => {
     await createDriverPredictionFeatures(db, completed.id, other.id, { winProbability: '0.15000', predictedPosition: 2 });
     await createRaceResult(db, completed.id, winner.id, { finishPosition: 1, gridPosition: 1 });
     await createRaceResult(db, completed.id, other.id, { finishPosition: 2, gridPosition: 2 });
+    await createQualifyingResult(db, completed.id, other.id, { gridPosition: 1 });
+    await createQualifyingResult(db, completed.id, winner.id, { gridPosition: 2 });
 
     upcomingRaceId = upcoming.id;
     completedRaceId = completed.id;
@@ -127,6 +130,28 @@ describe('predictions (integration)', () => {
     const season = data.find((d) => d.year === 2099)!;
     expect(season.gp.races).toBe(1);
     expect(season.gp.correct).toBe(1);
+  });
+
+  it('scores the whole field of every completed GP against the baselines', async () => {
+    const res = await apiRequest('/api/predictions/accuracy');
+    const { data } = (await res.json()) as {
+      data: Array<{
+        year: number;
+        calibration: {
+          races: number; poleWinRate: number; bins: Array<{ from: number; predictions: number; wins: number }>;
+          model: { brier: number; logLoss: number }; pole: { brier: number }; uniform: { brier: number };
+        } | null;
+      }>;
+    };
+    const { calibration } = data.find((d) => d.year === 2099)!;
+
+    // Only the completed round counts: AAA at 0.60 won, BBB at 0.15 on pole didn't.
+    expect(calibration!.races).toBe(1);
+    expect(calibration!.model.brier).toBeCloseTo(0.4 ** 2 + 0.15 ** 2, 4);
+    expect(calibration!.model.logLoss).toBeCloseTo(-Math.log(0.6), 4);
+    expect(calibration!.poleWinRate).toBe(0);
+    expect(calibration!.uniform.brier).toBeCloseTo(0.5, 4);
+    expect(calibration!.bins.map((b) => [b.from, b.predictions, b.wins])).toEqual([[0.1, 1, 0], [0.6, 1, 1]]);
   });
 
   it('reports the model version in use', async () => {
