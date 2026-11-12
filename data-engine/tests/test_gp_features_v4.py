@@ -12,6 +12,8 @@ from src.utils.gp_features_v4 import (
     long_run_gaps,
     neutralisation_rate,
     pace_gaps,
+    pre_quali_features,
+    previous_lineup,
     quali_gaps,
     sprint_features,
 )
@@ -198,3 +200,32 @@ class TestSprintFeatures:
     def test_a_race_without_a_sprint_grid_fails(self):
         with pytest.raises(ValueError):
             sprint_features(sample_history(), 3)
+
+
+class TestPreQualiFeatures:
+    def test_the_last_race_this_season_sets_the_field_before_qualifying(self):
+        lineup = previous_lineup(sample_history(), 3)
+
+        assert [(r["driver_id"], r["team_id"]) for r in lineup] == [(1, 10), (2, 10), (3, 20)]
+        assert all(r["grid_position"] is None for r in lineup)
+
+    def test_the_form_features_match_the_post_qualifying_ones(self):
+        h = sample_history()
+
+        before, after = pre_quali_features(h, 3), gp_features(h, 3)
+
+        assert set(before) == {1, 2, 3}
+        for d in before:
+            for f in ("driver_points", "team_race_pace", "team_quali_pace", "teammate_edge"):
+                assert before[d][f] == after[d][f]
+
+    def test_a_season_opener_has_no_lineup_to_go_on(self):
+        with pytest.raises(ValueError, match="No earlier race this season"):
+            previous_lineup(sample_history(), 1)
+
+    def test_last_season_s_races_don_t_count(self):
+        h = sample_history()
+        h.races[3] = {**h.races[3], "year": 2027}
+
+        with pytest.raises(ValueError):
+            previous_lineup(h, 3)

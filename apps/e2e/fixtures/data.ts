@@ -77,8 +77,8 @@ const gpFeatureInfo: FeatureInfo<GpFeatureKey>[] = [
 ];
 
 const driverPredictions: DriverPrediction[] = [
-  { driver, winProbability: '0.62000', podiumProbability: '0.88000', predictedPosition: 1, gridPosition: 1, features: poleFeatures },
-  { driver: driverB, winProbability: '0.38000', podiumProbability: '0.79000', predictedPosition: 2, gridPosition: 2, features: secondFeatures },
+  { driver, winProbability: '0.62000', podiumProbability: '0.88000', preQualiProbability: '0.45000', predictedPosition: 1, gridPosition: 1, features: poleFeatures },
+  { driver: driverB, winProbability: '0.38000', podiumProbability: '0.79000', preQualiProbability: null, predictedPosition: 2, gridPosition: 2, features: secondFeatures },
 ];
 
 export const predictionResponse: PredictionResponse = {
@@ -310,8 +310,8 @@ export const sprintRace: Race = {
 const sprintFeatureScores: GpFeatures = { ...poleFeatures };
 
 const sprintDriverPredictions: DriverSprintPrediction[] = [
-  { driver, winProbability: '0.58000', podiumProbability: null, predictedPosition: 1, gridPosition: 1, features: sprintFeatureScores },
-  { driver: driverB, winProbability: '0.42000', podiumProbability: null, predictedPosition: 2, gridPosition: 2, features: sprintFeatureScores },
+  { driver, winProbability: '0.58000', podiumProbability: null, preQualiProbability: null, predictedPosition: 1, gridPosition: 1, features: sprintFeatureScores },
+  { driver: driverB, winProbability: '0.42000', podiumProbability: null, preQualiProbability: null, predictedPosition: 2, gridPosition: 2, features: sprintFeatureScores },
 ];
 
 export const sprintPredictionResponse: SprintPredictionResponse = {

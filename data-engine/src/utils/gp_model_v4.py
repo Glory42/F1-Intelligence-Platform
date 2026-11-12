@@ -11,11 +11,13 @@ from typing import Any, Callable, Optional, Sequence
 import numpy as np
 
 from src.utils.conditional_logit import LogitModel, fit_conditional_logit
-from src.utils.gp_features_v4 import GP_V4_FEATURES, gp_features
+from src.utils.gp_features_v4 import GP_V4_FEATURES, PRE_QUALI_FEATURES, gp_features
 from src.utils.race_history import RaceHistory
 
 GP_V4_MODEL_VERSION = "weighted-v4"
 MODEL_PATH = Path(__file__).resolve().parents[1] / "models" / "gp_v4.json"
+PRE_QUALI_MODEL_VERSION = "pre-quali-v1"
+PRE_QUALI_MODEL_PATH = MODEL_PATH.with_name("gp_v4_prequali.json")
 # The 2010+ points table: older eras score finishes differently, so form features start here.
 TRAIN_FROM_YEAR = 2010
 DEFAULT_L2 = 1.0
@@ -135,9 +137,11 @@ class CommittedFit:
         return race_date <= self.trained_to
 
 
-def save_model(model: LogitModel, trained_on: dict[str, Any], l2: float, path: Path = MODEL_PATH) -> None:
+def save_model(
+    model: LogitModel, trained_on: dict[str, Any], l2: float, path: Path = MODEL_PATH, version: str = GP_V4_MODEL_VERSION,
+) -> None:
     payload = {
-        "model_version": GP_V4_MODEL_VERSION,
+        "model_version": version,
         "l2": l2,
         "trained_on": trained_on,
         "features": [
@@ -149,15 +153,17 @@ def save_model(model: LogitModel, trained_on: dict[str, Any], l2: float, path: P
     path.write_text(json.dumps(payload, indent=2) + "\n")
 
 
-def load_committed(path: Path = MODEL_PATH) -> CommittedFit:
+def load_committed(
+    path: Path = MODEL_PATH, version: str = GP_V4_MODEL_VERSION, expected: tuple[str, ...] = GP_V4_FEATURES,
+) -> CommittedFit:
     """Refuses a file fitted for a different feature list or model version, so a feature added to the
     code without a refit fails loudly instead of being scored with a missing or misplaced weight."""
     payload = json.loads(path.read_text())
-    if payload.get("model_version") != GP_V4_MODEL_VERSION:
-        raise ValueError(f"{path.name} holds {payload.get('model_version')}, the code is {GP_V4_MODEL_VERSION}")
+    if payload.get("model_version") != version:
+        raise ValueError(f"{path.name} holds {payload.get('model_version')}, the code is {version}")
     features = tuple(f["name"] for f in payload["features"])
-    if features != GP_V4_FEATURES:
-        raise ValueError(f"{path.name} was fitted for {features}, the code computes {GP_V4_FEATURES}: refit it")
+    if features != expected:
+        raise ValueError(f"{path.name} was fitted for {features}, the code computes {expected}: refit it")
     model = LogitModel(
         features=features,
         mean=np.array([f["mean"] for f in payload["features"]]),
@@ -165,3 +171,7 @@ def load_committed(path: Path = MODEL_PATH) -> CommittedFit:
         coef=np.array([f["coef"] for f in payload["features"]]),
     )
     return CommittedFit(model, float(payload["l2"]), date.fromisoformat(payload["trained_on"]["to_date"]))
+
+
+def load_pre_quali() -> CommittedFit:
+    return load_committed(PRE_QUALI_MODEL_PATH, PRE_QUALI_MODEL_VERSION, PRE_QUALI_FEATURES)

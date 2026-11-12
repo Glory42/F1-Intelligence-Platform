@@ -8,6 +8,7 @@ import { createDriver } from '../../support/factories/driver.factory';
 import { createRace } from '../../support/factories/race.factory';
 import { createRaceResult } from '../../support/factories/raceResult.factory';
 import { createQualifyingResult } from '../../support/factories/qualifying.factory';
+import { createPreQualiPrediction } from '../../support/factories/preQualiPrediction.factory';
 import { createRacePrediction } from '../../support/factories/prediction.factory';
 import { createDriverPredictionFeatures } from '../../support/factories/driverPredictionFeatures.factory';
 
@@ -35,6 +36,14 @@ describe('predictions (integration)', () => {
       podiumProbability: '0.81000',
     });
     await createDriverPredictionFeatures(db, upcoming.id, other.id, { winProbability: '0.20000', predictedPosition: 2 });
+    await createPreQualiPrediction(db, upcoming.id, winner.id, { winProbability: '0.35000', predictedPosition: 1 });
+
+    // The round after: no qualifying yet, so only the forecast before qualifying exists.
+    const later = await createRace(db, season.id, circuit.id, {
+      roundNumber: 3, name: 'Later GP', raceDate: '2099-04-01', status: 'scheduled',
+    });
+    await createPreQualiPrediction(db, later.id, other.id, { winProbability: '0.40000', predictedPosition: 1 });
+    await createPreQualiPrediction(db, later.id, winner.id, { winProbability: '0.25000', predictedPosition: 2 });
 
     // Completed prior round with a correct prediction: feeds history + accuracy.
     const completed = await createRace(db, season.id, circuit.id, {
@@ -62,7 +71,10 @@ describe('predictions (integration)', () => {
     const { data } = (await res.json()) as {
       data: {
         predictedWinner: { code: string }; modelVersion: string; race: { status: string };
-        drivers: Array<{ features: Record<string, { value: number; contribution: number }>; podiumProbability: string | null }>;
+        drivers: Array<{
+          features: Record<string, { value: number; contribution: number }>;
+          podiumProbability: string | null; preQualiProbability: string | null;
+        }>;
       };
     };
     expect(data.predictedWinner.code).toBe('AAA');
@@ -72,6 +84,8 @@ describe('predictions (integration)', () => {
     expect(data.drivers[0].features.teamRacePace).toEqual({ value: -0.15, contribution: 0.35 });
     expect(data.drivers[0].podiumProbability).toBe('0.81000');
     expect(data.drivers[1].podiumProbability).toBeNull();
+    // Qualifying moved AAA from 35% to 55%; BBB had no forecast before qualifying.
+    expect(data.drivers.map((d) => d.preQualiProbability)).toEqual(['0.35000', null]);
   });
 
   it('returns a prediction by race id', async () => {
@@ -157,6 +171,18 @@ describe('predictions (integration)', () => {
     expect(calibration!.poleWinRate).toBe(0);
     expect(calibration!.uniform.brier).toBeCloseTo(0.5, 4);
     expect(calibration!.bins.map((b) => [b.from, b.predictions, b.wins])).toEqual([[0.1, 1, 0], [0.6, 1, 1]]);
+  });
+
+  it('serves the next race still before qualifying with its forecast, favourite first', async () => {
+    const res = await apiRequest('/api/predictions/pre-quali/upcoming');
+    const { data } = (await res.json()) as {
+      data: { race: { name: string }; modelVersion: string; drivers: Array<{ driver: { code: string }; winProbability: string }> };
+    };
+
+    expect(res.status).toBe(200);
+    expect(data.race.name).toBe('Later GP');
+    expect(data.modelVersion).toBe('pre-quali-v1');
+    expect(data.drivers.map((d) => [d.driver.code, d.winProbability])).toEqual([['BBB', '0.40000'], ['AAA', '0.25000']]);
   });
 
   it('reports the model version in use', async () => {

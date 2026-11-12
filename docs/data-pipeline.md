@@ -29,6 +29,7 @@ All jobs live in `data-engine/src/jobs/`. They are invoked via `src/main.py --jo
 | `ingest_race_legacy` | Ingests race results from Ergast (no lap data): pre-2018 (run by `backfill_full.py`, not the CLI) |
 | `compute_season_stats` | Aggregates `driver_season_stats` and `team_season_stats` for a year (includes sprint aggregates) |
 | `compute_title_odds` | Monte Carlo championship odds into `title_odds_drivers` / `title_odds_teams` (see Title odds below) |
+| `compute_pre_quali` | `--race_id` of the race just completed: the next race's forecast before qualifying (`pre-quali-v1`, ADR 0015) into `pre_quali_predictions`, over this race's lineup. Skips the season finale and races inside the committed fit |
 | `compute_features` | The `weighted-v4` Prediction: 7 features, win probabilities, ranks and the predicted winner, in one transaction. Skips races inside the committed fit (`backfill_all_predictions.py` rebuilds those out-of-sample) |
 
 ### Sprint Race Jobs
@@ -177,6 +178,8 @@ compute_season_stats driver_season_stats and team_season_stats
       ↓
 compute_title_odds   non-fatal
       ↓
+compute_pre_quali    non-fatal: the next race's forecast before qualifying (pre_quali_predictions)
+      ↓
 ingest_race_control, ingest_overtakes, ingest_team_radio, ingest_stints, ingest_pit_stops
                      (Race, then Sprint if applicable) Race Events (OpenF1): non-fatal, 2023+ only
 ```
@@ -211,6 +214,7 @@ ingest_race                → race_results + lap_times
       ↓
 compute_season_stats       → final season stats update
 compute_title_odds         → non-fatal
+compute_pre_quali          → non-fatal: the next race's forecast before qualifying
       ↓
 ingest_race_control, ingest_overtakes, ingest_team_radio, ingest_stints, ingest_pit_stops
                             (Race, then Sprint) Race Events (OpenF1): non-fatal, 2023+ only; the Sprint pass

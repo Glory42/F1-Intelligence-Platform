@@ -80,6 +80,14 @@ const cols = hasResults
             {d.podiumProbability !== null && (
               <div class="mt-1 font-mono text-[8px] text-muted-foreground">podium {Math.round(Number(d.podiumProbability) * 100)}%</div>
             )}
+            {d.preQualiProbability !== null && (() => {
+              const moved = pct - Math.round(Number(d.preQualiProbability) * 100);
+              return (
+                <div class={`font-mono text-[8px] ${moved > 0 ? 'text-green-400' : moved < 0 ? 'text-red-400' : 'text-muted-foreground'}`}>
+                  {moved > 0 ? '▲' : moved < 0 ? '▼' : '='} {Math.abs(moved)} after qualifying
+                </div>
+              );
+            })()}
           </div>
           <div class="font-mono text-[9px] text-muted-foreground text-center hidden sm:block">{d.pace}</div>
           <div class="font-mono text-[9px] text-muted-foreground text-center hidden sm:block">{grid}</div>

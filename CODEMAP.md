@@ -52,7 +52,7 @@ apps/api/
 │   │   ├── constants.ts           # SPRINT_FORMATS: single source of truth shared by all services
 │   │   ├── mappers.ts             # toDriver(), toTeam(), toRace(), toCircuit(), toRaceResult(), toQualifyingResult(), toSprintResult(): canonical row→DTO mappers used by all services
 │   │   ├── standings.ts           # resolveSeason(), buildStandings(), buildCareerStats(), championshipPoints(), sortByChampionshipStanding(): shared standings/career-stats pipeline for drivers, teams, predictions; drivers/teams pass a StatsAdapter
-│   │   ├── session-kind.ts        # GP / SPRINT descriptors: prediction, feature, lap and result tables, date column, upcoming/done
+│   │   ├── session-kind.ts        # GP / SPRINT descriptors: prediction, feature, lap and result tables, date column, upcoming/done, preQuali (GP only)
 │   │   │                          #   statuses typed against the race status enum, grid sheet, mapFeatures(); isDone()
 │   │   ├── session-reads.ts       # findPrediction(), findUpcomingPrediction(), findLapSummaries(): one read per kind, GP and sprint alike
 │   │   ├── route.ts               # raceRoute / seasonRoute / driverRoute / teamRoute: id/year/session validation, the 404,
@@ -96,7 +96,8 @@ apps/api/
 │   │   │   ├── team_season_stats.ts
 │   │   │   ├── race_predictions.ts
 │   │   │   ├── driver_prediction_features.ts  # weighted-v4: features JSONB (value + contribution per feature)
-│   │   │   ├── driver_sprint_features.ts  # 8-feature sprint scores
+│   │   │   ├── driver_sprint_features.ts  # sprint-v3: features JSONB like the GP (sprint-v2's *_score columns legacy)
+│   │   │   ├── pre_quali_predictions.ts   # pre-quali-v1: a GP's forecast before qualifying, one row per driver of the previous race's lineup
 │   │   │   ├── fp2_long_run_times.ts      # FP2 per-driver long-run stint data (FP1 fallback on sprint weekends)
 │   │   │   ├── sprint_predictions.ts      # Sprint predicted winner
 │   │   │   ├── data_quality_runs.ts       # One row per data-quality audit run (summary JSON)
@@ -156,8 +157,9 @@ apps/api/
 │       │   ├── prediction-history.helpers.ts # buildHistoryItems(), buildWinnerMap(), buildProbPosMaps(), mergeHistoryByDateDesc()
 │       │   ├── intel-standings.helpers.ts # aggregateSeasonScores() (per-person average raw score + win probability) + buildIntelStandingRows() (rank + min-max normalise + sprint totals) for findIntelStandings()
 │       │   ├── title-odds.service.ts  # findTitleOdds(): latest round's driver/team title odds + per-round history for charting
+│       │   ├── pre-quali.service.ts   # PreQualiService.findUpcoming(): the next race still before qualifying with its forecast
 │       │   ├── predictions.controller.ts
-│       │   └── predictions.module.ts  # GET /model-info, /upcoming, /history, /accuracy, /standings, /title-odds, /race/:raceId
+│       │   └── predictions.module.ts  # GET /model-info, /upcoming, /pre-quali/upcoming, /history, /accuracy, /standings, /title-odds, /race/:raceId
 │       ├── sprint/
 │       │   ├── sprint.service.ts  # Sprint prediction (upcoming/by race) + sprint detail: results, SQ grid, lap summaries
 │       │   ├── sprint.controller.ts
@@ -176,11 +178,11 @@ apps/api/
 │                                   #   exports castSeverity() for its own test
 ├── drizzle/
 │   └── migrations/                # Generated SQL migration files + Drizzle metadata
-│       ├── 0000_glamorous_galactus.sql … 0032_sprint_v3_features.sql  # 33 migrations: initial schema, sprint,
+│       ├── 0000_glamorous_galactus.sql … 0033_pre_quali_predictions.sql  # 34 migrations: initial schema, sprint,
 │       │                                #   circuits, data quality, OpenF1, stints/pit stops, title odds, race story,
 │       │                                #   weather traces, qualifying telemetry, F1DB history, per-person drivers,
 │       │                                #   weighted-v4 (v3 score columns dropped, features JSONB), podium probability,
-│       │                                #   sprint-v3 features JSONB (v2 score columns nullable)
+│       │                                #   sprint-v3 features JSONB (v2 score columns nullable), pre-quali forecasts
 │       └── meta/                        # Drizzle migration metadata (_journal.json, snapshots)
 ├── tests/
 │   ├── unit/                      # bun test: mirrors src/, one *.test.ts per file
@@ -218,7 +220,7 @@ apps/api/
 │   │   ├── teams/team-pit-stops.test.ts # one team's timed GP stops, in round and lap order
 │   │   ├── seasons/seasons.test.ts # race-count aggregation
 │   │   ├── search/search.test.ts   # cross-season dedup
-│   │   ├── predictions/predictions.test.ts # upcoming/by-id/history/standings/accuracy/model-info
+│   │   ├── predictions/predictions.test.ts # upcoming/by-id/history/standings/accuracy/model-info, pre-quali upcoming + preQualiProbability
 │   │   ├── predictions/title-odds.test.ts  # latest-round odds ranked + history, expected-points tiebreak
 │   │   ├── sprint/sprint.test.ts   # upcoming/by-id/detail, conventional-race guard
 │   │   ├── session-kind/           # predictions + lap summaries asserted the same way for GP and sprint (pit/null laps excluded)
@@ -229,7 +231,7 @@ apps/api/
 │       ├── cache/fake-edge-cache.ts # FakeEdgeCache: in-memory Cache API (match/put), no expiry
 │       ├── cache/fake-snapshot-bucket.ts # FakeSnapshotBucket: in-memory R2 bucket (get/put + customMetadata), can be set failing
 │       ├── db/test-db.ts           # getTestDb()/truncateAll(): refuses *.neon.tech hosts and TEST_DATABASE_URL === DATABASE_URL
-│       └── factories/              # one insert helper per table, FK chain: season → team/circuit → driver → race → results
+│       └── factories/              # one insert helper per table (preQualiPrediction.factory for the forecast), FK chain: season → team/circuit → driver → race → results
 │                                   #   (+ prediction/sprint features, sprint lap times, OpenF1 events, stints/pit stops, race story, telemetry, title odds, history)
 ├── eslint.config.js               # Flat config: tiered `max-lines` (controller 80 / module 50 / service+helpers 200 / common 150 / default 150; schema+seed+types.ts+tests off), run via `bun run lint`
 ├── wrangler.toml                  # CF Workers config (name `f1-prediction-platform-api`): keep_vars = true, custom domain f1-api.gorkemkaryol.dev, workers.dev off, R2 binding SNAPSHOTS (f1-api-snapshots), SNAPSHOT_VERSION (in every cache key)
@@ -758,12 +760,14 @@ data-engine/
 │   │   │                              #   run(year, after_round) replays an earlier round (later races still to run)
 │   │   ├── registry.py                 # The one job list: Job(name, needs, run); main.py and weekend_pipeline.JOBS read it
 │   │   ├── compute_features.py         # weighted-v4 Prediction: committed fit → features JSONB, probabilities, winner in one transaction
+│   │   ├── compute_pre_quali.py        # pre-quali-v1: after a race, the next race's forecast before qualifying → pre_quali_predictions
 │   │   ├── compute_sprint_features.py  # sprint-v3 Prediction: weighted-v4's committed weights on sprint_features, stored like a GP, winner in one transaction
 │   │   ├── import_f1db.py              # Import an extracted F1DB release → history_* tables (weekly GitHub Action or local; skips imported versions)
 │   │   ├── data_quality_audit.py        # Per-table completeness/coverage audit → data_quality_runs/issues
 │   │   └── data_quality_repair.py       # Re-ingests data for fixable audit issues via weekend_pipeline.repair_plan()
 │   ├── models/
-│   │   └── gp_v4.json             # weighted-v4's fitted weights (written by scripts/fit_model_v4.py, committed, ADR 0010)
+│   │   ├── gp_v4.json             # weighted-v4's fitted weights (written by scripts/fit_model_v4.py, committed, ADR 0010)
+│   │   └── gp_v4_prequali.json    # pre-quali-v1's fitted weights (fit_model_v4.py --pre-quali, ADR 0015)
 │   └── utils/
 │       ├── openf1_session.py      # load_session() + race_results(), qualifying_results(), lap_times(), lap_records(), safety_car_laps(),
 │       │                          # weather_label/details(), is_complete(): OpenF1 + Jolpica → the ingest row shapes (ADR 0011)
@@ -789,8 +793,10 @@ data-engine/
 │       ├── logging_utils.py       # log_job_failure(), log_job_ok(), peak_rss_mb(): structured JSON job logs
 │       ├── conditional_logit.py   # LogitModel + fit_conditional_logit(): softmax over coef · standardized features, fitted by max likelihood
 │       ├── gp_features_v4.py      # gp_features(history, race_id): weighted-v4's features in real units, from races before this one only;
-│       │                          #   sprint_features(): the same from the sprint's grid sheet (SQ times; qualifying's in 2021–22)
-│       ├── gp_model_v4.py         # the GP model: training_races() → fit(before=) → predict(); load_committed()/save_model() for src/models/gp_v4.json
+│       │                          #   sprint_features(): the same from the sprint's grid sheet (SQ times; qualifying's in 2021–22);
+│       │                          #   PRE_QUALI_FEATURES + pre_quali_features() over previous_lineup() (the season's last race)
+│       ├── gp_model_v4.py         # the GP model: training_races() → fit(before=) → predict(); load_committed()/save_model() for src/models/gp_v4.json,
+│       │                          #   load_pre_quali() for gp_v4_prequali.json
 │       ├── race_history.py        # RaceHistory + load_history(conn, since, until): the in-memory slice the v4 features read (incl. sprint_grid)
 │       ├── identity.py            # person_key(), is_same_person(), constructor_key(): mirrors apps/api common/identity.ts
 │       ├── season_aggregates.py   # Driver/team season aggregates for compute_season_stats, optionally as of a race date
@@ -814,7 +820,7 @@ data-engine/
 │   ├── backfill_fastf1_enrichment.py # Stints, pit stops, race control, Q telemetry for 2018–2022 from FastF1 [--only] [--refresh]: local only, skips covered races
 │   ├── backfill_title_odds.py     # Replay title odds after every completed round for a year range (default 2018–2026)
 │   ├── backfill_race_story.py     # Backfill race_lap_traces/battles/weather for completed 2018–2022 races: FastF1 cache, local only
-│   ├── backfill_all_predictions.py # Regenerate GP (weighted-v4) + sprint (sprint-v3) predictions, fitted per season on earlier seasons: local only
+│   ├── backfill_all_predictions.py # Regenerate GP (weighted-v4), sprint (sprint-v3) and pre-quali predictions, fitted per season on earlier seasons: local only ([--skip-gp] [--skip-sprint] [--skip-pre-quali])
 │   ├── backfill_podium_probability.py # Fill podium_probability from stored win probabilities (no refit): local only, writes Neon
 │   ├── backfill_historical.sh     # Shell loop over sync_schedule/ingest/compute for OpenF1 seasons (2023+)
 │   ├── backtest.py                # Walk-forward GP backtest on the local snapshot: CANDIDATES vs grid-history/uniform baselines; --places scores P(podium)/P(points)
@@ -823,7 +829,7 @@ data-engine/
 │   ├── dev_snapshot.py            # Copy Neon into the local dev Postgres (docker-compose.dev.yml); read-only on Neon
 │   ├── neon_snapshot.py           # copy_neon_into(): shared pg_dump/pg_restore of the two snapshot scripts
 │   ├── neon_usage.py              # Print this month's Neon usage + projection (control-plane API: never wakes the DB)
-│   ├── fit_model_v4.py            # Refit weighted-v4 on the snapshot → src/models/gp_v4.json + importances in docs/feature-weights.json
+│   ├── fit_model_v4.py            # Refit weighted-v4 on the snapshot → src/models/gp_v4.json + importances in docs/feature-weights.json; --pre-quali → gp_v4_prequali.json
 │   ├── f1db_release.py            # Download + SHA-256-verify + extract an F1DB release (shared by the scripts below)
 │   ├── import_f1db.py             # Import F1DB all-time history tables (weekly via .github/workflows/f1db-import.yml, or local)
 │   ├── audit_results_vs_f1db.py   # Read-only: every race's results vs F1DB; --modern-plan lists 2018+ races to re-ingest
@@ -845,7 +851,7 @@ data-engine/
 │   ├── test_session_kind.py        # sprint formats, race sessions by name/code, source_for, results_ingest_for (2018–2022 refused)
 │   ├── test_compute_features.py    # weighted-v4 job: one transaction, stale drivers dropped, in-sample races skipped, stored p = backtest p
 │   ├── test_conditional_logit.py   # fit recovers known weights from simulated races, field probabilities
-│   ├── test_gp_features_v4.py      # quali/long-run/pace gaps, neutralisation rate, decayed form, gp_features, sprint_features, load_history
+│   ├── test_gp_features_v4.py      # quali/long-run/pace gaps, neutralisation rate, decayed form, gp_features, sprint_features, pre_quali_features, load_history
 │   ├── test_gp_model_v4.py         # gp_v4.json save/load, importance percentages, training set
 │   ├── test_identity.py            # person_key/is_same_person/constructor_key against docs/identity-cases.json
 │   ├── test_backtest.py            # race metrics, summarize, paired difference, calibration table, GridWinRates
@@ -887,6 +893,7 @@ data-engine/
 │   ├── test_import_f1db.py         # run() imports drivers/constructors/lineage, skips already-imported releases
 │   ├── test_f1db_results.py        # F1DB driver matching (accents, surname, aliases) + race/qualifying row building
 │   ├── test_f1db_backfill.py       # plan_season: stand-ins sharing a number, NAN codes, merges, wrong-driver deletes
+│   ├── test_compute_pre_quali.py   # pre-quali-v1: next race over the lineup just raced, one transaction, finale and in-sample skips
 │   └── test_compute_sprint_features.py # sprint-v3: GP weights on the sprint grid, stored like a GP, one transaction, in-sample skip
 ├── docker-compose.backtest.yml    # Local Postgres (:5434) holding the Neon snapshot scripts/backtest.py replays
 ├── render.yaml                    # Render web service f1-data-engine: `python -m src.server` (worker loop + dashboard), PYTHON_VERSION 3.12.8,
@@ -922,6 +929,7 @@ data-engine/
 | `compute_season_stats` | `--year` | Rolling aggregates for drivers and teams, including sprint stats |
 | `compute_title_odds` | `--year` | Monte Carlo driver/team title odds after the latest completed round; `scripts/backfill_title_odds.py` replays every earlier round |
 | `compute_features` | `--race_id` | weighted-v4 Prediction for a GP: 7 features (value + contribution), win probabilities, predicted winner |
+| `compute_pre_quali` | `--race_id` | The race after this one: its forecast before qualifying (pre-quali-v1) over this race's lineup |
 | `compute_sprint_features` | `--race_id` | sprint-v3 Prediction: weighted-v4's weights on the sprint grid, win probabilities, predicted sprint winner |
 | `data_quality_audit` | `[--year] [--all]` | Completeness/coverage audit → `data_quality_runs`/`data_quality_issues` |
 | `data_quality_repair` | `[--year] [--resolve_run]` | Re-runs the fixable audit issues' jobs and resolves them |
@@ -934,8 +942,8 @@ data-engine/
 | `openf1_session.py` | The OpenF1 + Jolpica adapter, the only module that knows their fields: `load_session(year, race_date, session_type, parts, session_key=None)` finds the weekend by `races.race_date` (or uses the cached key) and fetches only the parts a job needs; `session_entries()`, the `session_records` readers (`stints()`, `pit_stops()`, `race_control_messages()`, `overtakes()`, `radio_clips()`), `practice_laps()`, `fastest_laps()` + `lap_samples()`; `race_results(session, classification)` (Jolpica grid/status/points/times + OpenF1 fastest lap and headshots), `qualifying_results()`, `lap_times()` (FastF1 `pick_accurate()` rules: green-flag laps from `neutralisations()`), `lap_records()` (running order by line-crossing time), `safety_car_laps()`, `weather_label()`/`weather_details()`/`session_weather_trace()`, `is_complete()` (ADR 0011) |
 | `jolpica_client.py` | `fetch_classification(year, round, sprint=False)`: Jolpica `Results`/`SprintResults`, empty until published |
 | `math_utils.py` | `normalize_minmax(values)`: min-max to [0,1]; `bayesian_win_rate(wins, races)`: Laplace smoothed; `clamp(value)` |
-| `conditional_logit.py` / `gp_model_v4.py` | `fit_conditional_logit()` (damped Newton, L2 on standardized features) → `LogitModel` (`probabilities()`, `contributions()`); `training_races()` → `fit(before=)` → `predict()`, the only path to a GP Prediction (live job, backfill, fit script, backtest); `load_committed()`/`save_model()` for `src/models/gp_v4.json`, `importance_percentages()` (ADR 0010) |
-| `gp_features_v4.py` / `race_history.py` | `gp_features(history, race_id)`: grid, quali_pace, team_quali_pace, driver_points, teammate_edge, grid_processional, team_race_pace (plus backtest-only candidates) from an in-memory `RaceHistory` (`load_history(conn, since, until)`); `sprint_features(history, race_id)`: the same from the sprint grid sheet (`RaceHistory.sprint_grid`) |
+| `conditional_logit.py` / `gp_model_v4.py` | `fit_conditional_logit()` (damped Newton, L2 on standardized features) → `LogitModel` (`probabilities()`, `contributions()`); `training_races()` → `fit(before=)` → `predict()`, the only path to a GP Prediction (live job, backfill, fit script, backtest); `load_committed()`/`save_model()` for `src/models/gp_v4.json` (`load_pre_quali()` for `gp_v4_prequali.json`), `importance_percentages()` (ADR 0010) |
+| `gp_features_v4.py` / `race_history.py` | `gp_features(history, race_id)`: grid, quali_pace, team_quali_pace, driver_points, teammate_edge, grid_processional, team_race_pace (plus backtest-only candidates) from an in-memory `RaceHistory` (`load_history(conn, since, until)`); `sprint_features(history, race_id)`: the same from the sprint grid sheet (`RaceHistory.sprint_grid`); `pre_quali_features(history, race_id)`: `PRE_QUALI_FEATURES` over `previous_lineup()` |
 | `season_aggregates.py` | Driver/team season aggregates for `compute_season_stats`; `before=` limits them to races before a date |
 | `backtest.py` | Scoring for `scripts/backtest.py`: `race_metrics()`, `summarize()`, `paired_difference()`, `calibration_table()`, `GridWinRates` (P(win \| grid slot) from earlier races) |
 | `upsert.py` | `upsert(conn, table, rows, conflict_cols, exclude_update=[])`: idempotent bulk write; `exclude_update` prevents overwriting specified columns (used to protect sprint race data from SQ re-ingest) |
@@ -968,7 +976,7 @@ data-engine/
 | `feature-weights.json` | Canonical GP importances + labels (sprint-v3 shares them): checked by `test_weights.py` (against `gp_v4.json`) and the API's `feature-manifest.test.ts` (labels, importances) |
 | `plans/intelligence-platform-roadmap.md` | Intelligence-platform roadmap + free-tier budget rules (Neon, Render, OpenF1) |
 | `plans/architecture-deepening.md` | Plan from the 2026-10-13 architecture review: nine deepening candidates + bugs, in three tracks (data engine, API, web) |
-| `adr/0000`–`0014` | Legacy decisions; apps/ layout; DNF incl. DSQ/DNS; local-Postgres integration tests; OpenF1 pacing/budget; edge-cached responses; race events `session_type`; Plackett-Luce title odds; telemetry as resampled JSONB; drivers unique per person + pre-2018 results from F1DB; GP model as a fitted conditional logit; live ingest from OpenF1 + Jolpica; versioned KV read cache (superseded: KV Free's write cap); R2 snapshot store behind the edge cache; sprint model reuses the GP weights |
+| `adr/0000`–`0015` | Legacy decisions; apps/ layout; DNF incl. DSQ/DNS; local-Postgres integration tests; OpenF1 pacing/budget; edge-cached responses; race events `session_type`; Plackett-Luce title odds; telemetry as resampled JSONB; drivers unique per person + pre-2018 results from F1DB; GP model as a fitted conditional logit; live ingest from OpenF1 + Jolpica; versioned KV read cache (superseded: KV Free's write cap); R2 snapshot store behind the edge cache; sprint model reuses the GP weights; forecast before qualifying |
 
 ---
 

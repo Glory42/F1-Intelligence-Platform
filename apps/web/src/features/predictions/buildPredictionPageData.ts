@@ -42,6 +42,7 @@ function toView<F extends Record<string, FeatureTerm>>(prediction: PredictionOf<
       winProbability: d.winProbability,
       // Cached API copies from before the field existed lack it entirely.
       podiumProbability: d.podiumProbability ?? null,
+      preQualiProbability: d.preQualiProbability ?? null,
       gridPosition: d.gridPosition,
       terms: terms[i],
       radar: radar[i],

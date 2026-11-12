@@ -3,7 +3,7 @@ import type {
   Race, Driver, Team, DriverStanding, TeamStanding, Circuit,
   PredictionHistoryItem, IntelStandingRow, CircuitDetailResponse, RaceControlMessage, RaceOvertake, TeamRadioClip,
   DriverYearStats, TeamYearStats, SeasonSummary,
-  SprintPredictionResponse, SprintDetailResponse, ModelInfo, SeasonAccuracy,
+  SprintPredictionResponse, SprintDetailResponse, ModelInfo, SeasonAccuracy, PreQualiForecast,
   QualityReport, RaceSession, StrategyResponse, PitCrewRanking, LongRunRow,
   TitleOddsResponse, TeammateBattle, RacecraftRow, RaceStoryResponse, TelemetryResponse, QualifyingSession,
   HistoryRecords, HistoryMilestones, ConstructorLineage, DriverHistory, TeamHistory, RaceRecap, OnThisDay,
@@ -28,6 +28,7 @@ export const api = {
   // Predictions
   getModelInfo: () => get<ModelInfo>('/api/predictions/model-info'),
   getUpcomingPrediction: () => get<PredictionResponse>('/api/predictions/upcoming'),
+  getUpcomingPreQuali: () => get<PreQualiForecast>('/api/predictions/pre-quali/upcoming'),
   getPredictionByRace: (raceId: number) => get<PredictionResponse>(`/api/predictions/race/${raceId}`),
   getPredictionHistory: (year: number) => get<PredictionHistoryItem[]>(`/api/predictions/history?year=${year}`),
   getPredictionAccuracy: () => get<SeasonAccuracy[]>('/api/predictions/accuracy'),

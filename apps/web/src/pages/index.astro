@@ -12,16 +12,18 @@ import ChampionshipBlock from '@/features/hub/components/ChampionshipBlock.astro
 const year = new Date().getFullYear();
 const today = new Date();
 
-const [racesResult, predictionResult, driversResult, teamsResult, oddsResult, historyResult] = await Promise.allSettled([
+const [racesResult, predictionResult, driversResult, teamsResult, oddsResult, historyResult, preQualiResult] = await Promise.allSettled([
   api.getRaces(year),
   api.getUpcomingPrediction(),
   api.getDriverStandings(year),
   api.getTeamStandings(year),
   api.getTitleOdds(year),
   api.getPredictionHistory(year),
+  api.getUpcomingPreQuali(),
 ]);
 const races: Race[] = unwrapSettled(racesResult, []);
 const prediction = unwrapSettled(predictionResult, null);
+const preQuali = unwrapSettled(preQualiResult, null);
 
 const lastRace = races
   .filter((r) => r.status === 'completed')
@@ -43,7 +45,7 @@ const roundsLeft = races.filter((r) => r.status !== 'completed').length;
     </PageHeader>
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <NextRaceBlock race={nextRace} prediction={prediction} today={today} />
+      <NextRaceBlock race={nextRace} prediction={prediction} preQuali={preQuali} today={today} />
       <LastRaceBlock
         race={lastRace}
         recap={recapResult ? unwrapSettled(recapResult, null) : null}

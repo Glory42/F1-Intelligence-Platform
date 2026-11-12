@@ -25,7 +25,7 @@ from src.utils.backtest import (
     GridPlaceRates, GridWinRates, calibration_table, paired_difference, place_metrics, race_metrics, summarize,
 )
 from src.utils.finishing_order import PODIUM_PLACES, finishing_order_forecast
-from src.utils.gp_features_v4 import GP_V4_FEATURES
+from src.utils.gp_features_v4 import GP_V4_FEATURES, PRE_QUALI_FEATURES
 from src.utils.gp_model_v4 import DEFAULT_L2, eligible, fit, history_start, training_races
 from src.utils.race_history import RaceHistory, load_history
 from src.utils.title_odds import GP_POINTS
@@ -50,6 +50,10 @@ class Candidate:
 
 CANDIDATES: list[Candidate] = [
     Candidate("weighted-v4", GP_V4_FEATURES),
+    # Before qualifying (ADR 0015): scored over the qualifying sheet's drivers, with features qualifying can't set.
+    Candidate("pre-quali", PRE_QUALI_FEATURES),
+    Candidate("pre-quali+FP2", PRE_QUALI_FEATURES + ("long_run_pace",)),
+    Candidate("form only", ("driver_points",)),
 ]
 # A fitted model needs some history before its first prediction.
 MIN_TRAINING_RACES = 20

@@ -119,6 +119,8 @@ _CHAINS: dict[ActionKind, tuple[JobStep, ...]] = {
         JobStep("ingest_race", commits_status="completed"),
         JobStep("compute_season_stats"),
         _TITLE_ODDS,
+        # The next race's forecast before qualifying: it only needs races already run.
+        JobStep("compute_pre_quali", optional=True),
         # Race Events self-skip inside OpenF1's live window and, for the sprint, on a weekend
         # without one: see run_openf1_job.
         *(JobStep(step_name(name, session_type), optional=True)

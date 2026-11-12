@@ -41,6 +41,16 @@ export async function findPrediction<TF extends FeatureTable, TS>(
   return prediction ? assemblePrediction(db, kind, prediction, race, circuit) : null;
 }
 
+async function preQualiChances(db: Db, kind: AnySessionKind, raceId: number): Promise<Map<number, string>> {
+  const table = kind.preQuali;
+  if (!table) return new Map();
+  const rows = await db
+    .select({ driverId: table.driverId, winProbability: table.winProbability })
+    .from(table)
+    .where(eq(table.raceId, raceId));
+  return new Map(rows.map((r) => [r.driverId, r.winProbability]));
+}
+
 // A Prediction is the winner pointer plus every driver's feature row, ranked by predicted position.
 async function assemblePrediction<TF extends FeatureTable, TS>(
   db: Db, kind: SessionKind<TF, TS>, prediction: PredictionMeta, race: RaceRow, circuit: CircuitRow,
@@ -59,6 +69,7 @@ async function assemblePrediction<TF extends FeatureTable, TS>(
 
   const winner = rows.find((r) => r.driver.id === prediction.predictedWinnerId);
   if (!winner) return null;
+  const preQuali = await preQualiChances(db, kind, race.id);
   return {
     race: toRace(race, circuit),
     predictedWinner: toDriver(winner.driver, winner.team),
@@ -70,6 +81,7 @@ async function assemblePrediction<TF extends FeatureTable, TS>(
       winProbability: r.feature.winProbability,
       predictedPosition: r.feature.predictedPosition,
       podiumProbability: kind.podiumProbability(r.feature as TF['$inferSelect']),
+      preQualiProbability: preQuali.get(r.driver.id) ?? null,
       gridPosition: r.gridPosition,
       features: kind.mapFeatures(r.feature as TF['$inferSelect']),
     })),

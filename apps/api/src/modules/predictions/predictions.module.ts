@@ -6,6 +6,7 @@ const predictionsModule = new Hono<{ Bindings: Bindings }>();
 
 predictionsModule.get('/model-info', PredictionsController.getModelInfo);
 predictionsModule.get('/upcoming', PredictionsController.getUpcoming);
+predictionsModule.get('/pre-quali/upcoming', PredictionsController.getUpcomingPreQuali);
 predictionsModule.get('/history', PredictionsController.getHistory);
 predictionsModule.get('/accuracy', PredictionsController.getAccuracy);
 predictionsModule.get('/standings', PredictionsController.getIntelStandings);
