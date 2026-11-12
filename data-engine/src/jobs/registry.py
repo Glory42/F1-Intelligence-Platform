@@ -8,6 +8,7 @@ from typing import Any, Callable, Optional
 
 from src.jobs import (
     compute_features,
+    compute_pre_quali,
     compute_season_stats,
     compute_sprint_features,
     compute_title_odds,
@@ -89,6 +90,8 @@ JOB_LIST: tuple[Job, ...] = (
     Job("compute_title_odds", Needs.YEAR, lambda a: compute_title_odds.run(a.year)),
     Job("compute_sprint_features", Needs.RACE, lambda a: compute_sprint_features.run(a.race_id)),
     Job("compute_features", Needs.RACE, lambda a: compute_features.run(a.race_id)),
+    # --race_id is the race just completed: it forecasts the one after.
+    Job("compute_pre_quali", Needs.RACE, lambda a: compute_pre_quali.run(a.race_id)),
     Job("data_quality_audit", Needs.NONE, lambda a: _module("data_quality_audit").run(
         year=a.year or date.today().year, all_years=a.all_years)),
     Job("data_quality_repair", Needs.NONE, lambda a: _module("data_quality_repair").run(

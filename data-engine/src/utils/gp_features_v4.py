@@ -36,6 +36,9 @@ GP_V4_FEATURES: tuple[str, ...] = (
     "grid_processional",
     "team_race_pace",
 )
+# The forecast before qualifying (ADR 0015): v4 without the three features qualifying sets. Adding FP2 long
+# runs made it worse, as it did for v4; driver form alone scores within noise of it.
+PRE_QUALI_FEATURES: tuple[str, ...] = ("driver_points", "team_race_pace", "team_quali_pace", "teammate_edge")
 
 # Finishing positions are scored on the 2010+ table in every era, so form compares across seasons.
 POINTS = (25, 18, 15, 12, 10, 8, 6, 4, 2, 1)
@@ -193,6 +196,25 @@ def sprint_features(h: RaceHistory, race_id: int) -> dict[int, dict[str, float]]
         rows = [{**r, **{c: quali.get(r["driver_id"], {}).get(c) for c in QUALI_TIME_COLS}} for r in rows]
     # The sprint's own result is what's being predicted, so it can't be a feature here.
     return _field_features(h, race_id, rows, [])
+
+
+def previous_lineup(h: RaceHistory, race_id: int) -> list[dict[str, Any]]:
+    """Before qualifying the field isn't known yet: the season's last completed race stands in for it. A season
+    opener has no such race and gets no forecast."""
+    race = h.races[race_id]
+    earlier = [r for r in h.completed_before(race["race_date"]) if h.races[r]["year"] == race["year"] and h.results.get(r)]
+    if not earlier:
+        raise ValueError(f"No earlier race this season to take race {race_id}'s lineup from")
+    return [
+        {"driver_id": r["driver_id"], "team_id": r["team_id"], "grid_position": None,
+         **{c: None for c in QUALI_TIME_COLS}}
+        for r in h.results[earlier[0]]
+    ]
+
+
+def pre_quali_features(h: RaceHistory, race_id: int) -> dict[int, dict[str, float]]:
+    """The same features over the previous race's lineup, for the forecast before qualifying."""
+    return _field_features(h, race_id, previous_lineup(h, race_id), [])
 
 
 def _field_features(

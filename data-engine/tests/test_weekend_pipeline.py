@@ -79,6 +79,7 @@ class TestChain:
             "ingest_race",
             "compute_season_stats",
             "compute_title_odds",
+            "compute_pre_quali",
             "ingest_race_control",
             "ingest_overtakes",
             "ingest_team_radio",
@@ -173,7 +174,7 @@ class TestDueStatuses:
 class TestRepairSteps:
     def test_a_race_results_repair_reruns_what_the_worker_runs_after_the_race(self):
         assert [s.name for s in wp.repair_steps("race_results", "points_present")] == [
-            "ingest_race", "compute_season_stats", "compute_title_odds",
+            "ingest_race", "compute_season_stats", "compute_title_odds", "compute_pre_quali",
             "ingest_race_control", "ingest_overtakes", "ingest_team_radio", "ingest_stints", "ingest_pit_stops",
             "ingest_race_control_sprint", "ingest_overtakes_sprint", "ingest_team_radio_sprint",
             "ingest_stints_sprint", "ingest_pit_stops_sprint",
