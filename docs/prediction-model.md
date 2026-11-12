@@ -182,6 +182,34 @@ Probabilities sum to 1.0 across all drivers in a race.
 
 Drivers are ranked by `win_probability` descending. Rank 1 = predicted winner, stored in `race_predictions.predicted_winner_id` (or `sprint_predictions.predicted_winner_id` for sprints). All driver positions are stored in `driver_prediction_features.predicted_position` (or `driver_sprint_features.predicted_position`).
 
+## Podium chance (GP only)
+
+`compute_features` also stores each driver's P(top 3) in `driver_prediction_features.podium_probability`
+(`utils/finishing_order.py`). The field's win probabilities are treated as a Plackett–Luce distribution:
+20,000 finishing orders are drawn, seeded by `race_id` so a rerun writes the same numbers. The winner is drawn
+from the win probabilities, and the places after it from win probability ^ 0.8 (a Henery discount).
+
+`scripts/backtest.py --places` picked that 0.8 against a baseline of P(top k | grid slot) learned from earlier
+races (190 GPs, 2018–2026, binary log loss per driver, lower is better):
+
+| Henery exponent | podium log loss | podium Brier | points (top 10) log loss | points Brier |
+|---|---|---|---|---|
+| 1.0 (plain Plackett–Luce) | 0.2286 | 0.0690 | 0.8209 | 0.1649 |
+| **0.8** | **0.2244** | **0.0686** | 0.6726 | 0.1642 |
+| 0.6 | 0.2297 | 0.0698 | 0.5597 | 0.1649 |
+| 0.4 | 0.2483 | 0.0741 | 0.5230 | 0.1697 |
+| grid baseline | 0.2313 | 0.0695 | **0.5016** | **0.1639** |
+
+- **Plain Plackett–Luce overrates favourites' podiums.** Drivers it gave 70%+ finished on the podium 76% of
+  the time, against a mean prediction of 90%. The discount fixes most of that and beats the grid baseline.
+- **P(points) and expected points aren't served.** At no exponent did P(top 10) beat the grid baseline: win
+  probabilities are near zero for most of the field, and so are the chances the chain gives those drivers for
+  P8–P10, but they score points often. Expected points would inherit the same error.
+- Sprints have no podium chance: sprint-v2 is hand-weighted and was never validated this way.
+
+`scripts/backfill_podium_probability.py` fills the column for stored predictions from their stored win
+probabilities (no refit).
+
 ---
 
 ## Data Availability by Era

@@ -537,6 +537,7 @@ One row per driver per grand prix race (`weighted-v4`). Written by `compute_feat
 | `raw_weighted_score` | numeric(8,6) | Sum of the contributions: the driver's log-odds score |
 | `win_probability` | numeric(6,5) | Softmax (T = 1) over the field: sums to 1.0 per race |
 | `predicted_position` | integer | 1 = predicted winner |
+| `podium_probability` | numeric(6,5) | P(top 3) implied by the win probabilities (`utils/finishing_order.py`); null on rows from before migration `0031` until backfilled |
 | UNIQUE | `(race_id, driver_id)` | |
 
 The weighted-v3 score columns and `long_run_used_fp` were dropped by migrations `0029`/`0030`.
