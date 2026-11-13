@@ -6,7 +6,7 @@ import {
   globalSearchResponse,
   teamsListResponse, teamBDetailResponse, teamBCareer,
   sprintPredictionResponse, sprintDetailResponse, sprintWeekendRaceDetailResponse,
-  sprintRaceControlMessages, raceStrategyResponse, raceStrategyInsightsResponse, longRunRows, pitCrewRankings, teamStandingsResponse, race2026DetailResponse,
+  sprintRaceControlMessages, raceStrategyResponse, raceStrategyInsightsResponse, races2025, longRunRows, pitCrewRankings, teamStandingsResponse, race2026DetailResponse,
   races2026, titleOddsResponse, racecraftRows, teammateBattle, raceStoryResponse, telemetryResponse,
   historyRecords, historyMilestones, constructorLineages, driverHistory, teamHistory, lastRaceRecap, lastRaceDetailResponse, onThisDay,
 } from './data';
@@ -51,6 +51,7 @@ Bun.serve({
     if (url.pathname === '/api/teams/1/history') return ok(teamHistory);
     if (url.pathname === '/api/predictions/title-odds') return ok(titleOddsResponse);
     if (url.pathname === '/api/races' && url.searchParams.get('year') === '2026') return ok(races2026);
+    if (url.pathname === '/api/races' && url.searchParams.get('year') === '2025') return ok(races2025);
     if (url.pathname === '/api/sprint/upcoming') return notFound();
     if (url.pathname === '/api/sprint/race/2') return ok(sprintPredictionResponse);
     if (url.pathname === '/api/sprint/race/2/detail') return ok(sprintDetailResponse);

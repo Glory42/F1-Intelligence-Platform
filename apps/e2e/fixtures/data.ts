@@ -422,6 +422,14 @@ export const races2026: Race[] = [
   ...[20, 21, 22, 23, 24].map((round) => ({ ...race, id: 10 + round, roundNumber: round, status: 'scheduled' as const })),
 ];
 
+// 2025 with ten rounds left (one a sprint weekend): LEC, 140 behind, can still catch VER, so the what-if shows.
+export const races2025: Race[] = [
+  { ...race, id: 50, roundNumber: 14, status: 'completed' },
+  ...[15, 16, 17, 18, 19, 20, 21, 22, 23, 24].map((round) => ({
+    ...race, id: 50 + round, roundNumber: round, name: `Round ${round} Grand Prix`, status: 'scheduled' as const, hasSprint: round === 15,
+  })),
+];
+
 // The last completed 2026 race: LEC beat VER from pole, matching lastRaceRecap.
 export const lastRaceDetailResponse: RaceDetailResponse = {
   race: races2026[0],
@@ -439,8 +447,8 @@ export const lastRaceDetailResponse: RaceDetailResponse = {
 export const titleOddsResponse: TitleOddsResponse = {
   afterRound: 19,
   drivers: [
-    { driver, titleProbability: 1, expectedPoints: 452.3, pointsP10: 420, pointsP90: 475 },
-    { driver: driverB, titleProbability: 0, expectedPoints: 268.1, pointsP10: 240, pointsP90: 300 },
+    { driver, titleProbability: 1, expectedPoints: 452.3, pointsP10: 420, pointsP90: 475, finishes: [9, 4, 2] },
+    { driver: driverB, titleProbability: 0, expectedPoints: 268.1, pointsP10: 240, pointsP90: 300, finishes: [3, 5, 4] },
   ],
   teams: [
     { team, titleProbability: 0.81, expectedPoints: 690, pointsP10: 650, pointsP90: 720 },

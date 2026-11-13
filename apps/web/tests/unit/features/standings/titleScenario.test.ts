@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  applyScenario, clinchOutlook, clinchSentence, rankWithCountback, remainingWeekends, titleRaceSentence, weekendMaxPoints,
+  applyScenario, clinchOutlook, clinchSentence, rankWithCountback, remainingWeekends, scenarioOutcome, titleRaceSentence,
+  weekendMaxPoints,
   type Contender, type Weekend,
 } from '@/features/standings/titleScenario';
 
@@ -149,5 +150,34 @@ describe('applyScenario', () => {
     const result = applyScenario([contender(1, 'A', 10)], [{ id: 1, round: 22, gp: null, sprint: 1 }], [gp(22)], 2025);
 
     expect(result[0].points).toBe(10);
+  });
+});
+
+describe('scenarioOutcome', () => {
+  const weekends = [gp(21, 'Qatar Grand Prix'), gp(22, 'Abu Dhabi Grand Prix')];
+
+  it('names the round the picked results settle the title, counting every later pick in the final table', () => {
+    const outcome = scenarioOutcome(
+      [contender(1, 'VER', 400), contender(4, 'NOR', 380)],
+      [{ id: 1, round: 21, gp: 1, sprint: null }, { id: 4, round: 22, gp: 1, sprint: null }],
+      weekends, 2025,
+    );
+
+    expect(outcome).toMatchObject({ champion: { id: 1 }, decidedAt: { round: 21 }, onCountback: false });
+    expect(outcome!.standings.map((c) => [c.id, c.points])).toEqual([[1, 425], [4, 405]]);
+  });
+
+  it('goes to countback when the final round leaves them level, a ninth win beating more second places', () => {
+    const outcome = scenarioOutcome(
+      [contender(4, 'NOR', 367, [8, 5]), contender(1, 'VER', 360, [8, 2])],
+      [{ id: 1, round: 22, gp: 1, sprint: null }, { id: 4, round: 22, gp: 2, sprint: null }],
+      [gp(22, 'Abu Dhabi Grand Prix')], 2025,
+    );
+
+    expect(outcome).toMatchObject({ champion: { id: 1, points: 385 }, decidedAt: { round: 22 }, onCountback: true });
+  });
+
+  it('has no outcome once the season is over', () => {
+    expect(scenarioOutcome([contender(1, 'VER', 400)], [], [], 2025)).toBeNull();
   });
 });

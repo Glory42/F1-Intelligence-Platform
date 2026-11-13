@@ -8,7 +8,8 @@ import RankCell from '@/components/data/RankCell.astro';
 import ShareBar from '@/features/standings/components/ShareBar.astro';
 import { getTeamColor } from '@/lib/f1/teamColors';
 import { formatTitleOdds, titleContention, remainingSessions } from '@/lib/f1/championshipMath';
-import { titleRaceSentence } from '@/features/standings/titleScenario';
+import { remainingWeekends, titleRaceSentence } from '@/features/standings/titleScenario';
+import { TitleWhatIf } from '@/features/standings/components/TitleWhatIf';
 import ClinchNote from '@/features/standings/components/ClinchNote.astro';
 import type { DriverStanding, Race, TitleOddsResponse } from '@/types';
 
@@ -27,10 +28,20 @@ const contention = titleContention(
   standings.map((s) => ({ id: s.driver.id, points: Number(s.stats.championshipPoints) })),
   { year, ...remainingSessions(races) },
 );
-const clinch = titleRaceSentence(
-  standings.map((s) => ({ id: s.driver.id, name: s.driver.lastName, points: Number(s.stats.championshipPoints), finishes: [] })),
-  races, year, 'driver',
-);
+const finishesById = new Map(odds.drivers.map((d) => [d.driver.id, d.finishes]));
+const contenders = standings.map((s) => ({
+  id: s.driver.id, name: s.driver.lastName, points: Number(s.stats.championshipPoints), finishes: finishesById.get(s.driver.id) ?? [],
+}));
+const clinch = titleRaceSentence(contenders, races, year, 'driver');
+const weekends = remainingWeekends(races);
+const stillIn = standings.filter((s) => contention.get(s.driver.id)?.alive ?? false);
+const whatIf = weekends.length > 0 && stillIn.length >= 2
+  ? {
+    weekends,
+    contenders: contenders.filter((c) => contention.get(c.id)?.alive),
+    drivers: stillIn.slice(0, CHART_DRIVERS).map((s) => ({ id: s.driver.id, code: s.driver.code, color: getTeamColor(s.driver.team.teamKey) })),
+  }
+  : null;
 const pointsById = new Map(standings.map((s) => [s.driver.id, Number(s.stats.championshipPoints)]));
 
 // One round of odds is a single point per driver: nothing to chart until a second round exists.
@@ -101,4 +112,5 @@ const chart = {
       </div>
     )}
   </div>
+  {whatIf && <div class="mt-4"><TitleWhatIf client:idle year={year} {...whatIf} /></div>}
 </section>
