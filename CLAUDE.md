@@ -341,8 +341,9 @@ All queries use Drizzle joins. Never fetch a list then loop-query for each item.
 - Tailwind for all styling
 - `.astro` components for display; `.tsx` for interactive Shadcn islands
 - `client:load`/`client:idle` only when interactivity is strictly needed: currently: `GlobalSearch`,
-  `DriverCompareTool`, `TeamCompareTool` (see the client-fetch exception under Critical Constraints §3), and
-  `CircuitsGrid` (filters/sorts a list passed as a prop: no fetch)
+  `DriverCompareTool`, `TeamCompareTool` (see the client-fetch exception under Critical Constraints §3),
+  `CircuitsGrid` (filters/sorts a list passed as a prop: no fetch) and `TitleWhatIf` (`client:idle` on the
+  title-fight tab: re-scores the standings from picked places, all data passed as props: no fetch)
 
 ---
 
