@@ -19,6 +19,7 @@ test('the title fight tab shows title odds and who is mathematically out', async
   await expect(fight.getByRole('row', { name: /VER.*350.*100%/ })).toBeVisible();
   await expect(fight.getByRole('row', { name: /LEC.*210.*Eliminated/ })).toBeVisible();
   await expect(fight.getByRole('img', { name: /title odds after each round/i })).toBeVisible();
+  await expect(fight).toContainText('No one can catch Verstappen any more: the title is decided.');
 });
 
 test('switching to the racecraft tab keeps the chosen season', async ({ page }) => {
