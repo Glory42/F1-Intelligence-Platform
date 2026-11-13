@@ -97,6 +97,7 @@ recommended; brand `F1 Intelligence Platform`.
   | Route | Max size |
   |---|---|
   | strategy | 15 KB |
+  | strategy insights | 15 KB |
   | race story | 40 KB |
   | telemetry pair | 60 KB |
   | title odds | 20 KB |

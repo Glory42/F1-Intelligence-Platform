@@ -20,13 +20,15 @@ interface Props {
   /** viewBox width: match the width the chart is shown at so 9px labels stay 9px. */
   width?: number;
   integerTicks?: boolean;
+  /** Room right of the plot for the end-of-line labels. */
+  labelWidth?: number;
 }
 
-const { series, ariaLabel, yDomain, formatY = (v: number) => String(v), xLabel, height = 220, width = 640, integerTicks = false } = Astro.props;
+const { series, ariaLabel, yDomain, formatY = (v: number) => String(v), xLabel, height = 220, width = 640, integerTicks = false, labelWidth = 48 } = Astro.props;
 
 const WIDTH = width;
 const HEIGHT = height;
-const PAD = { top: 12, right: 48, bottom: 28, left: 40 };
+const PAD = { top: 12, right: labelWidth, bottom: 28, left: 40 };
 
 const xs = series.flatMap((s) => s.points.map((p) => p.x));
 const ys = series.flatMap((s) => s.points.flatMap((p) => (p.y == null ? [] : [p.y])));

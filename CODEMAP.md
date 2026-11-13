@@ -49,6 +49,7 @@ apps/api/
 │   ├── common/                    # Only what several modules share: module-only logic lives in that module's *.helpers.ts
 │   │   ├── types/                 # Response types per domain (api, seasons, circuits, drivers, teams, races, race-events,
 │   │   │                          #   strategy, race-story, telemetry, predictions, sprint, history, quality) + index.ts barrel
+│   │   ├── stats.ts               # median(): shared by teammate battle and tyre degradation
 │   │   ├── constants.ts           # SPRINT_FORMATS: single source of truth shared by all services
 │   │   ├── mappers.ts             # toDriver(), toTeam(), toRace(), toCircuit(), toRaceResult(), toQualifyingResult(), toSprintResult(): canonical row→DTO mappers used by all services
 │   │   ├── standings.ts           # resolveSeason(), buildStandings(), buildCareerStats(), championshipPoints(), sortByChampionshipStanding(): shared standings/career-stats pipeline for drivers, teams, predictions; drivers/teams pass a StatsAdapter
@@ -126,8 +127,10 @@ apps/api/
 │       │   └── race-events.module.ts     # GET /:id/race-control, /:id/overtakes, /:id/team-radio (mounted at /api/races)
 │       ├── strategy/              # Mounted at /api/races
 │       │   ├── strategy.service.ts    # findStrategy(): OpenF1 stints + pit stops per driver; derives stints from lap times when OpenF1 has none
+│       │   ├── strategy-insights.service.ts # findInsights(): reads the session's laps, team rows for degradation
+│       │   ├── degradation.helpers.ts # teamDegradation(): fuel-corrected wear per team × compound (stints from lap − tyre age)
 │       │   ├── strategy.controller.ts
-│       │   └── strategy.module.ts     # GET /:id/strategy
+│       │   └── strategy.module.ts     # GET /:id/strategy, /:id/strategy-insights
 │       ├── race-story/            # Mounted at /api/races
 │       │   ├── race-story.service.ts  # findRaceStory(): lap traces in finishing order, battles, minute-by-minute weather
 │       │   ├── recap.service.ts       # findRecap(): home "last race" card: winner, model pick + hit, fastest stop, longest battle
@@ -204,6 +207,7 @@ apps/api/
 │   │   ├── race-events/race-events.test.ts # race-control message + overtakes + team-radio lists, ordering, 404
 │   │   ├── race-events/race-events-sessions.test.ts # ?session=sprint returns only sprint rows
 │   │   ├── strategy/strategy.test.ts   # stints + stops in finishing order, lap-time-derived fallback, sprint session
+│   │   ├── strategy/strategy-insights.test.ts # fuel-corrected wear per team, too-short stints left out, sprint laps, empty race
 │   │   ├── race-story/race-story.test.ts # traces in finishing order, named battles, weather °C, short cache when not backfilled
 │   │   ├── telemetry/telemetry.test.ts # lists everyone with telemetry, samples only for the two requested / two fastest
 │   │   ├── hub/hub.test.ts         # race recap (winner, model pick, fastest stop, longest battle) + on-this-day races
@@ -277,6 +281,7 @@ A module with a second query area adds another `*.service.ts` beside the first (
 | GET | `/api/races/:id/overtakes` | `session` |
 | GET | `/api/races/:id/team-radio` | `session` |
 | GET | `/api/races/:id/strategy` | `session` |
+| GET | `/api/races/:id/strategy-insights` | `session` |
 | GET | `/api/races/:id/race-story` | `session` |
 | GET | `/api/races/:id/recap` | - |
 | GET | `/api/races/:id/telemetry` | `session` (`Q`\|`SQ`, default `Q`), `a`, `b` (driver codes) |
@@ -415,7 +420,7 @@ apps/web/
 │   │   │   ├── raceTabs.ts            # initRaceCountdown() + initRaceTabs(): shared by GP + sprint detail scripts
 │   │   │   ├── raceEventDisplay.ts    # timeOf(), dotColor(): shared by the three Race Event list components
 │   │   │   ├── calendar.ts            # calendarEntries() (sprint weekends → two entries, filter, sort), calendarQuery(), calendarSummary()
-│   │   │   ├── loadRaceEvents.ts      # loadRaceEvents(id, session): strategy + incidents + overtakes + radio, each degrading alone; raceEventTabs()
+│   │   │   ├── loadRaceEvents.ts      # loadRaceEvents(id, session): strategy (+ insights) + incidents + overtakes + radio, each degrading alone; raceEventTabs()
 │   │   │   ├── raceView.ts            # GP/sprint page view logic: predicted podium, winner, fastest lap, conditions, year links, SQ grid
 │   │   │   ├── gridPenalties.ts       # gridDrops(): grid drops vs qualifying (pit-lane start = grid 0)
 │   │   │   ├── weatherSpells.ts       # rainSpells(): contiguous rainfall minutes → spells
@@ -428,6 +433,7 @@ apps/web/
 │   │   │       ├── RaceTabs.astro / RaceTabPanel.astro # Client-side tab strip + panels (namespaced ids) + route links for heavy analysis
 │   │   │       ├── SessionSwitcher.astro  # Grand Prix ⇄ Sprint switch for a sprint weekend (overridable hrefs)
 │   │   │       ├── StintChart.astro       # Strategy tab: SVG tyre-stint bars per driver, compound colours
+│   │   │       ├── TyreDegradation.astro  # Strategy tab: a LineChart per compound (team lines) + team × compound ms/lap table
 │   │   │       ├── PitStopTable.tsx       # Strategy tab: per-driver pit stops (RaceResultsTable conventions)
 │   │   │       ├── BattleList.astro       # Race story: longest close battles (chaser, leader, laps, min gap)
 │   │   │       ├── WeatherStrip.astro     # Race story: track/air temperature LineChart + rain spells
@@ -580,7 +586,7 @@ apps/web/
 │   │   │   └── data/                         # chartScale, labelLayout
 │   │   ├── lib/                              # pure, `node` env: pageTabs / sidebarState / legacyRedirects / canonicalHost / pageCache / pageQuery / securityHeaders / utils
 │   │   │   └── f1/                           # predictionMath (all exports), predictionTerms, championshipMath, teamColors, teamLogos, tyres
-│   │   ├── features/races/ · features/telemetry/  # calendar, raceView + raceEventTabs, gridPenalties, weatherSpells, raceEventDisplay · telemetryCompare, trackMap
+│   │   ├── features/races/ · features/telemetry/  # calendar, raceView + raceEventTabs, gridPenalties, weatherSpells, raceEventDisplay, tyreDegradation · telemetryCompare, trackMap
 │   │   ├── features/predictions/
 │   │   │   └── buildPredictionPageData.test.ts / predictionCopy.test.ts / calibration.test.ts  # GP + sprint page data, copy table, all-season bins
 │   │   ├── features/{drivers,teams,races,history}/load*PageData.test.ts  # page-data loaders, `node` env, MSW-stubbed API

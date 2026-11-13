@@ -63,6 +63,7 @@ function quietEvents(raceId = 7): RequestHandler[] {
     apiOk(`/api/races/${raceId}/overtakes`, []),
     apiOk(`/api/races/${raceId}/team-radio`, []),
     apiOk(`/api/races/${raceId}/strategy`, { source: 'none', drivers: [] }),
+    apiOk(`/api/races/${raceId}/strategy-insights`, { degradation: [] }),
   ];
 }
 
