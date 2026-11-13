@@ -145,7 +145,7 @@ second unrelated feature needs it.
 | `/prediction` | Upcoming tab: `predictions/upcoming` + `sprint/upcoming` + `predictions/standings` · Scorecard tab: `predictions/history?year=` + `predictions/accuracy` |
 | `/prediction/[id]` | `predictions/race/:id` |
 | `/prediction/sprint/[id]` | `sprint/race/:id` |
-| `/races` · `/races/[id]` · `/races/[id]/sprint` | `races?year=` · `races/:id` + `predictions/race/:id` + `races/:id/long-runs` (Long Runs tab) + `races/circuit/:key` + `strategy` / `race-control` / `overtakes` / `team-radio` (each tab shown only when it has data) · `sprint/race/:id/detail` |
+| `/races` · `/races/[id]` · `/races/[id]/sprint` | `races?year=` · `races/:id` + `predictions/race/:id` + `races/:id/long-runs` (Long Runs tab) + `races/circuit/:key` + `strategy` (+ `strategy-insights`) / `race-control` / `overtakes` / `team-radio` (each tab shown only when it has data) · `sprint/race/:id/detail` |
 | `/races/[id]/race-story` | `races/:id/race-story` (`?session=sprint` for the sprint) |
 | `/races/[id]/telemetry` | `races/:id/telemetry?session=&a=&b=`: drivers picked with a plain GET form |
 | `/circuits` · `/circuits/[key]` | `races/circuits` · `races/circuit/:key` (Overview / Winners / Dominance tabs) + `races/circuit/:key/telemetry` (Telemetry tab) |

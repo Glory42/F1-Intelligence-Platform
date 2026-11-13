@@ -165,6 +165,22 @@ and `tyreAgeAtStart` is null), or `none`. 2018 stints keep Pirelli's named compo
 `ULTRASOFT`, `SUPERSOFT`, `SUPERHARD` alongside `SOFT`/`MEDIUM`/`HARD`). `stationaryMs` is only
 available from the 2024 US GP onward; pre-2023 stops carry `pitLaneMs` only. Cached like other race routes (`cacheControlForStatus`).
 
+### `GET /api/races/:id/strategy-insights?session=race|sprint`
+
+Analysis computed at read time from the session's `lap_times` (or `sprint_lap_times`): no table of its own.
+
+```json
+{ "degradation": [{ "team": { "...": "Team" }, "compound": "SOFT", "msPerLap": 104, "laps": 64, "stints": 4,
+    "points": [{ "tyreAge": 3, "lossMs": 508 }, { "tyreAge": 5, "lossMs": 440 }] }] }
+```
+
+`degradation` is each team's fuel-corrected time lost per lap of tyre age on each dry compound, softest first,
+then the gentlest team. Stints are found as `lap_number − tyre_life` per driver and compound (`stint_number`
+is missing for most seasons); `lap_times` already holds only green-flag laps, and laps over 107% of their
+stint's median are dropped. Each lap gets `55 ms × laps remaining` taken off for fuel, then one least-squares
+slope is fitted across the team's stints, each with its own intercept. A stint needs 5 clean laps and a team
+10 on a compound. `points` are the time lost to a new set in 3-lap buckets of tyre age. About 6 KB per race.
+
 ### `GET /api/races/:id/race-story?session=race|sprint`
 
 Lap-by-lap story from full laps (2018+: OpenF1 for races ingested since Oct 2026, FastF1 before), drivers in finishing order:
