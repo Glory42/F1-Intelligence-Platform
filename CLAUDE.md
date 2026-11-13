@@ -244,7 +244,7 @@ GET /api/races/:id/race-control?session=race|sprint
 GET /api/races/:id/overtakes?session=race|sprint
 GET /api/races/:id/team-radio?session=race|sprint
 GET /api/races/:id/strategy?session=race|sprint
-GET /api/races/:id/strategy-insights?session=race|sprint   # tyre degradation, computed from lap_times at read time
+GET /api/races/:id/strategy-insights?session=race|sprint   # tyre degradation + pit-window battles, computed at read time
 GET /api/races/:id/race-story?session=race|sprint
 GET /api/races/:id/telemetry?session=Q|SQ&a=CODE&b=CODE
 GET /api/races/:id/long-runs

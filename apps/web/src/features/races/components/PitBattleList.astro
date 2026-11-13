@@ -1,0 +1,45 @@
+---
+import TabIntro from '@/components/page/TabIntro.astro';
+import { dotColor } from '../raceEventDisplay';
+import { pitBattleLine, pitBattleSummary } from '../pitBattles';
+import type { Driver, PitBattle } from '@/types';
+
+interface Props {
+  battles: PitBattle[];
+  driverMap: Map<number, Driver>;
+}
+
+const { battles, driverMap } = Astro.props;
+const TONE_CLASS = { gain: 'text-[#a855f7]', neutral: 'text-muted-foreground', neutralised: 'text-yellow-400/70' };
+const lines = battles.map((b) => ({ line: pitBattleLine(b), neutralised: b.outcome === 'sc-assisted' }));
+const codeOf = (id: number) => driverMap.get(id)?.code ?? '???';
+---
+
+<section aria-label="Pit-window battles" class="space-y-3">
+  <TabIntro
+    lead={`Cars running within 3 s of each other that stopped up to 5 laps apart: ${pitBattleSummary(battles)}.`}
+    terms={[
+      { term: 'Undercut', meaning: 'stopped first and came out ahead' },
+      { term: 'Overcut', meaning: 'stayed out longer and came out ahead' },
+      { term: 'Covered', meaning: 'stopped first to stay ahead' },
+    ]}
+  />
+  <ol class="border border-white/[0.06] divide-y divide-white/[0.06] max-h-[520px] overflow-y-auto">
+    {lines.map(({ line, neutralised }) => (
+      <li class="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
+        <div class="flex items-center gap-2 flex-1 min-w-0">
+          <span class="size-2 rounded-full shrink-0" style={`background:${dotColor(driverMap.get(line.subjectId))}`} />
+          <span class="font-bold truncate">{codeOf(line.subjectId)}</span>
+          <span class={`text-sm shrink-0 ${TONE_CLASS[line.tone]}`}>{line.verb}</span>
+          <span class="size-2 rounded-full shrink-0" style={`background:${dotColor(driverMap.get(line.objectId))}`} />
+          <span class="font-bold truncate">{codeOf(line.objectId)}</span>
+          {neutralised && <span class="font-mono text-[8px] tracking-widest uppercase text-yellow-400/70 border border-yellow-500/30 px-1.5 py-0.5">SC / VSC</span>}
+        </div>
+        <div class="flex items-center gap-3 font-mono text-[9px] tracking-widest uppercase text-muted-foreground shrink-0">
+          <span>{line.laps}</span>
+          <span class="text-foreground/80">{line.gaps}</span>
+        </div>
+      </li>
+    ))}
+  </ol>
+</section>

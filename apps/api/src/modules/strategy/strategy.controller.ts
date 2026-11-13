@@ -16,6 +16,6 @@ export const StrategyController = {
   getInsights: raceRoute({
     session: RACE_SESSION,
     load: ({ db, race, session }) => insights.findInsights(db, race.id, session),
-    hasData: (data) => data.degradation.length > 0,
+    hasData: (data) => data.degradation.length > 0 || data.pitBattles.length > 0,
   }),
 };

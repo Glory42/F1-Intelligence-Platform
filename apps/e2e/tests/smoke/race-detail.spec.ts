@@ -64,6 +64,16 @@ test('renders the strategy tab with stints per compound and the pit stops', asyn
   await expect(panel.getByRole('row', { name: /VER.*20.*2\.30 s/ })).toBeVisible();
 });
 
+test('lists pit-window battles, keeping stops under a Safety Car apart', async ({ page }) => {
+  await page.goto('/races/1');
+  await page.getByRole('tab', { name: 'Strategy' }).click();
+
+  const section = page.locator('#panel-strategy').getByRole('region', { name: 'Pit-window battles' });
+  await expect(section).toContainText('1 undercut worked; 1 under a Safety Car or VSC');
+  await expect(section.getByRole('listitem').filter({ hasText: /VER\s*undercut\s*LEC/ })).toContainText('1.4 s behind → 2.1 s ahead');
+  await expect(section.getByRole('listitem').filter({ hasText: /LEC\s*pitted before\s*VER/ })).toContainText('SC / VSC');
+});
+
 test("shows each team's tyre degradation as a chart per compound and a table", async ({ page }) => {
   await page.goto('/races/1');
   await page.getByRole('tab', { name: 'Strategy' }).click();
