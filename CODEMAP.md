@@ -127,8 +127,9 @@ apps/api/
 │       │   └── race-events.module.ts     # GET /:id/race-control, /:id/overtakes, /:id/team-radio (mounted at /api/races)
 │       ├── strategy/              # Mounted at /api/races
 │       │   ├── strategy.service.ts    # findStrategy(): OpenF1 stints + pit stops per driver; derives stints from lap times when OpenF1 has none
-│       │   ├── strategy-insights.service.ts # findInsights(): reads the session's laps, team rows for degradation
+│       │   ├── strategy-insights.service.ts # findInsights(): session laps, traces, stops and race control → degradation + pit battles
 │       │   ├── degradation.helpers.ts # teamDegradation(): fuel-corrected wear per team × compound (stints from lap − tyre age)
+│       │   ├── pit-battles.helpers.ts # findPitBattles(): undercut/overcut/held/SC-assisted pairs; neutralisedLaps() from race control
 │       │   ├── strategy.controller.ts
 │       │   └── strategy.module.ts     # GET /:id/strategy, /:id/strategy-insights
 │       ├── race-story/            # Mounted at /api/races
@@ -207,7 +208,7 @@ apps/api/
 │   │   ├── race-events/race-events.test.ts # race-control message + overtakes + team-radio lists, ordering, 404
 │   │   ├── race-events/race-events-sessions.test.ts # ?session=sprint returns only sprint rows
 │   │   ├── strategy/strategy.test.ts   # stints + stops in finishing order, lap-time-derived fallback, sprint session
-│   │   ├── strategy/strategy-insights.test.ts # fuel-corrected wear per team, too-short stints left out, sprint laps, empty race
+│   │   ├── strategy/strategy-insights.test.ts # fuel-corrected wear per team, too-short stints left out, an undercut, SC-assisted sprint swap, empty race
 │   │   ├── race-story/race-story.test.ts # traces in finishing order, named battles, weather °C, short cache when not backfilled
 │   │   ├── telemetry/telemetry.test.ts # lists everyone with telemetry, samples only for the two requested / two fastest
 │   │   ├── hub/hub.test.ts         # race recap (winner, model pick, fastest stop, longest battle) + on-this-day races
@@ -433,6 +434,7 @@ apps/web/
 │   │   │       ├── RaceTabs.astro / RaceTabPanel.astro # Client-side tab strip + panels (namespaced ids) + route links for heavy analysis
 │   │   │       ├── SessionSwitcher.astro  # Grand Prix ⇄ Sprint switch for a sprint weekend (overridable hrefs)
 │   │   │       ├── StintChart.astro       # Strategy tab: SVG tyre-stint bars per driver, compound colours
+│   │   │       ├── PitBattleList.astro    # Strategy tab: pit-window battles (undercut/overcut/covered, SC/VSC tagged)
 │   │   │       ├── TyreDegradation.astro  # Strategy tab: a LineChart per compound (team lines) + team × compound ms/lap table
 │   │   │       ├── PitStopTable.tsx       # Strategy tab: per-driver pit stops (RaceResultsTable conventions)
 │   │   │       ├── BattleList.astro       # Race story: longest close battles (chaser, leader, laps, min gap)
@@ -586,7 +588,7 @@ apps/web/
 │   │   │   └── data/                         # chartScale, labelLayout
 │   │   ├── lib/                              # pure, `node` env: pageTabs / sidebarState / legacyRedirects / canonicalHost / pageCache / pageQuery / securityHeaders / utils
 │   │   │   └── f1/                           # predictionMath (all exports), predictionTerms, championshipMath, teamColors, teamLogos, tyres
-│   │   ├── features/races/ · features/telemetry/  # calendar, raceView + raceEventTabs, gridPenalties, weatherSpells, raceEventDisplay, tyreDegradation · telemetryCompare, trackMap
+│   │   ├── features/races/ · features/telemetry/  # calendar, raceView + raceEventTabs, gridPenalties, weatherSpells, raceEventDisplay, tyreDegradation, pitBattles · telemetryCompare, trackMap
 │   │   ├── features/predictions/
 │   │   │   └── buildPredictionPageData.test.ts / predictionCopy.test.ts / calibration.test.ts  # GP + sprint page data, copy table, all-season bins
 │   │   ├── features/{drivers,teams,races,history}/load*PageData.test.ts  # page-data loaders, `node` env, MSW-stubbed API

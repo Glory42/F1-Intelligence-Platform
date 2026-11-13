@@ -171,7 +171,9 @@ Analysis computed at read time from the session's `lap_times` (or `sprint_lap_ti
 
 ```json
 { "degradation": [{ "team": { "...": "Team" }, "compound": "SOFT", "msPerLap": 104, "laps": 64, "stints": 4,
-    "points": [{ "tyreAge": 3, "lossMs": 508 }, { "tyreAge": 5, "lossMs": 440 }] }] }
+    "points": [{ "tyreAge": 3, "lossMs": 508 }, { "tyreAge": 5, "lossMs": 440 }] }],
+  "pitBattles": [{ "attackerId": 4, "defenderId": 81, "attackerLap": 18, "defenderLap": 20,
+    "gapBeforeMs": 1400, "gapAfterMs": -2100, "outcome": "undercut" }] }
 ```
 
 `degradation` is each team's fuel-corrected time lost per lap of tyre age on each dry compound, softest first,
@@ -179,7 +181,14 @@ then the gentlest team. Stints are found as `lap_number − tyre_life` per drive
 is missing for most seasons); `lap_times` already holds only green-flag laps, and laps over 107% of their
 stint's median are dropped. Each lap gets `55 ms × laps remaining` taken off for fuel, then one least-squares
 slope is fitted across the team's stints, each with its own intercept. A stint needs 5 clean laps and a team
-10 on a compound. `points` are the time lost to a new set in 3-lap buckets of tyre age. About 6 KB per race.
+10 on a compound. `points` are the time lost to a new set in 3-lap buckets of tyre age.
+
+`pitBattles` reads `race_lap_traces`, `race_pit_stops` and `race_control_messages`: two cars adjacent and
+within 3 s at the end of the lap before the first stop, stopping 1–5 laps apart (no other stop by either in
+between). The first to stop is the attacker; gaps are its time behind the defender (negative = ahead), on that
+lap and on the second car's out-lap, null once a car is lapped. `outcome` is `undercut` (attacker came out
+ahead), `overcut` (defender did), `held`, or `sc-assisted` when a Safety Car, VSC or red flag ran on any lap from
+the first stop to that out-lap. Drivers come as ids, like overtakes. About 9 KB per race in all.
 
 ### `GET /api/races/:id/race-story?session=race|sprint`
 
