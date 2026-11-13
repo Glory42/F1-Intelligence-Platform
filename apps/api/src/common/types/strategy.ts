@@ -28,4 +28,16 @@ export type TyreDegradation = {
   points: Array<{ tyreAge: number; lossMs: number }>;
 };
 
-export type StrategyInsightsResponse = { degradation: TyreDegradation[] };
+// Two cars nose to tail (≤ 3 s, adjacent) stopping 1–5 laps apart; the first to stop is the attacker. Drivers by id:
+// the race page already holds them. Gaps are the attacker's time behind (negative = ahead); null once lapped.
+export type PitBattle = {
+  attackerId: number;
+  defenderId: number;
+  attackerLap: number;
+  defenderLap: number;
+  gapBeforeMs: number;
+  gapAfterMs: number | null;
+  outcome: 'undercut' | 'overcut' | 'held' | 'sc-assisted';
+};
+
+export type StrategyInsightsResponse = { degradation: TyreDegradation[]; pitBattles: PitBattle[] };

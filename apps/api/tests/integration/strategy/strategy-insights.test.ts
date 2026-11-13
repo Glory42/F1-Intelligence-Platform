@@ -10,6 +10,9 @@ import { createRaceResult } from '../../support/factories/raceResult.factory';
 import { createSprintResult } from '../../support/factories/sprintResult.factory';
 import { createLapTimes } from '../../support/factories/lapTime.factory';
 import { createSprintLapTimes } from '../../support/factories/sprintLapTime.factory';
+import { createLapTrace } from '../../support/factories/raceStory.factory';
+import { createRacePitStop } from '../../support/factories/racePitStop.factory';
+import { createRaceControlMessage } from '../../support/factories/raceControlMessage.factory';
 
 interface InsightsBody {
   data: {
@@ -20,6 +23,10 @@ interface InsightsBody {
       laps: number;
       stints: number;
       points: Array<{ tyreAge: number; lossMs: number }>;
+    }>;
+    pitBattles: Array<{
+      attackerId: number; defenderId: number; attackerLap: number; defenderLap: number;
+      gapBeforeMs: number; gapAfterMs: number | null; outcome: string;
     }>;
   };
 }
@@ -38,10 +45,32 @@ function wornLaps(raceId: number, driverId: number, compound: string, wearMs: nu
   });
 }
 
+// PIA leads LEC by 1.2 s until LEC's undercut puts LEC 0.8 s ahead from lap 8.
+function swapTraces(sessionType: 'race' | 'sprint') {
+  const laps = Array.from({ length: 12 }, (_, i) => i + 1);
+  const ahead = (lap: number) => lap >= 8;
+  return {
+    lec: {
+      sessionType, lapsDown: laps.map(() => 0),
+      positions: laps.map((l) => (ahead(l) ? 1 : 2)),
+      gapsMs: laps.map((l) => (ahead(l) ? 0 : 1_200)),
+      intervalsMs: laps.map((l) => (ahead(l) ? null : 1_200)),
+    },
+    pia: {
+      sessionType, lapsDown: laps.map(() => 0),
+      positions: laps.map((l) => (ahead(l) ? 2 : 1)),
+      gapsMs: laps.map((l) => (ahead(l) ? 800 : 0)),
+      intervalsMs: laps.map((l) => (ahead(l) ? 800 : null)),
+    },
+  };
+}
+
 describe('strategy insights (integration)', () => {
   const db = getTestDb();
   let raceId: number;
   let emptyRaceId: number;
+  let lecId: number;
+  let piaId: number;
 
   beforeAll(async () => {
     await truncateAll(db);
@@ -53,6 +82,8 @@ describe('strategy insights (integration)', () => {
     const pia = await createDriver(db, season.id, mclaren.id, { driverNumber: 81, code: 'PIA' });
     const race = await createRace(db, season.id, circuit.id, { status: 'completed' });
     raceId = race.id;
+    lecId = lec.id;
+    piaId = pia.id;
 
     await createRaceResult(db, race.id, lec.id, { finishPosition: 1 });
     await createRaceResult(db, race.id, pia.id, { finishPosition: 2 });
@@ -63,6 +94,21 @@ describe('strategy insights (integration)', () => {
     ]);
     await createSprintResult(db, race.id, pia.id, { finishPosition: 1 });
     await createSprintLapTimes(db, wornLaps(race.id, pia.id, 'SOFT', 120));
+
+    for (const sessionType of ['race', 'sprint'] as const) {
+      const traces = swapTraces(sessionType);
+      await createLapTrace(db, race.id, lec.id, traces.lec);
+      await createLapTrace(db, race.id, pia.id, traces.pia);
+      await createRacePitStop(db, race.id, lec.id, { sessionType, lapNumber: 5 });
+      await createRacePitStop(db, race.id, pia.id, { sessionType, lapNumber: 7 });
+    }
+    await createRaceControlMessage(db, race.id, {
+      sessionType: 'sprint', category: 'SafetyCar', flag: null, lapNumber: 6, message: 'VIRTUAL SAFETY CAR DEPLOYED',
+    });
+    await createRaceControlMessage(db, race.id, {
+      sessionType: 'sprint', category: 'SafetyCar', flag: null, lapNumber: 6, message: 'VIRTUAL SAFETY CAR ENDING',
+      date: new Date('2099-03-01T14:05:00Z'),
+    });
 
     const empty = await createRace(db, season.id, circuit.id, { roundNumber: 2, status: 'completed' });
     emptyRaceId = empty.id;
@@ -84,6 +130,23 @@ describe('strategy insights (integration)', () => {
     expect(data.degradation[0].points[0]).toEqual({ tyreAge: 2, lossMs: 160 });
   });
 
+  it('finds the undercut between two cars running nose to tail', async () => {
+    const res = await apiRequest(`/api/races/${raceId}/strategy-insights`);
+    const { data } = (await res.json()) as InsightsBody;
+
+    expect(data.pitBattles).toEqual([{
+      attackerId: lecId, defenderId: piaId, attackerLap: 5, defenderLap: 7,
+      gapBeforeMs: 1_200, gapAfterMs: -800, outcome: 'undercut',
+    }]);
+  });
+
+  it("marks the sprint's swap SC-assisted from the sprint's own race control", async () => {
+    const res = await apiRequest(`/api/races/${raceId}/strategy-insights?session=sprint`);
+    const { data } = (await res.json()) as InsightsBody;
+
+    expect(data.pitBattles.map((b) => b.outcome)).toEqual(['sc-assisted']);
+  });
+
   it("reads the sprint's own laps", async () => {
     const res = await apiRequest(`/api/races/${raceId}/strategy-insights?session=sprint`);
     const { data } = (await res.json()) as InsightsBody;
@@ -96,6 +159,7 @@ describe('strategy insights (integration)', () => {
     const { data } = (await res.json()) as InsightsBody;
 
     expect(data.degradation).toEqual([]);
+    expect(data.pitBattles).toEqual([]);
     expect(res.headers.get('Cache-Control')).not.toContain('immutable');
   });
 
