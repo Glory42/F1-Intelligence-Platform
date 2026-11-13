@@ -4,7 +4,8 @@ import { drivers, qualifyingResults, raceResults, races, teams } from '../../db/
 import type { HeadToHead, TeammateBattle, TeammateOuting, TeammateRace } from '../../common/types';
 import { toDriver } from '../../common/mappers';
 import { isClassifiedFinish } from './classification.helpers';
-import { median, qualifyingGapMs, type QualifyingTimes } from './qualifying-gap.helpers';
+import { median } from '../../common/stats';
+import { qualifyingGapMs, type QualifyingTimes } from './qualifying-gap.helpers';
 
 interface Outing extends TeammateOuting {
   roundNumber: number;
