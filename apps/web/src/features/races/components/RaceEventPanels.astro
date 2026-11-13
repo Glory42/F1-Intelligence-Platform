@@ -6,6 +6,7 @@ import RaceControlTimeline from './RaceControlTimeline.astro';
 import OvertakesList from './OvertakesList.astro';
 import TeamRadioList from './TeamRadioList.astro';
 import TyreDegradation from './TyreDegradation.astro';
+import PitBattleList from './PitBattleList.astro';
 import type { RaceEvents, RaceEventTab } from '../loadRaceEvents';
 import type { Driver } from '@/types';
 
@@ -32,6 +33,7 @@ const { strategy, insights, raceControlMessages, overtakes, teamRadio } = events
       <div class="border border-white/[0.06] overflow-hidden">
         <PitStopTable drivers={strategy.drivers} year={year} />
       </div>
+      {insights && insights.pitBattles.length > 0 && <PitBattleList battles={insights.pitBattles} driverMap={driverMap} />}
       {insights && insights.degradation.length > 0 && <TyreDegradation rows={insights.degradation} year={year} />}
     </div>
   </RaceTabPanel>

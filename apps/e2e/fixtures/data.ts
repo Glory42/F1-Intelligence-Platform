@@ -390,6 +390,10 @@ export const raceStrategyInsightsResponse: StrategyInsightsResponse = {
       points: [{ tyreAge: 5, lossMs: 360 }, { tyreAge: 20, lossMs: 1460 }, { tyreAge: 35, lossMs: 2550 }],
     },
   ],
+  pitBattles: [
+    { attackerId: 10, defenderId: 11, attackerLap: 20, defenderLap: 23, gapBeforeMs: 1400, gapAfterMs: -2100, outcome: 'undercut' },
+    { attackerId: 11, defenderId: 10, attackerLap: 38, defenderLap: 40, gapBeforeMs: 900, gapAfterMs: 600, outcome: 'sc-assisted' },
+  ],
 };
 
 export const longRunRows: LongRunRow[] = [
