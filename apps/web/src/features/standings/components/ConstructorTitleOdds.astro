@@ -7,14 +7,22 @@ import RankCell from '@/components/data/RankCell.astro';
 import ShareBar from '@/features/standings/components/ShareBar.astro';
 import { getTeamColor } from '@/lib/f1/teamColors';
 import { formatTitleOdds } from '@/lib/f1/championshipMath';
-import type { TitleOddsResponse } from '@/types';
+import { titleRaceSentence } from '@/features/standings/titleScenario';
+import ClinchNote from '@/features/standings/components/ClinchNote.astro';
+import type { Race, TeamStanding, TitleOddsResponse } from '@/types';
 
 interface Props {
   odds: TitleOddsResponse;
+  standings: TeamStanding[];
+  races: Race[];
   year: number;
 }
 
-const { odds, year } = Astro.props;
+const { odds, standings, races, year } = Astro.props;
+const clinch = titleRaceSentence(
+  standings.map((s) => ({ id: s.team.id, name: s.team.name, points: Number(s.stats.championshipPoints), finishes: [] })),
+  races, year, 'team',
+);
 const COLUMNS = 'grid-cols-[40px_1fr_140px] md:grid-cols-[40px_1fr_220px_120px]';
 ---
 
@@ -27,6 +35,7 @@ const COLUMNS = 'grid-cols-[40px_1fr_140px] md:grid-cols-[40px_1fr_220px_120px]'
         { term: 'Likely final', meaning: '10th–90th percentile points' },
       ]}
     />
+    {clinch && <ClinchNote text={clinch} />}
     <DataList
       label="Constructors' title odds"
       columns={COLUMNS}

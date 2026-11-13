@@ -151,7 +151,7 @@ second unrelated feature needs it.
 | `/circuits` · `/circuits/[key]` | `races/circuits` · `races/circuit/:key` (Overview / Winners / Dominance tabs) + `races/circuit/:key/telemetry` (Telemetry tab) |
 | `/drivers` | Standings / Title fight / Racecraft tabs: `drivers/standings` · `predictions/title-odds` · `drivers/racecraft` |
 | `/drivers/[id]` | Season: `drivers/:id?year=` · Teammate: `drivers/:id/teammate-battle` · Career: `drivers/:id/career` + `drivers/:id/history` · Model: `predictions/history` |
-| `/teams` | Standings / Title odds / Pit crews tabs: `teams/standings` · `predictions/title-odds` · `teams/pit-stops` |
+| `/teams` | Standings / Title odds / Pit crews tabs: `teams/standings` · `predictions/title-odds` + `teams/standings` + `races` (clinch sentence) · `teams/pit-stops` |
 | `/teams/[id]` | Season: `teams/:id?year=` · Pit crew: `teams/pit-stops` + `teams/:id/pit-stops` · History: `teams/:id/career` + `teams/:id/history` |
 | `/compare/drivers` · `/compare/teams` | `seasons` + `drivers?year=` / `teams?year=` + `search` in frontmatter; the compare island then fetches `:id?year=` / `:id/career` client-side |
 | `/history` | Records: `history/records` · Milestones: `history/milestones` · On this day: `history/on-this-day?date=MM-DD` (`?date=` param, nearest-day fallback) · Lineage: `history/lineages` |

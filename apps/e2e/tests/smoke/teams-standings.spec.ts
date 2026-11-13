@@ -26,4 +26,5 @@ test("the title odds tab shows constructors' title odds", async ({ page }) => {
 
   const table = page.getByRole('table', { name: "Constructors' title odds" });
   await expect(table.getByRole('row', { name: /Red Bull Racing.*81%/ })).toBeVisible();
+  await expect(page.getByText("No one can catch Red Bull Racing any more: the constructors' title is decided.")).toBeVisible();
 });

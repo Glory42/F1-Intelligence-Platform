@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { api } from '@/lib/api';
-import type { TeamStanding, SeasonSummary, PitCrewRanking, TitleOddsResponse } from '@/types';
+import type { Race, TeamStanding, SeasonSummary, PitCrewRanking, TitleOddsResponse } from '@/types';
 import PageHeader from '@/components/page/PageHeader.astro';
 import PageTabs from '@/components/page/PageTabs.astro';
 import EmptyState from '@/components/page/EmptyState.astro';
@@ -24,13 +24,15 @@ let seasons: SeasonSummary[] = [];
 let standings: TeamStanding[] = [];
 let titleOdds: TitleOddsResponse | null = null;
 let pitCrewRankings: PitCrewRanking[] = [];
+let races: Race[] = [];
 let error: string | null = null;
 try {
-  [seasons, standings, titleOdds, pitCrewRankings] = await Promise.all([
+  [seasons, standings, titleOdds, pitCrewRankings, races] = await Promise.all([
     api.getSeasons(),
-    tab === 'standings' ? api.getTeamStandings(year) : [],
+    tab === 'standings' ? api.getTeamStandings(year) : tab === 'title-odds' ? api.getTeamStandings(year).catch(() => []) : [],
     tab === 'title-odds' ? api.getTitleOdds(year).catch(() => null) : null,
     tab === 'pit-crews' ? api.getPitCrewRankings(year).catch(() => []) : [],
+    tab === 'title-odds' ? api.getRaces(year).catch(() => []) : [],
   ]);
 } catch (e) {
   error = e instanceof Error ? e.message : 'Failed to load standings';
@@ -53,7 +55,7 @@ try {
         : <EmptyState message={`No standings for ${year} yet.`} />
     ) : tab === 'title-odds' ? (
       titleOdds && titleOdds.teams.length > 0
-        ? <ConstructorTitleOdds odds={titleOdds} year={year} />
+        ? <ConstructorTitleOdds odds={titleOdds} standings={standings} races={races} year={year} />
         : <EmptyState message={`No title odds for ${year} yet. They start after the first race.`} />
     ) : (
       pitCrewRankings.length > 0

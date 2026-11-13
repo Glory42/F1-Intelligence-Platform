@@ -316,7 +316,7 @@ All queries use Drizzle joins. Never fetch a list then loop-query for each item.
 | `/races/[id]/race-story` | BaseLayout | `GET /api/races/:id/race-story` (`?session=sprint` for the sprint) |
 | `/races/[id]/telemetry` | BaseLayout | `GET /api/races/:id/telemetry`: drivers picked with a plain GET form, so no client fetch |
 | `/circuits` · `/circuits/[key]` | BaseLayout | `GET /api/races/circuits` · `GET /api/races/circuit/:key` (+ `/telemetry` tab) |
-| `/drivers` · `/teams` | BaseLayout | standings; `?tab=title-fight`/`title-odds` fetch title odds, `racecraft`/`pit-crews` their own route |
+| `/drivers` · `/teams` | BaseLayout | standings; `?tab=title-fight`/`title-odds` fetch title odds + races (for the clinch sentence), `racecraft`/`pit-crews` their own route |
 | `/drivers/[id]` | BaseLayout | `GET /api/drivers/:id` (+ teammate battle, career, model tabs) |
 | `/teams/[id]` | BaseLayout | `GET /api/teams/:id` (+ pit crew, history tabs) |
 | `/compare/drivers` · `/compare/teams` | BaseLayout | season lists in frontmatter; the compare island fetches the pair client-side (§3 exception) |

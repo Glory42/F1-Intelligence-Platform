@@ -469,12 +469,15 @@ apps/web/
 │   │   │       ├── TeamPitCrew.astro  # Pit crew tab: tiles, every-stop dot chart, per-driver split, all crews
 │   │   │       ├── PitCrewRankingTable.astro # Crews ranked by median stationary time (/teams Pit crews tab + team Pit crew tab)
 │   │   │       └── TeamHistoryTable.astro # History tab: one season-by-season table incl. chassis + power unit
+│   │   ├── standings/
+│   │   │   └── titleScenario.ts       # remainingWeekends(), weekendMaxPoints(), clinchOutlook() + clinchSentence(), rankWithCountback(), applyScenario()
 │   │   ├── standings/components/
+│   │   │   ├── ClinchNote.astro       # "X clinches at Y by outscoring Z by N or more" line on both title tabs
 │   │   │   ├── ShareBar.astro         # Percentage bar cell (title odds)
 │   │   │   ├── DriverStandingsTable.astro / TeamStandingsTable.astro  # Standings tabs on /drivers, /teams
-│   │   │   ├── TitleFight.astro       # /drivers Title fight: odds table, mathematically-out flags, odds-over-season chart
+│   │   │   ├── TitleFight.astro       # /drivers Title fight: clinch sentence, odds table, mathematically-out flags, odds-over-season chart
 │   │   │   ├── RacecraftTable.astro   # /drivers Racecraft: overtakes made/suffered/net
-│   │   │   └── ConstructorTitleOdds.astro # /teams Title odds: constructors' title probability + likely final points
+│   │   │   └── ConstructorTitleOdds.astro # /teams Title odds: clinch sentence, constructors' title probability + likely final points
 │   │   ├── hub/                       # Home
 │   │   │   ├── raceHighlights.ts      # Podium, pole, fastest lap, retirements from a race's results
 │   │   │   ├── nextSession.ts         # nextSession(), weekendSessions(): done/next/upcoming session state for a race weekend
@@ -561,7 +564,7 @@ apps/web/
 │   │       │                      #   bestCall/worstMiss/longestStreak (no model metadata: the API serves featureInfo)
 │   │       ├── predictionTerms.ts # termsOf(): each driver's served contributions; edgeBreakdown(), fieldScaled(),
 │   │       │                      #   whatIfProbabilities(): the "why" bar, radar and What-If Lab for both models
-│   │       ├── championshipMath.ts # titleContention() (mathematically out), remainingSessions(), formatTitleOdds()
+│   │       ├── championshipMath.ts # pointsSystem(year), titleContention() (mathematically out), remainingSessions(), formatTitleOdds()
 │   │       └── tyres.ts           # compoundToken(compound, year): tyre compound → colour token (2018 named compounds use the 2018 palette)
 │   ├── middleware.ts              # 301s the pages.dev alias, retired URLs and unknown query params; serves pages through servePageCached(); adds security headers to every response
 │   ├── types/                     # Type-only re-exports of apps/api common/types/ (+ search.ts GlobalSearchResponse): seasons, circuits,
@@ -643,7 +646,7 @@ apps/web/
 | `/drivers` | `drivers/standings` · `predictions/title-odds` + `races` · `drivers/racecraft` | Tabs: Standings · Title fight · Racecraft |
 | `/compare/drivers` | `drivers?year=N` + `seasons` + `search`; details fetched client-side | Driver head-to-head comparison page |
 | `/drivers/[id]` | `drivers/:id?year=N` · `drivers/:id/teammate-battle` · `drivers/:id/career` + `drivers/:id/history` · `predictions/history` | Tabs: This season · Teammate battle · Career · Model |
-| `/teams` | `teams/standings` · `predictions/title-odds` · `teams/pit-stops` | Tabs: Standings · Title odds · Pit crews |
+| `/teams` | `teams/standings` · `predictions/title-odds` + `teams/standings` + `races` · `teams/pit-stops` | Tabs: Standings · Title odds · Pit crews |
 | `/compare/teams` | `teams?year=N` + `seasons` + `search`; details fetched client-side | Team head-to-head comparison page |
 | `/teams/[id]` | `teams/:id?year=N` + driver standings · `teams/:id/pit-stops` + `teams/pit-stops` · `teams/:id/career` + `teams/:id/history` | Tabs: This season · Pit crew · History |
 | `/history` | `history/records` · `history/milestones` · `history/on-this-day?date=` · `history/lineages` | History: tabs Records · Milestones · On this day · Lineage (F1DB, credited) |

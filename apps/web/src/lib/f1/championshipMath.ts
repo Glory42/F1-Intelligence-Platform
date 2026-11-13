@@ -15,14 +15,30 @@ export interface Contention {
   gapToLeader: number;
 }
 
-// The fastest-lap bonus point existed 2019–2024; from 2025 a GP win is worth at most 25.
-function maxGrandPrixPoints(year: number): number {
-  return year >= 2019 && year <= 2024 ? 26 : 25;
+export interface PointsSystem {
+  grandPrix: number[];
+  sprint: number[];
+  fastestLap: number;
 }
 
-// Sprint wins paid 3 points in 2021 (top 3 scored); from 2022 the top 8 score and a win pays 8.
+const GRAND_PRIX_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+
+// The fastest-lap bonus point existed 2019–2024. Sprints paid the top 3 in 2021 and the top 8 from 2022.
+export function pointsSystem(year: number): PointsSystem {
+  return {
+    grandPrix: GRAND_PRIX_POINTS,
+    sprint: year <= 2021 ? [3, 2, 1] : [8, 7, 6, 5, 4, 3, 2, 1],
+    fastestLap: year >= 2019 && year <= 2024 ? 1 : 0,
+  };
+}
+
+function maxGrandPrixPoints(year: number): number {
+  const system = pointsSystem(year);
+  return system.grandPrix[0] + system.fastestLap;
+}
+
 function maxSprintPoints(year: number): number {
-  return year <= 2021 ? 3 : 8;
+  return pointsSystem(year).sprint[0];
 }
 
 export function titleContention(standings: StandingPoints[], remaining: RemainingRaces): Map<number, Contention> {
