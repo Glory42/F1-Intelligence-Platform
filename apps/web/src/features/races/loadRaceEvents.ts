@@ -1,29 +1,36 @@
 import { api } from '@/lib/api';
 import { unwrapSettled } from '@/lib/utils';
-import type { RaceControlMessage, RaceOvertake, RaceSession, StrategyResponse, TeamRadioClip } from '@/types';
+import type {
+  RaceControlMessage, RaceOvertake, RaceSession, StrategyInsightsResponse, StrategyResponse, TeamRadioClip,
+} from '@/types';
 
 export type RaceEvents = {
   raceControlMessages: RaceControlMessage[];
   overtakes: RaceOvertake[];
   teamRadio: TeamRadioClip[];
   strategy: StrategyResponse | null;
+  insights: StrategyInsightsResponse | null;
 };
 
-export const NO_RACE_EVENTS: RaceEvents = { raceControlMessages: [], overtakes: [], teamRadio: [], strategy: null };
+export const NO_RACE_EVENTS: RaceEvents = {
+  raceControlMessages: [], overtakes: [], teamRadio: [], strategy: null, insights: null,
+};
 
 // Each feed degrades on its own: a missing one just hides its tab.
 export async function loadRaceEvents(raceId: number, session: RaceSession): Promise<RaceEvents> {
-  const [raceControl, overtakes, teamRadio, strategy] = await Promise.allSettled([
+  const [raceControl, overtakes, teamRadio, strategy, insights] = await Promise.allSettled([
     api.getRaceControlMessages(raceId, session),
     api.getOvertakes(raceId, session),
     api.getTeamRadio(raceId, session),
     api.getStrategy(raceId, session),
+    api.getStrategyInsights(raceId, session),
   ]);
   return {
     raceControlMessages: unwrapSettled(raceControl, []),
     overtakes: unwrapSettled(overtakes, []),
     teamRadio: unwrapSettled(teamRadio, []),
     strategy: unwrapSettled(strategy, null),
+    insights: unwrapSettled(insights, null),
   };
 }
 

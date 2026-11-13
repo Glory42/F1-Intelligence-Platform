@@ -5,6 +5,7 @@ import { PitStopTable } from './PitStopTable';
 import RaceControlTimeline from './RaceControlTimeline.astro';
 import OvertakesList from './OvertakesList.astro';
 import TeamRadioList from './TeamRadioList.astro';
+import TyreDegradation from './TyreDegradation.astro';
 import type { RaceEvents, RaceEventTab } from '../loadRaceEvents';
 import type { Driver } from '@/types';
 
@@ -19,7 +20,7 @@ interface Props {
 
 const { events, tabs, defaultTab, namespace = '', driverMap, year } = Astro.props;
 const shown = new Set(tabs.map((t) => t.id));
-const { strategy, raceControlMessages, overtakes, teamRadio } = events;
+const { strategy, insights, raceControlMessages, overtakes, teamRadio } = events;
 ---
 
 {shown.has('strategy') && strategy && (
@@ -31,6 +32,7 @@ const { strategy, raceControlMessages, overtakes, teamRadio } = events;
       <div class="border border-white/[0.06] overflow-hidden">
         <PitStopTable drivers={strategy.drivers} year={year} />
       </div>
+      {insights && insights.degradation.length > 0 && <TyreDegradation rows={insights.degradation} year={year} />}
     </div>
   </RaceTabPanel>
 )}

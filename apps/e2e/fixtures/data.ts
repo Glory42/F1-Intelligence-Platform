@@ -6,7 +6,7 @@ import type {
   TeamDetailResponse, DriverStanding,
   FeatureInfo, GpFeatureKey, DriverSprintPrediction, SprintPredictionResponse,
   SprintResult, SprintDetailResponse, RaceControlMessage, RaceOvertake, TeamRadioClip,
-  StrategyResponse, LongRunRow, PitCrewRanking, TeamStanding, TitleOddsResponse,
+  StrategyResponse, StrategyInsightsResponse, LongRunRow, PitCrewRanking, TeamStanding, TitleOddsResponse,
   RacecraftRow, TeammateBattle, RaceStoryResponse, TelemetryResponse, LapTelemetrySamples,
   HistoryRecords, HistoryMilestones, ConstructorLineage, DriverHistory, TeamHistory, RaceRecap, OnThisDay, TeamPitStop, CircuitTelemetry,
   GlobalSearchResponse,
@@ -371,6 +371,23 @@ export const raceStrategyResponse: StrategyResponse = {
       driver: driverB, finishPosition: 2,
       stints: [{ stintNumber: 1, compound: 'HARD', lapStart: 1, lapEnd: 53, tyreAgeAtStart: 3 }],
       pitStops: [],
+    },
+  ],
+};
+
+export const raceStrategyInsightsResponse: StrategyInsightsResponse = {
+  degradation: [
+    {
+      team, compound: 'MEDIUM', msPerLap: 84, laps: 18, stints: 1,
+      points: [{ tyreAge: 2, lossMs: 170 }, { tyreAge: 5, lossMs: 420 }, { tyreAge: 8, lossMs: 680 }],
+    },
+    {
+      team, compound: 'HARD', msPerLap: 61, laps: 31, stints: 1,
+      points: [{ tyreAge: 2, lossMs: 120 }, { tyreAge: 11, lossMs: 650 }, { tyreAge: 20, lossMs: 1230 }],
+    },
+    {
+      team: teamB, compound: 'HARD', msPerLap: 73, laps: 49, stints: 1,
+      points: [{ tyreAge: 5, lossMs: 360 }, { tyreAge: 20, lossMs: 1460 }, { tyreAge: 35, lossMs: 2550 }],
     },
   ],
 };

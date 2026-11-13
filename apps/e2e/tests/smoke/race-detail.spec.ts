@@ -64,6 +64,17 @@ test('renders the strategy tab with stints per compound and the pit stops', asyn
   await expect(panel.getByRole('row', { name: /VER.*20.*2\.30 s/ })).toBeVisible();
 });
 
+test("shows each team's tyre degradation as a chart per compound and a table", async ({ page }) => {
+  await page.goto('/races/1');
+  await page.getByRole('tab', { name: 'Strategy' }).click();
+
+  const section = page.locator('#panel-strategy').getByRole('region', { name: 'Tyre degradation' });
+  await expect(section.getByRole('img', { name: 'MEDIUM tyre degradation: seconds lost by tyre age, per team' })).toBeVisible();
+  await expect(section.getByRole('img', { name: 'HARD tyre degradation: seconds lost by tyre age, per team' })).toBeVisible();
+  await expect(section.getByRole('row', { name: /Red Bull Racing.*84 ms.*61 ms/ })).toBeVisible();
+  await expect(section.getByRole('row', { name: /Ferrari.*–.*73 ms/ })).toBeVisible();
+});
+
 test('explains an empty team radio list for 2026+ races', async ({ page }) => {
   await page.goto('/races/3');
   await page.getByRole('tab', { name: 'Team Radio' }).click();

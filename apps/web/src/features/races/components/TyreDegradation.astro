@@ -1,0 +1,87 @@
+---
+import LineChart from '@/components/data/LineChart.astro';
+import TabIntro from '@/components/page/TabIntro.astro';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { compoundToken } from '@/lib/f1/tyres';
+import { getTeamColor } from '@/lib/f1/teamColors';
+import { degradationCharts, degradationTable } from '../tyreDegradation';
+import type { TyreDegradation } from '@/types';
+
+interface Props {
+  rows: TyreDegradation[];
+  year: number;
+}
+
+const { rows, year } = Astro.props;
+const charts = degradationCharts(rows);
+const table = degradationTable(rows);
+// One scale from zero across compounds, so a soft and a hard can be compared by eye; a noisy early
+// bucket can dip below a new set's fitted pace, so the floor goes under zero when it has to.
+const losses = charts.flatMap((c) => c.series.flatMap((s) => s.points.map((p) => p.y)));
+const yDomain: [number, number] = [Math.min(0, ...losses), Math.max(...losses)];
+const swatch = (compound: string) => `background:hsl(var(--${compoundToken(compound, year)}))`;
+---
+
+<section aria-label="Tyre degradation" class="space-y-4">
+  <TabIntro
+    lead="How fast each team's tyres fell off: time lost per lap of tyre age, with the fuel burned taken out. Green-flag laps only."
+    terms={[
+      { term: 'ms', meaning: 'time lost for each lap older the set gets' },
+      { term: 'Laps', meaning: 'clean laps behind the figure (10 or more)' },
+    ]}
+  />
+
+  <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    {charts.map((c) => (
+      <figure class="border border-white/[0.06] p-4">
+        <figcaption class="mb-2 flex items-center gap-1.5 font-mono text-[8px] tracking-widest uppercase text-muted-foreground">
+          <span class="inline-block w-2.5 h-2.5" style={swatch(c.compound)} />{c.compound}: seconds lost by tyre age
+        </figcaption>
+        <LineChart
+          series={c.series}
+          ariaLabel={`${c.compound} tyre degradation: seconds lost by tyre age, per team`}
+          yDomain={yDomain}
+          formatY={(v: number) => `${v.toFixed(1)}s`}
+          xLabel="laps"
+          height={200}
+          width={420}
+          labelWidth={76}
+        />
+      </figure>
+    ))}
+  </div>
+
+  <div class="border border-white/[0.06] overflow-x-auto">
+    <Table aria-label="Tyre degradation per team and compound">
+      <TableHeader>
+        <TableRow>
+          <TableHead>Team</TableHead>
+          {table.compounds.map((c) => (
+            <TableHead className="text-right">
+              <span class="inline-flex items-center gap-1.5"><span class="inline-block w-2 h-2" style={swatch(c)} />{c}</span>
+            </TableHead>
+          ))}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {table.rows.map((r) => (
+          <TableRow style={{ borderLeft: `2px solid ${getTeamColor(r.team.teamKey)}` }}>
+            <TableCell className="font-medium text-sm">{r.team.name}</TableCell>
+            {r.cells.map((cell) => (
+              <TableCell className="text-right font-mono text-sm">
+                {cell ? (
+                  <>
+                    <span class="whitespace-nowrap">{cell.msPerLap} ms</span>
+                    <span class="block font-mono text-[9px] text-muted-foreground">{cell.laps} laps</span>
+                  </>
+                ) : (
+                  <span class="text-muted-foreground">–</span>
+                )}
+              </TableCell>
+            ))}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  </div>
+</section>
