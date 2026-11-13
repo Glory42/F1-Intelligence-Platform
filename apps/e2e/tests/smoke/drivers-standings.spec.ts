@@ -22,6 +22,20 @@ test('the title fight tab shows title odds and who is mathematically out', async
   await expect(fight).toContainText('No one can catch Verstappen any more: the title is decided.');
 });
 
+test('the what-if island settles the title from picked places, without fetching', async ({ page }) => {
+  await page.goto('/drivers?year=2025&tab=title-fight');
+
+  const whatIf = page.getByRole('region', { name: 'What if' });
+  await expect(whatIf.getByRole('status')).toHaveText('Pick a few places to see who takes the title, and where.');
+  // client:idle: picks made before Astro hydrates the island (it drops `ssr` then) would be lost.
+  await expect(page.locator('astro-island:not([ssr])').filter({ has: whatIf })).toHaveCount(1);
+  for (const round of [15, 16, 17]) {
+    await whatIf.getByRole('combobox', { name: `VER, Round ${round} Grand Prix grand prix` }).selectOption('1');
+  }
+
+  await expect(whatIf.getByRole('status')).toHaveText('Verstappen takes the title at the Round 17 Grand Prix.');
+});
+
 test('switching to the racecraft tab keeps the chosen season', async ({ page }) => {
   await page.goto('/drivers?year=2026');
   await views(page).getByRole('link', { name: 'Racecraft' }).click();

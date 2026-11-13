@@ -79,7 +79,8 @@ These are the only client-side `fetch` calls in the app, and the only reason the
 sends CORS headers. Any *new* client fetch must fit the same shape: data genuinely unknowable until
 the user interacts. If it's knowable at request time (a circuit's coordinates, a fixed list), it
 belongs in frontmatter. `CircuitsGrid.tsx` is `client:load` but only for filtering/sorting a list
-already passed in as a prop: it does not fetch.
+already passed in as a prop: it does not fetch. Nor does `TitleWhatIf.tsx` (`client:idle`, title-fight
+tab): standings, finish counts and the remaining rounds come in as props and it only re-scores them.
 
 ## The API client
 
@@ -165,7 +166,7 @@ Year-scoped pages read `?year=` from `Astro.url.searchParams`, defaulting to the
 
 - **`.astro` for display, `.tsx` for interactive islands.** Prefer `.astro`.
 - A `client:*` directive is added **only** when interactivity is strictly required. Current islands:
-  `GlobalSearch` (`client:idle`), `DriverCompareTool` / `TeamCompareTool` / `CircuitsGrid`
+  `GlobalSearch` / `TitleWhatIf` (`client:idle`), `DriverCompareTool` / `TeamCompareTool` / `CircuitsGrid`
   (`client:load`). Everything else is server-rendered.
 - React hooks correctness is linted (`react-hooks/rules-of-hooks` error, `exhaustive-deps` warn).
 - No chart libraries: charts are hand-rolled SVG (`LapChart.astro`, `CalibrationChart.astro`,

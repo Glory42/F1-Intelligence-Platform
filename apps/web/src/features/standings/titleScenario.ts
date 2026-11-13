@@ -123,3 +123,24 @@ export function applyScenario(contenders: Contender[], picks: ScenarioPick[], we
   });
   return rankWithCountback(scored);
 }
+
+export interface ScenarioOutcome {
+  standings: Contender[];
+  champion: Contender;
+  decidedAt: Weekend;
+  onCountback: boolean;
+}
+
+// Unpicked places score nothing, so the title is settled at the first round after which no rival can catch up.
+export function scenarioOutcome(contenders: Contender[], picks: ScenarioPick[], weekends: Weekend[], year: number): ScenarioOutcome | null {
+  if (weekends.length === 0 || contenders.length === 0) return null;
+  const standings = applyScenario(contenders, picks, weekends, year);
+  for (const [k, weekend] of weekends.entries()) {
+    const rest = weekends.slice(k + 1);
+    const soFar = applyScenario(contenders, picks.filter((p) => p.round <= weekend.round), weekends, year);
+    const outlook = rest.length > 0 ? clinchOutlook(soFar, rest, year, 'driver') : null;
+    if (outlook?.kind === 'champion') return { standings, champion: outlook.leader, decidedAt: weekend, onCountback: false };
+  }
+  const [champion, runnerUp] = standings;
+  return { standings, champion, decidedAt: weekends[weekends.length - 1], onCountback: runnerUp?.points === champion.points };
+}

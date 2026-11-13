@@ -410,13 +410,16 @@ Latest Monte Carlo championship odds plus their per-round history (written by `c
 
 ```json
 { "afterRound": 19,
-  "drivers": [{ "driver": { "...": "Driver" }, "titleProbability": 0.88, "expectedPoints": 452.3, "pointsP10": 420, "pointsP90": 475 }],
+  "drivers": [{ "driver": { "...": "Driver" }, "titleProbability": 0.88, "expectedPoints": 452.3, "pointsP10": 420, "pointsP90": 475,
+    "finishes": [9, 4, 2] }],
   "teams":   [{ "team": { "...": "Team" }, "titleProbability": 0.81, "expectedPoints": 690, "pointsP10": 650, "pointsP90": 720 }],
   "history": [{ "afterRound": 18, "driverId": 10, "titleProbability": 0.93 }] }
 ```
 
 `history` has one entry per contender per completed round (2018–2026 replayed by
-`scripts/backfill_title_odds.py`). 404 if no odds exist for the season yet.
+`scripts/backfill_title_odds.py`). `finishes[i]` counts the driver's grand prix finishes in position `i + 1`
+this season (sprints excluded): the countback the what-if uses to break a tie on points. 404 if no odds exist
+for the season yet.
 
 ### `GET /api/predictions/pre-quali/upcoming`
 

@@ -160,7 +160,7 @@ apps/api/
 │       │   ├── calibration.helpers.ts # calibrationBySeason(): whole-field Brier/log loss vs pole + equal-chances baselines, 10-point bins
 │       │   ├── prediction-history.helpers.ts # buildHistoryItems(), buildWinnerMap(), buildProbPosMaps(), mergeHistoryByDateDesc()
 │       │   ├── intel-standings.helpers.ts # aggregateSeasonScores() (per-person average raw score + win probability) + buildIntelStandingRows() (rank + min-max normalise + sprint totals) for findIntelStandings()
-│       │   ├── title-odds.service.ts  # findTitleOdds(): latest round's driver/team title odds + per-round history for charting
+│       │   ├── title-odds.service.ts  # findTitleOdds(): latest round's driver/team title odds + per-round history for charting; GP finish counts for countback
 │       │   ├── pre-quali.service.ts   # PreQualiService.findUpcoming(): the next race still before qualifying with its forecast
 │       │   ├── predictions.controller.ts
 │       │   └── predictions.module.ts  # GET /model-info, /upcoming, /pre-quali/upcoming, /history, /accuracy, /standings, /title-odds, /race/:raceId
@@ -226,7 +226,7 @@ apps/api/
 │   │   ├── seasons/seasons.test.ts # race-count aggregation
 │   │   ├── search/search.test.ts   # cross-season dedup
 │   │   ├── predictions/predictions.test.ts # upcoming/by-id/history/standings/accuracy/model-info, pre-quali upcoming + preQualiProbability
-│   │   ├── predictions/title-odds.test.ts  # latest-round odds ranked + history, expected-points tiebreak
+│   │   ├── predictions/title-odds.test.ts  # latest-round odds ranked + history, expected-points tiebreak, finish counts
 │   │   ├── sprint/sprint.test.ts   # upcoming/by-id/detail, conventional-race guard
 │   │   ├── session-kind/           # predictions + lap summaries asserted the same way for GP and sprint (pit/null laps excluded)
 │   │   ├── route/route.test.ts     # 400 on bad id/year/session, 404, Cache-Control from the row's own season not ?year=
@@ -470,8 +470,9 @@ apps/web/
 │   │   │       ├── PitCrewRankingTable.astro # Crews ranked by median stationary time (/teams Pit crews tab + team Pit crew tab)
 │   │   │       └── TeamHistoryTable.astro # History tab: one season-by-season table incl. chassis + power unit
 │   │   ├── standings/
-│   │   │   └── titleScenario.ts       # remainingWeekends(), weekendMaxPoints(), clinchOutlook() + clinchSentence(), rankWithCountback(), applyScenario()
+│   │   │   └── titleScenario.ts       # remainingWeekends(), weekendMaxPoints(), clinchOutlook() + clinchSentence(), rankWithCountback(), applyScenario(), scenarioOutcome()
 │   │   ├── standings/components/
+│   │   │   ├── TitleWhatIf.tsx        # client:idle island: pick places for the rest of the season → who takes the title, where (props only)
 │   │   │   ├── ClinchNote.astro       # "X clinches at Y by outscoring Z by N or more" line on both title tabs
 │   │   │   ├── ShareBar.astro         # Percentage bar cell (title odds)
 │   │   │   ├── DriverStandingsTable.astro / TeamStandingsTable.astro  # Standings tabs on /drivers, /teams

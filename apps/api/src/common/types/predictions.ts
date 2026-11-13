@@ -136,7 +136,8 @@ type OddsFields = { titleProbability: number; expectedPoints: number; pointsP10:
 
 export type TitleOddsResponse = {
   afterRound: number;
-  drivers: Array<{ driver: Driver } & OddsFields>;
+  // finishes[i] = grand prix finishes in position i + 1 this season: the countback for a tie on points.
+  drivers: Array<{ driver: Driver; finishes: number[] } & OddsFields>;
   teams: Array<{ team: Team } & OddsFields>;
   history: Array<{ afterRound: number; driverId: number; titleProbability: number }>;
 };
