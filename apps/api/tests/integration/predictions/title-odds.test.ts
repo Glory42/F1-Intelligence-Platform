@@ -5,11 +5,14 @@ import { createSeason } from '../../support/factories/season.factory';
 import { createTeam } from '../../support/factories/team.factory';
 import { createDriver } from '../../support/factories/driver.factory';
 import { createDriverTitleOdds, createTeamTitleOdds } from '../../support/factories/titleOdds.factory';
+import { createCircuit } from '../../support/factories/circuit.factory';
+import { createRace } from '../../support/factories/race.factory';
+import { createRaceResult } from '../../support/factories/raceResult.factory';
 
 interface TitleOddsBody {
   data: {
     afterRound: number;
-    drivers: Array<{ driver: { code: string }; titleProbability: number }>;
+    drivers: Array<{ driver: { code: string }; titleProbability: number; finishes: number[] }>;
     teams: Array<{ team: { name: string }; titleProbability: number }>;
     history: Array<{ afterRound: number; driverId: number; titleProbability: number }>;
   };
@@ -32,6 +35,14 @@ describe('title odds (integration)', () => {
     await createDriverTitleOdds(db, season.id, nor.id, { afterRound: 2, titleProbability: '0.72000' });
     await createDriverTitleOdds(db, season.id, pia.id, { afterRound: 2, titleProbability: '0.28000' });
     await createTeamTitleOdds(db, season.id, mcl.id, { afterRound: 2, titleProbability: '1.00000' });
+
+    const circuit = await createCircuit(db, { circuitKey: 'title-odds-circuit' });
+    const [r1, r2, r3] = await Promise.all([1, 2, 3].map((roundNumber) => createRace(db, season.id, circuit.id, { roundNumber, status: 'completed' })));
+    await createRaceResult(db, r1.id, nor.id, { finishPosition: 1 });
+    await createRaceResult(db, r2.id, nor.id, { finishPosition: 3 });
+    await createRaceResult(db, r3.id, nor.id, { finishPosition: 1 });
+    await createRaceResult(db, r1.id, pia.id, { finishPosition: 2 });
+    await createRaceResult(db, r2.id, pia.id, { finishPosition: null });
 
     const tied = await createSeason(db, { year: 2092 });
     const fer = await createTeam(db, tied.id, { teamKey: 'ferrari', name: 'Ferrari' });
@@ -56,6 +67,13 @@ describe('title odds (integration)', () => {
       [1, 0.4],
       [2, 0.72],
     ]);
+  });
+
+  it("counts each driver's grand prix finishes by position, for countback", async () => {
+    const res = await apiRequest('/api/predictions/title-odds?year=2093');
+    const { data } = (await res.json()) as TitleOddsBody;
+
+    expect(data.drivers.map((d) => [d.driver.code, d.finishes])).toEqual([['NOR', [2, 0, 1]], ['PIA', [0, 1]]]);
   });
 
   it('orders drivers with equal odds by expected final points', async () => {
