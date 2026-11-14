@@ -5,6 +5,8 @@ node_modules/
 
 # Build outputs
 dist/
+# apps/og renders share images here before uploading them to R2
+apps/og/out/
 .output/
 .vercel/
 

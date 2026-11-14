@@ -562,6 +562,7 @@ apps/web/
 │   │   ├── icalendar.ts           # serializeCalendar() + foldLine(): RFC 5545 (CRLF, 75-octet folding, TEXT escaping)
 │   │   ├── localTime.ts           # formatUtc() / formatLocal() / localiseTimes(): the session/datetime/date formats LocalTime renders
 │   │   ├── sitemap.ts             # loadSitemapSources(year) + sitemapPaths() + renderUrlset(): the dynamic sitemap
+│   │   ├── shareImage.ts          # shareImageKey/Url(), raceShareImage(), predictionShareImage(), race/predictionShareCard(): shared with apps/og (ADR 0016)
 │   │   ├── pageCache.ts           # servePageCached(): rendered HTML (and the XML/calendar feeds) kept in the edge Cache API (5 min Fri–Mon noon UTC, 1 h between), keyed by path + sorted page params + sidebar cookie (Workers Free: 10 ms CPU)
 │   │   ├── pageQuery.ts           # PAGE_QUERY_PARAMS (every ?param a page reads) + strayQueryRedirect(): unknown params 301 away
 │   │   ├── securityHeaders.ts     # securityHeaders(apiOrigin) + withSecurityHeaders(): HSTS, nosniff, frame/CSP (script sources report-only)
@@ -599,7 +600,7 @@ apps/web/
 │   │   ├── components/
 │   │   │   ├── layout/navLinks.test.ts       # pure: sidebar groups, utilities, active-destination matching
 │   │   │   └── data/                         # chartScale, labelLayout, chartText
-│   │   ├── lib/                              # pure, `node` env: pageTabs / sidebarState / legacyRedirects / canonicalHost / pageCache / pageQuery / securityHeaders / sitemap / icalendar / localTime (jsdom) / utils
+│   │   ├── lib/                              # pure, `node` env: pageTabs / sidebarState / legacyRedirects / canonicalHost / pageCache / pageQuery / securityHeaders / sitemap / icalendar / localTime (jsdom) / shareImage / utils
 │   │   │   └── f1/                           # predictionMath (all exports), predictionTerms, championshipMath, teamColors, teamLogos, tyres
 │   │   ├── features/races/ · features/telemetry/  # calendar, raceCalendarFeed, raceView + raceEventTabs, gridPenalties, weatherSpells, raceEventDisplay, tyreDegradation, pitBattles · telemetryCompare, trackMap
 │   │   ├── features/predictions/
@@ -731,6 +732,22 @@ apps/e2e/
 ├── playwright.config.ts           # webServer: [fixture server, `astro dev` in ../web]
 ├── tsconfig.json
 └── package.json
+```
+
+---
+
+## Share images (`apps/og/`)
+
+Own package so `@resvg/resvg-js` (native) stays out of the Pages build. Run by
+`.github/workflows/og-images.yml` (every 3 h Fri–Mon + manual); ADR 0016.
+
+```
+apps/og/
+├── src/
+│   ├── generate.ts   # season's completed races + stored predictions → render the ones not yet in the bucket (HEAD check)
+│   ├── render.ts     # satori → SVG → resvg PNG at 1200×630; Sora + JetBrains Mono WOFF from @fontsource
+│   └── card.ts       # ShareCard (apps/web/src/lib/shareImage.ts) → satori element tree
+└── tsconfig.json     # @/* → ../web/src/*: same types and card builders as the web
 ```
 
 ---

@@ -12,7 +12,8 @@ f1-intelligence/
 │   ├── web/       # Astro SSR on Cloudflare Pages
 │   ├── api/       # Hono on Cloudflare Workers (NestJS-style modules)
 │   │              # Also owns the Drizzle schema (src/db/schema/) and migrations (drizzle/migrations/)
-│   └── e2e/       # Playwright smoke tests for apps/web: own package.json + playwright.config.ts
+│   ├── e2e/       # Playwright smoke tests for apps/web: own package.json + playwright.config.ts
+│   └── og/        # Share-image renderer (satori) run by a GitHub Action into a public R2 bucket (ADR 0016)
 └── data-engine/   # Python ETL batch jobs on Render
 ```
 `apps/` is a JS/Bun-only convention: root `package.json` orchestrates `apps/api`, `apps/web`, and

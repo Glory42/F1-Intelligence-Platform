@@ -36,6 +36,7 @@ Set this as a **Secret** (not plaintext) so it's encrypted at rest.
 | Variable | How to set | Notes |
 |----------|-----------|-------|
 | `PUBLIC_API_URL` | `[vars]` in `apps/web/wrangler.toml` | The API's custom domain |
+| `PUBLIC_OG_IMAGE_URL` | `[vars]` in `apps/web/wrangler.toml` | Public URL of the share-image bucket; unset = default image (see Share images) |
 
 **This is set in the committed `wrangler.toml`, not the Cloudflare Pages dashboard.** A Pages
 project's `wrangler.toml` `[vars]` block overrides whatever is set in Settings → Environment
@@ -133,6 +134,23 @@ analytics after a race weekend and raise the rate if SSR fetches are ever blocke
 off: it can challenge those same Worker-to-Worker requests.
 
 ---
+
+### Share images (R2 + GitHub Action, one-time)
+
+Per-race and per-prediction share images come from `.github/workflows/og-images.yml` (ADR 0016). Until
+the steps below are done, the workflow skips itself and pages keep `/og-image.jpg`.
+
+1. **R2 → Create bucket** `f1-og-images`, then under Settings turn on public access: either the
+   `r2.dev` URL or a custom domain such as `og.f1.gorkemkaryol.dev`.
+2. **API token:** My Profile → API Tokens → Create, with permission *Account → Workers R2 Storage → Edit*.
+3. **GitHub → Settings → Secrets and variables → Actions:**
+   - secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`;
+   - variable `OG_PUBLIC_URL` set to the bucket's public URL;
+   - variable `OG_BUCKET`, only if the bucket isn't called `f1-og-images`.
+4. Run the workflow by hand once (Actions → og-images → Run workflow), and once more with `year` set to
+   last season if you want that season too.
+5. Set `PUBLIC_OG_IMAGE_URL` to the same public URL in `apps/web/wrangler.toml` and push, so pages start
+   pointing at the images.
 
 ## First-Time Setup
 

@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
+import { predictionShareImage } from '@/lib/shareImage';
 import { buildPredictionPageData } from '@/features/predictions/buildPredictionPageData';
 import { PREDICTION_COPY } from '@/features/predictions/predictionCopy';
 import PredictionPageBody from '@/features/predictions/components/PredictionPageBody.astro';
@@ -10,6 +11,6 @@ const copy = PREDICTION_COPY.gp;
 const title = data.race ? copy.pageTitle(data.race.name) : copy.fallbackTitle;
 ---
 
-<BaseLayout title={title}>
+<BaseLayout title={title} image={predictionShareImage(data.race?.id, data.prediction !== null)}>
   <PredictionPageBody data={data} copy={copy} />
 </BaseLayout>
