@@ -103,10 +103,10 @@ const chart = {
     {showChart && (
       <div class="panel p-5">
         <div class="text-[11px] text-muted-foreground mb-3">Title odds by round</div>
-        <div class="2xl:hidden">
+        <div class="hidden sm:block 2xl:hidden">
           <LineChart {...chart} width={900} />
         </div>
-        <div class="hidden 2xl:block">
+        <div class="sm:hidden 2xl:block">
           <LineChart {...chart} width={380} />
         </div>
       </div>
