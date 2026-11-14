@@ -1,0 +1,60 @@
+name: og-images
+
+# Share images per race and prediction (#93 C). Workers Free can't run satori in 10 ms of CPU, so they
+# are rendered here from the public, cached API and uploaded to a public R2 bucket. Images already in
+# the bucket are skipped, so most runs only send a few HEAD requests. Nothing touches Neon directly.
+on:
+  schedule:
+    # Every 3 h Friday to Monday: a prediction appears after qualifying, a result after the race.
+    - cron: "0 */3 * * 0,1,5,6"
+  workflow_dispatch:
+    inputs:
+      year:
+        description: "Season to render (default: this year)"
+        required: false
+      force:
+        description: "Re-render images already in the bucket"
+        type: boolean
+        default: false
+
+concurrency:
+  group: og-images
+  cancel-in-progress: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/og
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      OG_BUCKET: ${{ vars.OG_BUCKET || 'f1-og-images' }}
+      OG_PUBLIC_URL: ${{ vars.OG_PUBLIC_URL }}
+      OG_YEAR: ${{ inputs.year }}
+      OG_FORCE: ${{ inputs.force }}
+    steps:
+      # Checkout first: the run defaults point into apps/og, which only exists after it.
+      - uses: actions/checkout@v5
+      - name: Skip until the bucket and token are set up
+        id: setup
+        run: echo "ready=$([ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$OG_PUBLIC_URL" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - uses: oven-sh/setup-bun@v2
+        if: steps.setup.outputs.ready == 'true'
+      - if: steps.setup.outputs.ready == 'true'
+        run: bun install --frozen-lockfile
+      - if: steps.setup.outputs.ready == 'true'
+        run: bun run typecheck
+      - name: Render missing images
+        if: steps.setup.outputs.ready == 'true'
+        run: bun run generate
+      # Runs even when one image failed, so the others still go up.
+      - name: Upload to R2
+        if: steps.setup.outputs.ready == 'true' && !cancelled()
+        run: |
+          [ -d out ] || exit 0
+          find out -name '*.png' | while read -r file; do
+            bunx wrangler@4 r2 object put "$OG_BUCKET/${file#out/}" --file "$file" \
+              --content-type image/png --cache-control "public, max-age=604800" --remote
+          done
