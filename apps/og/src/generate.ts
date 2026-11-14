@@ -40,7 +40,8 @@ async function main(): Promise<void> {
   ]);
   const jobs: Job[] = [
     ...races.filter((r) => r.status === 'completed').map((r) => ({ kind: 'race' as const, raceId: r.id })),
-    ...predictions.map((p) => ({ kind: 'prediction' as const, raceId: p.raceId })),
+    // A sprint weekend's history has a sprint row too, under the same race id: only the GP gets a card.
+    ...predictions.filter((p) => !p.isSprint).map((p) => ({ kind: 'prediction' as const, raceId: p.raceId })),
   ];
   let rendered = 0;
   let failed = 0;
