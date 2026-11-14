@@ -20,8 +20,8 @@ const hidden = entries.slice(visible);
 
 <div role="table" aria-label={title} class="border border-white/[0.06] bg-black p-5">
   <div role="row" class="flex items-baseline justify-between gap-3 mb-4">
-    <h3 role="columnheader" class="font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground/70">{title}</h3>
-    {note && <span class="font-mono text-[8px] tracking-wider uppercase text-muted-foreground/50">{note}</span>}
+    <h3 role="columnheader" class="font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground">{title}</h3>
+    {note && <span class="font-mono text-[8px] tracking-wider uppercase text-muted-foreground">{note}</span>}
   </div>
   {[shown, hidden].map((group, groupIdx) => {
     const rows = group.map((e, j) => {
@@ -33,7 +33,7 @@ const hidden = entries.slice(visible);
             <div role="cell" class="flex items-center gap-3 min-w-0">
               <span
                 class="font-mono text-[10px] w-5 shrink-0 tabular-nums"
-                style={`color: ${rankColor ?? 'rgba(255,255,255,0.35)'}`}
+                style={`color: ${rankColor ?? 'rgba(255,255,255,0.6)'}`}
               >{String(i + 1).padStart(2, '0')}</span>
               {e.nationality !== undefined && (
                 <span class="shrink-0 text-sm" title={f1dbCountryName(e.nationality)}>{f1dbCountryFlag(e.nationality)}</span>

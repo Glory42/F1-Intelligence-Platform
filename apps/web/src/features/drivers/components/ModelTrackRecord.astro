@@ -13,7 +13,7 @@ const { record, driverCode, year } = Astro.props;
 
 <div>
   <div class="flex items-center gap-3 mb-4">
-    <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">./model track record · {year}</span>
+    <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgb(168,85,247)">./model track record · {year}</span>
     <div class="h-px flex-1 bg-white/[0.05]" />
     {record.tipped > 0 && (
       <span class="font-mono text-[9px] text-muted-foreground">

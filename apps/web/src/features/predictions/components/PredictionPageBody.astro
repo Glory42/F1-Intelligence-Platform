@@ -33,7 +33,7 @@ const kicker = race ? copy.kicker(race.roundNumber) : '';
   {predictionFailed && !prediction ? (
     <div class="border border-white/[0.06] p-10 text-center">
       <p class="font-mono text-[9px] text-muted-foreground tracking-[0.25em] uppercase">{copy.notFoundMessage}</p>
-      <p class="mt-2 font-mono text-[8px] text-muted-foreground/50">{copy.fetchErrorMessage}</p>
+      <p class="mt-2 font-mono text-[8px] text-muted-foreground">{copy.fetchErrorMessage}</p>
     </div>
   ) : prediction && race ? (
     <>

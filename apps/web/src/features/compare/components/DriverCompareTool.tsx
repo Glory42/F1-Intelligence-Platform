@@ -79,7 +79,7 @@ export function DriverCompareTool({ allSeasons, initialDrivers, allDrivers }: Pr
   const driverInputLabel = (d: Driver) => `${d.fullName} (${d.team?.name || 'No Team'})`;
   const driverOption = (d: Driver) => (
     <>
-      {d.fullName} <span className="text-[8px] text-muted-foreground/60 ml-1">({d.team?.name || 'No Team'})</span>
+      {d.fullName} <span className="text-[8px] text-muted-foreground ml-1">({d.team?.name || 'No Team'})</span>
     </>
   );
 

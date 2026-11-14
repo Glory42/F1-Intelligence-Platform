@@ -23,7 +23,7 @@ const LABEL_MIN_WIDTH = 9;
     <div />
     <div class="relative h-4" aria-hidden="true">
       {decades.map((y) => (
-        <span class="absolute -translate-x-1/2 font-mono text-[8px] text-muted-foreground/60" style={`left: ${axisLeft(y)}%`}>{y}</span>
+        <span class="absolute -translate-x-1/2 font-mono text-[8px] text-muted-foreground" style={`left: ${axisLeft(y)}%`}>{y}</span>
       ))}
     </div>
   </div>
@@ -73,7 +73,7 @@ const LABEL_MIN_WIDTH = 9;
                   {m.coreId != null
                     ? <a href={`/teams/${m.coreId}`} class:list={['hover:text-[#a855f7] transition-colors', m.yearTo == null && 'text-white']}>{m.name}</a>
                     : <span class={m.yearTo == null ? 'text-white' : ''}>{m.name}</span>}
-                  <span class="text-white/30">{formatYearRange(m)}</span>
+                  <span class="text-muted-foreground">{formatYearRange(m)}</span>
                 </li>
               ))}
             </ol>

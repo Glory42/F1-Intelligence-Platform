@@ -14,7 +14,7 @@ const { lead, terms = [] } = Astro.props;
       {terms.map((t) => (
         <div class="flex items-baseline gap-1.5">
           <dt class="font-medium text-foreground/85">{t.term}</dt>
-          <dd class="text-muted-foreground/70">{t.meaning}</dd>
+          <dd class="text-muted-foreground">{t.meaning}</dd>
         </div>
       ))}
     </dl>

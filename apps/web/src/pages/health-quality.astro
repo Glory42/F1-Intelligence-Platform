@@ -50,7 +50,7 @@ const tableNames: Record<string, string> = {
     <div class="flex items-end justify-between gap-4 flex-wrap">
       <div>
         <div class="flex items-center gap-3 mb-2">
-          <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">./data-quality · dev</span>
+          <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgb(168,85,247)">./data-quality · dev</span>
           <div class="h-px w-16 bg-white/[0.05]" />
         </div>
         <h1 class="text-2xl font-bold">{year} Data Quality</h1>
@@ -73,7 +73,7 @@ const tableNames: Record<string, string> = {
             <div class="w-full h-1 bg-white/[0.06] mt-3">
               <div class={`h-full ${score! >= 80 ? 'bg-[#a855f7]' : score! >= 50 ? 'bg-amber-400' : 'bg-red-400'} bar-fill`} style={`width:${score}%`} />
             </div>
-            <div class="mt-3 font-mono text-[8px] text-muted-foreground/60">mean of per-race 100 − severity points</div>
+            <div class="mt-3 font-mono text-[8px] text-muted-foreground">mean of per-race 100 − severity points</div>
           </div>
           <div class="panel p-6">
             <div class="text-[11px] text-muted-foreground mb-2">races audited</div>
@@ -99,7 +99,7 @@ const tableNames: Record<string, string> = {
         <!-- Per-table breakdown -->
         <div>
           <div class="flex items-center gap-3 mb-4">
-            <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">./by table</span>
+            <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgb(168,85,247)">./by table</span>
             <div class="h-px flex-1 bg-white/[0.05]" />
           </div>
           <div class="border border-white/[0.06]">
@@ -124,7 +124,7 @@ const tableNames: Record<string, string> = {
         <!-- Issue list -->
         <div>
           <div class="flex items-center gap-3 mb-4">
-            <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">./issues</span>
+            <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgb(168,85,247)">./issues</span>
             <div class="h-px flex-1 bg-white/[0.05]" />
           </div>
           <div class="border border-white/[0.06]">
@@ -142,7 +142,7 @@ const tableNames: Record<string, string> = {
                         <span class="font-mono text-[9px] font-bold">{issue.checkName}</span>
                         <span class={`font-mono text-[7px] tracking-[0.1em] uppercase px-1.5 py-0.5 border ${meta.border} ${meta.text}`}>{issue.severity}</span>
                         {issue.fixable && (
-                          <span class="flex items-center gap-1 font-mono text-[7px] tracking-[0.1em] uppercase px-1.5 py-0.5 border border-[#a855f7]/30 text-[#a855f7]/80"><Wrench size={8} />fixable</span>
+                          <span class="flex items-center gap-1 font-mono text-[7px] tracking-[0.1em] uppercase px-1.5 py-0.5 border border-[#a855f7]/30 text-[#a855f7]"><Wrench size={8} />fixable</span>
                         )}
                       </div>
                       {issue.detail && <div class="font-mono text-[9px] text-muted-foreground mt-1">{issue.detail}</div>}
@@ -158,13 +158,13 @@ const tableNames: Record<string, string> = {
           </div>
         </div>
 
-        <p class="font-mono text-[8px] text-muted-foreground/60">
+        <p class="font-mono text-[8px] text-muted-foreground">
           Run the audit with <code class="text-foreground">python src/main.py --job data_quality_audit --year {year}</code></p>
       </>
     ) : (
       <div class="border border-white/[0.06] p-10 text-center">
         <p class="font-mono text-[9px] text-muted-foreground tracking-[0.25em] uppercase">No data-quality report for {year}</p>
-        <p class="mt-2 font-mono text-[8px] text-muted-foreground/50">Run <code class="text-foreground">python src/main.py --job data_quality_audit --year {year}</code> to generate one.</p>
+        <p class="mt-2 font-mono text-[8px] text-muted-foreground">Run <code class="text-foreground">python src/main.py --job data_quality_audit --year {year}</code> to generate one.</p>
       </div>
     )}
 

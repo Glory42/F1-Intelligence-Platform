@@ -88,7 +88,7 @@ const driver = data?.driver;
           <div class="space-y-8">
             <div>
               <div class="flex items-center gap-3 mb-4">
-                <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">./stats · {year}</span>
+                <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgb(168,85,247)">./stats · {year}</span>
                 <div class="h-px flex-1 bg-white/[0.05]" />
               </div>
               <DriverStatsGrid stats={data.seasonStats} />
@@ -96,7 +96,7 @@ const driver = data?.driver;
             {data.recentResults.length > 0 && (
               <div>
                 <div class="flex items-center gap-3 mb-4">
-                  <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">./recent results</span>
+                  <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgb(168,85,247)">./recent results</span>
                   <div class="h-px flex-1 bg-white/[0.05]" />
                 </div>
                 <div class="border border-white/[0.06] overflow-hidden">

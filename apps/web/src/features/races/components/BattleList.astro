@@ -33,7 +33,7 @@ const longest = [...battles].sort((a, b) => b.lapEnd - b.lapStart - (a.lapEnd - 
       ))}
     </DataList>
     {battles.length > SHOWN && (
-      <p class="font-mono text-[7px] text-muted-foreground/50 mt-3">+{battles.length - SHOWN} shorter battles</p>
+      <p class="font-mono text-[7px] text-muted-foreground mt-3">+{battles.length - SHOWN} shorter battles</p>
     )}
   </>
 )}

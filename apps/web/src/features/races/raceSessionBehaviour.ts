@@ -54,7 +54,7 @@ function gpStatus(race: Race): StatusBadge {
   const label = race.status.replace(/_/g, ' ');
   switch (race.status) {
     case 'completed':
-      return { icon: 'check', label, toneClass: 'border-[rgba(168,85,247,0.3)] text-[rgba(168,85,247,0.7)]' };
+      return { icon: 'check', label, toneClass: 'border-[rgba(168,85,247,0.3)] text-[#a855f7]' };
     case 'qualifying_done':
       return { icon: 'zap', label, toneClass: 'border-yellow-500/30 text-yellow-400/70' };
     case 'sprint_done':

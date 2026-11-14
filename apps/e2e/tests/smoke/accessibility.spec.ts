@@ -11,10 +11,7 @@ const BLOCKING = new Set(['serious', 'critical']);
 for (const path of PAGES) {
   test(`${path} has no serious accessibility violations`, async ({ page }) => {
     await page.goto(path);
-    const { violations } = await new AxeBuilder({ page })
-      // Low-contrast muted text is a site-wide palette question, fixed and re-enabled separately (#93 E).
-      .disableRules(['color-contrast'])
-      .analyze();
+    const { violations } = await new AxeBuilder({ page }).analyze();
 
     const blocking = violations
       .filter((v) => BLOCKING.has(v.impact ?? ''))
