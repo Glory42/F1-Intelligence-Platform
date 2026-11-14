@@ -192,6 +192,9 @@ Playwright, its own `package.json` and `playwright.config.ts` (see
   the fixtures.
 - `accessibility.spec.ts` runs axe (`@axe-core/playwright`) on ten key pages and fails on any
   `serious` or `critical` violation, colour contrast included.
+- `mobile.spec.ts` loads the main pages at 375 px and fails if any of them scrolls sideways. It also
+  checks that wide charts keep their labels legible in their own scroller and that the scorecard's
+  season column stays put.
 - `reuseExistingServer` is on outside CI, so a developer's own `astro dev` on `:4321` would be
   silently reused: against real data. Set `E2E_WEB_PORT` / `E2E_API_PORT` (e.g. `4329` / `4319`)
   to run against fresh fixture-backed servers while your dev servers are up.

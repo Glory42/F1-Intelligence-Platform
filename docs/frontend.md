@@ -196,6 +196,12 @@ Text meets WCAG AA (4.5:1) on the black page, and the axe smoke test enforces it
   enough. Lines, dots and bars keep the official colour.
 - Purely decorative text (watermarks) is drawn with CSS `content`, so it isn't read or checked.
 
+Phones (375 px) never scroll the page sideways (`mobile.spec.ts`):
+- `LineChart` keeps at least 80% of its design width and scrolls inside its panel.
+- Wide tables either condense below `sm` (hide a redundant column, tighter cells) or keep their
+  first column `sticky`.
+- Grid columns holding charts use `minmax(0, 1fr)` / `min-w-0` so a chart can't stretch the page.
+
 ## File-size budget
 
 `eslint.config.js` enforces a tiered `max-lines` (`error`, blank lines and comments excluded), run
