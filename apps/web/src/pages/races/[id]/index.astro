@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
+import { raceShareImage } from '@/lib/shareImage';
 import { RaceResultsTable } from '@/features/races/components/RaceResultsTable';
 import { QualifyingGrid } from '@/features/races/components/QualifyingGrid';
 import LapChart from '@/features/races/components/LapChart.astro';
@@ -21,7 +22,7 @@ const {
 } = await loadRacePageData('gp', Number(Astro.params.id));
 ---
 
-<BaseLayout title={race?.name ?? 'Race'}>
+<BaseLayout title={race?.name ?? 'Race'} image={raceShareImage(race)}>
   <div class="space-y-8">
 
     <div class="flex flex-wrap items-center justify-between gap-3">
