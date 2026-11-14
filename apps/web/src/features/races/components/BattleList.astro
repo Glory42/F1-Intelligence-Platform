@@ -12,7 +12,7 @@ interface Props {
 
 const { battles, year } = Astro.props;
 const SHOWN = 10;
-const COLUMNS = 'grid-cols-[70px_1fr_1fr_70px]';
+const COLUMNS = 'grid-cols-[44px_minmax(0,1fr)_minmax(0,1fr)_52px] sm:grid-cols-[70px_1fr_1fr_70px]';
 const longest = [...battles].sort((a, b) => b.lapEnd - b.lapStart - (a.lapEnd - a.lapStart) || a.minGapMs - b.minGapMs);
 ---
 
@@ -26,8 +26,8 @@ const longest = [...battles].sort((a, b) => b.lapEnd - b.lapStart - (a.lapEnd - 
       {longest.slice(0, SHOWN).map((b, i) => (
         <DataRow columns={COLUMNS} first={i === 0} accent={getTeamColor(b.chaser.team.teamKey)}>
           <div role="cell" class="font-mono text-[10px] text-muted-foreground">{b.lapStart}–{b.lapEnd}</div>
-          <DriverIdentity driver={b.chaser} year={year} />
-          <DriverIdentity driver={b.leader} year={year} />
+          <DriverIdentity driver={b.chaser} year={year} dense />
+          <DriverIdentity driver={b.leader} year={year} dense />
           <div role="cell" class="font-mono text-sm font-bold text-right">{(b.minGapMs / 1000).toFixed(2)} s</div>
         </DataRow>
       ))}

@@ -18,7 +18,7 @@ const shown = entries.slice(0, visible);
 const hidden = entries.slice(visible);
 ---
 
-<div role="table" aria-label={title} class="border border-white/[0.06] bg-black p-5">
+<div role="table" aria-label={title} class="min-w-0 border border-white/[0.06] bg-black p-5">
   <div role="row" class="flex items-baseline justify-between gap-3 mb-4">
     <h3 role="columnheader" class="font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground">{title}</h3>
     {note && <span class="font-mono text-[8px] tracking-wider uppercase text-muted-foreground">{note}</span>}

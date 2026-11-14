@@ -4,23 +4,28 @@ import type { Driver } from '@/types';
 interface Props {
   driver: Driver;
   year?: number;
+  /** Two drivers side by side (battles): on a phone, drop the avatar and show the surname only. */
+  dense?: boolean;
 }
 
-const { driver, year } = Astro.props;
+const { driver, year, dense = false } = Astro.props;
+const phoneHidden = dense ? 'hidden sm:flex' : 'flex';
 const href = `/drivers/${driver.id}${year ? `?year=${year}` : ''}`;
 ---
 
 <div role="cell" class="flex items-center gap-2.5 min-w-0">
   {driver.headshotUrl ? (
-    <img src={driver.headshotUrl} alt={driver.fullName} class="w-9 h-9 object-cover object-top border border-white/[0.08] shrink-0 bg-white/[0.02]" loading="lazy" />
+    <img src={driver.headshotUrl} alt={driver.fullName} class={`${dense ? 'hidden sm:block' : ''} w-9 h-9 object-cover object-top border border-white/[0.08] shrink-0 bg-white/[0.02]`} loading="lazy" />
   ) : (
-    <div class="w-9 h-9 border border-white/[0.08] flex items-center justify-center shrink-0">
+    <div class={`${phoneHidden} w-9 h-9 border border-white/[0.08] items-center justify-center shrink-0`}>
       <span class="font-mono text-[9px] font-bold text-muted-foreground">{driver.driverNumber}</span>
     </div>
   )}
   <div class="min-w-0">
     <a href={href} class="block font-semibold text-sm leading-none group-hover:text-[#a855f7] transition-colors duration-150 truncate">
-      <span class="sr-only">{driver.code} </span>{driver.fullName}
+      <span class="sr-only">{driver.code} </span>{dense ? (
+        <><span class="sm:hidden">{driver.lastName}</span><span class="hidden sm:inline">{driver.fullName}</span></>
+      ) : driver.fullName}
     </a>
     <div class="font-mono text-[8px] text-muted-foreground mt-1 truncate">{driver.code} · {driver.team.name}</div>
   </div>

@@ -23,7 +23,7 @@ const beatsBoth = (s: (typeof scored)[number], metric: Metric) =>
       <table aria-label="Forecast scores" class="w-full min-w-[440px] font-mono text-[10px]">
         <thead>
           <tr class="border-b border-white/[0.06] text-[8px] uppercase tracking-widest text-muted-foreground">
-            <th scope="col" class="py-2.5 pl-5 text-left font-normal">Season</th>
+            <th scope="col" class="sticky left-0 z-10 bg-black py-2.5 pl-5 pr-2 text-left font-normal">Season</th>
             {METRICS.map((m) => (
               <>
                 <th scope="col" class="px-2 py-2.5 text-right font-normal">{m.label}</th>
@@ -36,7 +36,7 @@ const beatsBoth = (s: (typeof scored)[number], metric: Metric) =>
         <tbody>
           {scored.map((s, i) => (
             <tr class={`${i !== 0 ? 'border-t border-white/[0.04]' : ''} ${s.year === year ? 'bg-white/[0.03]' : ''}`}>
-              <th scope="row" class="py-2.5 pl-5 text-left font-sans text-[13px] font-semibold">{s.year}</th>
+              <th scope="row" class={`sticky left-0 z-10 py-2.5 pl-5 pr-2 text-left font-sans text-[13px] font-semibold ${s.year === year ? 'bg-[#080808]' : 'bg-black'}`}>{s.year}</th>
               {METRICS.map((m) => (
                 <>
                   <td class={`px-2 py-2.5 text-right font-bold ${beatsBoth(s, m.key) ? 'text-[#a855f7]' : ''}`}>{s.model[m.key].toFixed(3)}</td>
