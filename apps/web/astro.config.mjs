@@ -14,9 +14,10 @@ export default defineConfig({
     imageService: "passthrough",
   }),
   integrations: [react(), sitemap({
-    // The data-quality dashboard is dev-only tooling (404-guarded in production);
-    // keep it out of the public sitemap for live users.
-    filter: (page) => !page.includes('/health-quality/'),
+    // The data-quality dashboard is dev-only (404 in production) and robots.txt disallows /compare/.
+    filter: (page) => !page.includes('/health-quality/') && !page.includes('/compare/'),
+    // Detail pages aren't known at build time: src/pages/sitemap-dynamic.xml.ts lists them per request.
+    customSitemaps: ["https://f1.gorkemkaryol.dev/sitemap-dynamic.xml"],
   })],
   vite: {
     optimizeDeps: {
