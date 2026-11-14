@@ -190,6 +190,9 @@ Playwright, its own `package.json` and `playwright.config.ts` (see
   `/drivers/[id]`, `/teams` + `/teams/[id]`, both compare pages, `/history` (all four tabs, old-URL redirects),
   the sidebar, branding, and the global search palette: each asserts key content renders against
   the fixtures.
+- `accessibility.spec.ts` runs axe (`@axe-core/playwright`) on ten key pages and fails on any
+  `serious` or `critical` violation. `color-contrast` is still disabled there until the muted palette
+  passes 4.5:1 (#93 E).
 - `reuseExistingServer` is on outside CI, so a developer's own `astro dev` on `:4321` would be
   silently reused: against real data. Set `E2E_WEB_PORT` / `E2E_API_PORT` (e.g. `4329` / `4319`)
   to run against fresh fixture-backed servers while your dev servers are up.

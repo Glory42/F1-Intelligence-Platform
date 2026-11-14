@@ -86,7 +86,7 @@ const payload = JSON.stringify({ options, features, accent }).replace(/</g, '\\u
         const cy = height / 2;
         const R = 110;
 
-        let svg = `<svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto;max-width:${width}px;margin:0 auto;display:block;">`;
+        let svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(`Feature profile: ${dA.code} against ${dB.code}`)}" style="width:100%;height:auto;max-width:${width}px;margin:0 auto;display:block;">`;
         for (let lvl = 1; lvl <= 5; lvl++) {
           const r = R * (lvl / 5);
           let points = '';

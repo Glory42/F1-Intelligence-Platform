@@ -1,6 +1,7 @@
 ---
 import { linearScale, niceTicks } from '@/components/data/chartScale';
 import { spreadLabels } from '@/components/data/labelLayout';
+import { lineChartSummary, lineDashes } from '@/components/data/chartText';
 
 export interface LineSeries {
   id: string | number;
@@ -48,6 +49,9 @@ const labelYs = spreadLabels(
   HEIGHT - PAD.bottom,
 );
 
+const dashes = lineDashes(series.map((s) => s.color));
+const summary = lineChartSummary(series, formatY, xLabel);
+
 const path = (points: LineSeries['points']) =>
   points
     .map((p, i) => (p.y == null ? '' : `${i > 0 && points[i - 1].y != null ? 'L' : 'M'}${x(p.x)},${y(p.y)}`))
@@ -55,6 +59,7 @@ const path = (points: LineSeries['points']) =>
 ---
 
 <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" role="img" aria-label={ariaLabel} style="display:block">
+  <desc>{summary}</desc>
   {yTicks.map((t) => (
     <g>
       <line x1={PAD.left} x2={WIDTH - PAD.right} y1={y(t)} y2={y(t)} stroke="hsl(var(--chart-grid))" />
@@ -69,7 +74,7 @@ const path = (points: LineSeries['points']) =>
     const last = lastPoints[i];
     return (
       <g>
-        <path d={path(s.points)} fill="none" stroke={s.color} stroke-width="2" />
+        <path d={path(s.points)} fill="none" stroke={s.color} stroke-width="2" stroke-dasharray={dashes[i] || undefined} />
         {last && last.y != null && <text x={x(last.x) + 6} y={labelYs[i]} fill={s.color} class="font-mono" font-size="9">{s.label}</text>}
       </g>
     );

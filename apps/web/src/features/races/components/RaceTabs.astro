@@ -28,10 +28,11 @@ const activeStyle = `border-color:${accent.hex};color:hsl(var(--foreground))`;
 
 <div
   class="race-tabs scrollbar-none relative mb-6 flex gap-6 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_rgba(255,255,255,0.06)]"
-  role="tablist"
   data-namespace={namespace}
   data-active-style={activeStyle}
 >
+  <!-- A tablist may only hold tabs, so the analysis links sit beside it rather than in it. -->
+  <div role="tablist" class="flex gap-6">
   {tabs.map((t) => (
     <button
       type="button"
@@ -47,6 +48,7 @@ const activeStyle = `border-color:${accent.hex};color:hsl(var(--foreground))`;
       {t.label}
     </button>
   ))}
+  </div>
   {links.map((l) => (
     <a
       href={l.href}
