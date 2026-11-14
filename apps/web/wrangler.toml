@@ -8,7 +8,7 @@ compatibility_flags = ["nodejs_compat"]
 # custom domain from apps/api/wrangler.toml `routes`: only there does its edge cache work (ADR 0005).
 PUBLIC_API_URL = "https://f1-api.gorkemkaryol.dev"
 # Public URL of the share-image bucket (docs/deployment.md, "Share images"). Unset, pages keep /og-image.jpg.
-# PUBLIC_OG_IMAGE_URL = "https://og.f1.gorkemkaryol.dev"
+PUBLIC_OG_IMAGE_URL = "https://pub-13dc044568784d22bb5b58c49d0c321d.r2.dev"
 
 # Build-system vars: a valid Pages wrangler.toml overrides dashboard env vars,
 # so these have to live here. Skip Cloudflare's npm auto-install (npm 10.9.2
