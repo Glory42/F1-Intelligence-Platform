@@ -14,6 +14,11 @@ interface Props {
   labelPrefix?: string;
 }
 
+// Phones get tighter cells, smaller times and no full-name column (the code still names the driver),
+// so three session times fit in 375 px without sideways scrolling.
+const CELL = 'px-2 sm:px-4';
+const TIME = 'text-right font-mono text-xs sm:text-sm';
+
 export function QualifyingGrid({ qualifying, year, labelPrefix = 'Q' }: Props) {
   const hasQ2 = qualifying.some((q) => q.q2TimeMs);
   const hasQ3 = qualifying.some((q) => q.q3TimeMs);
@@ -24,12 +29,12 @@ export function QualifyingGrid({ qualifying, year, labelPrefix = 'Q' }: Props) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-10">Grid</TableHead>
-            <TableHead className="w-14">Code</TableHead>
-            <TableHead>Driver</TableHead>
-            <TableHead className="text-right">{labelPrefix}1</TableHead>
-            {hasQ2 && <TableHead className="text-right">{labelPrefix}2</TableHead>}
-            {hasQ3 && <TableHead className="text-right">{labelPrefix}3</TableHead>}
+            <TableHead className={`w-10 ${CELL}`}>Grid</TableHead>
+            <TableHead className={`w-14 ${CELL}`}>Code</TableHead>
+            <TableHead className="hidden sm:table-cell">Driver</TableHead>
+            <TableHead className={`text-right ${CELL}`}>{labelPrefix}1</TableHead>
+            {hasQ2 && <TableHead className={`text-right ${CELL}`}>{labelPrefix}2</TableHead>}
+            {hasQ3 && <TableHead className={`text-right ${CELL}`}>{labelPrefix}3</TableHead>}
             {hasSectors && (
               <>
                 <TableHead className="text-right hidden lg:table-cell">S1</TableHead>
@@ -43,32 +48,32 @@ export function QualifyingGrid({ qualifying, year, labelPrefix = 'Q' }: Props) {
         <TableBody>
           {qualifying.map((q) => (
             <TableRow key={q.id} style={{ borderLeft: `2px solid ${getTeamColor(q.driver.team.teamKey)}` }}>
-              <TableCell>
+              <TableCell className={CELL}>
                 <span className={`font-mono text-sm font-bold ${q.gridPosition === 1 ? 'text-[#a855f7]' : 'text-muted-foreground'}`}>
                   P{q.gridPosition}
                 </span>
               </TableCell>
-              <TableCell>
+              <TableCell className={CELL}>
                 <a href={`/drivers/${q.driver.id}?year=${year}`} className="font-mono text-xs font-semibold tracking-widest hover:text-[#a855f7] transition-colors">
                   {q.driver.code}
                 </a>
               </TableCell>
-              <TableCell>
+              <TableCell className="hidden sm:table-cell">
                 <a href={`/drivers/${q.driver.id}?year=${year}`} className="font-medium hover:text-[#a855f7] transition-colors">
                   {q.driver.fullName}
                 </a>
                 <p className="font-mono text-[8px] text-muted-foreground mt-0.5">{q.driver.team.name}</p>
               </TableCell>
-              <TableCell className="text-right font-mono text-sm text-muted-foreground">
+              <TableCell className={`${TIME} ${CELL} text-muted-foreground`}>
                 {formatMs(q.q1TimeMs)}
               </TableCell>
               {hasQ2 && (
-                <TableCell className="text-right font-mono text-sm text-muted-foreground">
+                <TableCell className={`${TIME} ${CELL} text-muted-foreground`}>
                   {formatMs(q.q2TimeMs)}
                 </TableCell>
               )}
               {hasQ3 && (
-                <TableCell className={`text-right font-mono text-sm ${q.q3TimeMs ? 'font-bold' : 'text-muted-foreground'}`}>
+                <TableCell className={`${TIME} ${CELL} ${q.q3TimeMs ? 'font-bold' : 'text-muted-foreground'}`}>
                   {formatMs(q.q3TimeMs)}
                 </TableCell>
               )}

@@ -42,6 +42,7 @@ const y = linearScale([yMin, yMax], [HEIGHT - PAD.bottom, PAD.top]);
 const yTicks = niceTicks(Math.min(yMin, yMax), Math.max(yMin, yMax), 4).filter((t) => !integerTicks || Number.isInteger(t));
 const xTicks = niceTicks(xMin, xMax, Math.min(8, Math.max(1, xMax - xMin)));
 const LABEL_GAP = 11;
+const MIN_SCALE = 0.8;
 const lastPoints = series.map((s) => [...s.points].reverse().find((p) => p.y != null) ?? null);
 const labelYs = spreadLabels(
   lastPoints.map((p) => (p?.y != null ? y(p.y) + 3 : PAD.top)),
@@ -59,7 +60,10 @@ const path = (points: LineSeries['points']) =>
     .join('');
 ---
 
-<svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" role="img" aria-label={ariaLabel} style="display:block">
+{/* Below ~80% of its design width the 9px labels shrink past legibility, so a phone scrolls instead;
+    tabindex lets a keyboard scroll it too. */}
+<div class="overflow-x-auto focus-visible:outline focus-visible:outline-1 focus-visible:outline-white/30" tabindex="0">
+<svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" role="img" aria-label={ariaLabel} style={`display:block;min-width:${Math.round(WIDTH * MIN_SCALE)}px`}>
   <desc>{summary}</desc>
   {yTicks.map((t) => (
     <g>
@@ -81,3 +85,4 @@ const path = (points: LineSeries['points']) =>
     );
   })}
 </svg>
+</div>

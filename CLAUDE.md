@@ -55,7 +55,8 @@ it's Python, and its jobs run once and exit rather than being a long-running dev
   is still not covered.
 - `apps/e2e/tests/smoke/`: Playwright, drives a real browser against `astro dev` with a fixture API server
   (`apps/e2e/fixtures/`) standing in for `apps/api`. Covers the hub, races, circuits, drivers, teams,
-  compare, predictions and History pages and the global search palette. Playwright reuses an already-running
+  compare, predictions and History pages and the global search palette, plus axe on key pages
+  (`accessibility.spec.ts`) and a 375 px phone run (`mobile.spec.ts`). Playwright reuses an already-running
   `astro dev` on :4321 (your real-data dev server), set `E2E_WEB_PORT`/`E2E_API_PORT` to run against fixtures
   while dev servers are up. Fixtures in `apps/e2e/fixtures/data.ts` are typed against the API's response types
   (`apps/web/src/types` re-exports `apps/api/src/common/types` type-only) and CI runs `bun run typecheck` on them,

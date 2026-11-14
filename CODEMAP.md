@@ -707,6 +707,7 @@ apps/e2e/
 │       ├── sidebar.spec.ts         # Season/Explore groups, active destination, collapse persists across reloads
 │       ├── security.spec.ts        # security headers on pages; unknown query params 301 to the plain page
 │       ├── sitemap.spec.ts         # /sitemap-dynamic.xml lists the season's detail pages
+│       ├── mobile.spec.ts          # 375 px: no page scrolls sideways; wide charts scroll in their panel; sticky scorecard season; axe on a phone
 │       ├── accessibility.spec.ts   # axe (@axe-core/playwright) on 10 key pages: no serious/critical violations (contrast included); team-mates' lines dashed
 │       ├── race-calendar.spec.ts   # /races subscribe links (webcal + Google); /calendar.ics is CRLF iCalendar with the season's sessions
 │       ├── local-time.spec.ts      # Tokyo browser: race hero + prediction 'Computed' in local time, after a client-router click too

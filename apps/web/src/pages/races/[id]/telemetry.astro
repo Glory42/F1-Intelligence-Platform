@@ -80,8 +80,8 @@ const gapMs = lapA && lapB ? lapB.lapTimeMs - lapA.lapTimeMs : 0;
           </p>
         </section>
 
-        <div class="grid lg:grid-cols-[1fr_420px] gap-6">
-          <div class="space-y-6">
+        <div class="grid lg:grid-cols-[minmax(0,1fr)_420px] gap-6">
+          <div class="min-w-0 space-y-6">
             <section>
               <SectionKicker label="./speed · km/h" />
               <div class="panel p-5">

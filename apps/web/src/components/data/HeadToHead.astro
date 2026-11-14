@@ -16,32 +16,32 @@ const { left, right, color, rows, year } = Astro.props;
 
 <div class="border border-white/[0.06]">
   {/* Driver headers */}
-  <div class="grid grid-cols-[1fr_90px_1fr] border-b border-white/[0.06]">
-    <a href={`/drivers/${left.id}?year=${year}`} class="flex items-center gap-3 p-4 hover:bg-white/[0.02] transition-colors group" style={`border-left: 2px solid ${color};`}>
+  <div class="grid grid-cols-[minmax(0,1fr)_40px_minmax(0,1fr)] sm:grid-cols-[minmax(0,1fr)_90px_minmax(0,1fr)] border-b border-white/[0.06]">
+    <a href={`/drivers/${left.id}?year=${year}`} class="flex min-w-0 items-center gap-3 p-3 sm:p-4 hover:bg-white/[0.02] transition-colors group" style={`border-left: 2px solid ${color};`}>
       {left.headshotUrl ? (
-        <img src={left.headshotUrl} alt={left.fullName} class="w-12 h-12 object-cover object-top border border-white/[0.08] shrink-0" loading="lazy" />
+        <img src={left.headshotUrl} alt={left.fullName} class="hidden sm:block w-12 h-12 object-cover object-top border border-white/[0.08] shrink-0" loading="lazy" />
       ) : (
-        <div class="w-12 h-12 border border-white/[0.08] flex items-center justify-center shrink-0">
+        <div class="hidden sm:flex w-12 h-12 border border-white/[0.08] items-center justify-center shrink-0">
           <span class="font-mono text-sm font-bold text-[#a855f7]">{left.driverNumber}</span>
         </div>
       )}
-      <div>
+      <div class="min-w-0">
         <div class="font-mono text-[8px] text-muted-foreground tracking-wider">{left.code} #{left.driverNumber}</div>
-        <div class="font-semibold group-hover:text-[#a855f7] transition-colors">{left.fullName}</div>
+        <div class="font-semibold break-words group-hover:text-[#a855f7] transition-colors">{left.fullName}</div>
         {left.nationality && <div class="font-mono text-[9px] text-muted-foreground">{left.nationality}</div>}
       </div>
     </a>
     <div class="flex items-center justify-center text-[11px] text-muted-foreground border-x border-white/[0.06]">vs</div>
-    <a href={`/drivers/${right.id}?year=${year}`} class="flex items-center justify-end gap-3 p-4 hover:bg-white/[0.02] transition-colors group" style={`border-right: 2px solid ${color};`}>
-      <div class="text-right">
+    <a href={`/drivers/${right.id}?year=${year}`} class="flex min-w-0 items-center justify-end gap-3 p-3 sm:p-4 hover:bg-white/[0.02] transition-colors group" style={`border-right: 2px solid ${color};`}>
+      <div class="min-w-0 text-right">
         <div class="font-mono text-[8px] text-muted-foreground tracking-wider">{right.code} #{right.driverNumber}</div>
-        <div class="font-semibold group-hover:text-[#a855f7] transition-colors">{right.fullName}</div>
+        <div class="font-semibold break-words group-hover:text-[#a855f7] transition-colors">{right.fullName}</div>
         {right.nationality && <div class="font-mono text-[9px] text-muted-foreground">{right.nationality}</div>}
       </div>
       {right.headshotUrl ? (
-        <img src={right.headshotUrl} alt={right.fullName} class="w-12 h-12 object-cover object-top border border-white/[0.08] shrink-0" loading="lazy" />
+        <img src={right.headshotUrl} alt={right.fullName} class="hidden sm:block w-12 h-12 object-cover object-top border border-white/[0.08] shrink-0" loading="lazy" />
       ) : (
-        <div class="w-12 h-12 border border-white/[0.08] flex items-center justify-center shrink-0">
+        <div class="hidden sm:flex w-12 h-12 border border-white/[0.08] items-center justify-center shrink-0">
           <span class="font-mono text-sm font-bold text-[#a855f7]">{right.driverNumber}</span>
         </div>
       )}
