@@ -25,16 +25,17 @@ const active = activeDestination(groups, Astro.url.pathname);
   </a>
 
   <div class="px-2">
+    <!-- No aria-label: the visible "Search" names it, and the title does once the sidebar hides the label. -->
     <button
       type="button"
       onclick="window.dispatchEvent(new Event('open-global-search'))"
-      aria-label="Search"
+      aria-keyshortcuts="Meta+K Control+K"
       title="Search (⌘K)"
       class="press flex h-9 w-full items-center gap-3 rounded-md border border-white/[0.06] px-3 text-[13px] text-muted-foreground hover:text-foreground hover:border-white/[0.12] transition-colors duration-150"
     >
       <Search size={15} className="shrink-0" />
       <span class="sidebar-label">Search</span>
-      <kbd class="sidebar-label ml-auto font-mono text-[10px] text-muted-foreground/70">⌘K</kbd>
+      <kbd class="sidebar-label ml-auto font-mono text-[10px] text-muted-foreground/70" aria-hidden="true">⌘K</kbd>
     </button>
   </div>
 
