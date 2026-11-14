@@ -69,6 +69,12 @@ const sidebarCollapsed = isSidebarCollapsed(Astro.cookies.get(SIDEBAR_COOKIE)?.v
   </body>
 </html>
 
+<script>
+  import { localiseTimes } from '@/lib/localTime';
+
+  document.addEventListener('astro:page-load', () => localiseTimes(document));
+</script>
+
 <style is:global>
   @import '../styles/globals.css';
 </style>

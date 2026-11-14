@@ -1,0 +1,17 @@
+---
+import { formatUtc, hasTime, type LocalTimeFormat } from '@/lib/localTime';
+
+interface Props {
+  datetime: string;
+  format: LocalTimeFormat;
+  class?: string;
+}
+
+// BaseLayout's script rewrites the UTC text into the visitor's own timezone after each navigation.
+const { datetime, format, class: className } = Astro.props;
+const localised = hasTime(datetime);
+---
+
+<time datetime={datetime} data-local-time={localised ? format : undefined} class={className}>
+  {formatUtc(datetime, localised ? format : 'date')}
+</time>
