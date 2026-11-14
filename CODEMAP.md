@@ -386,8 +386,9 @@ apps/web/
 │   │   │   ├── StatTiles.astro        # Grid of label/value stat tiles
 │   │   │   ├── HeadToHead.astro       # Two-side head-to-head bar rows (driver teammate tab, team page)
 │   │   │   ├── headToHead.ts          # HeadToHeadRow type, importable by .ts loaders
-│   │   │   ├── LineChart.astro        # Plain SVG multi-series line chart: nice ticks, spread end labels
+│   │   │   ├── LineChart.astro        # Plain SVG multi-series line chart: nice ticks, spread end labels, dashed repeat colours, <desc> summary
 │   │   │   ├── chartScale.ts          # linearScale(), niceTicks(): d3-style scales for the plain-SVG charts
+│   │   │   ├── chartText.ts           # lineDashes() (repeated colour → dash pattern) + lineChartSummary() (last values, for <desc>)
 │   │   │   └── labelLayout.ts         # spreadLabels(): nudge end-of-line chart labels apart without reordering
 │   │   ├── identity/
 │   │   │   └── DriverIdentity.astro / TeamIdentity.astro  # Headshot/logo + linked name cell inside a DataRow
@@ -597,7 +598,7 @@ apps/web/
 │   │   │   └── useCompareController.test.ts  # jsdom: URL hydration, career mode, location-adapter seam
 │   │   ├── components/
 │   │   │   ├── layout/navLinks.test.ts       # pure: sidebar groups, utilities, active-destination matching
-│   │   │   └── data/                         # chartScale, labelLayout
+│   │   │   └── data/                         # chartScale, labelLayout, chartText
 │   │   ├── lib/                              # pure, `node` env: pageTabs / sidebarState / legacyRedirects / canonicalHost / pageCache / pageQuery / securityHeaders / sitemap / icalendar / localTime (jsdom) / utils
 │   │   │   └── f1/                           # predictionMath (all exports), predictionTerms, championshipMath, teamColors, teamLogos, tyres
 │   │   ├── features/races/ · features/telemetry/  # calendar, raceCalendarFeed, raceView + raceEventTabs, gridPenalties, weatherSpells, raceEventDisplay, tyreDegradation, pitBattles · telemetryCompare, trackMap
@@ -706,6 +707,7 @@ apps/e2e/
 │       ├── sidebar.spec.ts         # Season/Explore groups, active destination, collapse persists across reloads
 │       ├── security.spec.ts        # security headers on pages; unknown query params 301 to the plain page
 │       ├── sitemap.spec.ts         # /sitemap-dynamic.xml lists the season's detail pages
+│       ├── accessibility.spec.ts   # axe (@axe-core/playwright) on 10 key pages: no serious/critical violations; team-mates' lines dashed
 │       ├── race-calendar.spec.ts   # /races subscribe links (webcal + Google); /calendar.ics is CRLF iCalendar with the season's sessions
 │       ├── local-time.spec.ts      # Tokyo browser: race hero + prediction 'Computed' in local time, after a client-router click too
 │       ├── home-hub.spec.ts        # /: exactly three blocks: next race (schedule, circuit), last race recap, championship

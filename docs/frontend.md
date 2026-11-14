@@ -171,6 +171,9 @@ Year-scoped pages read `?year=` from `Astro.url.searchParams`, defaulting to the
   `GlobalSearch` / `TitleWhatIf` (`client:idle`), `DriverCompareTool` / `TeamCompareTool` / `CircuitsGrid`
   (`client:load`). Everything else is server-rendered.
 - React hooks correctness is linted (`react-hooks/rules-of-hooks` error, `exhaustive-deps` warn).
+- **Charts are images with words.** Each chart `<svg>` has `role="img"` and an `aria-label`; `LineChart`
+  adds a `<desc>` with every line's last value, and dashes a line whose colour repeats (team-mates share a
+  team colour), so nothing relies on colour alone. End-of-line labels name each line directly.
 - No chart libraries: charts are hand-rolled SVG (`LapChart.astro`, `CalibrationChart.astro`,
   `DriverRadarCompare.astro`). No heavy animation libraries.
 - Small co-located `<script>` blocks in `.astro` files are fine for view-local behaviour
