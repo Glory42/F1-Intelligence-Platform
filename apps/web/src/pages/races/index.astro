@@ -5,6 +5,7 @@ import type { Race, SeasonSummary } from '@/types';
 import YearSelect from '@/components/page/YearSelect.astro';
 import CalendarRow from '@/features/races/components/CalendarRow.astro';
 import CalendarCard from '@/features/races/components/CalendarCard.astro';
+import CalendarSubscribe from '@/features/races/components/CalendarSubscribe.astro';
 import {
   calendarEntries, calendarQuery, calendarSummary, parseCalendarFilter, parseCalendarSort, type CalendarFilter,
 } from '@/features/races/calendar';
@@ -50,7 +51,8 @@ const yearExtraParams = calendarQuery(year, filter, sort).replace(`?year=${year}
         <h1 class="text-2xl font-bold">{year} Season</h1>
         <p class="mt-1 text-[13px] text-muted-foreground">{statsLabel}</p>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2">
+        <CalendarSubscribe />
         <!-- Sort toggle -->
         <a
           href={sortHref}

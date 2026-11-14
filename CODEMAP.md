@@ -333,6 +333,7 @@ apps/web/
 │   │   ├── prediction/[id].astro  # Historical GP prediction: contribution breakdown, radar compare, what-if lab
 │   │   ├── health-quality.astro   # Dev-only data-quality dashboard (404-guarded outside DEV)
 │   │   ├── history.astro          # /history: tabs Records · Milestones · On this day · Lineage (F1DB)
+│   │   ├── calendar.ics.ts        # Subscribable iCalendar feed: this + next season's SQ/sprint/qualifying/race sessions (503, never empty, when the season can't be read)
 │   │   ├── sitemap-dynamic.xml.ts # Detail pages (season's races, predictions, drivers, teams + all circuits) the build-time sitemap can't see
 │   │   ├── compare/
 │   │   │   ├── drivers.astro      # /compare/drivers: driver head-to-head comparison tool
@@ -422,6 +423,7 @@ apps/web/
 │   │   │   ├── raceSessionBehaviour.ts # GP vs sprint descriptor: fetchers, status rules, visible tabs, labels, accent
 │   │   │   ├── raceTabs.ts            # initRaceCountdown() + initRaceTabs(): shared by GP + sprint detail scripts
 │   │   │   ├── raceEventDisplay.ts    # timeOf(), dotColor(): shared by the three Race Event list components
+│   │   │   ├── raceCalendarFeed.ts    # raceCalendarEvents() (stable UID per race + session) + buildRaceCalendar(): the /calendar.ics feed
 │   │   │   ├── calendar.ts            # calendarEntries() (sprint weekends → two entries, filter, sort), calendarQuery(), calendarSummary()
 │   │   │   ├── loadRaceEvents.ts      # loadRaceEvents(id, session): strategy (+ insights) + incidents + overtakes + radio, each degrading alone; raceEventTabs()
 │   │   │   ├── raceView.ts            # GP/sprint page view logic: predicted podium, winner, fastest lap, conditions, year links, SQ grid
@@ -430,6 +432,7 @@ apps/web/
 │   │   │   └── components/
 │   │   │       ├── LapChart.astro         # Plain SVG lap time chart (no chart library)
 │   │   │       ├── LongRunsTable.astro    # Long Runs tab (GP page): each driver's best practice long run, compound, gap to fastest
+│   │   │       ├── CalendarSubscribe.astro # /races: webcal:// Subscribe + Google Calendar links to /calendar.ics
 │   │   │       ├── CalendarRow.astro / CalendarCard.astro # /races: completed row, upcoming card (status badge + prediction links)
 │   │   │       ├── RaceEventPanels.astro  # Strategy / Incidents / Overtakes / Team radio tab panels, shared by GP + sprint pages
 │   │   │       ├── CircuitStatsGrid.astro # Circuit tab: laps, length, distance, corners, DRS, overtake rate (race or sprint distance)
@@ -555,6 +558,7 @@ apps/web/
 │   │   ├── sidebarState.ts        # Sidebar collapse cookie: isSidebarCollapsed() + sidebarCookie()
 │   │   ├── legacyRedirects.ts     # legacyRedirect(path, search): retired URLs (prediction recap, /records, /drivers|teams/compare) → their new home
 │   │   ├── canonicalHost.ts       # canonicalHostRedirect(): the production *.pages.dev address → 301 to the custom domain (previews stay)
+│   │   ├── icalendar.ts           # serializeCalendar() + foldLine(): RFC 5545 (CRLF, 75-octet folding, TEXT escaping)
 │   │   ├── localTime.ts           # formatUtc() / formatLocal() / localiseTimes(): the session/datetime/date formats LocalTime renders
 │   │   ├── sitemap.ts             # loadSitemapSources(year) + sitemapPaths() + renderUrlset(): the dynamic sitemap
 │   │   ├── pageCache.ts           # servePageCached(): rendered HTML (and the XML/calendar feeds) kept in the edge Cache API (5 min Fri–Mon noon UTC, 1 h between), keyed by path + sorted page params + sidebar cookie (Workers Free: 10 ms CPU)
@@ -594,9 +598,9 @@ apps/web/
 │   │   ├── components/
 │   │   │   ├── layout/navLinks.test.ts       # pure: sidebar groups, utilities, active-destination matching
 │   │   │   └── data/                         # chartScale, labelLayout
-│   │   ├── lib/                              # pure, `node` env: pageTabs / sidebarState / legacyRedirects / canonicalHost / pageCache / pageQuery / securityHeaders / sitemap / localTime (jsdom) / utils
+│   │   ├── lib/                              # pure, `node` env: pageTabs / sidebarState / legacyRedirects / canonicalHost / pageCache / pageQuery / securityHeaders / sitemap / icalendar / localTime (jsdom) / utils
 │   │   │   └── f1/                           # predictionMath (all exports), predictionTerms, championshipMath, teamColors, teamLogos, tyres
-│   │   ├── features/races/ · features/telemetry/  # calendar, raceView + raceEventTabs, gridPenalties, weatherSpells, raceEventDisplay, tyreDegradation, pitBattles · telemetryCompare, trackMap
+│   │   ├── features/races/ · features/telemetry/  # calendar, raceCalendarFeed, raceView + raceEventTabs, gridPenalties, weatherSpells, raceEventDisplay, tyreDegradation, pitBattles · telemetryCompare, trackMap
 │   │   ├── features/predictions/
 │   │   │   └── buildPredictionPageData.test.ts / predictionCopy.test.ts / calibration.test.ts  # GP + sprint page data, copy table, all-season bins
 │   │   ├── features/{drivers,teams,races,history}/load*PageData.test.ts  # page-data loaders, `node` env, MSW-stubbed API
@@ -702,6 +706,7 @@ apps/e2e/
 │       ├── sidebar.spec.ts         # Season/Explore groups, active destination, collapse persists across reloads
 │       ├── security.spec.ts        # security headers on pages; unknown query params 301 to the plain page
 │       ├── sitemap.spec.ts         # /sitemap-dynamic.xml lists the season's detail pages
+│       ├── race-calendar.spec.ts   # /races subscribe links (webcal + Google); /calendar.ics is CRLF iCalendar with the season's sessions
 │       ├── local-time.spec.ts      # Tokyo browser: race hero + prediction 'Computed' in local time, after a client-router click too
 │       ├── home-hub.spec.ts        # /: exactly three blocks: next race (schedule, circuit), last race recap, championship
 │       ├── global-search.spec.ts   # Cmd/Ctrl+K opens, shows results, Escape closes (client-side fetch)

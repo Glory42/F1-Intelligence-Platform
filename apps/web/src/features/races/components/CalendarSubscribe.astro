@@ -1,0 +1,16 @@
+---
+import { CalendarPlus } from 'lucide-react';
+
+// webcal:// hands the feed to the system calendar (Apple, Outlook); Google only takes it through its own URL.
+const feed = new URL('/calendar.ics', Astro.site ?? Astro.url);
+const webcal = `webcal://${feed.host}${feed.pathname}`;
+const google = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(webcal)}`;
+const linkClass = 'font-mono text-[8px] tracking-[0.15em] uppercase px-3 py-1.5 text-muted-foreground hover:text-foreground transition-colors duration-150';
+---
+
+<div role="group" class="flex items-center border border-white/[0.08]" aria-label="Subscribe to the session calendar">
+  <a href={webcal} class={`${linkClass} flex items-center gap-1.5 border-r border-white/[0.08]`} title="Every qualifying, sprint and race session, kept up to date in your calendar app">
+    <CalendarPlus size={10} />Subscribe
+  </a>
+  <a href={google} class={linkClass} target="_blank" rel="noopener noreferrer">Google</a>
+</div>

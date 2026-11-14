@@ -158,6 +158,7 @@ second unrelated feature needs it.
 | `/history` | Records: `history/records` · Milestones: `history/milestones` · On this day: `history/on-this-day?date=MM-DD` (`?date=` param, nearest-day fallback) · Lineage: `history/lineages` |
 | `/docs` · `/docs/[slug]` | Astro content collection (`prerender = true`) |
 | `/health-quality` | `quality?year=`: dev-only, 404-guarded outside `import.meta.env.DEV` |
+| `/calendar.ics` | `races?year=` for this season and the next: every Sprint Qualifying, Sprint, Qualifying and Race start as an RFC 5545 feed (`lib/icalendar.ts`), linked from `/races` as `webcal://` and Google Calendar. No practice sessions: they aren't stored. 503 rather than an empty feed if this season can't be read, so subscribers never lose their events. Edge-cached like a page |
 | `/sitemap-dynamic.xml` | `races?year=` + `predictions/history?year=` + `drivers?year=` + `teams?year=` + `races/circuits`: the current season's detail pages, which the build-time `@astrojs/sitemap` can't list (`customSitemaps` adds it to `sitemap-index.xml`). Edge-cached like a page |
 
 Year-scoped pages read `?year=` from `Astro.url.searchParams`, defaulting to the current year;
