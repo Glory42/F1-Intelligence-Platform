@@ -189,6 +189,13 @@ Tailwind for everything; the dark theme is fixed (`<html class="dark">`), colour
 custom properties in `styles/globals.css`. `lib/f1/teamColors.ts` and `lib/f1/teamLogos.ts` map a
 `team_key` to an official hex colour / static logo path under `public/teams/`.
 
+Text meets WCAG AA (4.5:1) on the black page, and the axe smoke test enforces it:
+- Secondary text is `text-muted-foreground` at full strength (5.8:1), never `/40`–`/70`.
+- Kickers (`./section` labels) use the accent at full colour, not a translucent tint.
+- Text in a team colour goes through `readableOnBlack()`, which lightens dark team colours just
+  enough. Lines, dots and bars keep the official colour.
+- Purely decorative text (watermarks) is drawn with CSS `content`, so it isn't read or checked.
+
 ## File-size budget
 
 `eslint.config.js` enforces a tiered `max-lines` (`error`, blank lines and comments excluded), run

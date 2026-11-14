@@ -567,7 +567,7 @@ apps/web/
 │   │   ├── securityHeaders.ts     # securityHeaders(apiOrigin) + withSecurityHeaders(): HSTS, nosniff, frame/CSP (script sources report-only)
 │   │   ├── utils.ts               # cn() (clsx + tailwind-merge), unwrapSettled(), formatMs/Probability/Date/StopSeconds/AgeFromDays
 │   │   └── f1/                    # F1 reference data + maths used across features
-│   │       ├── teamColors.ts      # team_key → official hex color map (fallback #6B7280)
+│   │       ├── teamColors.ts      # team_key → official hex color map (fallback #6B7280); readableOnBlack() for team-coloured text
 │   │       ├── teamLogos.ts       # team_key → /teams/<file> static logo path (null if no logo)
 │   │       ├── countryFlags.ts    # country/nationality/driver code → emoji flag + display name helpers
 │   │       ├── predictionMath.ts  # softmax, confidenceTier, driverPredictionRecord,
@@ -707,7 +707,7 @@ apps/e2e/
 │       ├── sidebar.spec.ts         # Season/Explore groups, active destination, collapse persists across reloads
 │       ├── security.spec.ts        # security headers on pages; unknown query params 301 to the plain page
 │       ├── sitemap.spec.ts         # /sitemap-dynamic.xml lists the season's detail pages
-│       ├── accessibility.spec.ts   # axe (@axe-core/playwright) on 10 key pages: no serious/critical violations; team-mates' lines dashed
+│       ├── accessibility.spec.ts   # axe (@axe-core/playwright) on 10 key pages: no serious/critical violations (contrast included); team-mates' lines dashed
 │       ├── race-calendar.spec.ts   # /races subscribe links (webcal + Google); /calendar.ics is CRLF iCalendar with the season's sessions
 │       ├── local-time.spec.ts      # Tokyo browser: race hero + prediction 'Computed' in local time, after a client-router click too
 │       ├── home-hub.spec.ts        # /: exactly three blocks: next race (schedule, circuit), last race recap, championship
