@@ -1,6 +1,6 @@
 ---
 import { MapPin, CalendarDays, ChevronRight } from 'lucide-react';
-import { formatDate } from '@/lib/utils';
+import LocalTime from '@/components/data/LocalTime.astro';
 import type { CalendarEntry } from '../calendar';
 
 interface Props {
@@ -38,7 +38,7 @@ const { race, sprint: isSprint, href, date } = entry;
     </div>
   </div>
   <span class="flex items-center gap-1 font-mono text-[9px] text-muted-foreground md:flex shrink-0">
-    <CalendarDays size={10} />{formatDate(date)}
+    <CalendarDays size={10} /><LocalTime datetime={date} format="date" />
   </span>
   {race.weather && (
     <span class="font-mono text-[9px] text-muted-foreground capitalize hidden lg:inline shrink-0">{race.weather}</span>

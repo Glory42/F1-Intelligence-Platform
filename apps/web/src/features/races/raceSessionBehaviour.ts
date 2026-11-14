@@ -95,7 +95,7 @@ export const SESSION_BEHAVIOUR: Record<RacePageKind, SessionBehaviour> = {
     load: loadGrandPrix,
     isDone: (race) => race.status === 'completed',
     status: gpStatus,
-    sessionDate: (race) => race.raceDate,
+    sessionDate: (race) => race.raceDateUtc ?? race.raceDate,
     countdownDate: (race) => race.raceDateUtc || race.raceDate,
     conditions: (race) => race,
     qualifyingLabel: 'Qualifying',

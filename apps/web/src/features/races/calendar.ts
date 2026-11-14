@@ -16,7 +16,7 @@ export function parseCalendarSort(value: string | null): CalendarSort {
 
 export function calendarEntries(races: Race[], filter: CalendarFilter, sort: CalendarSort): CalendarEntry[] {
   const entries = races.flatMap((race): CalendarEntry[] => {
-    const gp = { race, sprint: false, href: `/races/${race.id}`, date: race.raceDate };
+    const gp = { race, sprint: false, href: `/races/${race.id}`, date: race.raceDateUtc ?? race.raceDate };
     return race.hasSprint
       ? [{ race, sprint: true, href: `/races/${race.id}/sprint`, date: race.sprintDate ?? race.raceDate }, gp]
       : [gp];

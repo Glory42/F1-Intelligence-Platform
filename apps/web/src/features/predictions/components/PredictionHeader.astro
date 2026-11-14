@@ -1,5 +1,6 @@
 ---
 import { formatDate } from '@/lib/utils';
+import LocalTime from '@/components/data/LocalTime.astro';
 import ConfidenceBadge from '@/features/predictions/components/ConfidenceBadge.astro';
 import type { PredictionAccent } from '../types';
 
@@ -34,6 +35,6 @@ const { title, kicker, city, country, date, modelVersion, computedAt, p1, p2, ac
     {city}, {country} · {formatDate(date)}
   </p>
   <p class="font-mono text-[9px] text-muted-foreground mt-0.5">
-    Model: {modelVersion} · Computed: {new Date(computedAt).toLocaleString()}
+    Model: {modelVersion} · Computed: <LocalTime datetime={computedAt} format="datetime" />
   </p>
 </div>

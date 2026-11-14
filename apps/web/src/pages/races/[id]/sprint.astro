@@ -10,7 +10,6 @@ import RaceTabs from '@/features/races/components/RaceTabs.astro';
 import RaceTabPanel from '@/features/races/components/RaceTabPanel.astro';
 import RaceEventPanels from '@/features/races/components/RaceEventPanels.astro';
 import CircuitStatsGrid from '@/features/races/components/CircuitStatsGrid.astro';
-import { formatDate } from '@/lib/utils';
 import { loadRacePageData } from '@/features/races/loadRacePageData';
 import { Zap } from 'lucide-react';
 import { SPRINT_ACCENT } from '@/features/predictions/types';
@@ -48,7 +47,7 @@ const {
               statusToneClass={status.toneClass}
               raceName={race.name}
               circuit={race.circuit}
-              dateStr={formatDate(sessionDate ?? race.raceDate)}
+              date={sessionDate ?? race.raceDate}
               lapsLabel="~17 laps"
               lengthKm={race.circuit.trackLengthKm}
               weather={race.weather}
