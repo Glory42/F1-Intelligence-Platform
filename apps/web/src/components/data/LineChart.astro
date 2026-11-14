@@ -2,6 +2,7 @@
 import { linearScale, niceTicks } from '@/components/data/chartScale';
 import { spreadLabels } from '@/components/data/labelLayout';
 import { lineChartSummary, lineDashes } from '@/components/data/chartText';
+import { readableOnBlack } from '@/lib/f1/teamColors';
 
 export interface LineSeries {
   id: string | number;
@@ -75,7 +76,7 @@ const path = (points: LineSeries['points']) =>
     return (
       <g>
         <path d={path(s.points)} fill="none" stroke={s.color} stroke-width="2" stroke-dasharray={dashes[i] || undefined} />
-        {last && last.y != null && <text x={x(last.x) + 6} y={labelYs[i]} fill={s.color} class="font-mono" font-size="9">{s.label}</text>}
+        {last && last.y != null && <text x={x(last.x) + 6} y={labelYs[i]} fill={readableOnBlack(s.color)} class="font-mono" font-size="9">{s.label}</text>}
       </g>
     );
   })}

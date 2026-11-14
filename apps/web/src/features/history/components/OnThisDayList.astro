@@ -28,7 +28,7 @@ const next = shiftMonthDay(requested, 1);
       <ChevronLeft size={12} /> {formatMonthDay(prev)}
     </a>
     <div class="text-center">
-      <div class="font-mono text-[8px] tracking-[0.25em] uppercase text-[#a855f7]/70">on this day</div>
+      <div class="font-mono text-[8px] tracking-[0.25em] uppercase text-[#a855f7]">on this day</div>
       <div class="text-lg font-bold">{requestedLabel}</div>
     </div>
     <a href={hrefFor(next)} class="flex items-center gap-1 font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground hover:text-foreground transition-colors">
@@ -56,7 +56,8 @@ const next = shiftMonthDay(requested, 1);
                 class="group relative flex h-full flex-col gap-4 overflow-hidden border border-white/[0.06] bg-black p-5 hover:border-white/[0.12] transition-colors duration-150"
                 style={`border-left: 3px solid ${color}`}
               >
-                <span class="pointer-events-none absolute -right-2 -bottom-5 select-none font-mono text-7xl font-bold text-white/[0.03]" aria-hidden="true">{r.year}</span>
+                {/* A watermark, drawn by CSS: decoration isn't text, so contrast checks rightly skip it. */}
+                <span class="pointer-events-none absolute -right-2 -bottom-5 select-none font-mono text-7xl font-bold text-white/[0.03] after:content-[attr(data-year)]" data-year={r.year} aria-hidden="true" />
                 <div class="flex items-baseline justify-between gap-3">
                   <span class="font-mono text-2xl font-bold tabular-nums">{r.year}</span>
                   <span class="font-mono text-[8px] tracking-[0.15em] uppercase text-muted-foreground">{yearsAgoLabel(r.year, currentYear)}</span>

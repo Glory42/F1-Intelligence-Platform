@@ -37,7 +37,7 @@ const eraTabs = [
   </div>
 
   <div>
-    <h3 class="font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground/60 mb-3">Top Constructors</h3>
+    <h3 class="font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground mb-3">Top Constructors</h3>
     {eras.map((era) => (
       <div class={`era-content-${era} space-y-3 ${era !== 'all' ? 'hidden' : ''}`}>
         {dominance[era].constructors.length > 0 ? (
@@ -64,7 +64,7 @@ const eraTabs = [
   </div>
 
   <div>
-    <h3 class="font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground/60 mb-3">Top Drivers</h3>
+    <h3 class="font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground mb-3">Top Drivers</h3>
     {eras.map((era) => (
       <div class={`era-content-${era} space-y-3 ${era !== 'all' ? 'hidden' : ''}`}>
         {dominance[era].drivers.length > 0 ? (

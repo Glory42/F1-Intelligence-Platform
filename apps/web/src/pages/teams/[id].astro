@@ -41,7 +41,7 @@ const team = data?.team;
         <div>
           <div class="w-fit">
             <div class="flex items-center gap-3 mb-2">
-              <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">./constructor</span>
+              <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgb(168,85,247)">./constructor</span>
               <div class="h-px flex-1 bg-white/[0.05]" />
             </div>
             <div class="flex items-center gap-3">
@@ -64,7 +64,7 @@ const team = data?.team;
             <!-- Current season stats -->
             <div>
               <div class="flex items-center gap-3 mb-4">
-                <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">./stats · {year}</span>
+                <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgb(168,85,247)">./stats · {year}</span>
                 <div class="h-px flex-1 bg-white/[0.05]" />
               </div>
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-px bg-white/[0.06]">
@@ -105,7 +105,7 @@ const team = data?.team;
             {data.drivers.length > 0 && (
               <div>
                 <div class="flex items-center gap-3 mb-4">
-                  <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">./drivers · {year}</span>
+                  <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgb(168,85,247)">./drivers · {year}</span>
                   <div class="h-px flex-1 bg-white/[0.05]" />
                 </div>
 
@@ -125,7 +125,7 @@ const team = data?.team;
                         <div>
                           <div class="flex items-center gap-1.5 mb-1">
                             <div class="font-mono text-[8px] tracking-[0.15em] uppercase text-muted-foreground border border-white/[0.06] px-1.5 py-0.5">{d.code}</div>
-                            <div class="font-mono text-[8px] text-muted-foreground/60">#{d.driverNumber}</div>
+                            <div class="font-mono text-[8px] text-muted-foreground">#{d.driverNumber}</div>
                           </div>
                           <div class="font-semibold group-hover:text-[#a855f7] transition-colors duration-150">{d.fullName}</div>
                           {d.nationality && <div class="font-mono text-[9px] text-muted-foreground">{d.nationality}</div>}

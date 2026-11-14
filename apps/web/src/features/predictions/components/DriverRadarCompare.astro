@@ -21,7 +21,7 @@ const payload = JSON.stringify({ options, features, accent }).replace(/</g, '\\u
 
 <div>
   <div class="flex items-center gap-3 mb-4">
-    <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style={`color: rgba(${accent.rgb},0.55)`}>./compare drivers</span>
+    <span class="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style={`color: rgb(${accent.rgb})`}>./compare drivers</span>
     <div class="h-px flex-1 bg-white/[0.05]" />
   </div>
   <div class="radar-compare panel p-5 space-y-4" data-radar>
@@ -142,7 +142,7 @@ const payload = JSON.stringify({ options, features, accent }).replace(/</g, '\\u
               <div style="font-family:monospace;font-size:8px;color:rgba(${accent.rgb},0.6);text-transform:uppercase;letter-spacing:0.15em">${escapeHtml(dA.code)}</div>
               <div style="font-size:24px;font-weight:bold;color:${accent.hex}">${pA}%</div>
             </div>
-            <div style="font-family:monospace;font-size:9px;color:rgba(255,255,255,0.3)">win prob</div>
+            <div style="font-family:monospace;font-size:9px;color:rgba(255,255,255,0.6)">win prob</div>
             <div style="text-align:center">
               <div style="font-family:monospace;font-size:8px;color:rgba(96,165,250,0.6);text-transform:uppercase;letter-spacing:0.15em">${escapeHtml(dB.code)}</div>
               <div style="font-size:24px;font-weight:bold;color:${BLUE}">${pB}%</div>

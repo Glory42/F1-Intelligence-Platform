@@ -20,7 +20,7 @@ const driverHref = (e: RecordEntry) => (e.coreId != null ? `/drivers/${e.coreId}
   <ul aria-label="Chasing the record" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
     {cards.map(({ chase, chaser, view }) => (
       <li class="border border-white/[0.06] bg-black p-4 flex flex-col gap-3">
-        <div class="font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground/70">{CHASE_LABELS[chase.stat].title}</div>
+        <div class="font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground">{CHASE_LABELS[chase.stat].title}</div>
 
         <div class="space-y-2 text-xs">
           {[{ entry: chase.record, role: 'Record' }, { entry: chaser, role: 'Chaser' }].map(({ entry, role }) => (

@@ -7,7 +7,7 @@ import StatTiles from '@/components/data/StatTiles.astro';
 import { Map as MapIcon} from 'lucide-react';
 import DominanceMap from '@/features/telemetry/components/DominanceMap.astro';
 import { api } from '@/lib/api';
-import { getTeamColor } from '@/lib/f1/teamColors';
+import { getTeamColor, readableOnBlack } from '@/lib/f1/teamColors';
 import { formatMs, unwrapSettled } from '@/lib/utils';
 import { lapDelta, miniSectorWinners } from '@/features/telemetry/telemetryCompare';
 import type { QualifyingSession } from '@/types';
@@ -76,7 +76,7 @@ const gapMs = lapA && lapB ? lapB.lapTimeMs - lapA.lapTimeMs : 0;
             { label: 'Mini-sectors', value: `${aWins} – ${MINI_SECTORS - aWins}` },
           ]} />
           <p class="mt-3 font-mono text-[9px] tracking-widest uppercase text-muted-foreground">
-            <span style={`color:${colorA}`}>{lapA.driver.code}</span> faster in {aWins} of {MINI_SECTORS} mini-sectors
+            <span style={`color:${readableOnBlack(colorA)}`}>{lapA.driver.code}</span> faster in {aWins} of {MINI_SECTORS} mini-sectors
           </p>
         </section>
 
@@ -111,7 +111,7 @@ const gapMs = lapA && lapB ? lapB.lapTimeMs - lapA.lapTimeMs : 0;
                     points: delta.map((ms, j) => ({ x: km(lapA.samples.distanceM[j]), y: ms / 1000 })),
                   }]}
                 />
-                <p class="mt-3 font-mono text-[7px] text-muted-foreground/50">Below zero = {lapA.driver.code} ahead at that point of the lap.</p>
+                <p class="mt-3 font-mono text-[7px] text-muted-foreground">Below zero = {lapA.driver.code} ahead at that point of the lap.</p>
               </div>
             </section>
           </div>

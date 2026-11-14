@@ -12,7 +12,7 @@ const { groups, activeHref } = Astro.props;
 <div class="flex flex-col gap-5">
   {groups.map((group, i) => (
     <div>
-      <p class="sidebar-label px-3 mb-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgba(168,85,247,0.55)">
+      <p class="sidebar-label px-3 mb-1.5 font-mono text-[9px] tracking-[0.25em] uppercase" style="color: rgb(168,85,247)">
         ./{group.label}
       </p>
       {i > 0 && <div class="sidebar-collapsed-only mx-3 mb-3 h-px bg-white/[0.06]" />}

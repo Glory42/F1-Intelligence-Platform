@@ -95,7 +95,7 @@ export function GlobalSearch() {
                           {driver.code}
                         </span>
                       </div>
-                      <span className="font-mono text-[9px] text-muted-foreground/70 truncate">
+                      <span className="font-mono text-[9px] text-muted-foreground truncate">
                         {driver.team.name}
                       </span>
                     </div>
@@ -153,7 +153,7 @@ export function GlobalSearch() {
                     </div>
                     <div className="flex flex-col min-w-0">
                       <span className="font-semibold truncate">{circuit.name}</span>
-                      <span className="font-mono text-[9px] text-muted-foreground/70 truncate">{circuit.country}, {circuit.city}</span>
+                      <span className="font-mono text-[9px] text-muted-foreground truncate">{circuit.country}, {circuit.city}</span>
                     </div>
                   </div>
                 </Command.Item>

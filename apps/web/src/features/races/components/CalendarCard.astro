@@ -30,7 +30,7 @@ const isSQDone = race.status === 'sprint_qualifying_done';
     {(isQualiDone || isSprintDone || isSQDone) && (
       <span class={`flex items-center gap-1 font-mono text-[8px] tracking-[0.12em] uppercase px-1.5 py-0.5 border ${
         isQualiDone && !isSprint
-          ? 'border-[rgba(168,85,247,0.3)] text-[rgba(168,85,247,0.7)]'
+          ? 'border-[rgba(168,85,247,0.3)] text-[#a855f7]'
           : 'border-orange-500/30 text-orange-400/70'
       }`}>
         {isQualiDone && !isSprint  ? <><Zap size={9} />quali done</>   :
@@ -55,7 +55,7 @@ const isSQDone = race.status === 'sprint_qualifying_done';
   {((isQualiDone && !isSprint) || ((isSQDone || isSprintDone || isQualiDone) && isSprint)) && (
     <div class="relative z-10 mt-4 pt-3 border-t border-white/[0.06]">
       {isQualiDone && !isSprint && (
-        <a href="/prediction" class="flex items-center gap-1 font-mono text-[9px] tracking-[0.15em] uppercase text-[rgba(168,85,247,0.7)] hover:text-[#a855f7] transition-colors duration-150">
+        <a href="/prediction" class="flex items-center gap-1 font-mono text-[9px] tracking-[0.15em] uppercase text-[#a855f7] hover:text-[#c084fc] transition-colors duration-150">
           <Zap size={10} />race prediction
         </a>
       )}

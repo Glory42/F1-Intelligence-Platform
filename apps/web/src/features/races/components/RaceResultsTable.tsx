@@ -46,7 +46,7 @@ export function RaceResultsTable({ results, year, laps, flColor = '#a855f7' }: P
                   </a>
                   {r.fastestLap && (
                     <>
-                      <span className="font-mono text-[8px] tracking-widest uppercase px-1.5 py-0.5 border" style={{ borderColor: `color-mix(in srgb, ${flColor} 40%, transparent)`, color: `color-mix(in srgb, ${flColor} 80%, transparent)` }}>FL</span>
+                      <span className="font-mono text-[8px] tracking-widest uppercase px-1.5 py-0.5 border" style={{ borderColor: `color-mix(in srgb, ${flColor} 40%, transparent)`, color: flColor }}>FL</span>
                       {lapMsMap.get(r.driver.id) && (
                         <span className="font-mono text-[9px] font-bold" style={{ color: flColor }}>
                           {formatMs(lapMsMap.get(r.driver.id) ?? null)}

@@ -115,7 +115,7 @@ const split = weatherSplit(details.weatherStats);
           <div class="flex justify-between font-mono text-[9px] tracking-widest uppercase text-muted-foreground">
             <span class={split.dry > 0 ? "text-yellow-500/80" : "hidden"}>Dry {split.dry}%</span>
             <span class={split.mixed > 0 ? "text-blue-400/80" : "hidden"}>Mixed {split.mixed}%</span>
-            <span class={split.wet > 0 ? "text-blue-600/80" : "hidden"}>Wet {split.wet}%</span>
+            <span class={split.wet > 0 ? "text-blue-400" : "hidden"}>Wet {split.wet}%</span>
           </div>
         </>
       ) : (

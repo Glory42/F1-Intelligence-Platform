@@ -6,7 +6,7 @@ import DataRow from '@/components/data/DataRow.astro';
 import DriverIdentity from '@/components/identity/DriverIdentity.astro';
 import RankCell from '@/components/data/RankCell.astro';
 import ShareBar from '@/features/standings/components/ShareBar.astro';
-import { getTeamColor } from '@/lib/f1/teamColors';
+import { getTeamColor, readableOnBlack } from '@/lib/f1/teamColors';
 import { formatTitleOdds, titleContention, remainingSessions } from '@/lib/f1/championshipMath';
 import { remainingWeekends, titleRaceSentence } from '@/features/standings/titleScenario';
 import { TitleWhatIf } from '@/features/standings/components/TitleWhatIf';
@@ -39,7 +39,7 @@ const whatIf = weekends.length > 0 && stillIn.length >= 2
   ? {
     weekends,
     contenders: contenders.filter((c) => contention.get(c.id)?.alive),
-    drivers: stillIn.slice(0, CHART_DRIVERS).map((s) => ({ id: s.driver.id, code: s.driver.code, color: getTeamColor(s.driver.team.teamKey) })),
+    drivers: stillIn.slice(0, CHART_DRIVERS).map((s) => ({ id: s.driver.id, code: s.driver.code, color: readableOnBlack(getTeamColor(s.driver.team.teamKey)) })),
   }
   : null;
 const pointsById = new Map(standings.map((s) => [s.driver.id, Number(s.stats.championshipPoints)]));

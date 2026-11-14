@@ -65,7 +65,7 @@ export function WeatherForecast({ lat, lng, cityName, forecast }: WeatherForecas
                 {/* Weather code state icon */}
                 <div className="flex items-center gap-1.5">
                   {getWeatherIcon(day.weatherCode)}
-                  <span className="font-mono text-[9px] text-muted-foreground/60">{day.rainProb}% rain</span>
+                  <span className="font-mono text-[9px] text-muted-foreground">{day.rainProb}% rain</span>
                 </div>
                 {/* Temp */}
                 <div className="flex items-center gap-1">
@@ -77,7 +77,7 @@ export function WeatherForecast({ lat, lng, cityName, forecast }: WeatherForecas
               </div>
             </div>
           ))}
-          <div className="pt-1 flex items-center justify-between font-mono text-[7px] text-muted-foreground/40 uppercase tracking-widest">
+          <div className="pt-1 flex items-center justify-between font-mono text-[7px] text-muted-foreground uppercase tracking-widest">
             <span>Location: {cityName}</span>
             <span>Refreshed: live</span>
           </div>
