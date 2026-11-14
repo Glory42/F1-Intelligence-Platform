@@ -492,6 +492,11 @@ export const raceStoryResponse: RaceStoryResponse = {
   drivers: [
     { driver, finishPosition: 1, positions: [2, 1, 1, 1], gapsMs: [800, 0, 0, 0], intervalsMs: [800, null, null, null], lapsDown: [0, 0, 0, 0] },
     { driver: driverB, finishPosition: 2, positions: [1, 2, 2, 2], gapsMs: [0, 600, 900, 1400], intervalsMs: [null, 600, 900, 1400], lapsDown: [0, 0, 0, 0] },
+    // VER's team-mate: same team colour, so the charts must tell the two lines apart another way.
+    {
+      driver: { ...driver, id: 12, driverNumber: 22, code: 'TSU', firstName: 'Yuki', lastName: 'Tsunoda', fullName: 'Yuki Tsunoda' },
+      finishPosition: 3, positions: [3, 3, 3, 3], gapsMs: [1500, 1700, 2100, 2600], intervalsMs: [700, 1100, 1200, 1200], lapsDown: [0, 0, 0, 0],
+    },
   ],
   battles: [{ chaser: driverB, leader: driver, lapStart: 2, lapEnd: 4, minGapMs: 600 }],
   weather: {
