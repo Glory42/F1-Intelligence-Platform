@@ -1,6 +1,6 @@
 ---
 import { MapPin, CalendarDays, Flag, Zap } from 'lucide-react';
-import { formatDate } from '@/lib/utils';
+import LocalTime from '@/components/data/LocalTime.astro';
 import type { CalendarEntry } from '../calendar';
 
 interface Props {
@@ -49,7 +49,7 @@ const isSQDone = race.status === 'sprint_qualifying_done';
     </a>
   </div>
   <div class="flex items-center gap-1 font-mono text-[9px] text-muted-foreground tracking-widest">
-    <CalendarDays size={10} />{formatDate(date)}
+    <CalendarDays size={10} /><LocalTime datetime={date} format="date" />
   </div>
   {/* Action links: relative z-10 to sit above the stretched overlay */}
   {((isQualiDone && !isSprint) || ((isSQDone || isSprintDone || isQualiDone) && isSprint)) && (

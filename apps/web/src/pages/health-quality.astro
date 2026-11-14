@@ -3,6 +3,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import { api } from '@/lib/api';
 import type { QualityReport, SeasonSummary } from '@/types';
 import YearSelect from '@/components/page/YearSelect.astro';
+import LocalTime from '@/components/data/LocalTime.astro';
 import { ShieldCheck, Wrench, TriangleAlert, CircleAlert, Info } from 'lucide-react';
 
 // Dev-only dashboard: a production request short-circuits to a real 404 before
@@ -54,7 +55,9 @@ const tableNames: Record<string, string> = {
         </div>
         <h1 class="text-2xl font-bold">{year} Data Quality</h1>
         <p class="mt-1 font-mono text-[10px] text-muted-foreground tracking-widest uppercase">
-          {report ? `${report.issueCount} issues · ${report.fixableCount} fixable · generated ${new Date(report.generatedAt).toLocaleString()}` : 'no report generated yet'}
+          {report
+            ? <>{report.issueCount} issues · {report.fixableCount} fixable · generated <LocalTime datetime={report.generatedAt} format="datetime" /></>
+            : 'no report generated yet'}
         </p>
       </div>
       <YearSelect years={seasons} currentYear={year} basePath="/health-quality" />
