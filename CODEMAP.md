@@ -333,6 +333,7 @@ apps/web/
 │   │   ├── prediction/[id].astro  # Historical GP prediction: contribution breakdown, radar compare, what-if lab
 │   │   ├── health-quality.astro   # Dev-only data-quality dashboard (404-guarded outside DEV)
 │   │   ├── history.astro          # /history: tabs Records · Milestones · On this day · Lineage (F1DB)
+│   │   ├── sitemap-dynamic.xml.ts # Detail pages (season's races, predictions, drivers, teams + all circuits) the build-time sitemap can't see
 │   │   ├── compare/
 │   │   │   ├── drivers.astro      # /compare/drivers: driver head-to-head comparison tool
 │   │   │   └── teams.astro        # /compare/teams: team head-to-head comparison tool
@@ -553,7 +554,8 @@ apps/web/
 │   │   ├── sidebarState.ts        # Sidebar collapse cookie: isSidebarCollapsed() + sidebarCookie()
 │   │   ├── legacyRedirects.ts     # legacyRedirect(path, search): retired URLs (prediction recap, /records, /drivers|teams/compare) → their new home
 │   │   ├── canonicalHost.ts       # canonicalHostRedirect(): the production *.pages.dev address → 301 to the custom domain (previews stay)
-│   │   ├── pageCache.ts           # servePageCached(): rendered HTML kept in the edge Cache API (5 min Fri–Mon noon UTC, 1 h between), keyed by path + sorted page params + sidebar cookie (Workers Free: 10 ms CPU)
+│   │   ├── sitemap.ts             # loadSitemapSources(year) + sitemapPaths() + renderUrlset(): the dynamic sitemap
+│   │   ├── pageCache.ts           # servePageCached(): rendered HTML (and the XML/calendar feeds) kept in the edge Cache API (5 min Fri–Mon noon UTC, 1 h between), keyed by path + sorted page params + sidebar cookie (Workers Free: 10 ms CPU)
 │   │   ├── pageQuery.ts           # PAGE_QUERY_PARAMS (every ?param a page reads) + strayQueryRedirect(): unknown params 301 away
 │   │   ├── securityHeaders.ts     # securityHeaders(apiOrigin) + withSecurityHeaders(): HSTS, nosniff, frame/CSP (script sources report-only)
 │   │   ├── utils.ts               # cn() (clsx + tailwind-merge), unwrapSettled(), formatMs/Probability/Date/StopSeconds/AgeFromDays
@@ -590,7 +592,7 @@ apps/web/
 │   │   ├── components/
 │   │   │   ├── layout/navLinks.test.ts       # pure: sidebar groups, utilities, active-destination matching
 │   │   │   └── data/                         # chartScale, labelLayout
-│   │   ├── lib/                              # pure, `node` env: pageTabs / sidebarState / legacyRedirects / canonicalHost / pageCache / pageQuery / securityHeaders / utils
+│   │   ├── lib/                              # pure, `node` env: pageTabs / sidebarState / legacyRedirects / canonicalHost / pageCache / pageQuery / securityHeaders / sitemap / utils
 │   │   │   └── f1/                           # predictionMath (all exports), predictionTerms, championshipMath, teamColors, teamLogos, tyres
 │   │   ├── features/races/ · features/telemetry/  # calendar, raceView + raceEventTabs, gridPenalties, weatherSpells, raceEventDisplay, tyreDegradation, pitBattles · telemetryCompare, trackMap
 │   │   ├── features/predictions/
@@ -616,7 +618,7 @@ apps/web/
 ├── vitest.config.ts                # jsdom is opt-in per file via `// @vitest-environment jsdom`; default env is `node`
 ├── eslint.config.js              # Flat config: tiered `max-lines` (pages 300 / components 250 / lib 200), run via `bun run lint`
 ├── wrangler.toml                  # CF Pages config (name `f1-intelligence-web`): PUBLIC_API_URL (the API's custom domain f1-api.gorkemkaryol.dev) + Pages build vars
-├── astro.config.mjs               # site f1.gorkemkaryol.dev, output: 'server', Cloudflare adapter, React + sitemap (minus /health-quality)
+├── astro.config.mjs               # site f1.gorkemkaryol.dev, output: 'server', Cloudflare adapter, React + sitemap (minus /health-quality, /compare; customSitemaps adds sitemap-dynamic.xml)
 ├── tailwind.config.mjs
 ├── postcss.config.cjs
 ├── .env.example                   # PUBLIC_API_URL
@@ -697,6 +699,7 @@ apps/e2e/
 │       ├── branding.spec.ts        # /: dashboard title carries the brand exactly once
 │       ├── sidebar.spec.ts         # Season/Explore groups, active destination, collapse persists across reloads
 │       ├── security.spec.ts        # security headers on pages; unknown query params 301 to the plain page
+│       ├── sitemap.spec.ts         # /sitemap-dynamic.xml lists the season's detail pages
 │       ├── home-hub.spec.ts        # /: exactly three blocks: next race (schedule, circuit), last race recap, championship
 │       ├── global-search.spec.ts   # Cmd/Ctrl+K opens, shows results, Escape closes (client-side fetch)
 │       ├── prediction.spec.ts      # /prediction tabs + Scorecard, recap URL redirect
