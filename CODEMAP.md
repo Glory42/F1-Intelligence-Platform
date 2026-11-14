@@ -361,7 +361,7 @@ apps/web/
 │   │       ├── index.astro        # Tabs: Standings · Title odds · Pit crews
 │   │       └── [id].astro         # Team profile: tabs This season · Pit crew · History
 │   ├── layouts/
-│   │   └── BaseLayout.astro       # Shared layout: Sidebar + MobileNav, slot, Footer, GlobalSearch; reads the sidebar cookie
+│   │   └── BaseLayout.astro       # Shared layout: Sidebar + MobileNav, slot, Footer, GlobalSearch; reads the sidebar cookie; localiseTimes() on astro:page-load
 │   ├── components/                # Generic, cross-feature only: domain UI lives in features/
 │   │   ├── layout/
 │   │   │   ├── Sidebar.astro      # Desktop collapsible sidebar: search, Season/Explore groups, docs, collapse toggle
@@ -380,6 +380,7 @@ apps/web/
 │   │   │   └── YearSelectLinks.astro  # Year selector using anchor links; used by driver/team profile pages
 │   │   ├── data/                  # Data display
 │   │   │   ├── DataList.astro / DataRow.astro  # Standings-style row list with table roles (rows/cells) for a11y + tests
+│   │   │   ├── LocalTime.astro        # <time data-local-time>: UTC text (labelled) from the server, the visitor's zone after BaseLayout's script
 │   │   │   ├── RankCell.astro         # Rank cell: trophy for P1, highlighted top N
 │   │   │   ├── StatTiles.astro        # Grid of label/value stat tiles
 │   │   │   ├── HeadToHead.astro       # Two-side head-to-head bar rows (driver teammate tab, team page)
@@ -554,6 +555,7 @@ apps/web/
 │   │   ├── sidebarState.ts        # Sidebar collapse cookie: isSidebarCollapsed() + sidebarCookie()
 │   │   ├── legacyRedirects.ts     # legacyRedirect(path, search): retired URLs (prediction recap, /records, /drivers|teams/compare) → their new home
 │   │   ├── canonicalHost.ts       # canonicalHostRedirect(): the production *.pages.dev address → 301 to the custom domain (previews stay)
+│   │   ├── localTime.ts           # formatUtc() / formatLocal() / localiseTimes(): the session/datetime/date formats LocalTime renders
 │   │   ├── sitemap.ts             # loadSitemapSources(year) + sitemapPaths() + renderUrlset(): the dynamic sitemap
 │   │   ├── pageCache.ts           # servePageCached(): rendered HTML (and the XML/calendar feeds) kept in the edge Cache API (5 min Fri–Mon noon UTC, 1 h between), keyed by path + sorted page params + sidebar cookie (Workers Free: 10 ms CPU)
 │   │   ├── pageQuery.ts           # PAGE_QUERY_PARAMS (every ?param a page reads) + strayQueryRedirect(): unknown params 301 away
@@ -592,7 +594,7 @@ apps/web/
 │   │   ├── components/
 │   │   │   ├── layout/navLinks.test.ts       # pure: sidebar groups, utilities, active-destination matching
 │   │   │   └── data/                         # chartScale, labelLayout
-│   │   ├── lib/                              # pure, `node` env: pageTabs / sidebarState / legacyRedirects / canonicalHost / pageCache / pageQuery / securityHeaders / sitemap / utils
+│   │   ├── lib/                              # pure, `node` env: pageTabs / sidebarState / legacyRedirects / canonicalHost / pageCache / pageQuery / securityHeaders / sitemap / localTime (jsdom) / utils
 │   │   │   └── f1/                           # predictionMath (all exports), predictionTerms, championshipMath, teamColors, teamLogos, tyres
 │   │   ├── features/races/ · features/telemetry/  # calendar, raceView + raceEventTabs, gridPenalties, weatherSpells, raceEventDisplay, tyreDegradation, pitBattles · telemetryCompare, trackMap
 │   │   ├── features/predictions/
@@ -700,6 +702,7 @@ apps/e2e/
 │       ├── sidebar.spec.ts         # Season/Explore groups, active destination, collapse persists across reloads
 │       ├── security.spec.ts        # security headers on pages; unknown query params 301 to the plain page
 │       ├── sitemap.spec.ts         # /sitemap-dynamic.xml lists the season's detail pages
+│       ├── local-time.spec.ts      # Tokyo browser: race hero + prediction 'Computed' in local time, after a client-router click too
 │       ├── home-hub.spec.ts        # /: exactly three blocks: next race (schedule, circuit), last race recap, championship
 │       ├── global-search.spec.ts   # Cmd/Ctrl+K opens, shows results, Escape closes (client-side fetch)
 │       ├── prediction.spec.ts      # /prediction tabs + Scorecard, recap URL redirect

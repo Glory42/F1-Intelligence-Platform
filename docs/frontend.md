@@ -98,7 +98,7 @@ src/
 ├── components/         generic, cross-feature only: grouped by role
 │   ├── layout/         Sidebar, MobileNav, NavGroups, Footer, nav model
 │   ├── page/           page chrome: PageHeader, PageTabs, TabIntro, SectionKicker, EmptyState, YearSelect(Links)
-│   ├── data/           data display: DataList/DataRow, StatTiles, RankCell, HeadToHead, LineChart (+ chartScale, labelLayout)
+│   ├── data/           data display: DataList/DataRow, StatTiles, RankCell, HeadToHead, LineChart (+ chartScale, labelLayout), LocalTime
 │   ├── identity/       DriverIdentity, TeamIdentity
 │   └── ui/             Shadcn primitives (table, search-select)
 ├── features/           domain UI, grouped by area (one per sidebar section, plus docs, search, standings, telemetry)
@@ -174,6 +174,10 @@ Year-scoped pages read `?year=` from `Astro.url.searchParams`, defaulting to the
   `DriverRadarCompare.astro`). No heavy animation libraries.
 - Small co-located `<script>` blocks in `.astro` files are fine for view-local behaviour
   (tab toggles, countdowns: see `features/races/raceTabs.ts`).
+- **Times go through `<LocalTime datetime format>`** (`components/data/`), never `toLocaleString()` in
+  frontmatter, which formats in the Worker's zone. The server writes UTC with a "UTC" label; one script in
+  `BaseLayout` rewrites every `time[data-local-time]` into the visitor's zone on each `astro:page-load`.
+  A bare `YYYY-MM-DD` stays as it is: it's a calendar day, not an instant.
 
 ## Styling
 
