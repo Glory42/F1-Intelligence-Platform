@@ -158,6 +158,7 @@ second unrelated feature needs it.
 | `/history` | Records: `history/records` · Milestones: `history/milestones` · On this day: `history/on-this-day?date=MM-DD` (`?date=` param, nearest-day fallback) · Lineage: `history/lineages` |
 | `/docs` · `/docs/[slug]` | Astro content collection (`prerender = true`) |
 | `/health-quality` | `quality?year=`: dev-only, 404-guarded outside `import.meta.env.DEV` |
+| `/sitemap-dynamic.xml` | `races?year=` + `predictions/history?year=` + `drivers?year=` + `teams?year=` + `races/circuits`: the current season's detail pages, which the build-time `@astrojs/sitemap` can't list (`customSitemaps` adds it to `sitemap-index.xml`). Edge-cached like a page |
 
 Year-scoped pages read `?year=` from `Astro.url.searchParams`, defaulting to the current year;
 `YearSelect` / `RaceYearSelect` navigate by changing that param.

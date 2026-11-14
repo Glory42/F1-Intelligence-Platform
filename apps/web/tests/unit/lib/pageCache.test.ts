@@ -77,12 +77,22 @@ describe('page cache', () => {
     ['a missing page', page({}, 404)],
     ['a page that sets a cookie', page({ 'Set-Cookie': 'a=b' })],
     ['a page with its own cache rules', page({ 'Cache-Control': 'private' })],
-    ['a non-HTML response', page({ 'Content-Type': 'application/xml' })],
+    ['a JSON response', page({ 'Content-Type': 'application/json' })],
   ])('never stores %s', async (_label, render) => {
     await visit(render);
     await visit(render);
 
     expect(renders).toBe(2);
+  });
+
+  it.each([
+    ['the dynamic sitemap', 'application/xml; charset=utf-8'],
+    ['the race calendar', 'text/calendar; charset=utf-8'],
+  ])('stores %s like a page', async (_label, type) => {
+    await visit(page({ 'Content-Type': type }));
+    await visit(page({ 'Content-Type': type }));
+
+    expect(renders).toBe(1);
   });
 
   it.each([

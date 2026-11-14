@@ -39,9 +39,13 @@ function readCookie(header: string | null, name: string): string | undefined {
   return pair?.slice(name.length + 1);
 }
 
+// Pages plus the feeds built like them (sitemap, calendar): each render reads the same cached API.
+const CACHEABLE_TYPES = ['text/html', 'application/xml', 'text/calendar'];
+
 function isCacheablePage(res: Response): boolean {
-  const html = (res.headers.get('Content-Type') ?? '').includes('text/html');
-  return res.status === 200 && html && !res.headers.has('Set-Cookie') && !res.headers.has('Cache-Control');
+  const type = res.headers.get('Content-Type') ?? '';
+  const cacheable = CACHEABLE_TYPES.some((t) => type.includes(t));
+  return res.status === 200 && cacheable && !res.headers.has('Set-Cookie') && !res.headers.has('Cache-Control');
 }
 
 // Only the edge copy carries Cache-Control: a browser copy would ignore the sidebar cookie.
