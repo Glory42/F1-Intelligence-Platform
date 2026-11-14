@@ -7,7 +7,7 @@
     "dev:api": "cd apps/api && bun run dev",
     "dev:web": "cd apps/web && bun run dev",
     "build": "cd apps/web && bun run build",
-    "install:all": "cd apps/api && bun install && cd ../web && bun install && cd ../e2e && bun install",
+    "install:all": "cd apps/api && bun install && cd ../web && bun install && cd ../e2e && bun install && cd ../og && bun install",
     "test:e2e": "cd apps/e2e && bun run test",
     "prepare": "husky"
   },
