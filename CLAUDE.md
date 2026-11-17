@@ -141,6 +141,8 @@ Exceeding Neon's compute (100 CU-h/mo) or egress (5 GB/mo) suspends the DB until
   weekend or Wednesday's F1DB import; ADR 0013). A manual write to Neon outside those needs a `SNAPSHOT_VERSION` bump.
 - Site pages are kept at the edge for 5 min on race weekends and 1 h between (`apps/web/src/lib/pageCache.ts`):
   Workers Free cuts a render off at 10 ms of CPU, and a typical page takes about that.
+- Each site-to-API `fetch` is a billed Worker request even on an API cache hit, so the site keeps API answers in
+  its own edge cache for at most a page's lifetime (`apps/web/src/lib/apiCache.ts`).
 - Backfills run locally in bounded chunks and check `storage_guard` first: never on Render.
 - Tests never touch Neon (see "Where tests live").
 Full rules and numbers: `docs/plans/intelligence-platform-roadmap.md` §1–§2.

@@ -8,11 +8,12 @@ import type {
   TitleOddsResponse, TeammateBattle, RacecraftRow, RaceStoryResponse, TelemetryResponse, QualifyingSession,
   HistoryRecords, HistoryMilestones, ConstructorLineage, DriverHistory, TeamHistory, RaceRecap, OnThisDay,
  TeamPitStop, CircuitTelemetry, GlobalSearchResponse } from '@/types';
+import { defaultApiCache, fetchApiCached } from '@/lib/apiCache';
 
 const API_URL = import.meta.env.PUBLIC_API_URL ?? 'http://localhost:8787';
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`);
+  const res = await fetchApiCached(`${API_URL}${path}`, defaultApiCache());
   if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
   const json = (await res.json()) as { data: T; error: null } | { data: null; error: { message: string } };
   if (json.error) throw new Error(json.error.message);
