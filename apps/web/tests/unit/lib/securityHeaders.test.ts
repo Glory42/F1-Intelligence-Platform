@@ -6,20 +6,24 @@ const API = 'https://f1-api.example';
 describe('securityHeaders', () => {
   const headers = securityHeaders(API);
 
-  it('enforces the protections that cannot break a page', () => {
+  it('enforces the transport and framing protections', () => {
     expect(headers['Strict-Transport-Security']).toBe('max-age=31536000; includeSubDomains');
     expect(headers['X-Content-Type-Options']).toBe('nosniff');
     expect(headers['X-Frame-Options']).toBe('DENY');
     expect(headers['Content-Security-Policy']).toContain("frame-ancestors 'none'");
   });
 
-  it('only reports the script and connect policy while it is being tuned', () => {
-    expect(headers['Content-Security-Policy']).not.toContain('script-src');
-    expect(headers['Content-Security-Policy-Report-Only']).toContain("script-src 'self'");
+  it('enforces the source policy instead of only reporting it', () => {
+    expect(headers['Content-Security-Policy']).toContain("default-src 'self'");
+    expect(headers).not.toHaveProperty('Content-Security-Policy-Report-Only');
+  });
+
+  it("allows the ClientRouter's empty data: script", () => {
+    expect(headers['Content-Security-Policy']).toMatch(/script-src [^;]*data:/);
   });
 
   it('lets the client-fetch islands reach the API', () => {
-    expect(headers['Content-Security-Policy-Report-Only']).toMatch(new RegExp(`connect-src [^;]*${API}`));
+    expect(headers['Content-Security-Policy']).toMatch(new RegExp(`connect-src [^;]*${API}`));
   });
 });
 

@@ -79,10 +79,11 @@ Configured in `apps/api/src/main.ts`. Only `GET` and `OPTIONS` methods are allow
 
 - **Site** (`apps/web/src/lib/securityHeaders.ts`, applied in `src/middleware.ts` to every SSR response,
   edge-cache hits and redirects included): HSTS, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`,
-  `Permissions-Policy`, and an enforced CSP limited to `frame-ancestors`, `base-uri`, `object-src` and
-  `form-action`. Script, style, font, image and connect sources are in `Content-Security-Policy-Report-Only`:
-  watch the browser console on each page type, and once it's clean for a week move them into the enforced
-  header. Prerendered `/docs` pages and static assets are served by Pages directly and don't get these headers.
+  `Permissions-Policy`, and an enforced `Content-Security-Policy` (script, style, font, image, connect,
+  framing, `base-uri`, `object-src`, `form-action`). It ran report-only for a week first; the only violation
+  was Astro's ClientRouter inserting an empty `data:` module script on client-side navigation, so
+  `script-src` allows `data:`. A new third-party origin (fonts, analytics, an API host) must be added to
+  `securityHeaders.ts` or the browser blocks it. Prerendered `/docs` pages and static assets are served by Pages directly and don't get these headers.
 - **API** (`apps/api/src/main.ts`): `X-Content-Type-Options: nosniff` on every response.
 
 ### Cache keys

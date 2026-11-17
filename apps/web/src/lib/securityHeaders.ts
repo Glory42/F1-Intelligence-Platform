@@ -1,17 +1,22 @@
+
 export type SecurityHeaders = Record<string, string>;
 
-// Directives that can't break a page are enforced. Script, style and connect sources stay
-// report-only until a week of clean consoles: Astro islands and view transitions run inline scripts.
+// Astro's ClientRouter appends an empty `data:` module script on every client-side navigation, so
+// script-src allows data:; 'unsafe-inline' is already needed for its inline island scripts.
 export function securityHeaders(apiOrigin: string): SecurityHeaders {
-  const reportOnly = [
+  const policy = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
+    "script-src 'self' 'unsafe-inline' data: https://static.cloudflareinsights.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: https:",
     "media-src 'self' https:",
     `connect-src 'self' ${apiOrigin} https://cloudflareinsights.com`,
     "frame-src 'none'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "form-action 'self'",
   ];
   return {
     'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
@@ -19,8 +24,7 @@ export function securityHeaders(apiOrigin: string): SecurityHeaders {
     'X-Frame-Options': 'DENY',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
-    'Content-Security-Policy': "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'",
-    'Content-Security-Policy-Report-Only': reportOnly.join('; '),
+    'Content-Security-Policy': policy.join('; '),
   };
 }
 
