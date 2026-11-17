@@ -112,10 +112,32 @@ race weekends, the Wednesday F1DB import) need nothing: copies only hold until t
 R2 bills past its free allowance (1M writes, 10M reads, 10 GB a month) instead of refusing, so check
 R2 → Overview after the first weeks. Answers from the store carry `x-snapshot: hit`.
 
+### API reads from the site
+
+Every `fetch` from the site's Pages Functions to `f1-api.gorkemkaryol.dev` is a billed Worker request (Workers
+Free: 100k a day, shared by every Worker and Pages Function on the account), even when the API answers from
+its edge cache. So `apps/web/src/lib/apiCache.ts` keeps each API answer in the site's own edge cache, for the
+API's max-age but never longer than a page is kept (5 min on race weekends, 1 h between). A Service Binding
+would skip the hop entirely, but Cloudflare's docs don't say whether binding calls count toward the Free
+daily limit, or whether the API's Cache API still works when it's reached through one.
+
 ### Dev-only routes
 
 `GET /api/quality` and `GET /api/health/db` return 404 when `ENVIRONMENT = "production"`: both read Neon
 uncached on every hit. `/api/health` (no DB) stays public for uptime checks.
+
+### Crawlers on the API (Cloudflare dashboard, one-time)
+
+The API's `robots.txt` disallows everything, but Meta's `meta-webindexer` ignores it and calls API URLs
+directly; each call is a billed Worker request. Block crawlers before the Worker runs: `gorkemkaryol.dev`
+zone → Security → WAF → Custom rules → Create rule, action **Block**, expression:
+
+```
+(http.host eq "f1-api.gorkemkaryol.dev" and (cf.client.bot or http.user_agent contains "meta-webindexer" or http.user_agent contains "meta-externalagent"))
+```
+
+Nothing legitimate is a bot there: the site's server fetches send no crawler user agent, and browsers
+(search, compare) aren't verified bots.
 
 ### Rate limiting (Cloudflare dashboard, one-time)
 

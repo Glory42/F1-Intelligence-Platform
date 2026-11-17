@@ -563,6 +563,7 @@ apps/web/
 │   │   ├── localTime.ts           # formatUtc() / formatLocal() / localiseTimes(): the session/datetime/date formats LocalTime renders
 │   │   ├── sitemap.ts             # loadSitemapSources(year) + sitemapPaths() + renderUrlset(): the dynamic sitemap
 │   │   ├── shareImage.ts          # shareImageKey/Url(), raceShareImage(), predictionShareImage(), race/predictionShareCard(): shared with apps/og (ADR 0016)
+│   │   ├── apiCache.ts            # fetchApiCached(): API answers kept in the site's edge Cache API (API max-age, capped at the page lifetime): each site→API fetch is a billed Worker request
 │   │   ├── pageCache.ts           # servePageCached(): rendered HTML (and the XML/calendar feeds) kept in the edge Cache API (5 min Fri–Mon noon UTC, 1 h between), keyed by path + sorted page params + sidebar cookie (Workers Free: 10 ms CPU)
 │   │   ├── pageQuery.ts           # PAGE_QUERY_PARAMS (every ?param a page reads) + strayQueryRedirect(): unknown params 301 away
 │   │   ├── securityHeaders.ts     # securityHeaders(apiOrigin) + withSecurityHeaders(): HSTS, nosniff, frame/CSP (script sources report-only)
@@ -600,7 +601,7 @@ apps/web/
 │   │   ├── components/
 │   │   │   ├── layout/navLinks.test.ts       # pure: sidebar groups, utilities, active-destination matching
 │   │   │   └── data/                         # chartScale, labelLayout, chartText
-│   │   ├── lib/                              # pure, `node` env: pageTabs / sidebarState / legacyRedirects / canonicalHost / pageCache / pageQuery / securityHeaders / sitemap / icalendar / localTime (jsdom) / shareImage / utils
+│   │   ├── lib/                              # pure, `node` env: pageTabs / sidebarState / legacyRedirects / canonicalHost / pageCache / apiCache / pageQuery / securityHeaders / sitemap / icalendar / localTime (jsdom) / shareImage / utils
 │   │   │   └── f1/                           # predictionMath (all exports), predictionTerms, championshipMath, teamColors, teamLogos, tyres
 │   │   ├── features/races/ · features/telemetry/  # calendar, raceCalendarFeed, raceView + raceEventTabs, gridPenalties, weatherSpells, raceEventDisplay, tyreDegradation, pitBattles · telemetryCompare, trackMap
 │   │   ├── features/predictions/
