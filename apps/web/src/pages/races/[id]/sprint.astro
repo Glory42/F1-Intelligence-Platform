@@ -13,12 +13,14 @@ import CircuitStatsGrid from '@/features/races/components/CircuitStatsGrid.astro
 import { loadRacePageData } from '@/features/races/loadRacePageData';
 import { Zap } from 'lucide-react';
 import { SPRINT_ACCENT } from '@/features/predictions/types';
+import { missingPageStatus } from '@/lib/renderHealth';
 
 const {
   error, race, results, qualifying: sqGrid, laps, driverMap, events, eventTabs, raceYear, prediction, podium, confidence,
   predCorrect, actualWinnerName, isDone: isSprintDone, status, sessionDate, countdownTo, conditions, fastestLap,
   yearItems, links, tabs, defaultTab,
 } = await loadRacePageData('sprint', Number(Astro.params.id));
+Astro.response.status = missingPageStatus(!error);
 ---
 
 <BaseLayout title={race ? `Sprint · ${race.name}` : 'Sprint Race'}>

@@ -4,9 +4,11 @@ import { predictionShareImage } from '@/lib/shareImage';
 import { buildPredictionPageData } from '@/features/predictions/buildPredictionPageData';
 import { PREDICTION_COPY } from '@/features/predictions/predictionCopy';
 import PredictionPageBody from '@/features/predictions/components/PredictionPageBody.astro';
+import { missingPageStatus } from '@/lib/renderHealth';
 
 const { id } = Astro.params;
 const data = await buildPredictionPageData('gp', Number(id));
+Astro.response.status = missingPageStatus(data.race !== null);
 const copy = PREDICTION_COPY.gp;
 const title = data.race ? copy.pageTitle(data.race.name) : copy.fallbackTitle;
 ---

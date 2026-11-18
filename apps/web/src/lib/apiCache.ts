@@ -1,4 +1,6 @@
-import { defaultPageCache, pageCacheControl, type PageCache } from '@/lib/pageCache';
+import { defaultPageCache, type PageCache } from '@/lib/pageCache';
+import { BUILD_ID } from '@/lib/buildId';
+import { isWriteWindow, pageHoldSeconds } from '@/lib/pageHold';
 
 // Each fetch to the API's public URL is a billed Worker request (100k/day on Workers Free, shared
 // with every Worker on the account), even when the API answers from its own edge cache.
@@ -10,11 +12,20 @@ function maxAgeSeconds(cacheControl: string): number {
   return Number(/max-age=(\d+)/.exec(cacheControl)?.[1] ?? 0);
 }
 
-// Held no longer than a page is, so a backfill or SNAPSHOT_VERSION bump shows up as fast as before.
+// Held as long as a page is: between write windows the API's answer can't change whatever its
+// max-age (ADR 0013), and inside one its own shorter max-age wins.
 function storedCacheControl(apiCacheControl: string, now: Date): string | null {
-  if (!apiCacheControl.includes('public')) return null;
-  const maxAge = Math.min(maxAgeSeconds(apiCacheControl), maxAgeSeconds(pageCacheControl(now)));
-  return maxAge > 0 ? `public, max-age=${maxAge}` : null;
+  const apiMaxAge = maxAgeSeconds(apiCacheControl);
+  if (!apiCacheControl.includes('public') || apiMaxAge <= 0) return null;
+  const hold = pageHoldSeconds(now);
+  return `public, max-age=${isWriteWindow(now) ? Math.min(apiMaxAge, hold) : hold}`;
+}
+
+// The build is part of the key so a deploy (the way to show a manual write early) starts fresh.
+function cacheKey(url: string): Request {
+  const key = new URL(url);
+  key.searchParams.set('__build', BUILD_ID);
+  return new Request(key, { method: 'GET' });
 }
 
 export async function fetchApiCached(
@@ -24,7 +35,7 @@ export async function fetchApiCached(
   now: Date = new Date(),
 ): Promise<Response> {
   if (!cache) return load(url);
-  const key = new Request(url, { method: 'GET' });
+  const key = cacheKey(url);
   const hit = await cache.match(key).catch(() => undefined);
   if (hit) return hit;
 

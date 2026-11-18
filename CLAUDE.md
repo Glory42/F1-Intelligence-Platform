@@ -139,10 +139,13 @@ Exceeding Neon's compute (100 CU-h/mo) or egress (5 GB/mo) suspends the DB until
   and a lapsed copy when Neon errors (ADR 0005). In-progress data is cached 10 min on race weekends, 1 h between.
 - Behind it, `snapshotStore()` keeps one global copy per URL in R2, held until the next write window (race
   weekend or Wednesday's F1DB import; ADR 0013). A manual write to Neon outside those needs a `SNAPSHOT_VERSION` bump.
-- Site pages are kept at the edge for 5 min on race weekends and 1 h between (`apps/web/src/lib/pageCache.ts`):
-  Workers Free cuts a render off at 10 ms of CPU, and a typical page takes about that.
+- Site pages are kept at the edge 10 min inside a write window, else until the next window or 00:00 UTC
+  (`apps/web/src/lib/pageHold.ts`): Workers Free cuts a render off at 10 ms of CPU and an uncached page takes
+  15–100 ms. One copy per URL and build (no cookie in the key); a render that saw an API outage is never kept.
+  A manual Neon write shows on the site early only after a redeploy (the build id is in every key).
 - Each site-to-API `fetch` is a billed Worker request even on an API cache hit, so the site keeps API answers in
-  its own edge cache for at most a page's lifetime (`apps/web/src/lib/apiCache.ts`).
+  its own edge cache for a page's lifetime (`apps/web/src/lib/apiCache.ts`).
+- Crawlers that ignore robots.txt are blocked by a zone WAF rule before any Worker runs (`docs/deployment.md`).
 - Backfills run locally in bounded chunks and check `storage_guard` first: never on Render.
 - Tests never touch Neon (see "Where tests live").
 Full rules and numbers: `docs/plans/intelligence-platform-roadmap.md` §1–§2.

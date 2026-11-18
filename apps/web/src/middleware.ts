@@ -2,6 +2,7 @@ import { defineMiddleware } from 'astro:middleware';
 import { legacyRedirect } from '@/lib/legacyRedirects';
 import { canonicalHostRedirect } from '@/lib/canonicalHost';
 import { defaultPageCache, servePageCached, type RunInBackground } from '@/lib/pageCache';
+import { trackRenderHealth } from '@/lib/renderHealth';
 import { strayQueryRedirect } from '@/lib/pageQuery';
 import { securityHeaders, withSecurityHeaders } from '@/lib/securityHeaders';
 
@@ -18,6 +19,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const ctx = (context.locals as CloudflareLocals).runtime?.ctx;
   const runInBackground: RunInBackground = (work) => (ctx ? ctx.waitUntil(work) : void work);
   const cache = import.meta.env.DEV ? undefined : defaultPageCache();
-  const res = await servePageCached(context.request, () => next(), cache, runInBackground);
+  const res = await trackRenderHealth((health) => servePageCached(context.request, () => next(), cache, {
+    runInBackground,
+    degraded: () => health.degraded,
+  }));
   return withSecurityHeaders(res, SECURITY_HEADERS);
 });

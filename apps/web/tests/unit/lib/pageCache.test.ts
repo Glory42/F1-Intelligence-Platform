@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { pageCacheControl, pageCacheKey, servePageCached, type PageCache } from '@/lib/pageCache';
+import { pageCacheKey, servePageCached, type PageCache } from '@/lib/pageCache';
 
 class FakePageCache implements PageCache {
   readonly entries = new Map<string, Response>();
@@ -22,9 +22,13 @@ describe('page cache', () => {
     renders += 1;
     return new Response(`render ${renders}`, { status, headers: { 'Content-Type': 'text/html', ...headers } });
   };
-  const visit = async (render = page(), init: RequestInit = {}, path = '/drivers') => {
-    const res = await servePageCached(new Request(`https://f1.example${path}`, init), render, cache, (work) => {
-      pending.push(work);
+  const runInBackground = (work: Promise<unknown>) => {
+    pending.push(work);
+  };
+  const visit = async (render = page(), init: RequestInit = {}, path = '/drivers', degraded = () => false) => {
+    const res = await servePageCached(new Request(`https://f1.example${path}`, init), render, cache, {
+      runInBackground,
+      degraded,
     });
     await Promise.all(pending);
     return res;
@@ -52,29 +56,51 @@ describe('page cache', () => {
     expect(repeat.headers.get('Cache-Control')).toBeNull();
   });
 
-  it('renders separately for a collapsed and an expanded sidebar', async () => {
+  it('serves one copy whatever sidebar state the visitor has saved', async () => {
     await visit(page(), { headers: { Cookie: 'sidebar=collapsed' } });
     const res = await visit(page(), { headers: { Cookie: 'theme=dark; sidebar=expanded' } });
 
-    expect(await res.text()).toBe('render 2');
+    expect(await res.text()).toBe('render 1');
+  });
+
+  it('keeps a not-found page: it is the same on every render', async () => {
+    await visit(page({}, 404));
+    const res = await visit(page({}, 404));
+
+    expect(res.status).toBe(404);
+    expect(renders).toBe(1);
+  });
+
+  it('never keeps a render that showed a fallback for an API outage', async () => {
+    const first = await visit(page(), {}, '/drivers', () => true);
+    await visit();
+
+    expect(await first.text()).toBe('render 1');
+    expect(renders).toBe(2);
+  });
+
+  it('starts a fresh set of copies with every build', () => {
+    const url = new URL('https://f1.example/drivers');
+
+    expect(pageCacheKey(url, 'build-a').url).not.toBe(pageCacheKey(url, 'build-b').url);
   });
 
   it('keys each tab and season variant as its own page', () => {
-    const tab = pageCacheKey(new URL('https://f1.example/drivers?tab=racecraft'), null).url;
-    const season = pageCacheKey(new URL('https://f1.example/drivers?year=2024'), null).url;
+    const tab = pageCacheKey(new URL('https://f1.example/drivers?tab=racecraft')).url;
+    const season = pageCacheKey(new URL('https://f1.example/drivers?year=2024')).url;
 
     expect(tab).not.toBe(season);
   });
 
   it('keys the same tab and season in either param order as one page', () => {
-    const one = pageCacheKey(new URL('https://f1.example/drivers?year=2024&tab=racecraft'), null).url;
-    const other = pageCacheKey(new URL('https://f1.example/drivers?tab=racecraft&year=2024'), null).url;
+    const one = pageCacheKey(new URL('https://f1.example/drivers?year=2024&tab=racecraft')).url;
+    const other = pageCacheKey(new URL('https://f1.example/drivers?tab=racecraft&year=2024')).url;
 
     expect(one).toBe(other);
   });
 
   it.each([
-    ['a missing page', page({}, 404)],
+    ['a server error page', page({}, 503)],
     ['a page that sets a cookie', page({ 'Set-Cookie': 'a=b' })],
     ['a page with its own cache rules', page({ 'Cache-Control': 'private' })],
     ['a JSON response', page({ 'Content-Type': 'application/json' })],
@@ -95,30 +121,18 @@ describe('page cache', () => {
     expect(renders).toBe(1);
   });
 
-  it.each([
-    ['Thursday night', '2026-06-18T23:59:00Z', 'public, max-age=3600'],
-    ['Friday morning', '2026-06-19T00:00:00Z', 'public, max-age=300'],
-    ['Sunday night', '2026-06-21T23:00:00Z', 'public, max-age=300'],
-    ['Monday morning', '2026-06-22T11:59:00Z', 'public, max-age=300'],
-    ['Monday noon', '2026-06-22T12:00:00Z', 'public, max-age=3600'],
-  ])('keeps a page rendered on %s for %s', (_label, iso, expected) => {
-    expect(pageCacheControl(new Date(iso))).toBe(expected);
-  });
-
-  it('stores the edge copy with the lifetime for the moment it was rendered', async () => {
-    const wednesday = new Date('2026-06-17T12:00:00Z');
-    await servePageCached(new Request('https://f1.example/drivers'), page(), cache, (work) => {
-      pending.push(work);
-    }, wednesday);
+  it('stores the edge copy with the hold for the moment it was rendered', async () => {
+    const tuesday = new Date('2026-06-16T22:00:00Z');
+    await servePageCached(new Request('https://f1.example/drivers'), page(), cache, { runInBackground, now: tuesday });
     await Promise.all(pending);
 
     const [stored] = cache.entries.values();
 
-    expect(stored.headers.get('Cache-Control')).toBe('public, max-age=3600');
+    expect(stored.headers.get('Cache-Control')).toBe('public, max-age=7200');
   });
 
   it('always renders when no edge cache is available (astro dev, *.pages.dev)', async () => {
-    const res = await servePageCached(new Request('https://f1.example/'), page(), undefined, () => undefined);
+    const res = await servePageCached(new Request('https://f1.example/'), page(), undefined, { runInBackground });
 
     expect(await res.text()).toBe('render 1');
   });

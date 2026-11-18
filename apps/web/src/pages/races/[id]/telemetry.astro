@@ -11,6 +11,7 @@ import { getTeamColor, readableOnBlack } from '@/lib/f1/teamColors';
 import { formatMs, unwrapSettled } from '@/lib/utils';
 import { lapDelta, miniSectorWinners } from '@/features/telemetry/telemetryCompare';
 import type { QualifyingSession } from '@/types';
+import { missingPageStatus } from '@/lib/renderHealth';
 
 const { id } = Astro.params;
 const params = Astro.url.searchParams;
@@ -23,6 +24,7 @@ const [raceResult, telemetryResult] = await Promise.allSettled([
 ]);
 const race = unwrapSettled(raceResult, null)?.race ?? null;
 const telemetry = unwrapSettled(telemetryResult, null);
+Astro.response.status = missingPageStatus(race !== null);
 const [lapA, lapB] = telemetry?.laps ?? [];
 
 const colorA = lapA ? getTeamColor(lapA.driver.team.teamKey) : '#a855f7';

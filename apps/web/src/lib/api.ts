@@ -9,12 +9,27 @@ import type {
   HistoryRecords, HistoryMilestones, ConstructorLineage, DriverHistory, TeamHistory, RaceRecap, OnThisDay,
  TeamPitStop, CircuitTelemetry, GlobalSearchResponse } from '@/types';
 import { defaultApiCache, fetchApiCached } from '@/lib/apiCache';
+import { isTransientApiStatus, reportApiFailure } from '@/lib/apiFailure';
 
 const API_URL = import.meta.env.PUBLIC_API_URL ?? 'http://localhost:8787';
 
+async function load(path: string): Promise<Response> {
+  try {
+    return await fetchApiCached(`${API_URL}${path}`, defaultApiCache());
+  } catch (e) {
+    reportApiFailure();
+    throw e;
+  }
+}
+
 async function get<T>(path: string): Promise<T> {
-  const res = await fetchApiCached(`${API_URL}${path}`, defaultApiCache());
-  if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
+  const res = await load(path);
+  if (!res.ok) {
+    if (isTransientApiStatus(res.status)) reportApiFailure();
+    // The body is never read: cancel it so the connection doesn't stay open.
+    res.body?.cancel().catch(() => undefined);
+    throw new Error(`API ${res.status}: ${path}`);
+  }
   const json = (await res.json()) as { data: T; error: null } | { data: null; error: { message: string } };
   if (json.error) throw new Error(json.error.message);
   return json.data;
