@@ -5,11 +5,6 @@ import SiteLogo from './SiteLogo.astro';
 import NavGroups from './NavGroups.astro';
 import { activeDestination, buildNavGroups, buildNavUtilities } from './navLinks';
 
-interface Props {
-  collapsed: boolean;
-}
-
-const { collapsed } = Astro.props;
 const groups = buildNavGroups();
 const utilities = buildNavUtilities(import.meta.env.DEV);
 const active = activeDestination(groups, Astro.url.pathname);
@@ -59,8 +54,8 @@ const active = activeDestination(groups, Astro.url.pathname);
       id="sidebar-toggle"
       type="button"
       aria-controls="site-sidebar"
-      aria-expanded={collapsed ? 'false' : 'true'}
-      aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      aria-expanded="true"
+      aria-label="Collapse sidebar"
       class="press flex h-8 items-center gap-3 rounded-md px-3 text-[12px] text-muted-foreground hover:bg-white/[0.03] hover:text-foreground transition-colors duration-150"
     >
       <ChevronsLeft size={14} className="sidebar-label shrink-0" />
@@ -73,16 +68,21 @@ const active = activeDestination(groups, Astro.url.pathname);
 <script>
   import { sidebarCookie } from '@/lib/sidebarState';
 
+  function showState(toggle: HTMLElement, collapsed: boolean) {
+    toggle.setAttribute('aria-expanded', String(!collapsed));
+    toggle.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+  }
+
   function initSidebarToggle() {
     const toggle = document.getElementById('sidebar-toggle');
     if (!toggle) return;
+    const root = document.documentElement;
+    showState(toggle, root.dataset.sidebar === 'collapsed');
     toggle.addEventListener('click', () => {
-      const root = document.documentElement;
       const collapsed = root.dataset.sidebar !== 'collapsed';
       root.dataset.sidebar = collapsed ? 'collapsed' : 'expanded';
       document.cookie = sidebarCookie(collapsed);
-      toggle.setAttribute('aria-expanded', String(!collapsed));
-      toggle.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+      showState(toggle, collapsed);
     });
   }
 

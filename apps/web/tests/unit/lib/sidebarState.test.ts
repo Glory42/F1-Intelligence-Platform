@@ -1,25 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { SIDEBAR_COOKIE, isSidebarCollapsed, sidebarCookie } from '@/lib/sidebarState';
+import { SIDEBAR_COLLAPSED_PAIR, sidebarCookie } from '@/lib/sidebarState';
+
+const pairOf = (cookie: string) => cookie.split(';')[0];
 
 describe('sidebar collapse state', () => {
-  it('reads a collapsed sidebar back from the cookie it writes', () => {
-    const [pair] = sidebarCookie(true).split(';');
-    const [name, value] = pair.split('=');
-
-    expect(name).toBe(SIDEBAR_COOKIE);
-    expect(isSidebarCollapsed(value)).toBe(true);
+  it('writes the pair the layout reads back as collapsed', () => {
+    expect(pairOf(sidebarCookie(true))).toBe(SIDEBAR_COLLAPSED_PAIR);
   });
 
-  it('reads an expanded sidebar back from the cookie it writes', () => {
-    const value = sidebarCookie(false).split(';')[0].split('=')[1];
-
-    expect(isSidebarCollapsed(value)).toBe(false);
-  });
-
-  it('starts expanded when there is no cookie or it holds anything unexpected', () => {
-    expect(isSidebarCollapsed(undefined)).toBe(false);
-    expect(isSidebarCollapsed('')).toBe(false);
-    expect(isSidebarCollapsed('yes please')).toBe(false);
+  it('writes something else for an expanded sidebar', () => {
+    expect(pairOf(sidebarCookie(false))).not.toBe(SIDEBAR_COLLAPSED_PAIR);
   });
 
   it('remembers the choice site-wide for a year', () => {
