@@ -4,7 +4,7 @@ import Sidebar from '@/components/layout/Sidebar.astro';
 import MobileNav from '@/components/layout/MobileNav.astro';
 import Footer from '@/components/layout/Footer.astro';
 import { GlobalSearch } from '@/features/search/components/GlobalSearch';
-import { SIDEBAR_COOKIE, isSidebarCollapsed } from '@/lib/sidebarState';
+import { SIDEBAR_COLLAPSED_PAIR } from '@/lib/sidebarState';
 import { ClientRouter, fade } from 'astro:transitions';
 
 interface Props {
@@ -20,14 +20,24 @@ const {
 const fullTitle = `${title} | ${SITE_NAME}`;
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 const ogImageURL = new URL(image, Astro.site);
-const sidebarCollapsed = isSidebarCollapsed(Astro.cookies.get(SIDEBAR_COOKIE)?.value);
+const collapsedCookie = SIDEBAR_COLLAPSED_PAIR;
 ---
 
 <!doctype html>
-<html lang="en" class="dark scroll-smooth" data-sidebar={sidebarCollapsed ? 'collapsed' : 'expanded'}>
+<html lang="en" class="dark scroll-smooth" data-sidebar="expanded">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- One cached copy serves every visitor, so the collapsed sidebar is applied here, before first paint,
+         and on each client-side navigation (the router copies the new page's <html> attributes). -->
+    <script is:inline define:vars={{ collapsedCookie }}>
+      const sidebarState = () => (document.cookie.split('; ').includes(collapsedCookie) ? 'collapsed' : 'expanded');
+      document.documentElement.dataset.sidebar = sidebarState();
+      if (!window.sidebarSwapHooked) {
+        window.sidebarSwapHooked = true;
+        document.addEventListener('astro:before-swap', (e) => { e.newDocument.documentElement.dataset.sidebar = sidebarState(); });
+      }
+    </script>
     <meta name="description" content={description} />
     <title>{fullTitle}</title>
     <link rel="canonical" href={canonicalURL} />
@@ -51,7 +61,7 @@ const sidebarCollapsed = isSidebarCollapsed(Astro.cookies.get(SIDEBAR_COOKIE)?.v
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
   </head>
   <body class="min-h-screen bg-background text-foreground antialiased font-sans">
-    <Sidebar collapsed={sidebarCollapsed} />
+    <Sidebar />
     <MobileNav />
 
     <div class="flex min-h-screen flex-col md:pl-[var(--sidebar-w)] transition-[padding] duration-200 ease-spring">

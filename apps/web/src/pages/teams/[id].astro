@@ -10,10 +10,12 @@ import EmptyState from '@/components/page/EmptyState.astro';
 import { getTeamColor } from '@/lib/f1/teamColors';
 import { getTeamLogo } from '@/lib/f1/teamLogos';
 import { TEAM_TABS, loadTeamPageData } from '@/features/teams/loadTeamPageData';
+import { missingPageStatus } from '@/lib/renderHealth';
 
 const {
   tab, year, yearLinks, error, career, detail: data, headToHead, pitCrewRankings, teamPitStops, hasPitCrewData, teamHistory,
 } = await loadTeamPageData(Astro.url, Number(Astro.params.id));
+Astro.response.status = missingPageStatus(!error);
 const team = data?.team;
 ---
 

@@ -116,8 +116,9 @@ R2 → Overview after the first weeks. Answers from the store carry `x-snapshot:
 
 Every `fetch` from the site's Pages Functions to `f1-api.gorkemkaryol.dev` is a billed Worker request (Workers
 Free: 100k a day, shared by every Worker and Pages Function on the account), even when the API answers from
-its edge cache. So `apps/web/src/lib/apiCache.ts` keeps each API answer in the site's own edge cache, for the
-API's max-age but never longer than a page is kept (5 min on race weekends, 1 h between). A Service Binding
+its edge cache. So `apps/web/src/lib/apiCache.ts` keeps each API answer in the site's own edge cache as long
+as a page is kept (`apps/web/src/lib/pageHold.ts`: 10 min inside a write window, else until the next window or
+00:00 UTC; inside a window the API's shorter max-age wins). A Service Binding
 would skip the hop entirely, but Cloudflare's docs don't say whether binding calls count toward the Free
 daily limit, or whether the API's Cache API still works when it's reached through one.
 
@@ -126,18 +127,33 @@ daily limit, or whether the API's Cache API still works when it's reached throug
 `GET /api/quality` and `GET /api/health/db` return 404 when `ENVIRONMENT = "production"`: both read Neon
 uncached on every hit. `/api/health` (no DB) stays public for uptime checks.
 
-### Crawlers on the API (Cloudflare dashboard, one-time)
+### Pages kept at the edge
 
-The API's `robots.txt` disallows everything, but Meta's `meta-webindexer` ignores it and calls API URLs
-directly; each call is a billed Worker request. Block crawlers before the Worker runs: `gorkemkaryol.dev`
-zone → Security → WAF → Custom rules → Create rule, action **Block**, expression:
+Workers Free stops a request at 10 ms of CPU, and a page rendered from scratch takes 15–100 ms, so pages only
+stay under it when they come from the edge cache (`apps/web/src/lib/pageCache.ts`, 2–9 ms). A page is kept 10
+minutes inside a write window, otherwise until the next window opens or 00:00 UTC, whichever is first (pages
+read today's date). The key is the URL plus the build id, never a cookie: the collapsed sidebar is applied in
+the browser by a head script in `BaseLayout.astro`. Unknown ids answer 404 and are kept too; a render that saw
+an API outage answers 503 (or shows its fallback) and is never kept. To show a manual Neon write before the hold
+ends, bump `SNAPSHOT_VERSION` on the API and redeploy the site.
+
+### Crawlers (Cloudflare WAF, one-time)
+
+The API's `robots.txt` disallows everything and the site's lists what it allows, but Meta's `meta-webindexer`
+ignores both: on 2026-11-17 it made ~11k site requests in a day, each a billed, uncached render. The zone's
+custom rule "F1: block crawlers that ignore robots.txt" (Security → WAF → Custom rules, action **Block**) stops
+them before any Worker runs:
 
 ```
-(http.host eq "f1-api.gorkemkaryol.dev" and (cf.client.bot or http.user_agent contains "meta-webindexer" or http.user_agent contains "meta-externalagent"))
+(http.host in {"f1.gorkemkaryol.dev" "f1-api.gorkemkaryol.dev"} and (http.user_agent contains "meta-webindexer"
+  or http.user_agent contains "meta-externalagent" or http.user_agent contains "DotBot" or … or ip.src eq 213.209.159.133))
+or (http.host eq "f1-api.gorkemkaryol.dev" and cf.client.bot)
 ```
 
-Nothing legitimate is a bot there: the site's server fetches send no crawler user agent, and browsers
-(search, compare) aren't verified bots.
+The `…` stands for the other SEO/AI crawlers in the live rule (Ahrefs, Semrush, MJ12, Petal, Bytespider, GPTBot,
+ClaudeBot, CCBot, Amazonbot, Perplexity, DataForSeo, BLEX). Search engines and link-preview bots
+(`facebookexternalhit`, Slack, Discord…) still reach the site; nothing legitimate is a bot on the API. The Free
+plan allows five custom rules and the zone uses all but one, so extend this rule rather than adding another.
 
 ### Rate limiting (Cloudflare dashboard, one-time)
 

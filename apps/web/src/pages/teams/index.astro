@@ -10,6 +10,7 @@ import TeamStandingsTable from '@/features/standings/components/TeamStandingsTab
 import ConstructorTitleOdds from '@/features/standings/components/ConstructorTitleOdds.astro';
 import PitCrewRankingTable from '@/features/teams/components/PitCrewRankingTable.astro';
 import { resolveTab, seasonTabHref } from '@/lib/pageTabs';
+import { missingPageStatus } from '@/lib/renderHealth';
 
 const TABS = [
   { id: 'standings', label: 'Standings' },
@@ -37,6 +38,7 @@ try {
 } catch (e) {
   error = e instanceof Error ? e.message : 'Failed to load standings';
 }
+Astro.response.status = missingPageStatus(!error);
 ---
 
 <BaseLayout title={`${year} Constructor Standings`}>

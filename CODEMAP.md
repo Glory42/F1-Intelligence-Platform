@@ -362,7 +362,7 @@ apps/web/
 │   │       ├── index.astro        # Tabs: Standings · Title odds · Pit crews
 │   │       └── [id].astro         # Team profile: tabs This season · Pit crew · History
 │   ├── layouts/
-│   │   └── BaseLayout.astro       # Shared layout: Sidebar + MobileNav, slot, Footer, GlobalSearch; reads the sidebar cookie; localiseTimes() on astro:page-load
+│   │   └── BaseLayout.astro       # Shared layout: Sidebar + MobileNav, slot, Footer, GlobalSearch; applies the sidebar cookie in a head script (pages are cached cookie-free); localiseTimes() on astro:page-load
 │   ├── components/                # Generic, cross-feature only: domain UI lives in features/
 │   │   ├── layout/
 │   │   │   ├── Sidebar.astro      # Desktop collapsible sidebar: search, Season/Explore groups, docs, collapse toggle
@@ -556,15 +556,19 @@ apps/web/
 │   │   ├── site.ts                # SITE_NAME: the brand string
 │   │   ├── pageTabs.ts            # resolveTab() + tabHref() + seasonTabHref(): ?tab= link tabs that keep other params
 │   │   ├── careerYear.ts          # resolveCareerYear(): requested year → current year → latest active season
-│   │   ├── sidebarState.ts        # Sidebar collapse cookie: isSidebarCollapsed() + sidebarCookie()
+│   │   ├── sidebarState.ts        # Sidebar collapse cookie: sidebarCookie() + SIDEBAR_COLLAPSED_PAIR (read by BaseLayout's head script)
+│   │   ├── pageHold.ts            # pageHoldSeconds(): how long a page/API answer is kept (mirrors the API's write windows, capped at 00:00 UTC)
+│   │   ├── renderHealth.ts        # AsyncLocalStorage per render: marks API outages so the page isn't cached; missingPageStatus() → 200/404/503
+│   │   ├── apiFailure.ts          # reportApiFailure() hook: api.ts reports, the server's renderHealth listens (api.ts also runs in islands)
+│   │   ├── buildId.ts             # BUILD_ID (astro.config define): part of every edge-cache key, so a deploy starts fresh
 │   │   ├── legacyRedirects.ts     # legacyRedirect(path, search): retired URLs (prediction recap, /records, /drivers|teams/compare) → their new home
 │   │   ├── canonicalHost.ts       # canonicalHostRedirect(): the production *.pages.dev address → 301 to the custom domain (previews stay)
 │   │   ├── icalendar.ts           # serializeCalendar() + foldLine(): RFC 5545 (CRLF, 75-octet folding, TEXT escaping)
 │   │   ├── localTime.ts           # formatUtc() / formatLocal() / localiseTimes(): the session/datetime/date formats LocalTime renders
 │   │   ├── sitemap.ts             # loadSitemapSources(year) + sitemapPaths() + renderUrlset(): the dynamic sitemap
 │   │   ├── shareImage.ts          # shareImageKey/Url(), raceShareImage(), predictionShareImage(), race/predictionShareCard(): shared with apps/og (ADR 0016)
-│   │   ├── apiCache.ts            # fetchApiCached(): API answers kept in the site's edge Cache API (API max-age, capped at the page lifetime): each site→API fetch is a billed Worker request
-│   │   ├── pageCache.ts           # servePageCached(): rendered HTML (and the XML/calendar feeds) kept in the edge Cache API (5 min Fri–Mon noon UTC, 1 h between), keyed by path + sorted page params + sidebar cookie (Workers Free: 10 ms CPU)
+│   │   ├── apiCache.ts            # fetchApiCached(): API answers kept in the site's edge Cache API (held as long as a page; the API's shorter max-age wins inside a write window): each site→API fetch is a billed Worker request
+│   │   ├── pageCache.ts           # servePageCached(): rendered HTML (and the XML/calendar feeds) kept in the edge Cache API for pageHold.ts's hold (10 min in a write window, else until the next one or 00:00 UTC), keyed by path + sorted page params + build id; 200/404 kept, degraded renders never (Workers Free: 10 ms CPU)
 │   │   ├── pageQuery.ts           # PAGE_QUERY_PARAMS (every ?param a page reads) + strayQueryRedirect(): unknown params 301 away
 │   │   ├── securityHeaders.ts     # securityHeaders(apiOrigin) + withSecurityHeaders(): HSTS, nosniff, frame/CSP (script sources report-only)
 │   │   ├── utils.ts               # cn() (clsx + tailwind-merge), unwrapSettled(), formatMs/Probability/Date/StopSeconds/AgeFromDays
@@ -676,7 +680,7 @@ apps/web/
 | `lib/f1/championshipMath.ts` | Title contention (who is mathematically out given remaining GPs + sprints and the era's points) and title-odds formatting. |
 | `components/data/chartScale.ts` / `labelLayout.ts` | Scale + tick + label-spreading primitives behind the plain-SVG `LineChart` and `StintChart` (no chart library). |
 | `lib/pageTabs.ts` | `resolveTab(url, tabs)` picks the open `?tab=` (first tab when absent/unknown); `tabHref()` builds a tab link that keeps `year` etc. and drops `tab` for the default. Pages fetch only the open tab's data. |
-| `lib/sidebarState.ts` | Reads/writes the `sidebar` cookie: a cookie (not localStorage) so `BaseLayout` renders the right width server-side and the layout never jumps. |
+| `lib/sidebarState.ts` | Writes the `sidebar` cookie: a cookie (not localStorage) so `BaseLayout`'s head script applies the width before first paint, while the server renders one cookie-free copy for the edge cache. |
 | `lib/utils.ts` | `cn()`: combines `clsx` and `tailwind-merge` for conditional class names. `unwrapSettled(result, fallback)`: one-line `PromiseSettledResult` unwrap, used wherever a page fans out `Promise.allSettled()` calls. Plus `format*` display helpers. |
 | `features/history/historyView.ts` | Pure view logic for the History page: leaderboard bar widths, chase summaries, month-day stepping for On this day, lineage timeline spans and family totals; unit-tested directly. |
 | `features/compare/compareReducer.ts` | Pure `compareReducer(state, action, config)`: every hydrate/year-change/selection/mode transition and stale-fetch-response guard, as one reducer with no React dependency; unit-tested directly. |

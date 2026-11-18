@@ -3,9 +3,11 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import { buildPredictionPageData } from '@/features/predictions/buildPredictionPageData';
 import { PREDICTION_COPY } from '@/features/predictions/predictionCopy';
 import PredictionPageBody from '@/features/predictions/components/PredictionPageBody.astro';
+import { missingPageStatus } from '@/lib/renderHealth';
 
 const { id } = Astro.params;
 const data = await buildPredictionPageData('sprint', Number(id));
+Astro.response.status = missingPageStatus(data.race !== null);
 const copy = PREDICTION_COPY.sprint;
 const title = data.race ? copy.pageTitle(data.race.name) : copy.fallbackTitle;
 ---

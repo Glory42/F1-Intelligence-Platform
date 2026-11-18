@@ -61,7 +61,7 @@ The schema source of truth lives in `apps/api/src/db/schema/`. Generated SQL mig
 
 **Cloudflare Workers have no TCP.** The `apps/api/` layer must use `@neondatabase/serverless` (HTTP driver). Never use `pg` or `postgres` packages there.
 
-**Python writes directly to Neon.** The API is read-only. There are no write endpoints: the ETL engine connects directly via psycopg2. Fresh data reaches the site once the edge cache's `max-age` lapses (10 min on race weekends, 1 h between).
+**Python writes directly to Neon.** The API is read-only. There are no write endpoints: the ETL engine connects directly via psycopg2. Fresh data reaches the site once the edge caches lapse: 10 min inside a write window; between windows the data can't change, so pages hold until the next window or 00:00 UTC.
 
 **All data fetching in Astro frontmatter.** No client-side data fetching, no React/Vue islands for data. The `---` blocks handle everything server-side. The only exceptions are `GlobalSearch`, `DriverCompareTool` and `TeamCompareTool`, whose data depends on arbitrary user input (see [Frontend](./frontend.md)).
 

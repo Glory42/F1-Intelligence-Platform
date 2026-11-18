@@ -50,18 +50,24 @@ describe('API response cache', () => {
     expect(await first.json()).toEqual({ data: 1, error: null });
   });
 
-  it('holds an answer no longer than a page is held', async () => {
-    await fetchApiCached(URL_SEASONS, cache, api(), TUESDAY);
-    await fetchApiCached(`${URL_SEASONS}?w`, cache, api(), SATURDAY);
+  const storedFor = () => [...cache.entries.values()][0]?.headers.get('Cache-Control');
 
-    expect(cache.entries.get(URL_SEASONS)?.headers.get('Cache-Control')).toBe('public, max-age=3600');
-    expect(cache.entries.get(`${URL_SEASONS}?w`)?.headers.get('Cache-Control')).toBe('public, max-age=300');
-  });
-
-  it("keeps the API's shorter max-age", async () => {
+  it('holds an answer as long as a page between write windows, whatever its max-age', async () => {
     await fetchApiCached(URL_SEASONS, cache, api('public, max-age=600'), TUESDAY);
 
-    expect(cache.entries.get(URL_SEASONS)?.headers.get('Cache-Control')).toBe('public, max-age=600');
+    expect(storedFor()).toBe('public, max-age=43200');
+  });
+
+  it('holds an answer no longer than a page inside a write window', async () => {
+    await fetchApiCached(URL_SEASONS, cache, api(), SATURDAY);
+
+    expect(storedFor()).toBe('public, max-age=600');
+  });
+
+  it("keeps the API's shorter max-age inside a write window", async () => {
+    await fetchApiCached(URL_SEASONS, cache, api('public, max-age=300'), SATURDAY);
+
+    expect(storedFor()).toBe('public, max-age=300');
   });
 
   it.each([

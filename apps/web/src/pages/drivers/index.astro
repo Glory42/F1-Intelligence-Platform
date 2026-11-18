@@ -10,6 +10,7 @@ import DriverStandingsTable from '@/features/standings/components/DriverStanding
 import TitleFight from '@/features/standings/components/TitleFight.astro';
 import RacecraftTable from '@/features/standings/components/RacecraftTable.astro';
 import { resolveTab, seasonTabHref } from '@/lib/pageTabs';
+import { missingPageStatus } from '@/lib/renderHealth';
 
 const TABS = [
   { id: 'standings', label: 'Standings' },
@@ -37,6 +38,7 @@ try {
 } catch (e) {
   error = e instanceof Error ? e.message : 'Failed to load standings';
 }
+Astro.response.status = missingPageStatus(!error);
 ---
 
 <BaseLayout title={`${year} Driver Standings`}>

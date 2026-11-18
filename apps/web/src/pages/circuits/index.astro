@@ -7,6 +7,7 @@ import PageHeader from '@/components/page/PageHeader.astro';
 import PageTabs from '@/components/page/PageTabs.astro';
 import EmptyState from '@/components/page/EmptyState.astro';
 import { resolveTab } from '@/lib/pageTabs';
+import { missingPageStatus } from '@/lib/renderHealth';
 
 const TABS = [
   { id: 'season', label: 'This season' },
@@ -27,6 +28,7 @@ try {
 } catch (e) {
   error = e instanceof Error ? e.message : 'Failed to load circuits';
 }
+Astro.response.status = missingPageStatus(!error);
 
 const seasonCircuitIds = new Set(seasonRaces.map((r) => r.circuit.id));
 const shown = tab === 'season' ? circuits.filter((c) => seasonCircuitIds.has(c.id)) : circuits;

@@ -11,6 +11,7 @@ import { api } from '@/lib/api';
 import { getTeamColor } from '@/lib/f1/teamColors';
 import { unwrapSettled } from '@/lib/utils';
 import type { RaceSession } from '@/types';
+import { missingPageStatus } from '@/lib/renderHealth';
 
 const { id } = Astro.params;
 const session: RaceSession = Astro.url.searchParams.get('session') === 'sprint' ? 'sprint' : 'race';
@@ -24,6 +25,7 @@ const [raceResult, storyResult] = await Promise.allSettled([
 ]);
 const race = unwrapSettled(raceResult, null)?.race ?? null;
 const story = unwrapSettled(storyResult, null);
+Astro.response.status = missingPageStatus(race !== null);
 const drivers = story?.drivers ?? [];
 const shown = drivers.slice(0, CHART_DRIVERS);
 const year = race ? new Date(race.raceDate).getFullYear() : new Date().getFullYear();

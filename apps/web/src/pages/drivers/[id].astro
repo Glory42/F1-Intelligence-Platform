@@ -12,11 +12,13 @@ import PageTabs from '@/components/page/PageTabs.astro';
 import EmptyState from '@/components/page/EmptyState.astro';
 import { getTeamColor } from '@/lib/f1/teamColors';
 import { DRIVER_TABS, loadDriverPageData } from '@/features/drivers/loadDriverPageData';
+import { missingPageStatus } from '@/lib/renderHealth';
 
 const {
   tab, year, yearLinks, error, career, detail: data, headshotUrl, titles, nationalityFlag,
   teammateBattle, driverHistory, predictionRecord,
 } = await loadDriverPageData(Astro.url, Number(Astro.params.id));
+Astro.response.status = missingPageStatus(!error);
 const driver = data?.driver;
 ---
 

@@ -14,12 +14,14 @@ import RaceEventPanels from '@/features/races/components/RaceEventPanels.astro';
 import CircuitStatsGrid from '@/features/races/components/CircuitStatsGrid.astro';
 import { loadRacePageData } from '@/features/races/loadRacePageData';
 import { GP_ACCENT } from '@/features/predictions/types';
+import { missingPageStatus } from '@/lib/renderHealth';
 
 const {
   error, race, results, qualifying, laps, longRuns, drops, driverMap, events, eventTabs, raceYear, prediction, podium, confidence,
   predCorrect, actualWinnerName, isDone, status, sessionDate, countdownTo, conditions, fastestLap, yearItems, links,
   tabs, defaultTab,
 } = await loadRacePageData('gp', Number(Astro.params.id));
+Astro.response.status = missingPageStatus(!error);
 ---
 
 <BaseLayout title={race?.name ?? 'Race'} image={raceShareImage(race)}>

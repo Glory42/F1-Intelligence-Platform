@@ -9,6 +9,7 @@ import CalendarSubscribe from '@/features/races/components/CalendarSubscribe.ast
 import {
   calendarEntries, calendarQuery, calendarSummary, parseCalendarFilter, parseCalendarSort, type CalendarFilter,
 } from '@/features/races/calendar';
+import { missingPageStatus } from '@/lib/renderHealth';
 
 const year = Number(Astro.url.searchParams.get('year') ?? new Date().getFullYear());
 const filter = parseCalendarFilter(Astro.url.searchParams.get('filter'));
@@ -22,6 +23,7 @@ try {
 } catch (e) {
   error = e instanceof Error ? e.message : 'Failed to load races';
 }
+Astro.response.status = missingPageStatus(!error);
 
 const completed = races.filter((r) => r.status === 'completed');
 const upcoming = races.filter((r) => r.status !== 'completed');
