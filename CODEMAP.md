@@ -1008,6 +1008,7 @@ data-engine/
 | File | Content |
 |------|---------|
 | `architecture.md` | Monorepo layout, ASCII system diagram, data flow through a race weekend |
+| `data-sources.md` | Each source (OpenF1, Jolpica, F1DB, FastF1, Open-Meteo), what each era has, credits |
 | `data-pipeline.md` | Job descriptions, required chain order, worker schedule, local commands, backfill, idempotency |
 | `database-schema.md` | Every table with all columns, types, and notes; ER-style relationship diagram |
 | `prediction-model.md` | GP `weighted-v4` (fitted, 7 features), sprint `sprint-v3` (the same weights on the sprint grid), podium chance, softmax, backtests, data availability by era |
