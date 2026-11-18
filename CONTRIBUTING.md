@@ -34,6 +34,8 @@ Then point `apps/api/.dev.vars` at the snapshot: `DATABASE_URL=postgres://f1:f1@
 and `NEON_FETCH_ENDPOINT=http://localhost:4446/sql`. Schema changes: `bun run db:generate` +
 `bun run db:migrate` in `apps/api/` (the DB is migrate-tracked: not `db:push`).
 
+Run both apps with `bun run dev` from the repo root: the API on `:8787`, the site on `:4321`.
+
 ## Before Pushing
 
 A husky pre-commit hook (`lint-staged.config.mjs`) runs `typecheck` + `lint` for whichever of
@@ -97,6 +99,9 @@ Scopes: `web`, `api`, `db`, `etl`, `navbar`, `prediction`, `races`, `drivers`, `
 - [`apps/api/README.md`](apps/api/README.md): API setup, routes, and migration workflow
 - [`apps/web/README.md`](apps/web/README.md): frontend setup and pages
 - [`data-engine/README.md`](data-engine/README.md): ETL jobs and worker schedule
+- [`docs/data-sources.md`](docs/data-sources.md): where the data comes from and what each era has
+- [`docs/data-pipeline.md`](docs/data-pipeline.md): every job, backfill and the race-weekend schedule
+- [`docs/deployment.md`](docs/deployment.md): hosting, environment variables and free-tier limits
 
 ## Community
 
