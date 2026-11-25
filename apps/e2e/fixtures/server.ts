@@ -13,7 +13,7 @@ import {
 
 const PORT = Number(process.env.FIXTURE_API_PORT ?? 4310);
 
-// GlobalSearch/DriverCompareTool/TeamCompareTool fetch client-side (see CLAUDE.md), a real
+// GlobalSearch/DriverCompareTool/TeamCompareTool fetch client-side (see AGENTS.md), a real
 // cross-origin request to this fixture server, so it needs CORS like the real API does.
 const CORS_HEADERS = { 'Access-Control-Allow-Origin': '*' };
 

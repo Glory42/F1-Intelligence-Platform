@@ -5,7 +5,7 @@ description: Audits code for performance issues, N+1 queries in Hono services, p
 
 # Performance Check: F1 Intelligence Platform
 
-Audits code against the constraints in `CLAUDE.md`: the Neon HTTP driver, the "No N+1 queries" rule, ETL idempotency, and the free-tier budgets (§6: Neon compute/egress, Render 512 MB, OpenF1 request budget). This skill finds violations; it does not fix them unless the user explicitly asks.
+Audits code against the constraints in `AGENTS.md`: the Neon HTTP driver, the "No N+1 queries" rule, ETL idempotency, and the free-tier budgets (§6: Neon compute/egress, Render 512 MB, OpenF1 request budget). This skill finds violations; it does not fix them unless the user explicitly asks.
 
 ## Scope
 
@@ -22,7 +22,7 @@ If the diff is small (a handful of files), just read them directly instead of sp
 Work through each area that applies to the files in scope. Skip areas with no relevant files (e.g. skip Python loop checks if no `data-engine/` file changed).
 
 ### 1. N+1 queries in Hono services
-Grep changed `*.service.ts` files for `.map(async` or `for (...)` loops that issue a query per iteration (`await db.select()...` inside a loop body). CLAUDE.md's API section states this explicitly: "No N+1 queries, all queries use Drizzle joins. Never fetch a list then loop-query for each item."
+Grep changed `*.service.ts` files for `.map(async` or `for (...)` loops that issue a query per iteration (`await db.select()...` inside a loop body). AGENTS.md's API section states this explicitly: "No N+1 queries, all queries use Drizzle joins. Never fetch a list then loop-query for each item."
 - Good reference pattern: `predictions.service.ts` `scorecardItems()` fetches the prediction rows, collects their race ids, batch-fetches winners and probabilities with `inArray(...)`, and `prediction-history.helpers.ts` (`buildProbPosMaps`, `buildWinnerMap`) builds `Map`s keyed by `${raceId}:${driverId}` for a synchronous assembly pass. `findIntelStandings()` does the same: one `inArray` feature query, aggregated per person in `intel-standings.helpers.ts`.
 - Fix: collect ids, batch-fetch with `inArray()`, build a `Map`, then assemble synchronously.
 
@@ -31,17 +31,17 @@ Read changed service files for consecutive `await` statements where the second c
 - Reference: `predictions.service.ts` `findHistory()` runs the GP and sprint scorecards in one `Promise.all`, and each `scorecardItems()` runs its winner and probability lookups in another. `getModelInfo()` does the same for GP vs sprint model version.
 
 ### 3. Astro frontmatter fetch waterfalls
-CLAUDE.md requires all data fetching happen server-side in Astro frontmatter (`---` blocks), and pages with tabs or fallbacks fetch through a page-data loader (`apps/web/src/features/<area>/load*PageData.ts`). Within a page's frontmatter or its loader, check for sequential `await api.getX()` calls where the second call doesn't use the first call's result (e.g. doesn't need an id from the first response). These should be `Promise.all([...])` / `Promise.allSettled([...])`. Also check each `?tab=` fetches only its own data, not every tab's.
+AGENTS.md requires all data fetching happen server-side in Astro frontmatter (`---` blocks), and pages with tabs or fallbacks fetch through a page-data loader (`apps/web/src/features/<area>/load*PageData.ts`). Within a page's frontmatter or its loader, check for sequential `await api.getX()` calls where the second call doesn't use the first call's result (e.g. doesn't need an id from the first response). These should be `Promise.all([...])` / `Promise.allSettled([...])`. Also check each `?tab=` fetches only its own data, not every tab's.
 - Check the data-heavy loaders and pages: `features/races/loadRacePageData.ts` (+ `loadRaceEvents.ts`), `features/predictions/buildPredictionPageData.ts`, `features/drivers/loadDriverPageData.ts`, `features/teams/loadTeamPageData.ts`, `features/history/loadHistoryPageData.ts`, and `pages/circuits/[key].astro` (fetches inline).
 - Fix: `const [a, b, c] = await Promise.allSettled([api.getA(), api.getB(), api.getC()]);`
 
 ### 4. Unbounded / unpaginated list endpoints
-For any new or changed service method returning an array (race lists, driver career stats, prediction history): check whether it's tied to unbounded growth (history across seasons, lap times). CLAUDE.md doesn't mandate pagination everywhere, but flag any new endpoint returning raw `lap_times` or `sprint_lap_times` rows without a `race_id`/`driver_id` filter: these tables grow every race weekend, and every byte counts against Neon's 5 GB/mo egress.
+For any new or changed service method returning an array (race lists, driver career stats, prediction history): check whether it's tied to unbounded growth (history across seasons, lap times). AGENTS.md doesn't mandate pagination everywhere, but flag any new endpoint returning raw `lap_times` or `sprint_lap_times` rows without a `race_id`/`driver_id` filter: these tables grow every race weekend, and every byte counts against Neon's 5 GB/mo egress.
 - Heavy routes must set `Cache-Control` through `apps/api/src/common/cache.ts` (`cacheControlForStatus`, `cacheIfData`...) so `edgeCache()` serves repeats: flag a new heavy route that skips it, since every uncached hit wakes Neon.
 
 ### 5. Missing DB indexes
 For any new or changed table in `apps/api/src/db/schema/`: does every column used in a `.where(eq(...))` / `inArray(...)` filter or join elsewhere in the codebase have an index? Check the corresponding migration in `apps/api/drizzle/migrations/` for `CREATE INDEX`.
-- Natural-key uniqueness (`UNIQUE(race_id, driver_id)`) is already required by CLAUDE.md's schema conventions: confirm it's present, not just an index.
+- Natural-key uniqueness (`UNIQUE(race_id, driver_id)`) is already required by AGENTS.md's schema conventions: confirm it's present, not just an index.
 - After adding an index, confirm a migration file exists in `apps/api/drizzle/migrations/`: schema changes without a matching migration are drift, not just a perf gap (see `codebase-audit` for the drift check itself).
 
 ### 6. Per-row query loops in ETL jobs (data-engine/)

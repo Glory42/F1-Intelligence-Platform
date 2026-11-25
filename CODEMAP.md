@@ -6,7 +6,8 @@ Complete directory structure and file reference for the codebase.
 
 ```
 f1-intelligence/
-├── CLAUDE.md              # Agent guidelines, constraints, and project conventions
+├── AGENTS.md              # Agent guidelines, constraints, and project conventions (canonical: every agent reads it)
+├── CLAUDE.md              # Claude Code entry point: imports AGENTS.md
 ├── CODEMAP.md             # This file: codebase structure reference
 ├── CONTRIBUTING.md        # Contribution guidelines
 ├── CODE_OF_CONDUCT.md     # Contributor Covenant 2.1
@@ -32,7 +33,8 @@ f1-intelligence/
 │   ├── web/               # Astro SSR frontend: Cloudflare Pages
 │   └── e2e/               # Playwright smoke tests for apps/web: own package.json + playwright.config.ts
 ├── data-engine/           # Python ETL batch jobs: Render (outside apps/: no dev server, one-shot jobs)
-└── .claude/skills/        # Claude Code skill definitions (see Claude Skills section below)
+├── .agents/skills/        # Codex's skill location: byte-identical copies of .claude/skills/ (CI diff)
+└── .claude/skills/        # Edit source for the skills, one folder each (see Agent Skills section below)
 ```
 
 ---
@@ -320,7 +322,7 @@ A module with a second query area adds another `*.service.ts` beside the first (
 ## Frontend (`apps/web/`)
 
 Astro SSR with Cloudflare adapter. All data fetching is server-side in Astro frontmatter: the only client-side
-fetches are `GlobalSearch`, `DriverCompareTool`, `TeamCompareTool` (see CLAUDE.md §3).
+fetches are `GlobalSearch`, `DriverCompareTool`, `TeamCompareTool` (see AGENTS.md §3).
 
 ```
 apps/web/
@@ -1029,7 +1031,10 @@ data-engine/
 
 ---
 
-## Claude Skills (`.claude/skills/`)
+## Agent Skills (`.agents/skills/`, `.claude/skills/`)
+
+One skill per folder (`SKILL.md`); `.agents/skills/` is a byte-identical copy of `.claude/skills/` for Codex.
+Edit `.claude/skills/`, then `cp -a .claude/skills/. .agents/skills/`: CI runs `diff -r` and fails on drift.
 
 | Skill | Purpose |
 |-------|---------|
@@ -1037,6 +1042,6 @@ data-engine/
 | `build/` | Build verification runbook |
 | `backfill/` | Historical backfill runbook and checklist |
 | `performance-check/` | Audits N+1 queries, sequential awaits, per-row ETL loops, missing indexes |
-| `codebase-audit/` | Health check against CLAUDE.md critical constraints, schema drift, `any` types |
+| `codebase-audit/` | Health check against AGENTS.md critical constraints, schema drift, `any` types |
 | `refactor-hunt/` | Finds duplication, especially GP/sprint pipeline drift |
 | `codebase-cleanup/` | Removes dead code, unused imports, orphaned migrations |

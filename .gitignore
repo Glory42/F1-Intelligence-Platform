@@ -39,6 +39,7 @@ ENV/
 dist/
 build/
 !.claude/skills/build/
+!.agents/skills/build/
 .eggs/
 
 # FastF1 cache
