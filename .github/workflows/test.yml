@@ -63,3 +63,12 @@ jobs:
         working-directory: apps/e2e
       - run: bun run test
         working-directory: apps/e2e
+
+  agent-skills:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v5
+      # Codex reads .agents/skills, Claude Code/opencode read .claude/skills. They are copies, not
+      # symlinks, so Windows checkouts keep both trees: this catches the copies drifting apart.
+      - run: diff -r .claude/skills .agents/skills

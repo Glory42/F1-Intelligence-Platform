@@ -54,13 +54,13 @@ Flag clusters of 3+ consecutive commented lines. Distinguish dead code (old impl
 
 ### 7. console.log / debug print statements
 
-CLAUDE.md: "No console.log in production code, use structured logging patterns."
+AGENTS.md: "No console.log in production code, use structured logging patterns."
 ```bash
 grep -rn "console\.log" apps/api/src apps/web/src --include="*.ts" --include="*.tsx"
 ```
 `console.error` inside `app.onError` (`apps/api/src/main.ts`) is the documented error-handling path: keep it. Flag any other `console.log`/`console.warn` left from debugging. `apps/api/src/db/seed.ts` and `apps/api/src/db/migrate.ts` use `console.log` for progress output: they're standalone scripts run manually, not production request-path code, so they're fine; don't flag them.
 
-For Python, bare `print()` calls are the existing convention for job progress (`print(f"[compute_features] race_id={race_id}")`: see every job's `run()` entry). Only flag `print()` used in place of the structured-logging failure path CLAUDE.md requires on error, not progress prints.
+For Python, bare `print()` calls are the existing convention for job progress (`print(f"[compute_features] race_id={race_id}")`: see every job's `run()` entry). Only flag `print()` used in place of the structured-logging failure path AGENTS.md requires on error, not progress prints.
 
 ### 8. Stale feature flags / always-false branches
 ```bash

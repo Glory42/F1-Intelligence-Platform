@@ -92,9 +92,16 @@ Scopes: `web`, `api`, `db`, `etl`, `navbar`, `prediction`, `races`, `drivers`, `
 - **Stay inside the free tiers**: local dev and tests never touch Neon, no Workers KV, heavy routes cached
   (see `docs/plans/intelligence-platform-roadmap.md` §1–§2)
 
+## Working with coding agents
+
+- [`AGENTS.md`](AGENTS.md): the guide every coding agent follows: architecture, constraints and conventions
+  (Codex, opencode and others read it directly; Claude Code reads the same file through `CLAUDE.md`'s import)
+- Agent skills (`commit`, `build`, `backfill`, `codebase-audit`, `codebase-cleanup`, `performance-check`,
+  `refactor-hunt`) live in [`.claude/skills/`](.claude/skills), mirrored byte-for-byte into `.agents/skills/`
+  for Codex; CI's `diff -r` fails if the two drift
+
 ## Project Docs
 
-- [`CLAUDE.md`](CLAUDE.md): full architecture reference and constraints
 - [`CODEMAP.md`](CODEMAP.md): full file-level reference map
 - [`apps/api/README.md`](apps/api/README.md): API setup, routes, and migration workflow
 - [`apps/web/README.md`](apps/web/README.md): frontend setup and pages

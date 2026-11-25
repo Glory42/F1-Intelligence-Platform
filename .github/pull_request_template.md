@@ -26,4 +26,4 @@
 - [ ] No TCP drivers in `apps/api`; web data fetching stays in Astro frontmatter
 - [ ] Schema changes come with a generated migration (`bun run db:generate`)
 - [ ] Model changes validated with `scripts/backtest.py` before refitting, and `feature-manifest.ts` mirrors `docs/feature-weights.json`
-- [ ] Docs updated (`CLAUDE.md`, `docs/`, READMEs) where behaviour or routes changed
+- [ ] Docs updated (`AGENTS.md`, `docs/`, READMEs) where behaviour or routes changed
